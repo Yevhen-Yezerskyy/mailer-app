@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.pycache/
+
+# Virtualenv
+venv/
+env/
+.venv/
+
+# Django
+*.sqlite3
+media/
+staticfiles/
+static/
+
+# VS Code / PyCharm
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+log/
+logs/
+
+# Docker
+*.pid
+*.tar
+docker-data/
+db-data/
+*.sock
+
+# Env files
+.env
+.env.*
+!env.example
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Scrapy cache (если будет в engine)
+.scrapy/
+
+# Temporary
+tmp/
+temp/
