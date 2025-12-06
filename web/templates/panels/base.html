@@ -1,0 +1,73 @@
+<!-- FILE: web/templates/panels/base.html -->
+
+{% load static %}
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <title>{% block title %}Serenity Mailer — Панель{% endblock %}</title>
+
+    <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="{% static 'css/panel.css' %}">
+  </head>
+  <body>
+    <div class="panel-layout">
+      <!-- ЛЕВАЯ КОЛОНКА -->
+      <aside class="panel-sidebar">
+        <div class="panel-logo">
+          <a href="{% url 'landing' %}" class="panel-logo-link">
+            <img src="{% static 'img/logo.main.svg' %}" class="panel-logo-img" alt="Serenity Mailer">
+          </a>
+        </div>
+
+        <nav class="panel-sidebar-menu">
+          {% block sidebar_menu %}
+            <a href="{% url 'dashboard' %}" class="panel-menu-item panel-menu-item-active">
+              Dashboard
+            </a>
+          {% endblock %}
+        </nav>
+
+        <div class="panel-sidebar-user">
+          {% if request.user.is_authenticated %}
+            <span class="panel-sidebar-user-label">Пользователь:</span>
+            <span class="panel-sidebar-user-name">{{ request.user.username }}</span>
+          {% endif %}
+        </div>
+      </aside>
+
+      <!-- ПРАВАЯ ЧАСТЬ -->
+      <main class="panel-main">
+        <header class="panel-topbar">
+          <nav class="panel-topbar-nav">
+            <div class="panel-topbar-nav-left">
+              <a href="#" class="panel-topbar-link">Пункт 1</a>
+              <a href="#" class="panel-topbar-link">Пункт 2</a>
+              <a href="#" class="panel-topbar-link">Пункт 3</a>
+              <a href="#" class="panel-topbar-link">Пункт 4</a>
+              <a href="#" class="panel-topbar-link">Пункт 5</a>
+              <a href="#" class="panel-topbar-link">Настройки</a>
+            </div>
+            <div class="panel-topbar-nav-right">
+              <a href="{% url 'dashboard' %}" class="panel-topbar-link panel-topbar-link-main">
+                Дашборд
+              </a>
+              <a href="{% url 'logout' %}" class="panel-topbar-link panel-topbar-link-danger">
+                Выйти
+              </a>
+            </div>
+          </nav>
+        </header>
+
+        <section class="panel-content">
+          {% block content %}{% endblock %}
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

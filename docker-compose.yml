@@ -1,0 +1,55 @@
+
+services:
+  # ------------ POSTGRES ------------
+  mailer-db:
+    image: postgres:16
+    container_name: mailer-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mailersys
+      POSTGRES_USER: mailersys_user
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - mailer-db-data:/var/lib/postgresql/data
+    # наружу даём НЕ стандартный порт, чтобы не пересечься с другим postgres
+    ports:
+      - "5433:5432"
+    networks:
+      - webnet
+
+  # ------------ DJANGO (DEV) ------------
+  mailer-web:
+    image: python:3.12
+    container_name: mailer-web
+    working_dir: /app
+    restart: unless-stopped
+    user: "1001:1001"
+    depends_on:
+      - mailer-db
+    environment:
+      DB_HOST: mailer-db
+      DB_PORT: 5432
+      DB_NAME: mailersys
+      DB_USER: mailersys_user
+      DB_PASSWORD: secret
+    volumes:
+      - ./web:/app         
+      - mailer-static:/app/staticfiles
+    ports:
+      - "8000:8000"        # http://твой-сервер:8000
+    # ничего не запускаем, просто держим контейнер живым
+    command:  >  
+      /app/.venv/bin/gunicorn mailer_web.wsgi:application
+      --bind 0.0.0.0:8000
+      --reload
+      --workers 1
+    networks:
+      - webnet
+
+volumes:
+  mailer-db-data:
+  mailer-static:
+
+networks:
+  webnet:
+    external: true

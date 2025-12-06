@@ -1,0 +1,18 @@
+{% extends "base_start.html" %}
+{% block title %}Вход – Serenity Mailer{% endblock %}
+
+{% block content %}
+  <section class="form-card">
+    <h2>Вход</h2>
+
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button type="submit" class="btn btn-primary">Войти</button>
+    </form>
+
+    <p class="form-help">
+      Нет аккаунта? <a href="{% url 'register' %}">Зарегистрироваться</a>
+    </p>
+  </section>
+{% endblock %}
