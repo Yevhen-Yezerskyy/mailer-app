@@ -9,13 +9,148 @@
 
 {% block content %}
 <div class="panel-page">
-  <h1 class="panel-title">Mail Servers</h1>
-  <p class="panel-subtitle">SMTP, IMAP, имя отправителя и обратный адрес.</p>
+  <h1 class="panel-title">Почтовые сервера</h1>
+  <p class="panel-subtitle">Настройка SMTP и IMAP-подключений для отправки и чтения писем.</p>
 
   <div class="panel-card">
-    <div class="panel-placeholder-line w-40"></div>
-    <div class="panel-placeholder-line w-56"></div>
-    <div class="panel-placeholder-line w-32"></div>
+    <h2 class="panel-card-title">Текущие подключения</h2>
+
+    {% if connections %}
+      <table class="panel-table">
+        <thead>
+          <tr>
+            <th>Название</th>
+            <th>От кого</th>
+            <th>Статус</th>
+            <th>SMTP</th>
+            <th>IMAP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for conn in connections %}
+            <tr>
+              <td>{{ conn.name }}</td>
+              <td>{{ conn.from_name }} &lt;{{ conn.from_email }}&gt;</td>
+              <td>{{ conn.status }}</td>
+              <td>{{ conn.smtp_status }}</td>
+              <td>{{ conn.imap_status }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>Пока нет ни одного почтового подключения.</p>
+    {% endif %}
+  </div>
+
+  <div class="panel-card">
+    <h2 class="panel-card-title">Добавить новое подключение</h2>
+
+    <form method="post" class="panel-form">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <!-- Общие поля -->
+      <div class="panel-form-group">
+        <div class="panel-form-row">
+          <label for="{{ form.name.id_for_label }}" class="panel-form-label">Name</label>
+          {{ form.name }}
+          {{ form.name.errors }}
+        </div>
+
+        <div class="panel-form-row">
+          <label for="{{ form.from_name.id_for_label }}" class="panel-form-label">From name</label>
+          {{ form.from_name }}
+          {{ form.from_name.errors }}
+        </div>
+
+        <div class="panel-form-row">
+          <label for="{{ form.from_email.id_for_label }}" class="panel-form-label">From email</label>
+          {{ form.from_email }}
+          {{ form.from_email.errors }}
+        </div>
+      </div>
+
+      <hr class="panel-separator" />
+
+      <!-- SMTP блок -->
+      <h3 class="panel-block-title">SMTP (отправка писем)</h3>
+
+      <div class="panel-form-group panel-two-columns">
+        <div class="panel-form-row">
+          <label for="{{ form.smtp_host.id_for_label }}" class="panel-form-label">SMTP хост</label>
+          {{ form.smtp_host }}
+          {{ form.smtp_host.errors }}
+        </div>
+
+        <div class="panel-form-row">
+          <label for="{{ form.smtp_port.id_for_label }}" class="panel-form-label">SMTP порт</label>
+          {{ form.smtp_port }}
+          {{ form.smtp_port.errors }}
+        </div>
+
+        <div class="panel-form-row">
+          <label for="{{ form.smtp_encryption.id_for_label }}" class="panel-form-label">SMTP шифрование</label>
+          {{ form.smtp_encryption }}
+          {{ form.smtp_encryption.errors }}
+        </div>
+
+        <div class="panel-form-row">
+          <label for="{{ form.smtp_username.id_for_label }}" class="panel-form-label">SMTP логин</label>
+          {{ form.smtp_username }}
+          {{ form.smtp_username.errors }}
+        </div>
+
+        <div class="panel-form-row panel-span-2">
+          <label for="{{ form.smtp_password.id_for_label }}" class="panel-form-label">SMTP пароль</label>
+          {{ form.smtp_password }}
+          {{ form.smtp_password.errors }}
+        </div>
+      </div>
+
+      <hr class="panel-separator" />
+
+      <!-- IMAP блок -->
+      <h3 class="panel-block-title">IMAP (чтение ответов)</h3>
+
+      <div class="panel-form-group panel-two-columns">
+        <div class="panel-form-row">
+          <label for="{{ form.imap_host.id_for_label }}" class="panel-form-label">IMAP хост</label>
+          {{ form.imap_host }}
+          {{ form.imap_host.errors }}
+        </div>
+
+        <div class="panel-form-row">
+          <label for="{{ form.imap_port.id_for_label }}" class="panel-form-label">IMAP порт</label>
+          {{ form.imap_port }}
+          {{ form.imap_port.errors }}
+        </div>
+
+        <div class="panel-form-row">
+          <label for="{{ form.imap_encryption.id_for_label }}" class="panel-form-label">IMAP шифрование</label>
+          {{ form.imap_encryption }}
+          {{ form.imap_encryption.errors }}
+        </div>
+
+        <div class="panel-form-row">
+          <label for="{{ form.imap_username.id_for_label }}" class="panel-form-label">IMAP логин</label>
+          {{ form.imap_username }}
+          {{ form.imap_username.errors }}
+        </div>
+
+        <div class="panel-form-row panel-span-2">
+          <label for="{{ form.imap_password.id_for_label }}" class="panel-form-label">IMAP пароль</label>
+          {{ form.imap_password }}
+          {{ form.imap_password.errors }}
+        </div>
+      </div>
+
+      <div class="panel-form-actions">
+        <button type="submit" class="panel-button-primary">
+          Сохранить подключение
+        </button>
+      </div>
+    </form>
   </div>
 </div>
 {% endblock %}
