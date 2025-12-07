@@ -1,6 +1,7 @@
 <!-- FILE: web/templates/panels/aap_audience/how.html -->
 
 {% extends "panels/base.html" %}
+
 {% block title %}Подбор адресатов — Как ищем?{% endblock %}
 
 {% block sidebar_menu %}
@@ -11,14 +12,38 @@
 <div class="panel-page">
   <h1 class="panel-title">Как ищем?</h1>
   <p class="panel-subtitle">
-    Здесь будет настройка логики подбора адресатов:
-    источники, фильтры, сегменты и критерии.
+    Здесь можно экспериментировать с правилами поиска:
+    первый блок — системное задание, второй — запрос пользователя,
+    третий — ответ от gpt-5-nano.
   </p>
 
-  <div class="panel-card">
-    <div class="panel-placeholder-line w-64"></div>
-    <div class="panel-placeholder-line w-40"></div>
-    <div class="panel-placeholder-line w-56"></div>
-  </div>
+  <form method="post" class="panel-form">
+    {% csrf_token %}
+
+    <div class="panel-form-row">
+      <label class="panel-form-label" for="{{ form.system.id_for_label }}">
+        {{ form.system.label }}
+      </label>
+      {{ form.system }}
+    </div>
+
+    <div class="panel-form-row">
+      <label class="panel-form-label" for="{{ form.user.id_for_label }}">
+        {{ form.user.label }}
+      </label>
+      {{ form.user }}
+    </div>
+
+    <div class="panel-form-row">
+      <label class="panel-form-label" for="{{ form.result.id_for_label }}">
+        {{ form.result.label }}
+      </label>
+      {{ form.result }}
+    </div>
+
+    <button type="submit" class="panel-button-primary">
+      Отправить в nano
+    </button>
+  </form>
 </div>
 {% endblock %}

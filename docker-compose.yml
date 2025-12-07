@@ -1,3 +1,4 @@
+# FILE: docker-compose.yml
 
 services:
   # ------------ POSTGRES ------------
@@ -26,23 +27,34 @@ services:
     user: "1001:1001"
     depends_on:
       - mailer-db
+
+    # тут ЗАМЕНИЛ на список, чтобы аккуратно прокинуть OPENAI_API_KEY из среды машинки
     environment:
-      DB_HOST: mailer-db
-      DB_PORT: 5432
-      DB_NAME: mailersys
-      DB_USER: mailersys_user
-      DB_PASSWORD: secret
+      - DB_HOST=mailer-db
+      - DB_PORT=5432
+      - DB_NAME=mailersys
+      - DB_USER=mailersys_user
+      - DB_PASSWORD=secret
+      - PYTHONPATH=/app:/engine
+      # берём значение переменной OPENAI_API_KEY с хоста, если оно там есть
+      - OPENAI_API_KEY
+
     volumes:
-      - ./web:/app         
+      - ./web:/app          # твой Django-проект
+      - ./engine:/engine    # движок с GPT-клиентом рядом
+      - ./logs:/logs    # движок с GPT-клиентом рядом
       - mailer-static:/app/staticfiles
+
     ports:
-      - "8000:8000"        # http://твой-сервер:8000
-    # ничего не запускаем, просто держим контейнер живым
+      - "8000:8000"        # http://сервер:8000
+
+    # как и было: gunicorn из venv
     command:  >  
       /app/.venv/bin/gunicorn mailer_web.wsgi:application
       --bind 0.0.0.0:8000
       --reload
       --workers 1
+
     networks:
       - webnet
 
