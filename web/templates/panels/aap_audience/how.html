@@ -1,0 +1,24 @@
+<!-- FILE: web/templates/panels/aap_audience/how.html -->
+
+{% extends "panels/base.html" %}
+{% block title %}Подбор адресатов — Как ищем?{% endblock %}
+
+{% block sidebar_menu %}
+  {% include "panels/aap_audience/menu_left.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="panel-page">
+  <h1 class="panel-title">Как ищем?</h1>
+  <p class="panel-subtitle">
+    Здесь будет настройка логики подбора адресатов:
+    источники, фильтры, сегменты и критерии.
+  </p>
+
+  <div class="panel-card">
+    <div class="panel-placeholder-line w-64"></div>
+    <div class="panel-placeholder-line w-40"></div>
+    <div class="panel-placeholder-line w-56"></div>
+  </div>
+</div>
+{% endblock %}

@@ -47,19 +47,17 @@
         <header class="panel-topbar">
           <nav class="panel-topbar-nav">
             <div class="panel-topbar-nav-left">
-              <a href="#" class="panel-topbar-link">Пункт 1</a>
-              <a href="#" class="panel-topbar-link">Пункт 2</a>
-              <a href="#" class="panel-topbar-link">Пункт 3</a>
-              <a href="#" class="panel-topbar-link">Пункт 4</a>
-              <a href="#" class="panel-topbar-link">Пункт 5</a>
+                <a href="{% url 'audience:index' %}"
+                  class="panel-topbar-link {% if request.path|slice:":16" == "/panel/audience/" %}panel-topbar-link-active{% endif %}">
+                  Подбор адресатов
+                </a>
 
-              <!-- Настройки: активны для ЛЮБОГО урла аппа settings -->
-<a href="{% url 'settings:sending' %}"
-   class="panel-topbar-link {% if request.path|slice:":16" == "/panel/settings/" %}panel-topbar-link-active{% endif %}">
-  Настройки
-</a>
-
-            </div>
+                <!-- Настройки: активны для ЛЮБОГО урла аппа settings -->
+                <a href="{% url 'settings:sending' %}"
+                  class="panel-topbar-link {% if request.path|slice:":16" == "/panel/settings/" %}panel-topbar-link-active{% endif %}">
+                  Настройки
+                </a>
+              </div>
 
             <div class="panel-topbar-nav-right">
               <a href="{% url 'dashboard' %}" class="panel-topbar-link panel-topbar-link-main">

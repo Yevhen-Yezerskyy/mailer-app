@@ -1,0 +1,16 @@
+<!-- FILE: web/templates/panels/aap_audience/menu_left.html -->
+
+<a href="{% url 'audience:how' %}"
+   class="panel-menu-item {% if request.resolver_match.url_name == 'how' %}panel-menu-item-active{% endif %}">
+  Как ищем?
+</a>
+
+<a href="{% url 'audience:status' %}"
+   class="panel-menu-item {% if request.resolver_match.url_name == 'status' %}panel-menu-item-active{% endif %}">
+  Статус
+</a>
+
+<a href="{% url 'audience:result' %}"
+   class="panel-menu-item {% if request.resolver_match.url_name == 'result' %}panel-menu-item-active{% endif %}">
+  Результат
+</a>

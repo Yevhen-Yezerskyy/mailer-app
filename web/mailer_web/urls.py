@@ -16,6 +16,9 @@ urlpatterns = [
 
     # Настройки (несколько страниц → у аппа свой urls.py)
     path("panel/settings/", include("aap_settings.urls")),
+
+    # Подбор адресатов
+    path("panel/audience/", include("aap_audience.urls")), 
 ]
 
 if settings.DEBUG:

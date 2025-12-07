@@ -1,0 +1,23 @@
+<!-- FILE: web/templates/panels/aap_audience/status.html -->
+
+{% extends "panels/base.html" %}
+{% block title %}Подбор адресатов — Статус{% endblock %}
+
+{% block sidebar_menu %}
+  {% include "panels/aap_audience/menu_left.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="panel-page">
+  <h1 class="panel-title">Статус</h1>
+  <p class="panel-subtitle">
+    Текущий статус процессов подбора адресатов:
+    очереди, задачи, ошибки, прогресс.
+  </p>
+
+  <div class="panel-card">
+    <div class="panel-placeholder-line w-48"></div>
+    <div class="panel-placeholder-line w-32"></div>
+  </div>
+</div>
+{% endblock %}

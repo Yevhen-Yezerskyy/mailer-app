@@ -47,6 +47,7 @@ INSTALLED_APPS = [
 
     "aap_console",
     "aap_settings",
+    "aap_audience",
     "accounts",
 ]
 
