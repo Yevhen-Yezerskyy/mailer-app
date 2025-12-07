@@ -8,7 +8,6 @@
     <title>{% block title %}Serenity Mailer — Панель{% endblock %}</title>
 
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -17,6 +16,7 @@
   </head>
   <body>
     <div class="panel-layout">
+
       <!-- ЛЕВАЯ КОЛОНКА -->
       <aside class="panel-sidebar">
         <div class="panel-logo">
@@ -27,7 +27,8 @@
 
         <nav class="panel-sidebar-menu">
           {% block sidebar_menu %}
-            <a href="{% url 'dashboard' %}" class="panel-menu-item panel-menu-item-active">
+            <a href="{% url 'dashboard' %}"
+               class="panel-menu-item {% if request.resolver_match.url_name == 'dashboard' %}panel-menu-item-active{% endif %}">
               Dashboard
             </a>
           {% endblock %}
@@ -51,8 +52,15 @@
               <a href="#" class="panel-topbar-link">Пункт 3</a>
               <a href="#" class="panel-topbar-link">Пункт 4</a>
               <a href="#" class="panel-topbar-link">Пункт 5</a>
-              <a href="#" class="panel-topbar-link">Настройки</a>
+
+              <!-- Настройки: активны для ЛЮБОГО урла аппа settings -->
+<a href="{% url 'settings:sending' %}"
+   class="panel-topbar-link {% if request.path|slice:":16" == "/panel/settings/" %}panel-topbar-link-active{% endif %}">
+  Настройки
+</a>
+
             </div>
+
             <div class="panel-topbar-nav-right">
               <a href="{% url 'dashboard' %}" class="panel-topbar-link panel-topbar-link-main">
                 Дашборд
@@ -68,6 +76,7 @@
           {% block content %}{% endblock %}
         </section>
       </main>
+
     </div>
   </body>
 </html>

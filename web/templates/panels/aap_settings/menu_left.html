@@ -1,0 +1,11 @@
+<!-- FILE: web/templates/panels/aap_settings/menu_left.html -->
+
+<a href="{% url 'settings:sending' %}"
+   class="panel-menu-item {% if request.resolver_match.url_name == 'sending' %}panel-menu-item-active{% endif %}">
+  Sending Settings
+</a>
+
+<a href="{% url 'settings:mail_servers' %}"
+   class="panel-menu-item {% if request.resolver_match.url_name == 'mail_servers' %}panel-menu-item-active{% endif %}">
+  Mail Servers
+</a>
