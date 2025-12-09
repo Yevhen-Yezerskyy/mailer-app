@@ -1,49 +1,91 @@
-<!-- FILE: web/templates/panels/aap_audience/how.html -->
+{# FILE: web/templates/panels/aap_audience/how.html   (новое — 2025-12-08) #}
 
 {% extends "panels/base.html" %}
 
-{% block title %}Подбор адресатов — Как ищем?{% endblock %}
-
-{% block sidebar_menu %}
-  {% include "panels/aap_audience/menu_left.html" %}
-{% endblock %}
-
 {% block content %}
+
 <div class="panel-page">
-  <h1 class="panel-title">Как ищем?</h1>
-  <p class="panel-subtitle">
-    Здесь можно экспериментировать с правилами поиска:
-    первый блок — системное задание, второй — запрос пользователя,
-    третий — ответ от gpt-5-nano.
-  </p>
+    <h1 class="panel-title">Подбор параметров поиска</h1>
 
-  <form method="post" class="panel-form">
-    {% csrf_token %}
+    <p class="panel-subtitle">
+        Какие ключевые отрасли клиентов для вас приоритетны (например, производство, дистрибуция, услуги, IT, финансы)?<br>
+        Это нужно, чтобы точнее подобрать B2B-аудиторию и города с высокой концентрацией нужных вам компаний.
+    </p>
 
-    <div class="panel-form-row">
-      <label class="panel-form-label" for="{{ form.system.id_for_label }}">
-        {{ form.system.label }}
-      </label>
-      {{ form.system }}
-    </div>
+    <form method="post" class="panel-form" id="how-form">
+        {% csrf_token %}
 
-    <div class="panel-form-row">
-      <label class="panel-form-label" for="{{ form.user.id_for_label }}">
-        {{ form.user.label }}
-      </label>
-      {{ form.user }}
-    </div>
+        {# -------- WHAT -------- #}
+        <div class="panel-form-group">
+            {% if form.question_what.value %}
+                <div class="gpt-question-block">
+                    <strong>Уточняющий вопрос:</strong> {{ form.question_what.value }}
+                    {% if form.hint_what.value %}
+                        <div class="gpt-hint">{{ form.hint_what.value }}</div>
+                    {% endif %}
+                </div>
+            {% endif %}
 
-    <div class="panel-form-row">
-      <label class="panel-form-label" for="{{ form.result.id_for_label }}">
-        {{ form.result.label }}
-      </label>
-      {{ form.result }}
-    </div>
+            <label class="panel-form-label">Что продаём?</label>
+            {{ form.what }}
+        </div>
 
-    <button type="submit" class="panel-button-primary">
-      Отправить в nano
-    </button>
-  </form>
+        {# -------- WHO -------- #}
+        <div class="panel-form-group">
+            {% if form.question_who.value %}
+                <div class="gpt-question-block">
+                    <strong>Уточняющий вопрос:</strong> {{ form.question_who.value }}
+                    {% if form.hint_who.value %}
+                        <div class="gpt-hint">{{ form.hint_who.value }}</div>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <label class="panel-form-label">Кто продавец?</label>
+            {{ form.who }}
+        </div>
+
+        {# -------- GEO -------- #}
+        <div class="panel-form-group">
+            {% if form.question_geo.value %}
+                <div class="gpt-question-block">
+                    <strong>Уточняющий вопрос:</strong> {{ form.question_geo.value }}
+                    {% if form.hint_geo.value %}
+                        <div class="gpt-hint">{{ form.hint_geo.value }}</div>
+                    {% endif %}
+                </div>
+            {% endif %}
+
+            <label class="panel-form-label">География?</label>
+            {{ form.geo }}
+        </div>
+
+        {# скрытые поля для вопросов/хинтов #}
+        {{ form.question_what }}{{ form.hint_what }}
+        {{ form.question_who }}{{ form.hint_who }}
+        {{ form.question_geo }}{{ form.hint_geo }}
+
+        <div class="panel-form-actions">
+            <button type="submit" class="panel-button-primary" id="submit-btn">
+                Обработать
+            </button>
+        </div>
+
+        <div class="panel-form-overlay">
+            <div class="panel-form-overlay-inner">
+                Думаю…
+            </div>
+        </div>
+    </form>
 </div>
+
+<script>
+document.getElementById("how-form").addEventListener("submit", function () {
+    const form = document.getElementById("how-form");
+    const btn = document.getElementById("submit-btn");
+    form.classList.add("panel-form--loading");
+    btn.disabled = true;
+});
+</script>
+
 {% endblock %}

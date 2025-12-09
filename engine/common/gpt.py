@@ -1,26 +1,19 @@
-# FILE: engine/common/gpt.py
+# FILE: engine/common/gpt.py  (новое — 2025-12-08)
 
 """
 GPT connector for mailer-app.
 
-This module is the ONLY place that should talk to OpenAI GPT models.
-It also handles validation, logging, and (optionally) history (by session_id).
+Единственная точка общения с OpenAI:
 
-PRICES (TEXT TOKENS, PER 1M TOKENS, FLEX TIER)
-------------------------------------------------
-MODEL        INPUT       CACHED INPUT     OUTPUT
-gpt-5.1      $0.625      $0.0625          $5.00
-gpt-5        $0.625      $0.0625          $5.00
-gpt-5-mini   $0.125      $0.0125          $1.00
-gpt-5-nano   $0.025      $0.0025          $0.20
-o3           $1.00       $0.25            $4.00
-o4-mini      $0.55       $0.138           $2.20
-
-NOTES:
-- We use ONLY these three models here: gpt-5-nano, gpt-5-mini, gpt-5.1.
-- Default service tier is FLEX (other tiers: standard, priority) — мы их логируем,
-  но реальный выбор Tier сейчас настраивается на аккаунте.
-- API key MUST be provided via env var OPENAI_API_KEY. If missing, we raise.
+- Три tier'а:
+    nano -> gpt-5-nano
+    mini -> gpt-5-mini
+    maxi -> gpt-5.1
+- ВСЕ вызовы идут через Responses API (НЕ chat.completions).
+- Формат всегда простой: system (instructions) + user (input) → один ответ.
+- Для tier='maxi' при with_web=True включается web_search_preview.
+- Вся история (session_id) хранится только локально в объекте и
+  НИКОГДА не отправляется в модель.
 """
 
 from __future__ import annotations
@@ -168,17 +161,13 @@ def _log_call(
 
 class GPTClient:
     """
-    Stateless (по смыслу) клиент GPT для всего проекта.
+    Stateless-клиент GPT для проекта.
 
     ВАЖНО:
-    - Этот объект НЕ привязан к конкретной модели, воркспейсу или пользователю.
-    - Все важные параметры (tier, with_web, workspace, user, service_tier)
-      передаются на каждый вызов ask().
-    - Внутри есть только:
-        - проверка конфигурации,
-        - транспорт-клиент (OpenAI),
-        - счётчик для auto-reset каждые N_CALLS_BEFORE_RESET,
-        - опциональная история по session_id.
+    - Внешний интерфейс: один вызов → один ответ (Q→A), без чата.
+    - Внутри — только Responses API, без chat.completions.
+    - session_id / use_history используются ТОЛЬКО для внутреннего хранения
+      истории (self._sessions_history) и не влияют на запросы к модели.
     """
 
     N_CALLS_BEFORE_RESET = 7
@@ -188,7 +177,7 @@ class GPTClient:
         self._client: Any = None
         self._calls_since_reset: int = 0
 
-        # session_id -> list[Message]
+        # session_id -> list[Message] (чисто для себя, не в модель)
         self._sessions_history: dict[str, List[Message]] = {}
 
     # ----- PUBLIC API -----
@@ -209,16 +198,14 @@ class GPTClient:
         use_history: bool = False,
     ) -> GptResponse:
         """
-        Выполнить один запрос к GPT.
+        Один запрос к GPT (всегда одиночный ход, без контекста).
 
-        Требования:
         - tier: 'nano' | 'mini' | 'maxi'
-        - service_tier: 'flex' | 'standard' | 'priority' (по умолчанию 'flex')
-        - workspace_id, user_id: обязательны и не пустые
-        - system, user: строки, не пустые
         - with_web:
             * для 'maxi' ОБЯЗАТЕЛЕН (True/False)
             * для 'nano'/'mini' НЕЛЬЗЯ ставить True (raise)
+        - system → instructions
+        - user   → input
         """
 
         # --- validate tier & model ---
@@ -234,7 +221,7 @@ class GPTClient:
                 f"Unsupported service_tier {service_tier!r}. "
                 f"Allowed: {sorted(ALLOWED_SERVICE_TIERS)}."
             )
-        service_tier = service_tier  # type: ServiceTier  # for type-checkers
+        service_tier = service_tier  # type: ServiceTier
 
         # --- validate with_web rules ---
         if tier in ("nano", "mini") and with_web is True:
@@ -256,52 +243,36 @@ class GPTClient:
         system_clean = _validate_not_empty("system", system)
         user_clean = _validate_not_empty("user", user)
 
-        # --- history (optional, by session_id) ---
-        messages: List[Message] = []
-        history_ref: Optional[List[Message]] = None
-
+        # --- history (только запоминаем, НО не шлём в модель) ---
         if use_history and session_id:
-            history_ref = self._sessions_history.setdefault(session_id, [])
-            messages.extend(history_ref)
+            history = self._sessions_history.setdefault(session_id, [])
+            history.append({"role": "user", "content": user_clean})
+            history.append({"role": "system", "content": system_clean})
 
-        messages.append({"role": "system", "content": system_clean})
-        messages.append({"role": "user", "content": user_clean})
-
-        # --- build payload ---
-        payload: Dict[str, Any] = {
-            "model": model_name,
-            "messages": messages,
-        }
-
-        # Здесь позже можно будет аккуратно прокинуть параметры
-        # для service_tier и web-search. Пока мы только валидируем
-        # и логируем with_web, а объект OpenAI вызываем напрямую.
-        #
-        # Пример (когда решишь использовать Responses API с tools):
-        #
-        # if tier == "maxi":
-        #     tools = []
-        #     if with_web:
-        #         tools.append({"type": "web_search"})
-        #     payload["tools"] = tools
-        #
-        if extra_payload:
-            payload.update(extra_payload)
+        extra_payload = extra_payload or {}
 
         # --- perform request & log ---
+        self._ensure_client()
+
         try:
-            self._ensure_client()
-            raw_response = self._perform_request(payload)
+            raw_response = self._perform_responses_request(
+                model_name=model_name,
+                system=system_clean,
+                user=user_clean,
+                with_web=with_web,
+                extra_payload=extra_payload,
+            )
             usage = self._extract_usage(raw_response)
             status = "ok"
             error_message: Optional[str] = None
 
-            # update history if needed
-            if use_history and session_id and history_ref is not None:
-                assistant_content = self._extract_content(raw_response)
-                history_ref.append(
-                    {"role": "assistant", "content": assistant_content}
+            if use_history and session_id:
+                # сохраним assistant-ответ в локальной истории
+                content_for_history = self._extract_content(raw_response)
+                self._sessions_history.setdefault(session_id, []).append(
+                    {"role": "assistant", "content": content_for_history}
                 )
+
         except Exception as exc:
             raw_response = {
                 "error": {
@@ -313,7 +284,6 @@ class GPTClient:
             status = "error"
             error_message = str(exc)
 
-        # log call
         _log_call(
             model_name=model_name,
             tier_name=tier,
@@ -341,74 +311,146 @@ class GPTClient:
     # ----- INTERNAL HELPERS -----
 
     def _ensure_client(self) -> None:
-        """
-        Следит за тем, чтобы транспорт-клиент существовал и
-        пересоздаётся каждые N_CALLS_BEFORE_RESET вызовов.
-        """
-        from openai import OpenAI  # локальный импорт, чтобы не падать без либы
+        """Создаёт/ресетит OpenAI клиент каждые N_CALLS_BEFORE_RESET вызовов."""
+        from openai import OpenAI  # локальный импорт
 
         if self._client is None or self._calls_since_reset >= self.N_CALLS_BEFORE_RESET:
             self._client = OpenAI(api_key=self._api_key)
             self._calls_since_reset = 0
 
-    def _perform_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _perform_responses_request(
+        self,
+        *,
+        model_name: str,
+        system: str,
+        user: str,
+        with_web: Optional[bool],
+        extra_payload: Dict[str, Any],
+    ) -> Dict[str, Any]:
         """
-        Реальный запрос к OpenAI через Chat Completions API.
+        Один вызов Responses API.
 
-        Ожидает в payload как минимум:
-        - model: str
-        - messages: list[{"role": "...", "content": "..."}]
+        - system → instructions
+        - user   → input
+        - web_search_preview включается, если with_web=True и tier='maxi'
         """
+
+        from openai import OpenAI  # для type-checkеров; клиент уже есть
         self._calls_since_reset += 1
 
-        model = payload.get("model")
-        messages = payload.get("messages") or []
-        if not model:
-            raise GptValidationError(
-                "Missing 'model' in payload for _perform_request()."
-            )
-        if not messages:
-            raise GptValidationError(
-                "Missing 'messages' in payload for _perform_request()."
-            )
+        # Базовый payload
+        payload: Dict[str, Any] = {
+            "model": model_name,
+            "instructions": system,
+            "input": user,
+        }
 
-        # TODO: сюда позже можно будет аккуратно прокинуть:
-        # - reasoning_effort (none/low/medium/high/...)
-        # - tools/web_search и т. д. для tier='maxi'
-        # Пока — простой chat.completions.
-        response = self._client.chat.completions.create(
-            model=model,
-            messages=messages,
-        )
+        # Поддержка web_search_preview
+        tools = extra_payload.pop("tools", None)
+        tool_choice = extra_payload.pop("tool_choice", None)
 
-        # Превращаем объект SDK в обычный dict
+        if with_web:
+            # если явно не передали tools в extra_payload — включаем web_search_preview
+            if tools is None:
+                tools = [{"type": "web_search_preview"}]
+            if tool_choice is None:
+                tool_choice = "auto"
+
+        if tools is not None:
+            payload["tools"] = tools
+        if tool_choice is not None:
+            payload["tool_choice"] = tool_choice
+
+        payload.update(extra_payload)
+
+        response = self._client.responses.create(**payload)
+
+        # достанем text для удобства
+        try:
+            content_text = response.output_text
+        except Exception:
+            # fallback: через сырые данные
+            try:
+                tmp = response.model_dump()
+            except AttributeError:
+                tmp = json.loads(response.json())
+            content_text = ""
+            try:
+                out_items = tmp.get("output") or []
+                if out_items:
+                    cont = out_items[0].get("content") or []
+                    if cont:
+                        content_text = cont[0].get("text", "") or ""
+            except Exception:
+                content_text = ""
+
+        # raw dict
         try:
             raw = response.model_dump()
         except AttributeError:
             raw = json.loads(response.json())
 
+        # эмулируем choices → message → content,
+        # чтобы _extract_content работал одинаково везде
+        raw.setdefault(
+            "choices",
+            [
+                {
+                    "message": {
+                        "content": content_text,
+                    }
+                }
+            ],
+        )
+
         return raw
+
+    # --- Parsing helpers ---
 
     @staticmethod
     def _extract_usage(raw: Dict[str, Any]) -> GptUsage:
         usage = raw.get("usage") or {}
+
+        prompt_tokens = usage.get("prompt_tokens") or usage.get("input_tokens")
+        completion_tokens = usage.get("completion_tokens") or usage.get(
+            "output_tokens"
+        )
+        total_tokens = usage.get("total_tokens")
+
         return GptUsage(
-            prompt_tokens=usage.get("prompt_tokens"),
-            completion_tokens=usage.get("completion_tokens"),
-            total_tokens=usage.get("total_tokens"),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
         )
 
     @staticmethod
     def _extract_content(raw: Dict[str, Any]) -> str:
+        """
+        Универсальный извлекатель текста:
+        - сначала chat-подобный путь (choices[0].message.content),
+        - если нет choices, то пытаемся достать из output[..].content[..].text,
+        - если есть error — вернём строку с ошибкой.
+        """
         try:
             choices = raw.get("choices") or []
-            if not choices:
-                if "error" in raw:
-                    return f"ERROR: {raw['error']}"
-                return ""
-            msg = choices[0].get("message") or {}
-            content = msg.get("content") or ""
-            return str(content)
+            if choices:
+                msg = choices[0].get("message") or {}
+                content = msg.get("content") or ""
+                return str(content)
+
+            if "output" in raw:
+                out_items = raw.get("output") or []
+                if out_items:
+                    first = out_items[0]
+                    cont = first.get("content") or []
+                    if cont:
+                        text = cont[0].get("text") or ""
+                        return str(text)
+
+            if "error" in raw:
+                return f"ERROR: {raw['error']}"
+
+            return ""
         except Exception:
             return ""
 
