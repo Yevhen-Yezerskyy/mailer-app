@@ -1,0 +1,509 @@
+/* FILE: web/static/css/panel.css (новое) 2025-12-09 */
+
+/* ---------- БАЗА ---------- */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Inter", "Roboto", sans-serif;
+    background: #f4f6f8;
+    color: #111827;
+    min-height: 100vh;
+}
+
+/* ---------- ЛЕЙАУТ ПАНЕЛИ ---------- */
+
+.panel-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    min-height: 100vh;
+}
+
+/* ---------- ЛЕВАЯ ПАНЕЛЬ ---------- */
+
+.panel-sidebar {
+    background: #ffffff;
+    border-right: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    padding: 16px 18px 24px;
+}
+
+/* ЛОГО */
+
+.panel-logo {
+    margin-bottom: 18px;
+}
+
+.panel-logo-link {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.panel-logo-img {
+    display: block;
+    max-width: 150px;
+    width: 100%;
+    height: auto;
+}
+
+/* Вертикальное меню слева */
+
+.panel-sidebar-menu {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.panel-menu-item {
+    display: block;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    text-decoration: none;
+    color: #374151;
+}
+
+.panel-menu-item:hover {
+    background: #f3f4f6;
+}
+
+.panel-menu-item-active {
+    background: #e5efff;
+    color: #1f2937;
+    font-weight: 500;
+}
+
+/* Блок пользователя под меню */
+
+.panel-sidebar-user {
+    margin-top: 18px;
+    font-size: 13px;
+    color: #4b5563;
+}
+
+.panel-sidebar-user-label {
+    display: block;
+    margin-bottom: 2px;
+    color: #6b7280;
+}
+
+.panel-sidebar-user-name {
+    font-weight: 600;
+    color: #111827;
+}
+
+/* ---------- ПРАВАЯ ЧАСТЬ ---------- */
+
+.panel-main {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Верхняя горизонтальная полоска */
+
+.panel-topbar {
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    min-height: 40px;
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+}
+
+.panel-topbar-nav {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    font-size: 14px;
+}
+
+.panel-topbar-nav-left {
+    display: flex;
+    gap: 14px;
+}
+
+.panel-topbar-nav-right {
+    margin-left: auto;
+    display: flex;
+    gap: 12px;
+}
+
+.panel-topbar-link {
+    text-decoration: none;
+    color: #4b5563;
+    padding: 6px 10px;
+    border-radius: 999px;
+}
+
+.panel-topbar-link:hover {
+    background: #f3f4f6;
+}
+
+.panel-topbar-link-main,
+.panel-topbar-link-active {
+    font-weight: 500;
+    background: #e5efff;
+    color: #111827;
+}
+
+.panel-topbar-link-danger {
+    color: #b91c1c;
+}
+
+/* Контент */
+
+.panel-content {
+    padding: 24px 24px 32px;
+}
+
+/* ---------- КАРТОЧКИ ---------- */
+
+.panel-page {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.panel-card {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 20px 24px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+    max-width: 900px;
+    margin: 20px auto;
+}
+
+.panel-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+}
+
+.panel-card h2,
+.panel-card h3 {
+    margin-bottom: 8px;
+    font-size: 18px;
+    color: #111827;
+}
+
+.panel-card p {
+    font-size: 14px;
+    margin-top: 4px;
+    color: #4b5563;
+}
+
+.panel-card-metric-value {
+    font-size: 24px;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+/* Инструкция в карточке */
+
+.panel-card ol li {
+    margin-bottom: 6px;
+}
+
+/* ---------- ТАБЛИЦЫ ---------- */
+
+.panel-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.panel-table th,
+.panel-table td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.panel-table th {
+    font-weight: 600;
+    background: #f9fafb;
+}
+
+/* ---------- ФОРМЫ ---------- */
+
+.panel-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    position: relative; /* для оверлея */
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.panel-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.panel-two-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem 1.5rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.panel-span-2 {
+    grid-column: 1 / span 2;
+}
+
+.panel-form-row {
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-form-label {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: #374151;
+}
+
+/* input/select */
+
+.panel-form-row input,
+.panel-form-row select {
+    font-size: 14px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    border: 1px solid #d1d5db;
+    outline: none;
+}
+
+.panel-form-row input:focus,
+.panel-form-row select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
+}
+
+.panel-form-row .errorlist {
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    color: #b91c1c;
+    font-size: 12px;
+}
+
+/* textarea */
+
+.panel-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 80px;
+    height: 100px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #d0d7e2;
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #111827;
+    background-color: #ffffff;
+    resize: vertical;
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        background-color 0.15s ease;
+}
+
+.panel-form textarea::placeholder {
+    color: #9ca3af;
+}
+
+.panel-form textarea:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35);
+    background-color: #ffffff;
+}
+
+.panel-form textarea[readonly] {
+    background-color: #f3f4f6;
+    color: #4b5563;
+}
+
+/* подписи и ошибки */
+
+.panel-form-error {
+    color: #dc2626;
+    font-size: 14px;
+    margin-top: 6px;
+}
+
+/* Заголовки внутри карточек */
+
+.panel-card-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.panel-block-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+/* Разделитель блоков в форме */
+
+.panel-separator {
+    border: none;
+    border-top: 1px dashed #e5e7eb;
+    margin: 1.25rem 0;
+}
+
+/* ---------- КНОПКИ ---------- */
+
+.panel-form-actions {
+    margin-top: 0.5rem;
+}
+
+.panel-button-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 14px;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 9999px;
+    border: 1px solid #2563eb;
+    background: #2563eb;
+    color: #ffffff;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.panel-button-primary:hover {
+    background: #1d4ed8;
+    border-color: #1d4ed8;
+}
+
+.panel-button-primary[disabled] {
+    opacity: 0.7;
+    cursor: default;
+}
+
+.panel-button-secondary {
+    padding: 10px 18px;
+    border-radius: 8px;
+    background: #f3f4f6;
+    color: #374151;
+    font-size: 15px;
+    border: 1px solid #d1d5db;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.panel-button-secondary:hover {
+    background: #e5e7eb;
+    border-color: #9ca3af;
+}
+
+.panel-button-secondary:active {
+    background: #d1d5db;
+    border-color: #6b7280;
+}
+
+/* ---------- ОВЕРЛЕЙ "ДУМАЮ" ---------- */
+
+.panel-form-overlay {
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    background: rgba(249, 250, 251, 0.8);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+.panel-form-overlay-inner {
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: rgba(55, 65, 81, 0.92);
+    color: #f9fafb;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.panel-form--loading .panel-form-overlay {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* ---------- GPT ВОПРОСЫ/ХИНТЫ ---------- */
+
+.gpt-question-block {
+    margin: 10px 0 6px;
+    padding: 10px;
+    background: #fff7d6;
+    border-left: 4px solid #e0b200;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.gpt-hint {
+    margin-top: 4px;
+    font-size: 13px;
+    color: #444;
+}
+
+/* ---------- EDITABLE ПОЛЯ HOW.HTML ---------- */
+
+/* общий вид contenteditable-блоков */
+.panel-input-textarea.editable-block {
+    min-height: 110px;
+    padding: 12px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 15px;
+    line-height: 1.5;
+    outline: none;
+    white-space: pre-wrap;
+    transition: border-color 0.15s ease;
+    color: #171b22 !Important; /* новый текст — тёмно-серый */
+}
+
+/* placeholder */
+.panel-input-textarea.editable-block:empty:before {
+    content: attr(data-placeholder);
+    color: #9ca3af;
+    pointer-events: none;
+}
+
+/* фокус */
+.panel-input-textarea.editable-block:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+/* «старый» текст, который приехал из системы */
+.panel-input-textarea.editable-block .editable-existing {
+    /*color: #0f1f4b !Important; /* тёмно-синий */
+    color: rgb(139, 2, 2) !Important;
+    pointer-events: none; 
+}
+
+/* фиксы для Firefox */
+.panel-input-textarea.editable-block br:last-child {
+    display: none;
+}

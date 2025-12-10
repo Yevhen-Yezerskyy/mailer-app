@@ -1,0 +1,258 @@
+/* ---------------------------------------------------------
+   GLOBAL
+--------------------------------------------------------- */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: "Inter", "Roboto", sans-serif;
+    background: radial-gradient(circle at 50% 20%, #0d1b2a, #020c16 70%);
+    color: #e5e7eb;
+    min-height: 100vh;
+    line-height: 1.4;
+}
+
+/* ---------- TOPBAR CONTAINER ---------- */
+
+.topbar {
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;     /* центрируем ВЕСЬ контент шапки */
+    position: relative;
+
+    background: linear-gradient(
+        90deg,
+        #d9dde2 0%,
+        #f4f6f8 40%,   /* пик белого по центру */
+        #f4f6f8 50%,   /* идеально белый центр */
+        #0b1722 85%,
+        #020915 100%
+    );
+
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    z-index: 20;
+}
+
+/* Внутренний контейнер */
+.topbar-inner {
+    width: 100%;
+    max-width: 1100px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* лого — слева, меню — справа */
+    padding: 0 24px;
+}
+
+/* ---------- LOGO ---------- */
+
+.logo-img {
+    height: 32px;      /* уменьшили, чтобы совпадал с Serenity Mailer */
+    width: auto;
+    display: block;
+    filter: drop-shadow(0 0 3px rgba(255,255,255,0.6));
+}
+
+/* ---------- RIGHT NAV ---------- */
+
+.topnav a {
+    text-decoration: none;
+    font-size: 15px;
+    margin-left: 26px;
+
+    color: #ffffff;     /* белые ссылки — видно отлично */
+    font-weight: 500;
+    text-shadow: 0 0 4px rgba(0,0,0,0.7);
+}
+
+.topnav a:hover {
+    color: #ffffff;
+    opacity: 0.75;
+}
+
+
+
+/* ---------------------------------------------------------
+   LAYOUT HELPERS
+--------------------------------------------------------- */
+
+.container {
+    max-width: 1100px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+/* ---------------------------------------------------------
+   CARD BLOCKS
+--------------------------------------------------------- */
+
+.card {
+    background: rgba(20, 32, 44, 0.88);
+    padding: 28px 32px;
+    border-radius: 14px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    margin-bottom: 32px;
+}
+
+.card h2 {
+    margin-bottom: 8px;
+    font-size: 22px;
+    color: #e2e8f0;
+}
+
+.card p {
+    font-size: 15px;
+    margin-top: 4px;
+    opacity: 0.9;
+}
+
+/* ---------------------------------------------------------
+   BUTTONS
+--------------------------------------------------------- */
+
+.btn-row {
+    margin-top: 22px;
+    display: flex;
+    gap: 14px;
+}
+
+.btn {
+    padding: 10px 22px;
+    font-size: 15px;
+    border-radius: 20px;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    transition: 0.2s;
+}
+
+.btn-primary {
+    background-color: #1f455d;
+    color: #ffffff;
+}
+
+.btn-primary:hover {
+    background-color: #23516d;
+}
+
+.btn-secondary {
+    background-color: transparent;
+    color: #ffffff;
+}
+
+.btn-secondary:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ---------------------------------------------------------
+   FORMS (login / register)
+--------------------------------------------------------- */
+
+.form-card {
+    background: rgba(20, 32, 44, 0.92);
+    max-width: 460px;
+    margin: 60px auto;
+    padding: 36px 40px;
+    border-radius: 14px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}
+
+.form-card h2 {
+    margin-bottom: 18px;
+}
+
+.form-card label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 15px;
+}
+
+.form-card input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #3a4a57;
+    background: #0f1a24;
+    color: #e5e7eb;
+    margin-bottom: 16px;
+}
+
+/* ---------------------------------------------------------
+   FOOTER OPTIONAL
+--------------------------------------------------------- */
+
+.footer {
+    margin-top: 80px;
+    padding: 20px 0;
+    text-align: center;
+    opacity: 0.4;
+    font-size: 14px;
+}
+
+.form-help {
+    margin-top: 14px;
+    font-size: 15px;
+    color: #d7dde5;
+}
+
+.form-help a {
+    color: #a8c7ff;                /* светло-голубой под стиль Serenity */
+    text-decoration: none;
+    font-weight: 500;
+    transition: 0.2s ease;
+}
+
+.form-help a:hover {
+    color: #cfe0ff;
+    text-decoration: underline;
+}
+
+.logo-link {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.logo-link:hover .logo-img {
+    opacity: 0.85;
+    transition: opacity 0.2s;
+}
+
+.logout-actions {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.logout-actions .btn-primary {
+    align-self: flex-start;   /* чтобы стояла как обычная кнопка */
+}
+
+.logout-cancel {
+    margin-top: 4px;
+}
+
+.logout-cancel a {
+    color: #a8c7ff;
+    text-decoration: none;
+}
+
+.logout-cancel a:hover {
+    text-decoration: underline;
+}
+
+.welcome-card h2 {
+    color: #e9eef5;
+}
+
+.welcome-card p {
+    margin-top: 10px;
+    color: #c7d0da;
+}
+
