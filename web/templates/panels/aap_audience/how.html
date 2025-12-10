@@ -1,91 +1,213 @@
-{# FILE: web/templates/panels/aap_audience/how.html   (новое — 2025-12-08) #}
+{# FILE: web/templates/panels/aap_audience/how.html (новое) 2025-12-09 #}
 
 {% extends "panels/base.html" %}
+
+{% block title %}Подбор адресатов — Serenity Mailer{% endblock %}
+
+{% block sidebar_menu %}
+  {% include "panels/aap_audience/menu_left.html" %}
+{% endblock %}
 
 {% block content %}
 
 <div class="panel-page">
-    <h1 class="panel-title">Подбор параметров поиска</h1>
 
-    <p class="panel-subtitle">
-        Какие ключевые отрасли клиентов для вас приоритетны (например, производство, дистрибуция, услуги, IT, финансы)?<br>
-        Это нужно, чтобы точнее подобрать B2B-аудиторию и города с высокой концентрацией нужных вам компаний.
-    </p>
+  {# Инструкция в виде отдельной карточки #}
+  <div class="panel-card" style="margin-bottom: 24px;">
+    <ol style="margin: 0; padding-left: 20px; line-height: 1.6;">
+      <li><strong>Напишите про себя и что вы продаёте.</strong> Всё остальное — лишнее.</li>
+      <li>
+        <strong>Дайте ссылку на сайт</strong> (например: <span style="white-space: nowrap;">https://mysite.ua</span>).
+        Система сама подтянет нужные факты.
+      </li>
+      <li><strong>Пишите как угодно</strong> — система сама разложит по полкам.</li>
+      <li>
+        <strong>Лишнее и неважное система выкинет.</strong>
+        Что удалили — исчезнет. Что дописали — оформится нормально.
+      </li>
+      <li>
+        <strong>Отвечайте коротко на вопросы.</strong>
+        Они нужны только для того, чтобы правильно искать ваших клиентов.
+      </li>
+    </ol>
+  </div>
 
+  <div class="panel-card">
     <form method="post" class="panel-form" id="how-form">
-        {% csrf_token %}
+      {% csrf_token %}
 
-        {# -------- WHAT -------- #}
-        <div class="panel-form-group">
-            {% if form.question_what.value %}
-                <div class="gpt-question-block">
-                    <strong>Уточняющий вопрос:</strong> {{ form.question_what.value }}
-                    {% if form.hint_what.value %}
-                        <div class="gpt-hint">{{ form.hint_what.value }}</div>
-                    {% endif %}
-                </div>
+      {# -------- Что продаёте -------- #}
+      
+      <div class="panel-form-group">
+        <label class="panel-form-label" for="id_what">Что продаёте</label>
+        {% if form.question_what.value %}
+          <div class="gpt-question-block">
+            <strong>Уточняющий вопрос:</strong> {{ form.question_what.value }}
+            {% if form.hint_what.value %}
+              <div class="gpt-hint">{{ form.hint_what.value }}</div>
             {% endif %}
+          </div>
+        {% endif %}
 
-            <label class="panel-form-label">Что продаём?</label>
-            {{ form.what }}
-        </div>
+        
+        <textarea
+          name="{{ form.what.name }}"
+          id="id_what"
+          rows="4"
+          class="panel-input-textarea"
+          placeholder="Опишите продукт или услугу в нескольких словах."
+        >{{ form.what.value|default_if_none:"" }}</textarea>
 
-        {# -------- WHO -------- #}
-        <div class="panel-form-group">
-            {% if form.question_who.value %}
-                <div class="gpt-question-block">
-                    <strong>Уточняющий вопрос:</strong> {{ form.question_who.value }}
-                    {% if form.hint_who.value %}
-                        <div class="gpt-hint">{{ form.hint_who.value }}</div>
-                    {% endif %}
-                </div>
+        {% if form.what.errors %}
+          <div class="panel-form-error">{{ form.what.errors }}</div>
+        {% endif %}
+      </div>
+
+      {# -------- Кто вы как компания -------- #}
+      <div class="panel-form-group">
+        <label class="panel-form-label" for="id_who">Кто вы как компания</label>
+        {% if form.question_who.value %}
+          <div class="gpt-question-block">
+            <strong>Уточняющий вопрос:</strong> {{ form.question_who.value }}
+            {% if form.hint_who.value %}
+              <div class="gpt-hint">{{ form.hint_who.value }}</div>
             {% endif %}
+          </div>
+        {% endif %}
 
-            <label class="panel-form-label">Кто продавец?</label>
-            {{ form.who }}
-        </div>
+        
+        <textarea
+          name="{{ form.who.name }}"
+          id="id_who"
+          rows="4"
+          class="panel-input-textarea"
+          placeholder="Укажите название компании, сайт и короткие факты о бизнесе: чем занимаетесь, инфраструктура, опыт работы."
+        >{{ form.who.value|default_if_none:"" }}</textarea>
 
-        {# -------- GEO -------- #}
-        <div class="panel-form-group">
-            {% if form.question_geo.value %}
-                <div class="gpt-question-block">
-                    <strong>Уточняющий вопрос:</strong> {{ form.question_geo.value }}
-                    {% if form.hint_geo.value %}
-                        <div class="gpt-hint">{{ form.hint_geo.value }}</div>
-                    {% endif %}
-                </div>
+        {% if form.who.errors %}
+          <div class="panel-form-error">{{ form.who.errors }}</div>
+        {% endif %}
+      </div>
+
+      {# -------- География работы -------- #}
+      <div class="panel-form-group">
+        <label class="panel-form-label" for="id_geo">География работы</label>
+        {% if form.question_geo.value %}
+          <div class="gpt-question-block">
+            <strong>Уточняющий вопрос:</strong> {{ form.question_geo.value }}
+            {% if form.hint_geo.value %}
+              <div class="gpt-hint">{{ form.hint_geo.value }}</div>
             {% endif %}
+          </div>
+        {% endif %}
 
-            <label class="panel-form-label">География?</label>
-            {{ form.geo }}
+        
+        <textarea
+          name="{{ form.geo.name }}"
+          id="id_geo"
+          rows="4"
+          class="panel-input-textarea"
+          placeholder="Реальные факты, которые влияют на поиск клиентов в Германии: офисы, партнёры, склады, откуда можете работать и доставлять."
+        >{{ form.geo.value|default_if_none:"" }}</textarea>
+
+        {% if form.geo.errors %}
+          <div class="panel-form-error">{{ form.geo.errors }}</div>
+        {% endif %}
+      </div>
+
+      {# скрытые поля для вопросов/хинтов (как есть в форме) #}
+      {{ form.question_what }}{{ form.hint_what }}
+      {{ form.question_who }}{{ form.hint_who }}
+      {{ form.question_geo }}{{ form.hint_geo }}
+
+      <div class="panel-form-actions">
+        <button type="submit" class="panel-button-primary" id="submit-btn">
+          Обработать
+        </button>
+        <button type="button" class="panel-button-secondary" id="clear-btn" style="margin-left: 8px;">
+          Очистить
+        </button>
+      </div>
+
+      <div id="how-error" class="panel-form-error" style="display:none; margin-top: 8px;">
+        Пожалуйста, заполните хотя бы одно поле.
+      </div>
+
+      <div class="panel-form-overlay">
+        <div class="panel-form-overlay-inner">
+          Думаю…
         </div>
-
-        {# скрытые поля для вопросов/хинтов #}
-        {{ form.question_what }}{{ form.hint_what }}
-        {{ form.question_who }}{{ form.hint_who }}
-        {{ form.question_geo }}{{ form.hint_geo }}
-
-        <div class="panel-form-actions">
-            <button type="submit" class="panel-button-primary" id="submit-btn">
-                Обработать
-            </button>
-        </div>
-
-        <div class="panel-form-overlay">
-            <div class="panel-form-overlay-inner">
-                Думаю…
-            </div>
-        </div>
+      </div>
     </form>
+  </div>
 </div>
 
 <script>
-document.getElementById("how-form").addEventListener("submit", function () {
+  (function () {
     const form = document.getElementById("how-form");
-    const btn = document.getElementById("submit-btn");
-    form.classList.add("panel-form--loading");
-    btn.disabled = true;
-});
+    const submitBtn = document.getElementById("submit-btn");
+    const clearBtn = document.getElementById("clear-btn");
+    const errorBox = document.getElementById("how-error");
+
+    const whatField = document.getElementById("id_what");
+    const whoField  = document.getElementById("id_who");
+    const geoField  = document.getElementById("id_geo");
+
+    if (form && submitBtn) {
+      form.addEventListener("submit", function (e) {
+        const whatText = (whatField?.value || "").trim();
+        const whoText  = (whoField?.value  || "").trim();
+        const geoText  = (geoField?.value  || "").trim();
+
+        // Запретить POST, если все три поля пустые
+        if (!whatText && !whoText && !geoText) {
+          e.preventDefault();
+          if (errorBox) errorBox.style.display = "block";
+          (whatField || whoField || geoField)?.focus();
+          return;
+        }
+
+        if (errorBox) errorBox.style.display = "none";
+
+        form.classList.add("panel-form--loading");
+        submitBtn.disabled = true;
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+
+        if (!confirm("Вы уверены?")) return;
+
+        if (whatField) whatField.value = "";
+        if (whoField)  whoField.value  = "";
+        if (geoField)  geoField.value  = "";
+
+        // обнулить скрытые поля вопросов/хинтов, если они есть
+        const metaIds = [
+          "id_question_what",
+          "id_question_who",
+          "id_question_geo",
+          "id_hint_what",
+          "id_hint_who",
+          "id_hint_geo",
+        ];
+        metaIds.forEach(function (id) {
+          const el = document.getElementById(id);
+          if (el) el.value = "";
+        });
+
+        // спрятать блоки с вопросами/хинтами
+        const questionBlocks = document.querySelectorAll(".gpt-question-block");
+        questionBlocks.forEach(function (qb) {
+          qb.style.display = "none";
+        });
+
+        if (errorBox) errorBox.style.display = "none";
+      });
+    }
+  })();
 </script>
 
 {% endblock %}
