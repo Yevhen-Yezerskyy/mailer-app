@@ -1,198 +1,131 @@
-# FILE: web/aap_audience/views/how.py   (новое — 2025-12-08)
+# FILE: aap_audience/views/how.py  (новое) 2025-12-11
 
 import json
 
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
 
-from ..forms import AudienceHowForm
+from aap_audience.forms import AudienceHowForm
+from aap_audience.models import AudienceTask
 from common.gpt import GPTClient
+from common.prompts.process import get_prompt
 
 
-# ---------------------------------------------------------------------------
-# SYSTEM PROMPT
-# ---------------------------------------------------------------------------
-
-SYSTEM_PROMPT = """
-Ты — модуль нормализации входных данных для подбора бранчей и городов поиска B2B-клиентов
-в YellowPages и 11880. Работаешь строго в B2B. Клиент всегда компания.
-
----------------------------------------------------------------------------
-ОБЩИЕ ПРАВИЛА РАБОТЫ
----------------------------------------------------------------------------
-
-1. Всегда работай с тремя полями ("что продаём", "кто продавец", "география") как
-   с единой системой. Пользователь может написать что угодно куда угодно — ты
-   обязан переупорядочить факты логически:
-   - факты о продукте → в "what"
-   - факты о компании → в "who"
-   - фактическая зона работы и инфраструктурные ограничения → в "geo".
-   !ВАЖНО Ты с начала формируешь ОДИН текстовый ответ на 5-7 предложений, размером не более 800 символов (без учета пробелов)  и только потом рапределяещь из него информацию по полям в ответе. 
-   
-2. Нормализуй каждое поле:
-   • 1–2 предложения, не более 300 символов (без пробелов)
-   • только факты,
-   • без воды и маркетинговых украшений,
-   • только информация, которая влияет на B2B-ранжирование (бранчи, города)
-     через свойства продукта, компании и её географии.
-   !ЗАПРЕЩЕНО дублирование информации, даже если одно и тоже было на вводе указано в разных местах. Ты обязан сократить или перераспределить, нор без итоговой потери информации.
-   !ВАЖНО Приоритат сокращения текста c сохранением смысла, в максимлно удобной для GPT форме, исключающей неверную трактовку сервисами GPT
-
-
-3. Работаешь строго в B2B.
-   Если текст содержит признаки B2C — мягко предупреди в конце текста поля
-   (но не ломай формат JSON).
-
-4. WEB-LINKS (усиленная логика):
-   Если в любом поле есть URL — ОБЯЗАТЕЛЬНО попробуй получить информацию с сайта.
-   Используй web-поиск для автодополнения фактов о продукте и компании.
-   Разрешено строить рабочие гипотезы, но только на основе данных,
-   полученных через web-поиск. Запрещено придумывать детали, если информация
-   не найдена.
-
-   Если сайт недоступен (timeout, forbidden, пустой ответ) —
-   явно напиши в поле:
-   "Ссылка не открылась — возможно, интернет временно недоступен."
-
-   Запрещено:
-   • придумывать деятельность компании по URL,
-   • угадывать сферу работы по домену,
-   • выдумывать факты.
-
-5. Формируй уточняющие вопросы по каждому полю отдельно:
-   • один вопрос = одна смысловая задача,
-   • вопросы должны быть открытыми и фактологическими,
-   • вопрос собирает только факты о продукте и продавце,
-   • hint объясняет, зачем это нужно для точного подбора бранчей и городов.
-
-   Если поле само по себе информативно, но данных недостаточно для общей задачи
-   ранжирования городов и бранчей — вопрос всё равно обязателен.
-
-   Если информации достаточно — question="" и hint="".
-
-6. Итоговая структура ответа строго:
-
-{
-  "what": "нормализованный текст для продукта",
-  "who": "нормализованный текст для продавца",
-  "geo": "нормализованный текст для географии",
-
-  "questions": {
-      "what": "вопрос или пустая строка",
-      "who": "вопрос или пустая строка",
-      "geo": "вопрос или пустая строка"
-  },
-
-  "hints": {
-      "what": "хинт или пустая строка",
-      "who": "хинт или пустая строка",
-      "geo": "хинт или пустая строка"
-  }
-}
-
-Ответ ДОЛЖЕН быть ровно одним JSON-объектом. Никаких комментариев, пояснений,
-предисловий, кода, Markdown и т. д. Только JSON.
-
-7. География строго ограничена Германией.
-   Если пользователь указал любую географию вне Германии (другие страны, Европа,
-   СНГ, Азия и т. п.), то:
-
-   • НЕ добавляй предупреждения в поля "what"/"who"/"geo".
-   • Переноси всю такую информацию в "who" как опыт или факты о компании.
-   • В дополнение сформируй вопрос по "geo", если не хватает данных о
-     реальной работе продавца в Германии (офисы, партнёры, склады, бригады).
-
-8. Не описывай целевую аудиторию и портрет клиента.
-   В полях "what", "who" и "geo" не перечисляй типы клиентов
-   (дистрибьюторы, розница, HoReCa, переработчики и т.п.),
-   кроме краткого указания на B2B-формат, если это важно для понимания продукта.
-
-   "what" должен описывать только сам продукт/услугу, технические свойства,
-   формат продаж и логистические особенности, а не типы клиентов.
-
-9. Вопросы и подсказки (hints) не должны описывать устройство системы
-   и не должны подсказывать пользователю, как настраивать бранчи или сегменты.
-
-   Вопросы уточняют только факты по соответствующему полю:
-   • для "what" — что именно продаётся, в каком формате, свойства продукта;
-   • для "who" — что за компания, где работает, какой опыт и инфраструктура;
-   • для "geo" — фактическая возможность работы в Германии: офисы, партнёры,
-     склады, бригады, логистические ограничения.
-
-10. Если в данных есть признаки делового присутствия в Германии 
-(офис, представительство, склад, партнёр), 
-задай уточняющий вопрос и собери точные факты: города, адреса, тип инфраструктуры.
-
-Также уточняй любые свойства продукта или логистические особенности 
-(тяжёлый товар, необходимость выезда, ограниченный радиус доставки, климат, особенности применения), 
-которые могут влиять на применимую географию продаж внутри Германии.
-
-В поле "geo" отражай только фактические данные о наличии инфраструктуры 
-и ограничениях работы в Германии, без каких-либо намерений или планов продавца.
-
-Инфраструктура продавца за пределами Германии (например, склады или производство 
-в Польше, Чехии, Австрии) также может должна учитываться в "geo" если она значима для последующего 
-выбора и ранжирования городов.
-
-11. Никогда не добавляй фразу "для B2B-заказчиков" или другие указания на тип клиентов
-в нормализованные поля "what", "who" и "geo". Система уже работает строго в B2B.
-
-Если текст выглядит как B2C — укажи это только в "hints", не меняя нормализованный текст.
-
-12. Вопросы не могут быть форматом, где ответ "да/нет" является достаточным.
-Разрешены формулировки вида "есть ли", но только если они требуют развернутого
-фактологического ответа (указать города, описать инфраструктуру, перечислить партнёров).
-
-Запрещены вопросы формата:
-"планируете ли вы", "будете ли", "куда хотите", "нужно ли вам".
-
-13. Приоритет — задавать уточняющие вопросы. Если в поле остаётся хотя бы одна
-неопределённость, неоднозначность или полезная деталь, которая помогает системе
-точнее подобрать бранчи и города, — обязательно задай вопрос.
-
-Пропускай вопрос только если информация полностью однозначна и достаточна.
-Вопросы должны быть простыми, короткими, конкретными и фактологическими.
-
-14. Правила стиля для вопросов и хинтов.
-- Вопросы задавать в личной форме, если уместно. - у Вас а не у продавца. 
-- ЗАПРЕЩЕНО упоминать бранчи, другю внутриситмную непонятную херню.
-- ЗАПРЕЩЕНО задавать близкие по смыслу вопросы.
-- ЗАПРЕЩЕНО задавать вопросы, в которых есть два и более смыслов, на которые можно ответить 1. вот это, 2. вот то.
--   Вопросы и хинты - только:
-      "what": только о продукте, который продаем.
-      "who": только о продавце как о компании, иключая то, что ниже в "geo"
-      "geo": только о географических параметрах продавца и продукта, которыевляют на выбор и ранжирование городов, бранчей и компаний - покупателей.
-
-- Вопросы должны быть короткими, простыми и содержать только одну смысловую задачу.
-       Запрещено объединять несколько уточнений в одном вопросе.
-
-- Оптимальная длина вопроса — 8–15 слов.
-       Если выходит длиннее, сократи формулировку без потери смысла.
-
--  Хинт — это короткая дружелюбная подсказка, которая:
-       • помогает пользователю понять, какой ответ лучше дать;
-       • при необходимости кратко объясняет, зачем этот вопрос задаётся.
-
-- Хинты должны быть лёгкими по стилю, без сложной терминологии,
-       без повторения вопроса. в одном из трех вопросов обязан быть лёгкий юмор, но чтобы не мешал
-       смыслу и делал коммуникацию проще.
-
-- Вопросы и хинты всегда ориентированы на сбор фактов, связанных с продуктом
-       и продавцом, а не на обсуждение стратегий, намерений или устройства системы.
-"""
-
-
-# ---------------------------------------------------------------------------
-# GPT CALL
-# ---------------------------------------------------------------------------
-
-def call_gpt(payload: dict, request) -> dict:
+def _parse_how_json(raw: str, fallback: dict) -> dict:
     """
-    Корректный вызов GPT через GPTClient().ask().
-
-    Если GPT вернул не-JSON (или мы не смогли его распарсить) —
-    возвращаем fallback-структуру на основе исходного ввода, чтобы UI не падал.
+    Аккуратно парсим JSON от HOW-промпта.
+    Если что-то не так — возвращаем fallback.
     """
+    try:
+        data = json.loads((raw or "").strip())
+        if not isinstance(data, dict):
+            raise ValueError("not a dict")
+        return data
+    except Exception:
+        return {
+            "what": fallback.get("what", ""),
+            "who": fallback.get("who", ""),
+            "geo": fallback.get("geo", ""),
+            "questions": {},
+            "hints": {},
+        }
 
+
+def how_view(request):
+    ws_id = request.workspace_id
+    user = request.user
+
+    client = GPTClient()
+
+    # все сохранённые задачи для таблицы
+    tasks = AudienceTask.objects.filter(workspace_id=ws_id, user=user)
+
+    # -------------------------
+    # GET: обычный / режим edit
+    # -------------------------
+    if request.method == "GET":
+        edit_id = request.GET.get("edit")
+        if edit_id:
+            obj = get_object_or_404(
+                AudienceTask,
+                id=edit_id,
+                workspace_id=ws_id,
+                user=user,
+            )
+
+            # разложим сохранённый task обратно в what/who/geo через HOW-промпт
+            gpt_resp = client.ask(
+                tier="maxi",
+                workspace_id=ws_id,
+                user_id=user.id,
+                system=get_prompt("audience_how_system"),
+                user=obj.task,
+                with_web=False,
+                endpoint="audience_how_prepare",
+            )
+
+            parsed = _parse_how_json(gpt_resp.content, {"what": "", "who": "", "geo": ""})
+
+            initial = {
+                "what": parsed.get("what", ""),
+                "who": parsed.get("who", ""),
+                "geo": parsed.get("geo", ""),
+                "question_what": parsed.get("questions", {}).get("what", ""),
+                "hint_what": parsed.get("hints", {}).get("what", ""),
+                "question_who": parsed.get("questions", {}).get("who", ""),
+                "hint_who": parsed.get("hints", {}).get("who", ""),
+                "question_geo": parsed.get("questions", {}).get("geo", ""),
+                "hint_geo": parsed.get("hints", {}).get("geo", ""),
+                "edit_id": obj.id,
+            }
+            form = AudienceHowForm(initial=initial)
+        else:
+            form = AudienceHowForm()
+
+        return render(
+            request,
+            "panels/aap_audience/how.html",
+            {"form": form, "tasks": tasks},
+        )
+
+    # -------------------------
+    # POST
+    # -------------------------
+
+    # Сначала обработка удаления, без форм и GPT
+    if request.POST.get("mode") == "delete":
+        delete_id = request.POST.get("delete_id")
+        if delete_id:
+            AudienceTask.objects.filter(
+                id=delete_id,
+                workspace_id=ws_id,
+                user=user,
+            ).delete()
+        return redirect(request.path)
+
+    # дальше обычная форма HOW
+    form = AudienceHowForm(request.POST)
+    if not form.is_valid():
+        return render(
+            request,
+            "panels/aap_audience/how.html",
+            {"form": form, "tasks": tasks},
+        )
+
+    payload = {
+        "what": form.cleaned_data.get("what", "") or "",
+        "who": form.cleaned_data.get("who", "") or "",
+        "geo": form.cleaned_data.get("geo", "") or "",
+    }
+
+    if not any(payload.values()):
+        form.add_error(None, "Заполните хотя бы одно поле.")
+        return render(
+            request,
+            "panels/aap_audience/how.html",
+            {"form": form, "tasks": tasks},
+        )
+
+    # ----- НОРМАЛИЗАЦИЯ HOW (maxi + web) -----
     user_message = f"""
 Пользователь ввёл три поля.
 
@@ -208,86 +141,106 @@ def call_gpt(payload: dict, request) -> dict:
 Выполни нормализацию строго по SYSTEM_PROMPT и верни ТОЛЬКО JSON.
 """
 
-    client = GPTClient()
-
-    gpt_response = client.ask(
-        tier="maxi",                     # → gpt-5.1
-        workspace_id=request.workspace_id,
-        user_id=request.user.id,
-        system=SYSTEM_PROMPT,
+    how_resp = client.ask(
+        tier="maxi",
+        workspace_id=ws_id,
+        user_id=user.id,
+        system=get_prompt("audience_how_system"),
         user=user_message,
         with_web=True,
         endpoint="audience_how_prepare",
     )
 
-    raw_content = (gpt_response.content or "").strip()
+    result = _parse_how_json(how_resp.content, payload)
 
-    # Защита от "болтовни" и ошибок — пытаемся распарсить JSON, иначе fallback.
-    try:
-        result = json.loads(raw_content)
-        if not isinstance(result, dict):
-            raise ValueError("GPT response is not a JSON object")
-        return result
-    except Exception:
-        # Fallback: ничего не роняем, просто возвращаем исходные данные
-        # и пустые вопросы/подсказки, плюс можем добавить текст ошибки в hints.what.
-        return {
-            "what": payload.get("what", ""),
-            "who": payload.get("who", ""),
-            "geo": payload.get("geo", ""),
-            "questions": {
-                "what": "",
-                "who": "",
-                "geo": "",
-            },
-            "hints": {
-                "what": "GPT вернул не-JSON. Ответ сохранён как есть.",
-                "who": "",
-                "geo": "",
-            },
-        }
+    # ----- СОХРАНЕНИЕ / ОБНОВЛЕНИЕ ЗАДАЧИ -----
+    if request.POST.get("mode") == "save":
+        # одна строка без WHAT/WHO/GEO, куски через пробел
+        pieces = [
+            (result.get("what", "") or "").replace("\n", " ").strip(),
+            (result.get("who", "") or "").replace("\n", " ").strip(),
+            (result.get("geo", "") or "").replace("\n", " ").strip(),
+        ]
+        task_text = " ".join(p for p in pieces if p).strip()
 
+        # title
+        title_resp = client.ask(
+            tier="nano",
+            workspace_id=ws_id,
+            user_id=user.id,
+            system=get_prompt("audience_how_name"),
+            user=task_text,
+            with_web=False,
+            endpoint="audience_task_title",
+        )
+        title = (title_resp.content or "").strip()
 
-# ---------------------------------------------------------------------------
-# HOW VIEW
-# ---------------------------------------------------------------------------
+        # branches
+        branches_resp = client.ask(
+            tier="maxi",
+            workspace_id=ws_id,
+            user_id=user.id,
+            system=get_prompt("audience_how_branches"),
+            user=task_text,
+            with_web=True,
+            endpoint="audience_task_branches",
+        )
+        task_branches = (branches_resp.content or "").strip()
 
-def how_view(request):
-    """
-    Главная логика формы: GET → пустая форма, POST → нормализация GPT.
-    """
+        # geo
+        geo_resp = client.ask(
+            tier="maxi",
+            workspace_id=ws_id,
+            user_id=user.id,
+            system=get_prompt("audience_how_geo"),
+            user=task_text,
+            with_web=True,
+            endpoint="audience_task_geo",
+        )
+        task_geo = (geo_resp.content or "").strip()
 
-    # ----- GET -----
-    if request.method == "GET":
-        form = AudienceHowForm()
-        return render(request, "panels/aap_audience/how.html", {"form": form})
+        edit_id = form.cleaned_data.get("edit_id")
 
-    # ----- POST -----
-    form = AudienceHowForm(request.POST)
-    if not form.is_valid():
-        return render(request, "panels/aap_audience/how.html", {"form": form})
+        if edit_id:
+            obj = get_object_or_404(
+                AudienceTask,
+                id=edit_id,
+                workspace_id=ws_id,
+                user=user,
+            )
+            obj.task = task_text
+            obj.title = title
+            obj.task_branches = task_branches
+            obj.task_geo = task_geo
+            obj.save()
+        else:
+            AudienceTask.objects.create(
+                workspace_id=ws_id,
+                user=user,
+                task=task_text,
+                title=title,
+                task_branches=task_branches,
+                task_geo=task_geo,
+            )
 
-    payload = {
-        "what": form.cleaned_data["what"],
-        "who": form.cleaned_data["who"],
-        "geo": form.cleaned_data["geo"],
-    }
+        return redirect(request.path)
 
-    result = call_gpt(payload, request)
-
-    questions = result.get("questions", {}) or {}
-    hints = result.get("hints", {}) or {}
-
+    # ----- ПРОСТО ОБРАБОТАТЬ (без сохранения) -----
     updated_form = AudienceHowForm(initial={
         "what": result.get("what", payload["what"]),
         "who": result.get("who", payload["who"]),
         "geo": result.get("geo", payload["geo"]),
-        "question_what": questions.get("what", ""),
-        "hint_what": hints.get("what", ""),
-        "question_who": questions.get("who", ""),
-        "hint_who": hints.get("who", ""),
-        "question_geo": questions.get("geo", ""),
-        "hint_geo": hints.get("geo", ""),
+        "question_what": result.get("questions", {}).get("what", ""),
+        "hint_what": result.get("hints", {}).get("what", ""),
+        "question_who": result.get("questions", {}).get("who", ""),
+        "hint_who": result.get("hints", {}).get("who", ""),
+        "question_geo": result.get("questions", {}).get("geo", ""),
+        "hint_geo": result.get("hints", {}).get("geo", ""),
+        "edit_id": form.cleaned_data.get("edit_id"),
     })
 
-    return render(request, "panels/aap_audience/how.html", {"form": updated_form})
+    return render(
+        request,
+        "panels/aap_audience/how.html",
+        {"form": updated_form, "tasks": tasks},
+    )

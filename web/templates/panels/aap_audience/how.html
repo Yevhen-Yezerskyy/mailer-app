@@ -1,4 +1,4 @@
-{# FILE: web/templates/panels/aap_audience/how.html (новое) 2025-12-09 #}
+{# FILE: web/templates/panels/aap_audience/how.html (новое) 2025-12-11 #}
 
 {% extends "panels/base.html" %}
 
@@ -37,7 +37,6 @@
       {% csrf_token %}
 
       {# -------- Что продаёте -------- #}
-      
       <div class="panel-form-group">
         <label class="panel-form-label" for="id_what">Что продаёте</label>
         {% if form.question_what.value %}
@@ -49,7 +48,6 @@
           </div>
         {% endif %}
 
-        
         <textarea
           name="{{ form.what.name }}"
           id="id_what"
@@ -75,7 +73,6 @@
           </div>
         {% endif %}
 
-        
         <textarea
           name="{{ form.who.name }}"
           id="id_who"
@@ -101,7 +98,6 @@
           </div>
         {% endif %}
 
-        
         <textarea
           name="{{ form.geo.name }}"
           id="id_geo"
@@ -119,11 +115,22 @@
       {{ form.question_what }}{{ form.hint_what }}
       {{ form.question_who }}{{ form.hint_who }}
       {{ form.question_geo }}{{ form.hint_geo }}
+      {{ form.edit_id }}
+      <input type="hidden" name="mode" id="id_mode" value="">
 
       <div class="panel-form-actions">
         <button type="submit" class="panel-button-primary" id="submit-btn">
           Обработать
         </button>
+
+        <button type="submit" name="save" value="1" class="panel-button-secondary" id="save-btn" style="margin-left: 8px;">
+          {% if form.edit_id.value %}
+            Сохранить изменения
+          {% else %}
+            Сохранить задачу
+          {% endif %}
+        </button>
+
         <button type="button" class="panel-button-secondary" id="clear-btn" style="margin-left: 8px;">
           Очистить
         </button>
@@ -140,20 +147,103 @@
       </div>
     </form>
   </div>
-</div>
+
+</div>  {# /panel-page — ЗАКРЫЛИ #}
+
+
+{# ----- Сохранённые задачи (широкая карточка на 95%) ----- #}
+{% if tasks %}
+  <div class="panel-card" style="margin-top: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
+    <h3 class="panel-card-title" style="margin-bottom: 12px;">Сохранённые задачи</h3>
+
+    <div class="panel-table-wrapper">
+      <table class="panel-table">
+        <thead>
+          <tr>
+            <th style="width: 10%;">Название</th>
+            <th style="width: 30%;">Task</th>
+            <th style="width: 30%;">Branches-задача</th>
+            <th style="width: 30%;">Geo-задача</th>
+            <th style="width: 110px; text-align: right;">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tasks %}
+            <tr>
+              <td>
+                <strong>{{ t.title }}</strong>
+              </td>
+              <td>
+                {{ t.task|linebreaksbr }}
+              </td>
+              <td>
+                {{ t.task_branches|linebreaksbr }}
+              </td>
+              <td>
+                {{ t.task_geo|linebreaksbr }}
+              </td>
+              <td style="text-align: right;">
+                <div style="display: inline-flex; gap: 8px; align-items: center;">
+                  {# редактировать #}
+                  <a href="?edit={{ t.id }}"
+                     class="panel-link task-edit-link"
+                     style="font-size: 13px;"
+                     title="Изменить задачу">
+                    ✏️ Изменить
+                  </a>
+
+                  {# удалить #}
+                  <form method="post" style="margin: 0; display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="delete">
+                    <input type="hidden" name="delete_id" value="{{ t.id }}">
+                    <button type="submit"
+                            class="panel-link"
+                            style="background: none; border: none; padding: 0; margin-left: 4px; font-size: 13px; color: #b91c1c; cursor: pointer;"
+                            title="Удалить задачу"
+                            onclick="return confirm('Вы уверены, что хотите удалить задачу?');">
+                      🗑️ Удалить
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
+
+
 
 <script>
   (function () {
     const form = document.getElementById("how-form");
     const submitBtn = document.getElementById("submit-btn");
+    const saveBtn = document.getElementById("save-btn");
     const clearBtn = document.getElementById("clear-btn");
     const errorBox = document.getElementById("how-error");
 
     const whatField = document.getElementById("id_what");
     const whoField  = document.getElementById("id_who");
     const geoField  = document.getElementById("id_geo");
+    const editIdField = document.getElementById("id_edit_id");
+    const modeField = document.getElementById("id_mode");
 
-    if (form && submitBtn) {
+    if (submitBtn) {
+      submitBtn.addEventListener("click", function () {
+        if (modeField) modeField.value = "process";
+      });
+    }
+
+    if (saveBtn) {
+      saveBtn.addEventListener("click", function () {
+        if (modeField) modeField.value = "save";
+      });
+    }
+
+    if (form) {
       form.addEventListener("submit", function (e) {
         const whatText = (whatField?.value || "").trim();
         const whoText  = (whoField?.value  || "").trim();
@@ -170,7 +260,8 @@
         if (errorBox) errorBox.style.display = "none";
 
         form.classList.add("panel-form--loading");
-        submitBtn.disabled = true;
+        if (submitBtn) submitBtn.disabled = true;
+        if (saveBtn) saveBtn.disabled = true;
       });
     }
 
@@ -184,7 +275,9 @@
         if (whoField)  whoField.value  = "";
         if (geoField)  geoField.value  = "";
 
-        // обнулить скрытые поля вопросов/хинтов, если они есть
+        if (editIdField) editIdField.value = "";
+        if (modeField) modeField.value = "";
+
         const metaIds = [
           "id_question_what",
           "id_question_who",
@@ -198,7 +291,6 @@
           if (el) el.value = "";
         });
 
-        // спрятать блоки с вопросами/хинтами
         const questionBlocks = document.querySelectorAll(".gpt-question-block");
         questionBlocks.forEach(function (qb) {
           qb.style.display = "none";
@@ -207,7 +299,18 @@
         if (errorBox) errorBox.style.display = "none";
       });
     }
+
+    // Оверлэй "Думаю..." при клике на "Изменить" в списке задач
+    const editLinks = document.querySelectorAll(".task-edit-link");
+    editLinks.forEach(function (link) {
+      link.addEventListener("click", function () {
+        if (form) {
+          form.classList.add("panel-form--loading");
+        }
+      });
+    });
   })();
 </script>
+
 
 {% endblock %}

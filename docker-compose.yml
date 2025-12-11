@@ -49,11 +49,14 @@ services:
       - "8000:8000"        # http://сервер:8000
 
     # как и было: gunicorn из venv
-    command:  >  
+    command: >
       /app/.venv/bin/gunicorn mailer_web.wsgi:application
       --bind 0.0.0.0:8000
       --reload
       --workers 1
+      --timeout 180
+      --graceful-timeout 30
+      --worker-tmp-dir /dev/shm
 
     networks:
       - webnet

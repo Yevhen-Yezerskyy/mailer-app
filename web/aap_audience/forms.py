@@ -1,4 +1,4 @@
-# FILE: web/aap_audience/forms.py   (новое — 2025-12-08)
+# FILE: web/aap_audience/forms.py  (новое) 2025-12-11
 
 from django import forms
 
@@ -21,11 +21,35 @@ class AudienceHowForm(forms.Form):
     )
 
     # Уточняющие вопросы и подсказки для каждого блока
-    question_what = forms.CharField(required=False, widget=forms.HiddenInput())
-    hint_what = forms.CharField(required=False, widget=forms.HiddenInput())
+    question_what = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+    )
+    hint_what = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+    )
 
-    question_who = forms.CharField(required=False, widget=forms.HiddenInput())
-    hint_who = forms.CharField(required=False, widget=forms.HiddenInput())
+    question_who = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+    )
+    hint_who = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+    )
 
-    question_geo = forms.CharField(required=False, widget=forms.HiddenInput())
-    hint_geo = forms.CharField(required=False, widget=forms.HiddenInput())
+    question_geo = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+    )
+    hint_geo = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+    )
+
+    # Для режима редактирования сохранённой задачи HOW
+    edit_id = forms.IntegerField(
+        required=False,
+        widget=forms.HiddenInput(),
+    )

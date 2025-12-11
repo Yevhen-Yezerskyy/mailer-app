@@ -1,4 +1,4 @@
-# FILE: engine/common/gpt.py  (новое — 2025-12-08)
+# FILE: engine/common/gpt.py  (новое — 2025-12-11)
 
 """
 GPT connector for mailer-app.
@@ -14,12 +14,19 @@ GPT connector for mailer-app.
 - Для tier='maxi' при with_web=True включается web_search_preview.
 - Вся история (session_id) хранится только локально в объекте и
   НИКОГДА не отправляется в модель.
+
+Добавлено:
+- Файловый кеш по хешу запроса:
+    ключ = hash(model_name, tier_name, with_web, system, user)
+- Кеш хранится в PROJECT_ROOT/cache/gpt/<model>/<префикс>/<hash>.json
+  с полем created_at для последующей чистки по экспирации внешним скриптом.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -46,6 +53,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 # Base log directory: mailer-app/logs/gpt/
 LOG_BASE_DIR = PROJECT_ROOT / "logs" / "gpt"
 LOG_BASE_DIR.mkdir(parents=True, exist_ok=True)
+
+# Base cache directory: mailer-app/cache/gpt/
+CACHE_BASE_DIR = LOG_BASE_DIR / "cache"
+CACHE_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class GptConfigError(RuntimeError):
@@ -100,6 +111,65 @@ def _make_log_dir(service_tier: ServiceTier, model_name: str) -> Path:
     d = LOG_BASE_DIR / service_tier / model_name
     d.mkdir(parents=True, exist_ok=True)
     return d
+
+
+def _make_cache_path(model_name: str, cache_key: str) -> Path:
+    """
+    Возвращает путь к файлу кеша для данного model_name + cache_key.
+    Кеш раскладывается по подпапкам по первым двум символам хеша,
+    чтобы не было тысячи файлов в одной директории.
+    """
+    subdir = CACHE_BASE_DIR / model_name / cache_key[:2]
+    subdir.mkdir(parents=True, exist_ok=True)
+    return subdir / f"{cache_key}.json"
+
+
+def _compute_cache_key(
+    *,
+    model_name: str,
+    tier_name: TierName,
+    with_web: Optional[bool],
+    service_tier: ServiceTier,      # оставлено в сигнатуре для совместимости, но НЕ в ключе
+    workspace_id: str,              # НЕ в ключе
+    user_id: str,                   # НЕ в ключе
+    system: str,
+    user: str,
+    endpoint: str,                  # НЕ в ключе
+    extra_payload: Dict[str, Any],  # НЕ в ключе
+) -> str:
+    """
+    Формирует хеш-ключ кеша.
+
+    В хеш входят ТОЛЬКО:
+        - model_name
+        - tier_name
+        - with_web
+        - system (instructions)
+        - user (input)
+
+    Всё остальное НЕ влияет на кеш:
+        - workspace_id, user_id
+        - endpoint
+        - extra_payload
+        - service_tier
+    """
+
+    payload_for_hash = {
+        "model": model_name,
+        "tier": tier_name,
+        "with_web": with_web,
+        "system": system,
+        "user": user,
+    }
+
+    serialized = json.dumps(
+        payload_for_hash,
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
 def _log_call(
@@ -168,6 +238,9 @@ class GPTClient:
     - Внутри — только Responses API, без chat.completions.
     - session_id / use_history используются ТОЛЬКО для внутреннего хранения
       истории (self._sessions_history) и не влияют на запросы к модели.
+    - Есть файловый кеш по хешу запроса (см. _compute_cache_key). Кеш можно
+      отключить per-call (use_cache=False) или чистить отдельным скриптом
+      по полю created_at в файлах кеша.
     """
 
     N_CALLS_BEFORE_RESET = 7
@@ -196,6 +269,7 @@ class GPTClient:
         extra_payload: Optional[Dict[str, Any]] = None,
         session_id: Optional[str] = None,
         use_history: bool = False,
+        use_cache: bool = True,
     ) -> GptResponse:
         """
         Один запрос к GPT (всегда одиночный ход, без контекста).
@@ -206,6 +280,10 @@ class GPTClient:
             * для 'nano'/'mini' НЕЛЬЗЯ ставить True (raise)
         - system → instructions
         - user   → input
+        - use_cache:
+            * True (по умолчанию): перед API-вызовом будет пробоваться файловый кеш;
+              успешный ответ также будет записан в кеш.
+            * False: кеш игнорируется и не пишется.
         """
 
         # --- validate tier & model ---
@@ -246,15 +324,73 @@ class GPTClient:
         # --- history (только запоминаем, НО не шлём в модель) ---
         if use_history and session_id:
             history = self._sessions_history.setdefault(session_id, [])
-            history.append({"role": "user", "content": user_clean})
+            # логичнее: system → user
             history.append({"role": "system", "content": system_clean})
+            history.append({"role": "user", "content": user_clean})
 
         extra_payload = extra_payload or {}
 
-        # --- perform request & log ---
-        self._ensure_client()
+        # --- cache: попытка cache hit до любого обращения к API ---
+        cache_key = _compute_cache_key(
+            model_name=model_name,
+            tier_name=tier,
+            with_web=with_web,
+            service_tier=service_tier,
+            workspace_id=workspace_id_str,
+            user_id=user_id_str,
+            system=system_clean,
+            user=user_clean,
+            endpoint=endpoint,
+            extra_payload=extra_payload,
+        )
+        cache_path = _make_cache_path(model_name, cache_key)
 
+        if use_cache and cache_path.exists():
+            try:
+                with cache_path.open("r", encoding="utf-8") as f:
+                    cached = json.load(f)
+
+                raw_response = cached.get("response", {}) or {}
+                usage = self._extract_usage(raw_response)
+                status = "cache"
+                error_message: Optional[str] = None
+
+                if use_history and session_id:
+                    content_for_history = self._extract_content(raw_response)
+                    self._sessions_history.setdefault(session_id, []).append(
+                        {"role": "assistant", "content": content_for_history}
+                    )
+
+                _log_call(
+                    model_name=model_name,
+                    tier_name=tier,
+                    with_web=with_web,
+                    service_tier=service_tier,
+                    workspace_id=workspace_id_str,
+                    user_id=user_id_str,
+                    system=system_clean,
+                    user=user_clean,
+                    endpoint=endpoint,
+                    response=raw_response,
+                    usage=usage,
+                    status=status,
+                    error_message=error_message,
+                )
+
+                content = self._extract_content(raw_response)
+                return GptResponse(
+                    content=content,
+                    raw=raw_response,
+                    usage=usage,
+                )
+            except Exception:
+                # Любая проблема с кешем → просто игнорируем и идём в реальный API.
+                pass
+
+        # --- perform request & log ---
         try:
+            self._ensure_client()
+
             raw_response = self._perform_responses_request(
                 model_name=model_name,
                 system=system_clean,
@@ -272,6 +408,32 @@ class GPTClient:
                 self._sessions_history.setdefault(session_id, []).append(
                     {"role": "assistant", "content": content_for_history}
                 )
+
+            # --- успешный ответ можно положить в кеш ---
+            if use_cache:
+                try:
+                    cache_record = {
+                        "created_at": datetime.utcnow().isoformat() + "Z",
+                        "request_fingerprint": cache_key,
+                        "request_meta": {
+                            "model": model_name,
+                            "tier": tier,
+                            "with_web": with_web,
+                            "service_tier": service_tier,
+                            "workspace_id": workspace_id_str,
+                            "user_id": user_id_str,
+                            "endpoint": endpoint,
+                            "system": system_clean,
+                            "user": user_clean,
+                            "extra_payload": extra_payload,
+                        },
+                        "response": raw_response,
+                    }
+                    with cache_path.open("w", encoding="utf-8") as f:
+                        json.dump(cache_record, f, ensure_ascii=False)
+                except Exception:
+                    # Ошибки кеша не должны ломать основной поток
+                    pass
 
         except Exception as exc:
             raw_response = {
@@ -335,7 +497,7 @@ class GPTClient:
         - web_search_preview включается, если with_web=True и tier='maxi'
         """
 
-        from openai import OpenAI  # для type-checkеров; клиент уже есть
+        # клиент уже создан в _ensure_client
         self._calls_since_reset += 1
 
         # Базовый payload

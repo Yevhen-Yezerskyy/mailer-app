@@ -72,12 +72,17 @@ def save_state(state: Dict[str, Any]) -> None:
 # PUBLIC API: get_prompt(key)
 # ============================================================================
 
-def get_prompt(key: str) -> str:
+def get_prompt(key: str, lang: str = "same") -> str:
     """
     Вернуть АКТУАЛЬНЫЙ текст промпта:
     - если есть eng/<key>.txt и он не старее исходника → вернуть его
     - иначе вернуть <key>.txt
-    - если ничего нет / ошибка чтения → вернуть "" (никаких исключений)
+    - если ничего нет → вернуть ""
+
+    Язык:
+        lang = "same"  → ничего не добавляем, модель сама выбирает язык ответа.
+        lang = "en"/"de"/"uk"/... → в конец промпта добавляется строка
+                                   LANGUAGE OF THE RESPONSE: <lang>
     """
     try:
         state = load_state()
@@ -88,7 +93,7 @@ def get_prompt(key: str) -> str:
     if not source_file.exists():
         return ""
 
-    # исходник
+    # ---- читаем оригинал ----
     try:
         source_text = source_file.read_text(encoding="utf-8")
     except Exception:
@@ -100,14 +105,24 @@ def get_prompt(key: str) -> str:
     eng_file = ENG_DIR / f"{key}.txt"
     eng_mtime = entry.get("eng_mtime")
 
-    if eng_file.exists() and isinstance(eng_mtime, (int, float)):
-        if eng_mtime >= source_mtime:
-            try:
-                return eng_file.read_text(encoding="utf-8")
-            except Exception:
-                return source_text
+    # ---- выбираем актуальный текст ----
+    if eng_file.exists() and isinstance(eng_mtime, (int, float)) and eng_mtime >= source_mtime:
+        try:
+            prompt_text = eng_file.read_text(encoding="utf-8")
+        except Exception:
+            prompt_text = source_text
+    else:
+        prompt_text = source_text
 
-    return source_text
+    # ---- язык ответа ----
+    if lang == "same":
+        # НИЧЕГО не добавляем — модель сама понимает язык ответа
+        return prompt_text
+
+    # ---- приклеиваем инструкцию ----
+    appendix = f"\n\nLANGUAGE OF THE RESPONSE: {lang}\n"
+    return prompt_text.rstrip() + appendix
+
 
 
 # ============================================================================
