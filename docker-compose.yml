@@ -1,4 +1,4 @@
-# FILE: docker-compose.yml
+# FILE: docker-compose.yml  (новое) 2025-12-11
 
 services:
   # ------------ POSTGRES ------------
@@ -12,7 +12,6 @@ services:
       POSTGRES_PASSWORD: secret
     volumes:
       - mailer-db-data:/var/lib/postgresql/data
-    # наружу даём НЕ стандартный порт, чтобы не пересечься с другим postgres
     ports:
       - "5433:5432"
     networks:
@@ -22,33 +21,36 @@ services:
   mailer-web:
     image: python:3.12
     container_name: mailer-web
-    working_dir: /app
+    working_dir: /app/web            # корень Django внутри общего репозитория
     restart: unless-stopped
     user: "1001:1001"
     depends_on:
       - mailer-db
 
-    # тут ЗАМЕНИЛ на список, чтобы аккуратно прокинуть OPENAI_API_KEY из среды машинки
     environment:
+      # DB
       - DB_HOST=mailer-db
       - DB_PORT=5432
       - DB_NAME=mailersys
       - DB_USER=mailersys_user
       - DB_PASSWORD=secret
-      - PYTHONPATH=/app:/engine
-      # берём значение переменной OPENAI_API_KEY с хоста, если оно там есть
+
+      # Python path — оба аппа доступны одинаково локально и в контейнере
+      - PYTHONPATH=/app
+
+      # API key (если есть в окружении хоста — прокинется)
       - OPENAI_API_KEY
 
     volumes:
-      - ./web:/app          # твой Django-проект
-      - ./engine:/engine    # движок с GPT-клиентом рядом
-      - ./logs:/logs    # движок с GPT-клиентом рядом
-      - mailer-static:/app/staticfiles
+      # Монтируем ВЕСЬ проект в контейнер
+      - ./:/app
+
+      # статика остаётся volume, чтобы collectstatic мог записывать
+      - mailer-static:/app/web/staticfiles
 
     ports:
-      - "8000:8000"        # http://сервер:8000
+      - "8000:8000"
 
-    # как и было: gunicorn из venv
     command: >
       /app/.venv/bin/gunicorn mailer_web.wsgi:application
       --bind 0.0.0.0:8000

@@ -34,7 +34,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict
 
-from common.gpt import GPTClient
+from engine.common.gpt import GPTClient
 
 try:
     from worker.tick import BaseProcess

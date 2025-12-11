@@ -11,6 +11,7 @@ class AudienceTask(models.Model):
     title = models.CharField(max_length=255)
     task_branches = models.TextField()
     task_geo = models.TextField()
+    task_client = models.TextField(blank=True, default="")  # <-- НОВОЕ
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -158,12 +158,13 @@
 
     <div class="panel-table-wrapper">
       <table class="panel-table">
-        <thead>
+               <thead>
           <tr>
-            <th style="width: 10%;">Название</th>
-            <th style="width: 30%;">Task</th>
-            <th style="width: 30%;">Branches-задача</th>
-            <th style="width: 30%;">Geo-задача</th>
+            <th style="width: 8%;">Название</th>
+            <th style="width: 23%;">Task</th>
+            <th style="width: 23%;">Branches-задача</th>
+            <th style="width: 23%;">Geo-задача</th>
+            <th style="width: 23%;">Client-задача</th> 
             <th style="width: 110px; text-align: right;">Действия</th>
           </tr>
         </thead>
@@ -182,6 +183,9 @@
               <td>
                 {{ t.task_geo|linebreaksbr }}
               </td>
+              <td>
+                {{ t.task_client|linebreaksbr }} 
+              </td>
               <td style="text-align: right;">
                 <div style="display: inline-flex; gap: 8px; align-items: center;">
                   {# редактировать #}
@@ -189,7 +193,7 @@
                      class="panel-link task-edit-link"
                      style="font-size: 13px;"
                      title="Изменить задачу">
-                    ✏️ Изменить
+                    ✏️
                   </a>
 
                   {# удалить #}
@@ -202,7 +206,7 @@
                             style="background: none; border: none; padding: 0; margin-left: 4px; font-size: 13px; color: #b91c1c; cursor: pointer;"
                             title="Удалить задачу"
                             onclick="return confirm('Вы уверены, что хотите удалить задачу?');">
-                      🗑️ Удалить
+                      🗑️
                     </button>
                   </form>
                 </div>

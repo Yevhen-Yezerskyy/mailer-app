@@ -6,8 +6,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 
 from aap_audience.forms import AudienceHowForm
 from aap_audience.models import AudienceTask
-from common.gpt import GPTClient
-from common.prompts.process import get_prompt
+from engine.common.gpt import GPTClient
+from engine.common.prompts.process import get_prompt
 
 
 def _parse_how_json(raw: str, fallback: dict) -> dict:
@@ -199,6 +199,18 @@ def how_view(request):
         )
         task_geo = (geo_resp.content or "").strip()
 
+        # client  <-- НОВОЕ
+        client_resp = client.ask(
+            tier="maxi",
+            workspace_id=ws_id,
+            user_id=user.id,
+            system=get_prompt("audience_how_client"),
+            user=task_text,
+            with_web=True,
+            endpoint="audience_task_client",
+        )
+        task_client = (client_resp.content or "").strip()
+
         edit_id = form.cleaned_data.get("edit_id")
 
         if edit_id:
@@ -212,6 +224,7 @@ def how_view(request):
             obj.title = title
             obj.task_branches = task_branches
             obj.task_geo = task_geo
+            obj.task_client = task_client      # <-- НОВОЕ
             obj.save()
         else:
             AudienceTask.objects.create(
@@ -221,6 +234,7 @@ def how_view(request):
                 title=title,
                 task_branches=task_branches,
                 task_geo=task_geo,
+                task_client=task_client,        # <-- НОВОЕ
             )
 
         return redirect(request.path)
