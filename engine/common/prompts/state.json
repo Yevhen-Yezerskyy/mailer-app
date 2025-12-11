@@ -1,0 +1,22 @@
+{
+  "prompt_quality": {
+    "name": "Оценка ясности промпта",
+    "rate": 9,
+    "source_mtime": 1765411080.5121949,
+    "last_eval": "2025-12-10T23:58:22",
+    "debug": "YES",
+    "name_en": "",
+    "rate_en": 0,
+    "eng_mtime": null
+  },
+  "prompt_translate": {
+    "name": "Prompt translation clarity",
+    "rate": 2,
+    "source_mtime": 1765411153.0288548,
+    "last_eval": "2025-12-10T23:59:27",
+    "debug": "YES",
+    "name_en": "",
+    "rate_en": 0,
+    "eng_mtime": null
+  }
+}
