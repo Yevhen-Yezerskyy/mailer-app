@@ -1,0 +1,312 @@
+<!-- FILE: web/templates/panels/aap_audience/clar.html  (новое) 2025-12-12 -->
+
+{% extends "panels/base.html" %}
+
+{% block title %}Уточнение задачи — Serenity Mailer{% endblock %}
+
+{% block sidebar_menu %}
+  {% include "panels/aap_audience/menu_left.html" %}
+{% endblock %}
+
+{% block content %}
+
+{# Верхняя карточка с формой (только в режиме редактирования) #}
+{% if form %}
+  <div class="panel-card" style="margin-bottom: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
+
+    <h3 class="panel-card-title" style="margin-bottom: 12px;">Редактирование задачи</h3>
+
+    <div style="display: grid; grid-template-columns: 40% 30% 30%; gap: 20px;">
+
+      {# Левая колонка — сама форма #}
+      <div>
+
+        <form method="post" class="panel-form">
+          {% csrf_token %}
+          <input type="hidden" name="mode" value="save">
+          {{ form.edit_id }}
+
+          <div class="panel-form-group">
+            <label class="panel-form-label" for="{{ form.title.id_for_label }}">Название</label>
+            {{ form.title }}
+          </div>
+
+          <div class="panel-form-group">
+            <label class="panel-form-label" for="{{ form.task.id_for_label }}">Основной task</label>
+            {{ form.task }}
+          </div>
+
+          <div class="panel-form-group">
+            <label class="panel-form-label" for="{{ form.task_branches.id_for_label }}">Branches-задача</label>
+            {{ form.task_branches }}
+          </div>
+
+          <div class="panel-form-group">
+            <label class="panel-form-label" for="{{ form.task_geo.id_for_label }}">Geo-задача</label>
+            {{ form.task_geo }}
+          </div>
+
+          <div class="panel-form-group">
+            <label class="panel-form-label" for="{{ form.task_client.id_for_label }}">Client-задача</label>
+            {{ form.task_client }}
+          </div>
+
+          <div class="panel-form-actions" style="display: flex; gap: 12px;">
+
+            <button type="submit"
+                    class="panel-btn panel-btn-primary"
+                    style="background: #2563eb; color: white; padding: 8px 18px; border-radius: 8px;">
+              💾 Сохранить
+            </button>
+
+            <a href="{% url 'audience:clar' %}"
+               class="panel-btn"
+               style="background: #e5e7eb; padding: 8px 18px; border-radius: 8px; color: #111;">
+              ✖ Закрыть
+            </a>
+
+          </div>
+
+        </form>
+
+      </div>
+
+      {# Средняя колонка — города #}
+      <div>
+        <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">Города</h4>
+
+        {% if current_task_id %}
+          <div style="display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+            <form method="post" style="display: inline;">
+              {% csrf_token %}
+              <input type="hidden" name="edit_id" value="{{ current_task_id }}">
+              <input type="hidden" name="mode" value="gen_city">
+              <input type="hidden" name="task_id" value="{{ current_task_id }}">
+              <button type="submit"
+                      class="panel-btn panel-btn-primary"
+                      style="font-size: 13px; padding: 6px 12px; border-radius: 8px;">
+                ➕ Добавить города
+              </button>
+            </form>
+
+            <form method="post" style="display: inline;">
+              {% csrf_token %}
+              <input type="hidden" name="edit_id" value="{{ current_task_id }}">
+              <input type="hidden" name="mode" value="clear_city">
+              <input type="hidden" name="task_id" value="{{ current_task_id }}">
+              <button type="submit"
+                      class="panel-btn"
+                      style="font-size: 13px; padding: 6px 12px; border-radius: 8px; background: #fee2e2; color: #991b1b;">
+                🗑 Удалить города
+              </button>
+            </form>
+          </div>
+
+          <p style="font-size: 13px; margin-bottom: 6px;">
+            Городов: {{ clar_city_count|default:0 }}
+          </p>
+
+          <div style="max-height: 800px; max-width: 350px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; font-size: 13px;">
+            {% if clar_city_items %}
+              {% for item in clar_city_items %}
+                <div style="display: flex; justify-content: space-between; gap: 8px; padding: 2px 0;">
+                  <span>{{ item.value }}</span>
+                  <span style="opacity: 0.7;">{{ item.rate }}</span>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div style="opacity: 0.7;">Пока нет сгенерированных городов.</div>
+            {% endif %}
+          </div>
+        {% else %}
+          <p style="font-size: 13px; opacity: 0.7;">
+            Выберите задачу ниже (✏️), чтобы работать с городами.
+          </p>
+        {% endif %}
+      </div>
+
+      {# Правая колонка — бранчи #}
+      <div>
+        <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">Бранчи</h4>
+
+        {% if current_task_id %}
+          <div style="display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
+            <form method="post" style="display: inline;">
+              {% csrf_token %}
+              <input type="hidden" name="edit_id" value="{{ current_task_id }}">
+              <input type="hidden" name="mode" value="gen_branch">
+              <input type="hidden" name="task_id" value="{{ current_task_id }}">
+              <button type="submit"
+                      class="panel-btn panel-btn-primary"
+                      style="font-size: 13px; padding: 6px 12px; border-radius: 8px;">
+                ➕ Добавить бранчи
+              </button>
+            </form>
+
+            <form method="post" style="display: inline;">
+            <input type="hidden" name="edit_id" value="{{ current_task_id }}">
+              {% csrf_token %}
+              <input type="hidden" name="mode" value="clear_branch">
+              <input type="hidden" name="task_id" value="{{ current_task_id }}">
+              <button type="submit"
+                      class="panel-btn"
+                      style="font-size: 13px; padding: 6px 12px; border-radius: 8px; background: #fee2e2; color: #991b1b;">
+                🗑 Удалить бранчи
+              </button>
+            </form>
+          </div>
+
+          <p style="font-size: 13px; margin-bottom: 6px;">
+            Бранчей: {{ clar_branch_count|default:0 }}
+          </p>
+
+          <div style="max-height: 800px; max-width: 350px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; font-size: 13px;">
+            {% if clar_branch_items %}
+              {% for item in clar_branch_items %}
+                <div style="display: flex; justify-content: space-between; gap: 8px; padding: 2px 0;">
+                  <span>{{ item.value }}</span>
+                  <span style="opacity: 0.7;">{{ item.rate }}</span>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div style="opacity: 0.7;">Пока нет сгенерированных бранчей.</div>
+            {% endif %}
+          </div>
+        {% else %}
+          <p style="font-size: 13px; opacity: 0.7;">
+            Выберите задачу ниже (✏️), чтобы работать с бранчами.
+          </p>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+{% endif %}
+
+
+<!-- FILE: web/templates/panels/aap_audience/clar.html  (фрагмент таблицы) 2025-12-12 -->
+
+{# Нижняя карточка с таблицей задач #}
+{% if tasks %}
+  <div class="panel-card" style="margin-top: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
+    <h3 class="panel-card-title" style="margin-bottom: 12px;">Задачи HOW</h3>
+
+    <div class="panel-table-wrapper">
+      <table class="panel-table">
+        <thead>
+          <tr>
+            <th style="width: 25%;">Название + Task</th>
+            <th style="width: 25%;">Branches / Geo / Client</th>
+            <th style="width: 25%;">Города (топ-50)</th>
+            <th style="width: 25%;">Бранчи (топ-50)</th>
+            <th style="width: 110px; text-align: right;">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in tasks %}
+            <tr>
+              <td>
+                <strong>{{ t.title }}</strong><br><br>
+                <b>Основной task</b><br><br>
+                {{ t.task|linebreaksbr }}
+              </td>
+              <td>
+                <b>Бранчи task</b><br><br>
+                {{ t.task_branches|linebreaksbr }}<br><br><br>
+                <b>Гео task</b><br><br>
+                {{ t.task_geo|linebreaksbr }}<br><br><br>
+                <b>Client task</b><br><br><br>
+                {{ t.task_client|linebreaksbr }}
+              </td>
+
+              {# Колонка 3 — города #}
+              <td style="font-size: 12px; vertical-align: top;">
+                {% with items=t.clar_city_items %}
+                  {% if items %}
+                    <div style="margin-bottom: 4px;">
+                      Городов: {{ items|length }}
+                    </div>
+                    <div style="max-height: 500px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px;">
+                      {% for item in items|slice:":50" %}
+                        <div style="display: flex; justify-content: space-between; gap: 6px;">
+                          <span>{{ item.value }}</span>
+                          <span style="opacity: 0.65;">{{ item.rate }}</span>
+                        </div>
+                      {% endfor %}
+                      {% if items|length > 50 %}
+                        <div style="text-align: center; opacity: 0.7; margin-top: 4px;">...</div>
+                        <div style="text-align: center; opacity: 0.7;">...</div>
+                      {% endif %}
+                    </div>
+                  {% else %}
+                    <span style="opacity: 0.6;">Города не сгенерированы.</span>
+                  {% endif %}
+                {% endwith %}
+              </td>
+
+              {# Колонка 4 — бранчи #}
+              <td style="font-size: 12px; vertical-align: top;">
+                {% with items=t.clar_branch_items %}
+                  {% if items %}
+                    <div style="margin-bottom: 4px;">
+                      Бранчей: {{ items|length }}
+                    </div>
+                    <div style="max-height: 500px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px;">
+                      {% for item in items|slice:":50" %}
+                        <div style="display: flex; justify-content: space-between; gap: 6px;">
+                          <span>{{ item.value }}</span>
+                          <span style="opacity: 0.65;">{{ item.rate }}</span>
+                        </div>
+                      {% endfor %}
+                      {% if items|length > 50 %}
+                        <div style="text-align: center; opacity: 0.7; margin-top: 4px;">...</div>
+                        <div style="text-align: center; opacity: 0.7;">...</div>
+                      {% endif %}
+                    </div>
+                  {% else %}
+                    <span style="opacity: 0.6;">Бранчи не сгенерированы.</span>
+                  {% endif %}
+                {% endwith %}
+              </td>
+
+              <td style="text-align: right;">
+                <div style="display: inline-flex; gap: 8px; align-items: center;">
+
+                  {# редактировать #}
+                  <a href="?edit={{ t.id }}"
+                     class="panel-link task-edit-link"
+                     style="font-size: 13px;"
+                     title="Изменить задачу">
+                    ✏️
+                  </a>
+
+                  {# удалить #}
+                  <form method="post" style="margin: 0; display: inline;">
+                    {% csrf_token %}
+                    <input type="hidden" name="mode" value="delete">
+                    <input type="hidden" name="delete_id" value="{{ t.id }}">
+                    <button type="submit"
+                            class="panel-link"
+                            style="background: none; border: none; padding-left: 4px; font-size: 13px; color: #b91c1c; cursor: pointer;"
+                            title="Удалить задачу"
+                            onclick="return confirm('Вы уверены, что хотите удалить задачу?');">
+                      🗑️
+                    </button>
+                  </form>
+
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <div class="panel-card" style="margin-top: 24px;">
+    <p>Задач пока нет. Создайте первую задачу на вкладке «Как ищем?».</p>
+  </div>
+{% endif %}
+
+
+{% endblock %}

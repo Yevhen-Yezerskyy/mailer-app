@@ -1,4 +1,4 @@
-# FILE: engine/common/gpt.py  (новое — 2025-12-11)
+# FILE: engine/common/gpt.py  (новое — 2025-12-12)
 
 """
 GPT connector for mailer-app.
@@ -8,7 +8,7 @@ GPT connector for mailer-app.
 - Три tier'а:
     nano -> gpt-5-nano
     mini -> gpt-5-mini
-    maxi -> gpt-5.1
+    maxi -> gpt-5.2 (c откатом на gpt-5.1 при недоступности 5.2)
 - ВСЕ вызовы идут через Responses API (НЕ chat.completions).
 - Формат всегда простой: system (instructions) + user (input) → один ответ.
 - Для tier='maxi' при with_web=True включается web_search_preview.
@@ -20,6 +20,12 @@ GPT connector for mailer-app.
     ключ = hash(model_name, tier_name, with_web, system, user)
 - Кеш хранится в PROJECT_ROOT/cache/gpt/<model>/<префикс>/<hash>.json
   с полем created_at для последующей чистки по экспирации внешним скриптом.
+
+Дополнительно:
+- Для tier='maxi' сначала пытаемся использовать gpt-5.2.
+- Если модель недоступна / не существует (model_not_found/unsupported),
+  один раз откатываемся на gpt-5.1.
+- НИКАКИХ preview-моделей (gpt-5.2-preview и т.п.) не используется.
 """
 
 from __future__ import annotations
@@ -40,8 +46,11 @@ ServiceTier = Literal["flex", "standard", "priority"]
 ALLOWED_TIERS: dict[TierName, str] = {
     "nano": "gpt-5-nano",
     "mini": "gpt-5-mini",
-    "maxi": "gpt-5.1",
+    "maxi": "gpt-5.2",  # основная целевая модель для 'maxi'
 }
+
+# Фоллбек-модель для 'maxi', если gpt-5.2 недоступна / не существует
+FALLBACK_MAXI_MODEL = "gpt-5.1"
 
 ALLOWED_SERVICE_TIERS: set[str] = {"flex", "standard", "priority"}
 
@@ -293,6 +302,13 @@ class GPTClient:
             )
         model_name = ALLOWED_TIERS[tier]
 
+        # Отдельный "логический" идентификатор модели для кеша:
+        # для 'maxi' кеш привязываем к tier, а не к конкретной gpt-5.2/gpt-5.1,
+        # чтобы откат не ломал кеш.
+        cache_model_name = model_name
+        if tier == "maxi":
+            cache_model_name = "gpt-5-maxi"
+
         # --- validate service tier ---
         if service_tier not in ALLOWED_SERVICE_TIERS:
             raise GptValidationError(
@@ -332,7 +348,7 @@ class GPTClient:
 
         # --- cache: попытка cache hit до любого обращения к API ---
         cache_key = _compute_cache_key(
-            model_name=model_name,
+            model_name=cache_model_name,
             tier_name=tier,
             with_web=with_web,
             service_tier=service_tier,
@@ -343,7 +359,7 @@ class GPTClient:
             endpoint=endpoint,
             extra_payload=extra_payload,
         )
-        cache_path = _make_cache_path(model_name, cache_key)
+        cache_path = _make_cache_path(cache_model_name, cache_key)
 
         if use_cache and cache_path.exists():
             try:
@@ -361,8 +377,16 @@ class GPTClient:
                         {"role": "assistant", "content": content_for_history}
                     )
 
+                # Для логов берём модель из самого ответа, если она там есть,
+                # иначе используем логический cache_model_name.
+                logged_model_name = (
+                    raw_response.get("model") if isinstance(raw_response, dict) else None
+                )
+                if not logged_model_name:
+                    logged_model_name = cache_model_name
+
                 _log_call(
-                    model_name=model_name,
+                    model_name=str(logged_model_name),
                     tier_name=tier,
                     with_web=with_web,
                     service_tier=service_tier,
@@ -391,13 +415,50 @@ class GPTClient:
         try:
             self._ensure_client()
 
-            raw_response = self._perform_responses_request(
-                model_name=model_name,
-                system=system_clean,
-                user=user_clean,
-                with_web=with_web,
-                extra_payload=extra_payload,
-            )
+            # Будем хранить, какой моделью реально отстрелялись
+            used_model_name = model_name
+
+            try:
+                # 1-я попытка: основная модель (для maxi — gpt-5.2)
+                raw_response = self._perform_responses_request(
+                    model_name=model_name,
+                    system=system_clean,
+                    user=user_clean,
+                    with_web=with_web,
+                    extra_payload=extra_payload,
+                )
+                used_model_name = model_name
+
+            except Exception as exc:
+                err = str(exc).lower()
+
+                # Если модель не найдена / не поддерживается, и это 'maxi' —
+                # один раз пробуем откат на gpt-5.1.
+                model_error_markers = (
+                    "model_not_found",
+                    "no such model",
+                    "does not exist",
+                    "is not valid",
+                    "unsupported",
+                    "unknown model",
+                )
+
+                if (
+                    tier == "maxi"
+                    and any(marker in err for marker in model_error_markers)
+                ):
+                    raw_response = self._perform_responses_request(
+                        model_name=FALLBACK_MAXI_MODEL,
+                        system=system_clean,
+                        user=user_clean,
+                        with_web=with_web,
+                        extra_payload=extra_payload,
+                    )
+                    used_model_name = FALLBACK_MAXI_MODEL
+                else:
+                    # это не "модельная" ошибка → пусть летит выше
+                    raise
+
             usage = self._extract_usage(raw_response)
             status = "ok"
             error_message: Optional[str] = None
@@ -416,7 +477,7 @@ class GPTClient:
                         "created_at": datetime.utcnow().isoformat() + "Z",
                         "request_fingerprint": cache_key,
                         "request_meta": {
-                            "model": model_name,
+                            "model": used_model_name,
                             "tier": tier,
                             "with_web": with_web,
                             "service_tier": service_tier,
@@ -445,9 +506,12 @@ class GPTClient:
             usage = GptUsage()
             status = "error"
             error_message = str(exc)
+            # В случае жёсткой ошибки логируем через cache_model_name,
+            # чтобы не развалить структуру логов
+            used_model_name = cache_model_name
 
         _log_call(
-            model_name=model_name,
+            model_name=used_model_name,
             tier_name=tier,
             with_web=with_web,
             service_tier=service_tier,
@@ -611,7 +675,6 @@ class GPTClient:
 
             if "error" in raw:
                 return f"ERROR: {raw['error']}"
-
             return ""
         except Exception:
             return ""

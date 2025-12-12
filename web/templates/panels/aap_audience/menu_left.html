@@ -1,8 +1,13 @@
-<!-- FILE: web/templates/panels/aap_audience/menu_left.html -->
+<!-- FILE: web/templates/panels/aap_audience/menu_left.html  (новое) 2025-12-11 -->
 
 <a href="{% url 'audience:how' %}"
    class="panel-menu-item {% if request.resolver_match.url_name == 'how' %}panel-menu-item-active{% endif %}">
   Как ищем?
+</a>
+
+<a href="{% url 'audience:clar' %}"
+   class="panel-menu-item {% if request.resolver_match.url_name == 'clar' %}panel-menu-item-active{% endif %}">
+  Уточнение задачи
 </a>
 
 <a href="{% url 'audience:status' %}"

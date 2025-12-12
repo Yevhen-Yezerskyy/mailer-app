@@ -30,6 +30,20 @@ def _parse_how_json(raw: str, fallback: dict) -> dict:
         }
 
 
+# ---- ФУНКЦИЯ ДЛЯ УДАЛЕНИЯ ДВОЙНЫХ/ПУСТЫХ СТРОК ----
+def _clean_multiline(text: str) -> str:
+    """
+    Убирает пустые строки, двойные переносы,
+    нормализует многострочный GPT-ответ.
+    """
+    if not text:
+        return ""
+    text = text.replace("\r", "")
+    lines = [line.strip() for line in text.split("\n")]
+    lines = [l for l in lines if l]  # убираем пустые строки
+    return "\n".join(lines)
+
+
 def how_view(request):
     ws_id = request.workspace_id
     user = request.user
@@ -185,7 +199,7 @@ def how_view(request):
             with_web=True,
             endpoint="audience_task_branches",
         )
-        task_branches = (branches_resp.content or "").strip()
+        task_branches = _clean_multiline(branches_resp.content or "")
 
         # geo
         geo_resp = client.ask(
@@ -197,7 +211,7 @@ def how_view(request):
             with_web=True,
             endpoint="audience_task_geo",
         )
-        task_geo = (geo_resp.content or "").strip()
+        task_geo = _clean_multiline(geo_resp.content or "")
 
         # client  <-- НОВОЕ
         client_resp = client.ask(
@@ -209,7 +223,7 @@ def how_view(request):
             with_web=True,
             endpoint="audience_task_client",
         )
-        task_client = (client_resp.content or "").strip()
+        task_client = _clean_multiline(client_resp.content or "")
 
         edit_id = form.cleaned_data.get("edit_id")
 
@@ -224,7 +238,7 @@ def how_view(request):
             obj.title = title
             obj.task_branches = task_branches
             obj.task_geo = task_geo
-            obj.task_client = task_client      # <-- НОВОЕ
+            obj.task_client = task_client  # <-- НОВОЕ
             obj.save()
         else:
             AudienceTask.objects.create(
@@ -234,7 +248,7 @@ def how_view(request):
                 title=title,
                 task_branches=task_branches,
                 task_geo=task_geo,
-                task_client=task_client,        # <-- НОВОЕ
+                task_client=task_client,  # <-- НОВОЕ
             )
 
         return redirect(request.path)
