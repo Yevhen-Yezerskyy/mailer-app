@@ -1,4 +1,5 @@
-<!-- FILE: web/templates/panels/aap_audience/clar.html  (новое) 2025-12-12 -->
+<!-- FILE: web/templates/panels/aap_audience/clar.html  (обновлено) 2025-12-13 -->
+<!-- Смысл: добавлены run_processing + subscribers_limit в форму и печать в 1-й колонке таблицы. -->
 
 {% extends "panels/base.html" %}
 
@@ -10,7 +11,6 @@
 
 {% block content %}
 
-{# Верхняя карточка с формой (только в режиме редактирования) #}
 {% if form %}
   <div class="panel-card" style="margin-bottom: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
 
@@ -18,9 +18,7 @@
 
     <div style="display: grid; grid-template-columns: 40% 30% 30%; gap: 20px;">
 
-      {# Левая колонка — сама форма #}
       <div>
-
         <form method="post" class="panel-form">
           {% csrf_token %}
           <input type="hidden" name="mode" value="save">
@@ -51,8 +49,21 @@
             {{ form.task_client }}
           </div>
 
-          <div class="panel-form-actions" style="display: flex; gap: 12px;">
+          <div class="panel-form-group" style="display:flex; align-items:center; gap:10px;">
+            {{ form.run_processing }}
+            <label class="panel-form-label" for="{{ form.run_processing.id_for_label }}" style="margin:0;">
+              {{ form.run_processing.label }}
+            </label>
+          </div>
 
+          <div class="panel-form-group">
+            <label class="panel-form-label" for="{{ form.subscribers_limit.id_for_label }}">
+              {{ form.subscribers_limit.label }}
+            </label>
+            {{ form.subscribers_limit }}
+          </div>
+
+          <div class="panel-form-actions" style="display: flex; gap: 12px;">
             <button type="submit"
                     class="panel-btn panel-btn-primary"
                     style="background: #2563eb; color: white; padding: 8px 18px; border-radius: 8px;">
@@ -64,14 +75,11 @@
                style="background: #e5e7eb; padding: 8px 18px; border-radius: 8px; color: #111;">
               ✖ Закрыть
             </a>
-
           </div>
 
         </form>
-
       </div>
 
-      {# Средняя колонка — города #}
       <div>
         <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">Города</h4>
 
@@ -110,7 +118,7 @@
             {% if clar_city_items %}
               {% for item in clar_city_items %}
                 <div style="display: flex; justify-content: space-between; gap: 8px; padding: 2px 0;">
-                  <span>{{ item.value }}</span>
+                  <span>{{ item.value_text }}</span>
                   <span style="opacity: 0.7;">{{ item.rate }}</span>
                 </div>
               {% endfor %}
@@ -125,7 +133,6 @@
         {% endif %}
       </div>
 
-      {# Правая колонка — бранчи #}
       <div>
         <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">Бранчи</h4>
 
@@ -144,8 +151,8 @@
             </form>
 
             <form method="post" style="display: inline;">
-            <input type="hidden" name="edit_id" value="{{ current_task_id }}">
               {% csrf_token %}
+              <input type="hidden" name="edit_id" value="{{ current_task_id }}">
               <input type="hidden" name="mode" value="clear_branch">
               <input type="hidden" name="task_id" value="{{ current_task_id }}">
               <button type="submit"
@@ -164,7 +171,7 @@
             {% if clar_branch_items %}
               {% for item in clar_branch_items %}
                 <div style="display: flex; justify-content: space-between; gap: 8px; padding: 2px 0;">
-                  <span>{{ item.value }}</span>
+                  <span>{{ item.value_text }}</span>
                   <span style="opacity: 0.7;">{{ item.rate }}</span>
                 </div>
               {% endfor %}
@@ -183,10 +190,6 @@
   </div>
 {% endif %}
 
-
-<!-- FILE: web/templates/panels/aap_audience/clar.html  (фрагмент таблицы) 2025-12-12 -->
-
-{# Нижняя карточка с таблицей задач #}
 {% if tasks %}
   <div class="panel-card" style="margin-top: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
     <h3 class="panel-card-title" style="margin-bottom: 12px;">Задачи HOW</h3>
@@ -209,7 +212,14 @@
                 <strong>{{ t.title }}</strong><br><br>
                 <b>Основной task</b><br><br>
                 {{ t.task|linebreaksbr }}
+
+                <br><br>
+                <div style="font-size: 12px; opacity: 0.85;">
+                  <div>Процессинг: {% if t.run_processing %}да{% else %}нет{% endif %}</div>
+                  <div>Сабскрайберов: {{ t.subscribers_limit }}</div>
+                </div>
               </td>
+
               <td>
                 <b>Бранчи task</b><br><br>
                 {{ t.task_branches|linebreaksbr }}<br><br><br>
@@ -219,7 +229,6 @@
                 {{ t.task_client|linebreaksbr }}
               </td>
 
-              {# Колонка 3 — города #}
               <td style="font-size: 12px; vertical-align: top;">
                 {% with items=t.clar_city_items %}
                   {% if items %}
@@ -229,7 +238,7 @@
                     <div style="max-height: 500px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px;">
                       {% for item in items|slice:":50" %}
                         <div style="display: flex; justify-content: space-between; gap: 6px;">
-                          <span>{{ item.value }}</span>
+                          <span>{{ item.value_text }}</span>
                           <span style="opacity: 0.65;">{{ item.rate }}</span>
                         </div>
                       {% endfor %}
@@ -244,7 +253,6 @@
                 {% endwith %}
               </td>
 
-              {# Колонка 4 — бранчи #}
               <td style="font-size: 12px; vertical-align: top;">
                 {% with items=t.clar_branch_items %}
                   {% if items %}
@@ -254,7 +262,7 @@
                     <div style="max-height: 500px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px;">
                       {% for item in items|slice:":50" %}
                         <div style="display: flex; justify-content: space-between; gap: 6px;">
-                          <span>{{ item.value }}</span>
+                          <span>{{ item.value_text }}</span>
                           <span style="opacity: 0.65;">{{ item.rate }}</span>
                         </div>
                       {% endfor %}
@@ -271,8 +279,6 @@
 
               <td style="text-align: right;">
                 <div style="display: inline-flex; gap: 8px; align-items: center;">
-
-                  {# редактировать #}
                   <a href="?edit={{ t.id }}"
                      class="panel-link task-edit-link"
                      style="font-size: 13px;"
@@ -280,7 +286,6 @@
                     ✏️
                   </a>
 
-                  {# удалить #}
                   <form method="post" style="margin: 0; display: inline;">
                     {% csrf_token %}
                     <input type="hidden" name="mode" value="delete">
@@ -293,7 +298,6 @@
                       🗑️
                     </button>
                   </form>
-
                 </div>
               </td>
             </tr>
@@ -307,6 +311,5 @@
     <p>Задач пока нет. Создайте первую задачу на вкладке «Как ищем?».</p>
   </div>
 {% endif %}
-
 
 {% endblock %}

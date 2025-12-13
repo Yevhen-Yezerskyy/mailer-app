@@ -1,10 +1,10 @@
-# FILE: web/aap_audience/forms.py  (новое) 2025-12-11
+# FILE: web/aap_audience/forms.py  (обновлено) 2025-12-13
+# Смысл: AudienceClarForm + поля run_processing (checkbox) и subscribers_limit (number, default=500).
 
 from django import forms
 
 
 class AudienceHowForm(forms.Form):
-    # Три основных блока ввода
     what = forms.CharField(
         label="Что продаём?",
         required=False,
@@ -21,39 +21,16 @@ class AudienceHowForm(forms.Form):
         widget=forms.Textarea(attrs={"class": "panel-textarea"}),
     )
 
-    # Уточняющие вопросы и подсказки для каждого блока (заполняются GPT)
-    question_what = forms.CharField(
-        required=False,
-        widget=forms.HiddenInput(),
-    )
-    hint_what = forms.CharField(
-        required=False,
-        widget=forms.HiddenInput(),
-    )
+    question_what = forms.CharField(required=False, widget=forms.HiddenInput())
+    hint_what = forms.CharField(required=False, widget=forms.HiddenInput())
 
-    question_who = forms.CharField(
-        required=False,
-        widget=forms.HiddenInput(),
-    )
-    hint_who = forms.CharField(
-        required=False,
-        widget=forms.HiddenInput(),
-    )
+    question_who = forms.CharField(required=False, widget=forms.HiddenInput())
+    hint_who = forms.CharField(required=False, widget=forms.HiddenInput())
 
-    question_geo = forms.CharField(
-        required=False,
-        widget=forms.HiddenInput(),
-    )
-    hint_geo = forms.CharField(
-        required=False,
-        widget=forms.HiddenInput(),
-    )
+    question_geo = forms.CharField(required=False, widget=forms.HiddenInput())
+    hint_geo = forms.CharField(required=False, widget=forms.HiddenInput())
 
-    # Для режима редактирования сохранённой задачи HOW
-    edit_id = forms.IntegerField(
-        required=False,
-        widget=forms.HiddenInput(),
-    )
+    edit_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
 
 
 class AudienceClarForm(forms.Form):
@@ -83,7 +60,19 @@ class AudienceClarForm(forms.Form):
         widget=forms.Textarea(attrs={"class": "panel-textarea", "rows": 8}),
     )
 
-    edit_id = forms.IntegerField(
-        required=True,
-        widget=forms.HiddenInput(),
+    run_processing = forms.BooleanField(
+        label="Запустить в процессинг",
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "panel-checkbox"}),
     )
+
+    subscribers_limit = forms.IntegerField(
+        label="Найти сабскрайберов",
+        required=True,
+        initial=500,
+        min_value=1,
+        max_value=1000000,
+        widget=forms.NumberInput(attrs={"class": "panel-input"}),
+    )
+
+    edit_id = forms.IntegerField(required=True, widget=forms.HiddenInput())

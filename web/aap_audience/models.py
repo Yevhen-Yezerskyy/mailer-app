@@ -1,4 +1,6 @@
-# FILE: aap_audience/models.py  (новое) 2025-12-11
+# FILE: aap_audience/models.py  (обновлено) 2025-12-13
+# Смысл: AudienceTask + поля управления запуском пайплайна: run_processing и subscribers_limit (default=500).
+
 from django.conf import settings
 from django.db import models
 
@@ -11,7 +13,10 @@ class AudienceTask(models.Model):
     title = models.CharField(max_length=255)
     task_branches = models.TextField()
     task_geo = models.TextField()
-    task_client = models.TextField(blank=True, default="")  # <-- НОВОЕ
+    task_client = models.TextField(blank=True, default="")
+
+    run_processing = models.BooleanField(default=False)
+    subscribers_limit = models.IntegerField(default=500)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
