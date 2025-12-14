@@ -1,30 +1,15 @@
-# FILE: engine/common/gpt.py  (новое — 2025-12-14)
-
-"""
-GPT connector for mailer-app.
-
-Единственная точка общения с OpenAI:
-
-- Три tier'а:
-    nano -> gpt-5-nano
-    mini -> gpt-5-mini
-    maxi -> gpt-5.2 (c откатом на gpt-5.1 при недоступности 5.2)
-- ВСЕ вызовы идут через Responses API (НЕ chat.completions).
-- Формат всегда простой: system (instructions) + user (input) → один ответ.
-- Для tier='maxi' при with_web=True включается web_search_preview.
-- Вся история (session_id) хранится только локально в объекте и
-  НИКОГДА не отправляется в модель.
-"""
+# FILE: engine/common/gpt.py (обновлено — 2025-12-14)
+# Смысл: единая точка общения с OpenAI (Responses API) + файловый кеш + логирование + fallback для maxi + debug-force (всегда nano).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
-import hashlib
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TypedDict, Literal
+from typing import Any, Dict, List, Literal, Optional, TypedDict
 
 # ---------- CONSTANTS & TYPES ----------
 
@@ -34,28 +19,34 @@ ServiceTier = Literal["flex", "standard", "priority"]
 ALLOWED_TIERS: dict[TierName, str] = {
     "nano": "gpt-5-nano",
     "mini": "gpt-5-mini",
-    "maxi": "gpt-5.2",
+    "maxi": "gpt-5.2",  # основная целевая модель для 'maxi'
 }
 
+# Фоллбек-модель для 'maxi', если gpt-5.2 недоступна / не существует
 FALLBACK_MAXI_MODEL = "gpt-5.1"
+
 ALLOWED_SERVICE_TIERS: set[str] = {"flex", "standard", "priority"}
+
 OPENAI_ENV_VAR = "OPENAI_API_KEY"
 
+# engine/common/gpt.py → common → engine → mailer-app
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
+# Base log directory: mailer-app/logs/gpt/
 LOG_BASE_DIR = PROJECT_ROOT / "logs" / "gpt"
 LOG_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
-CACHE_BASE_DIR = LOG_BASE_DIR / "cache"
+# Base cache directory: mailer-app/cache/gpt/
+CACHE_BASE_DIR = PROJECT_ROOT / "cache" / "gpt"
 CACHE_BASE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class GptConfigError(RuntimeError):
-    pass
+    """Configuration error: missing API key or similar."""
 
 
 class GptValidationError(ValueError):
-    pass
+    """Invalid input for GPT call (tier, workspace, user, prompt, etc.)."""
 
 
 @dataclass
@@ -79,10 +70,13 @@ class Message(TypedDict):
 
 # ---------- INTERNAL UTILS ----------
 
+
 def _require_api_key() -> str:
     api_key = os.environ.get(OPENAI_ENV_VAR, "").strip()
     if not api_key:
-        raise GptConfigError(f"OpenAI API key not found ({OPENAI_ENV_VAR}).")
+        raise GptConfigError(
+            f"OpenAI API key not found. Please set env var {OPENAI_ENV_VAR!r}."
+        )
     return api_key
 
 
@@ -102,6 +96,11 @@ def _make_log_dir(service_tier: ServiceTier, model_name: str) -> Path:
 
 
 def _make_cache_path(model_name: str, cache_key: str) -> Path:
+    """
+    Возвращает путь к файлу кеша для данного model_name + cache_key.
+    Кеш раскладывается по подпапкам по первым двум символам хеша,
+    чтобы не было тысячи файлов в одной директории.
+    """
     subdir = CACHE_BASE_DIR / model_name / cache_key[:2]
     subdir.mkdir(parents=True, exist_ok=True)
     return subdir / f"{cache_key}.json"
@@ -112,22 +111,37 @@ def _compute_cache_key(
     model_name: str,
     tier_name: TierName,
     with_web: Optional[bool],
-    service_tier: ServiceTier,
-    workspace_id: str,
-    user_id: str,
+    service_tier: ServiceTier,  # оставлено в сигнатуре для совместимости, но НЕ в ключе
+    workspace_id: str,  # НЕ в ключе
+    user_id: str,  # НЕ в ключе
     system: str,
     user: str,
-    endpoint: str,
-    extra_payload: Dict[str, Any],
+    endpoint: str,  # НЕ в ключе
+    extra_payload: Dict[str, Any],  # НЕ в ключе
 ) -> str:
-    payload = {
+    """
+    Формирует хеш-ключ кеша.
+    В хеш входят ТОЛЬКО:
+      - model_name
+      - tier_name
+      - with_web
+      - system (instructions)
+      - user (input)
+    Всё остальное НЕ влияет на кеш.
+    """
+    payload_for_hash = {
         "model": model_name,
         "tier": tier_name,
         "with_web": with_web,
         "system": system,
         "user": user,
     }
-    serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False)
+    serialized = json.dumps(
+        payload_for_hash,
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
@@ -148,21 +162,36 @@ def _log_call(
     error_message: Optional[str] = None,
 ) -> None:
     log_dir = _make_log_dir(service_tier, model_name)
-    log_file = log_dir / f"{datetime.now().date().isoformat()}.log"
+    now = datetime.now()
+    log_file = log_dir / f"{now.date().isoformat()}.log"
 
-    lines = [
-        f"[{datetime.now().isoformat()}] MODEL={model_name} "
-        f"TIER={tier_name} SERVICE_TIER={service_tier} "
-        f"WITH_WEB={with_web} STATUS={status} ENDPOINT={endpoint}",
-        f"TOKENS={usage}",
-        f"SYSTEM: {system}",
-        f"USER: {user}",
-        f"RESPONSE: {json.dumps(response, ensure_ascii=False)}",
-        "-" * 80,
-    ]
+    ws = str(workspace_id) if workspace_id is not None else "-"
+    user_str = str(user_id) if user_id is not None else "-"
+
+    lines: List[str] = []
+    header = (
+        f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] "
+        f"MODEL={model_name} TIER={tier_name} "
+        f"SERVICE_TIER={service_tier} WITH_WEB={with_web} "
+        f"WORKSPACE={ws} USER={user_str} "
+        f"TOKENS(in={usage.prompt_tokens},out={usage.completion_tokens},"
+        f"total={usage.total_tokens}) "
+        f"STATUS={status} ENDPOINT={endpoint}"
+    )
+    lines.append(header)
 
     if error_message:
-        lines.insert(1, f"ERROR: {error_message}")
+        lines.append(f"ERROR: {error_message}")
+
+    lines.append(f"SYSTEM: {system}")
+    lines.append(f"USER: {user}")
+
+    try:
+        resp_str = json.dumps(response, ensure_ascii=False)
+    except Exception:
+        resp_str = f"<unserializable response type {type(response)!r}>"
+    lines.append(f"RESPONSE: {resp_str}")
+    lines.append("-" * 80)
 
     with log_file.open("a", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
@@ -170,15 +199,34 @@ def _log_call(
 
 # ---------- MAIN CLIENT ----------
 
+
 class GPTClient:
+    """
+    Stateless-клиент GPT для проекта.
+
+    ВАЖНО:
+    - Внешний интерфейс: один вызов → один ответ (Q→A), без чата.
+    - Внутри — только Responses API, без chat.completions.
+    - session_id / use_history используются ТОЛЬКО для внутреннего хранения истории
+      (self._sessions_history) и не влияют на запросы к модели.
+    - Есть файловый кеш по хешу запроса (см. _compute_cache_key).
+      Кеш можно отключить per-call (use_cache=False) или чистить отдельным скриптом
+      по полю created_at в файлах кеша.
+    - debug=True: все запросы принудительно идут в nano (и без web/caching).
+    """
+
     N_CALLS_BEFORE_RESET = 7
 
     def __init__(self, *, debug: bool = False) -> None:
-        self._api_key = _require_api_key()
+        self._api_key: str = _require_api_key()
         self._client: Any = None
-        self._calls_since_reset = 0
-        self._debug = bool(debug)
+        self._calls_since_reset: int = 0
+        self._debug: bool = bool(debug)
+
+        # session_id -> list[Message] (чисто для себя, не в модель)
         self._sessions_history: dict[str, List[Message]] = {}
+
+    # ----- PUBLIC API -----
 
     def ask(
         self,
@@ -196,45 +244,219 @@ class GPTClient:
         use_history: bool = False,
         use_cache: bool = True,
     ) -> GptResponse:
+        """
+        Один запрос к GPT (всегда одиночный ход, без контекста).
 
-        # ---------- DEBUG FORCE ----------
+        - tier: 'nano' | 'mini' | 'maxi'
+        - with_web:
+            * для 'maxi' ОБЯЗАТЕЛЕН (True/False)
+            * для 'nano'/'mini' НЕЛЬЗЯ ставить True (raise)
+        - system → instructions
+        - user → input
+        - use_cache:
+            * True (по умолчанию): перед API-вызовом будет пробоваться файловый кеш;
+              успешный ответ также будет записан в кеш.
+            * False: кеш игнорируется и не пишется.
+        """
+
+        # --- DEBUG FORCE ---
         if self._debug:
             tier = "nano"
             with_web = False
-            service_tier = "flex"
             use_cache = False
-        # ---------------------------------
+        # -------------------
 
+        # --- validate tier & model ---
+        if tier not in ALLOWED_TIERS:
+            raise GptValidationError(
+                f"Unsupported tier {tier!r}. Allowed: {list(ALLOWED_TIERS.keys())}."
+            )
         model_name = ALLOWED_TIERS[tier]
 
+        # Отдельный "логический" идентификатор модели для кеша:
+        # для 'maxi' кеш привязываем к tier, а не к конкретной gpt-5.2/gpt-5.1,
+        # чтобы откат не ломал кеш.
+        cache_model_name = model_name
+        if tier == "maxi":
+            cache_model_name = "gpt-5-maxi"
+
+        # --- validate service tier ---
+        if service_tier not in ALLOWED_SERVICE_TIERS:
+            raise GptValidationError(
+                f"Unsupported service_tier {service_tier!r}. "
+                f"Allowed: {sorted(ALLOWED_SERVICE_TIERS)}."
+            )
+        service_tier = service_tier  # type: ignore[assignment]
+
+        # --- validate with_web rules ---
+        if tier in ("nano", "mini") and with_web is True:
+            raise GptValidationError(
+                "Web search is only supported for tier='maxi'. "
+                "Tier='nano' or 'mini' cannot use with_web=True."
+            )
+        if tier == "maxi" and with_web is None:
+            raise GptValidationError("Tier 'maxi' requires explicit with_web=True/False.")
+
+        # --- validate workspace/user ---
         workspace_id_str = _validate_not_empty("workspace_id", workspace_id)
         user_id_str = _validate_not_empty("user_id", user_id)
+
+        # --- validate prompts ---
         system_clean = _validate_not_empty("system", system)
         user_clean = _validate_not_empty("user", user)
 
-        extra_payload = dict(extra_payload or {})
+        # --- history (только запоминаем, НО не шлём в модель) ---
+        if use_history and session_id:
+            history = self._sessions_history.setdefault(session_id, [])
+            history.append({"role": "system", "content": system_clean})
+            history.append({"role": "user", "content": user_clean})
 
+        extra_payload = extra_payload or {}
+
+        # --- cache: попытка cache hit до любого обращения к API ---
+        cache_key = _compute_cache_key(
+            model_name=cache_model_name,
+            tier_name=tier,
+            with_web=with_web,
+            service_tier=service_tier,
+            workspace_id=workspace_id_str,
+            user_id=user_id_str,
+            system=system_clean,
+            user=user_clean,
+            endpoint=endpoint,
+            extra_payload=extra_payload,
+        )
+        cache_path = _make_cache_path(cache_model_name, cache_key)
+
+        if use_cache and cache_path.exists():
+            try:
+                with cache_path.open("r", encoding="utf-8") as f:
+                    cached = json.load(f)
+
+                raw_response = cached.get("response", {}) or {}
+                usage = self._extract_usage(raw_response)
+                status = "cache"
+                error_message: Optional[str] = None
+
+                if use_history and session_id:
+                    content_for_history = self._extract_content(raw_response)
+                    self._sessions_history.setdefault(session_id, []).append(
+                        {"role": "assistant", "content": content_for_history}
+                    )
+
+                logged_model_name = (
+                    raw_response.get("model") if isinstance(raw_response, dict) else None
+                )
+                if not logged_model_name:
+                    logged_model_name = cache_model_name
+
+                _log_call(
+                    model_name=str(logged_model_name),
+                    tier_name=tier,
+                    with_web=with_web,
+                    service_tier=service_tier,
+                    workspace_id=workspace_id_str,
+                    user_id=user_id_str,
+                    system=system_clean,
+                    user=user_clean,
+                    endpoint=endpoint,
+                    response=raw_response,
+                    usage=usage,
+                    status=status,
+                    error_message=error_message,
+                )
+
+                content = self._extract_content(raw_response)
+                return GptResponse(content=content, raw=raw_response, usage=usage)
+
+            except Exception:
+                # Любая проблема с кешем → игнорируем и идём в реальный API.
+                pass
+
+        # --- perform request & log ---
         try:
             self._ensure_client()
-            raw_response = self._perform_responses_request(
-                model_name=model_name,
-                system=system_clean,
-                user=user_clean,
-                with_web=with_web,
-                extra_payload=extra_payload,
-            )
+
+            used_model_name = model_name
+
+            try:
+                # 1-я попытка: основная модель (для maxi — gpt-5.2)
+                raw_response = self._perform_responses_request(
+                    model_name=model_name,
+                    system=system_clean,
+                    user=user_clean,
+                    with_web=with_web,
+                    extra_payload=extra_payload,
+                )
+                used_model_name = model_name
+
+            except Exception as exc:
+                err = str(exc).lower()
+                model_error_markers = (
+                    "model_not_found",
+                    "no such model",
+                    "does not exist",
+                    "is not valid",
+                    "unsupported",
+                    "unknown model",
+                )
+
+                if tier == "maxi" and any(marker in err for marker in model_error_markers):
+                    raw_response = self._perform_responses_request(
+                        model_name=FALLBACK_MAXI_MODEL,
+                        system=system_clean,
+                        user=user_clean,
+                        with_web=with_web,
+                        extra_payload=extra_payload,
+                    )
+                    used_model_name = FALLBACK_MAXI_MODEL
+                else:
+                    raise
+
             usage = self._extract_usage(raw_response)
             status = "ok"
-            error_message = None
+            error_message: Optional[str] = None
+
+            if use_history and session_id:
+                content_for_history = self._extract_content(raw_response)
+                self._sessions_history.setdefault(session_id, []).append(
+                    {"role": "assistant", "content": content_for_history}
+                )
+
+            # --- успешный ответ можно положить в кеш ---
+            if use_cache:
+                try:
+                    cache_record = {
+                        "created_at": datetime.utcnow().isoformat() + "Z",
+                        "request_fingerprint": cache_key,
+                        "request_meta": {
+                            "model": used_model_name,
+                            "tier": tier,
+                            "with_web": with_web,
+                            "service_tier": service_tier,
+                            "workspace_id": workspace_id_str,
+                            "user_id": user_id_str,
+                            "endpoint": endpoint,
+                            "system": system_clean,
+                            "user": user_clean,
+                            "extra_payload": extra_payload,
+                        },
+                        "response": raw_response,
+                    }
+                    with cache_path.open("w", encoding="utf-8") as f:
+                        json.dump(cache_record, f, ensure_ascii=False)
+                except Exception:
+                    pass
 
         except Exception as exc:
-            raw_response = {"error": str(exc)}
+            raw_response = {"error": {"type": type(exc).__name__, "message": str(exc)}}
             usage = GptUsage()
             status = "error"
             error_message = str(exc)
+            used_model_name = cache_model_name
 
         _log_call(
-            model_name=model_name,
+            model_name=used_model_name,
             tier_name=tier,
             with_web=with_web,
             service_tier=service_tier,
@@ -252,10 +474,11 @@ class GPTClient:
         content = self._extract_content(raw_response)
         return GptResponse(content=content, raw=raw_response, usage=usage)
 
-    # ---------- INTERNAL ----------
+    # ----- INTERNAL HELPERS -----
 
     def _ensure_client(self) -> None:
-        from openai import OpenAI
+        """Создаёт/ресетит OpenAI клиент каждые N_CALLS_BEFORE_RESET вызовов."""
+        from openai import OpenAI  # локальный импорт
 
         if self._client is None or self._calls_since_reset >= self.N_CALLS_BEFORE_RESET:
             self._client = OpenAI(api_key=self._api_key)
@@ -270,7 +493,12 @@ class GPTClient:
         with_web: Optional[bool],
         extra_payload: Dict[str, Any],
     ) -> Dict[str, Any]:
-
+        """
+        Один вызов Responses API.
+        - system → instructions
+        - user → input
+        - web_search_preview включается, если with_web=True
+        """
         self._calls_since_reset += 1
 
         payload: Dict[str, Any] = {
@@ -279,32 +507,98 @@ class GPTClient:
             "input": user,
         }
 
+        # Поддержка web_search_preview
+        tools = extra_payload.pop("tools", None)
+        tool_choice = extra_payload.pop("tool_choice", None)
+
+        if with_web:
+            if tools is None:
+                tools = [{"type": "web_search_preview"}]
+            if tool_choice is None:
+                tool_choice = "auto"
+
+        if tools is not None:
+            payload["tools"] = tools
+        if tool_choice is not None:
+            payload["tool_choice"] = tool_choice
+
+        payload.update(extra_payload)
+
         response = self._client.responses.create(**payload)
 
+        # достанем text для удобства
+        try:
+            content_text = response.output_text
+        except Exception:
+            try:
+                tmp = response.model_dump()
+            except AttributeError:
+                tmp = json.loads(response.json())
+            content_text = ""
+            try:
+                out_items = tmp.get("output") or []
+                if out_items:
+                    cont = out_items[0].get("content") or []
+                    if cont:
+                        content_text = cont[0].get("text", "") or ""
+            except Exception:
+                content_text = ""
+
+        # raw dict
         try:
             raw = response.model_dump()
         except AttributeError:
             raw = json.loads(response.json())
 
+        # эмулируем choices → message → content
         raw.setdefault(
             "choices",
-            [{"message": {"content": response.output_text or ""}}],
+            [{"message": {"content": content_text}}],
         )
         return raw
+
+    # --- Parsing helpers ---
 
     @staticmethod
     def _extract_usage(raw: Dict[str, Any]) -> GptUsage:
         usage = raw.get("usage") or {}
+        prompt_tokens = usage.get("prompt_tokens") or usage.get("input_tokens")
+        completion_tokens = usage.get("completion_tokens") or usage.get("output_tokens")
+        total_tokens = usage.get("total_tokens")
         return GptUsage(
-            prompt_tokens=usage.get("prompt_tokens"),
-            completion_tokens=usage.get("completion_tokens"),
-            total_tokens=usage.get("total_tokens"),
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
         )
 
     @staticmethod
     def _extract_content(raw: Dict[str, Any]) -> str:
+        """
+        Универсальный извлекатель текста:
+        - сначала chat-подобный путь (choices[0].message.content),
+        - если нет choices, то пытаемся достать из output[..].content[..].text,
+        - если есть error — вернём строку с ошибкой.
+        """
         try:
-            return raw["choices"][0]["message"]["content"]
+            choices = raw.get("choices") or []
+            if choices:
+                msg = choices[0].get("message") or {}
+                content = msg.get("content") or ""
+                return str(content)
+
+            if "output" in raw:
+                out_items = raw.get("output") or []
+                if out_items:
+                    first = out_items[0]
+                    cont = first.get("content") or []
+                    if cont:
+                        text = cont[0].get("text") or ""
+                        return str(text)
+
+            if "error" in raw:
+                return f"ERROR: {raw['error']}"
+
+            return ""
         except Exception:
             return ""
 
