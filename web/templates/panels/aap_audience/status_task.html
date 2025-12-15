@@ -1,0 +1,89 @@
+{% extends "panels/base.html" %}
+{# FILE: web/templates/panels/aap_audience/status_task.html  (обновлено) 2025-12-15 #}
+{# Fix: ширина 95% как в status.html; company_data печатаем красиво строками key — value. #}
+
+{% block title %}Задача {{ task.id }} — Статус{% endblock %}
+
+{% block sidebar_menu %}
+  {% include "panels/aap_audience/menu_left.html" %}
+{% endblock %}
+
+{% block content %}
+  <div class="panel-card" style="margin-top: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
+    <h2 class="panel-card-title" style="margin-bottom: 8px;">
+      {{ task.title }} <span style="opacity:.6;">(#{{ task.id }})</span>
+    </h2>
+    <div style="white-space: pre-line;">{{ task.task }}</div>
+  </div>
+
+  <div class="panel-card" style="margin-top: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
+    <h3 class="panel-card-title" style="margin-bottom: 12px;">
+      Найденные компании ({{ total }})
+    </h3>
+
+    {% if rows %}
+      <div class="panel-table-wrapper">
+        <table class="panel-table">
+          <thead>
+          <tr>
+            <th style="width: 6%;">ID</th>
+            <th style="width: 18%;">Компания</th>
+            <th style="width: 16%;">Email</th>
+            <th style="width: 12%;">Город</th>
+            <th style="width: 12%;">Бранч</th>
+            <th style="width: 36%;">Company data</th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>{{ r.id }}</td>
+              <td>{{ r.company_name }}</td>
+              <td>{{ r.email|default:"—" }}</td>
+              <td>{{ r.city }}</td>
+              <td>{{ r.branch }}</td>
+              <td>
+                {% if r.company_data %}
+                  <details>
+                    <summary style="cursor:pointer;">Показать</summary>
+                    <div style="margin-top: 8px;">
+                      {% for k, v in r.company_data.items %}
+                        <div style="display:flex; gap:12px; padding: 2px 0;">
+                          <div style="min-width: 140px; font-weight: 600; opacity: .85;">{{ k }}</div>
+                          <div style="white-space: pre-wrap;">{{ v }}</div>
+                        </div>
+                      {% empty %}
+                        <div style="opacity:.7;">(пусто)</div>
+                      {% endfor %}
+                    </div>
+                  </details>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top: 16px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="opacity:.8;">
+          Всего: {{ total }} • Страница {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+        </div>
+
+        <div style="display:flex; gap: 8px;">
+          {% if page_obj.has_previous %}
+            <a class="panel-button-secondary" href="?page={{ page_obj.previous_page_number }}" style="padding: 6px 10px;">← Назад</a>
+          {% endif %}
+          {% if page_obj.has_next %}
+            <a class="panel-button-secondary" href="?page={{ page_obj.next_page_number }}" style="padding: 6px 10px;">Вперёд →</a>
+          {% endif %}
+        </div>
+      </div>
+
+    {% else %}
+      <div class="panel-subtitle" style="margin: 0;">Компаний не найдено.</div>
+    {% endif %}
+  </div>
+{% endblock %}

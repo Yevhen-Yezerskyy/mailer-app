@@ -1,6 +1,9 @@
-<!-- FILE: web/templates/panels/aap_audience/status.html -->
+{# FILE: web/templates/panels/aap_audience/status.html  (обновлено) 2025-12-15 #}
+{# Fix: в колонке "Подробнее" — кнопка со ссылкой на якорь по task.id #}
 
 {% extends "panels/base.html" %}
+{% load audience_extras %}
+
 {% block title %}Подбор адресатов — Статус{% endblock %}
 
 {% block sidebar_menu %}
@@ -8,16 +11,46 @@
 {% endblock %}
 
 {% block content %}
-<div class="panel-page">
-  <h1 class="panel-title">Статус</h1>
-  <p class="panel-subtitle">
-    Текущий статус процессов подбора адресатов:
-    очереди, задачи, ошибки, прогресс.
-  </p>
+  <div class="panel-card" style="margin-top: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
+    <h3 class="panel-card-title" style="margin-bottom: 12px;">Задачи</h3>
 
-  <div class="panel-card">
-    <div class="panel-placeholder-line w-48"></div>
-    <div class="panel-placeholder-line w-32"></div>
+    {% if tasks %}
+      <div class="panel-table-wrapper">
+        <table class="panel-table">
+          <thead>
+          <tr>
+            <th style="width: 10%;">Название</th>
+            <th style="width: 30%;">Task</th>
+            <th style="width: 8%;">Run</th>
+            <th style="width: 10%;">Города</th>
+            <th style="width: 10%;">Бранчи</th>
+            <th style="width: 14%;">Найдено компаний</th>
+            <th style="width: 18%;">Подробнее</th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for t in tasks %}
+            {% with c=counts|get_item:t.id %}
+            <tr id="task-{{ t.id }}">
+              <td><strong>{{ t.title }}</strong></td>
+              <td>{{ t.task|linebreaksbr }}</td>
+              <td style="text-align: center;">{% if t.run_processing %}✅{% else %}—{% endif %}</td>
+              <td style="text-align: right;">{{ c.city|default:0 }}</td>
+              <td style="text-align: right;">{{ c.branch|default:0 }}</td>
+              <td style="text-align: right;">{{ companies|get_item:t.id|default:0 }}</td>
+              <td style="text-align: right;">
+                <a href="task-{{ t.id }}" class="panel-button-secondary" style="font-size: 12px; padding: 4px 8px;">
+                  Подробнее
+                </a>
+              </td>
+            </tr>
+            {% endwith %}
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="panel-subtitle" style="margin: 0;">Пока нет задач.</div>
+    {% endif %}
   </div>
-</div>
 {% endblock %}
