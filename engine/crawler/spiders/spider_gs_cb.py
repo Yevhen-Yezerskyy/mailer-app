@@ -1,7 +1,7 @@
-# FILE: engine/crawler/spiders/spider_gs_cb.py  (новое — 2025-12-15)
-# Смысл: GelbeSeiten spider: атомарно забирает 1 queue_sys (pending→processing), краулит выдачу по /suche/<branch>/<plz>,
-# ходит на карточки /gsbiz/*, парсит контактные данные (в т.ч. телефон), пишет item в pipeline,
-# в конце ставит queue_sys.status='collected' и обновляет cb_crawler(collected, collected_num, updated_at).
+# FILE: engine/crawler/spiders/spider_gs_cb.py  (обновлено) 2025-12-15
+# Fix: (1) защита от двойного захвата queue_sys (UPDATE только если status='pending' + cb_crawler.collected=false)
+# Fix: (2) телефон берется и из href="tel:..."
+# Fix: (3) если первый detail дал PLZ mismatch (collected_num==0) — останавливаем паука (дальше 100% тоже мимо)
 
 from __future__ import annotations
 
@@ -22,12 +22,17 @@ def _clean(s: str | None) -> str | None:
 
 
 def _pick_phone(candidates: list[str]) -> str | None:
-    # берём первый “похожий на телефон” кусок
     for raw in candidates:
         s = _clean(raw)
         if not s:
             continue
-        # должны быть цифры
+
+        if s.lower().startswith("tel:"):
+            s = s[4:].split("?", 1)[0].strip()
+            s = _clean(s)
+            if not s:
+                continue
+
         if re.search(r"\d", s):
             return s
     return None
@@ -47,13 +52,12 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         self.cb_crawler_id: int | None = None
         self.collected_num: int = 0
 
+        # если первый detail не совпал по PLZ — дальше смысла нет
+        self._abort_plz_mismatch: bool = False
+
     # ------------------------------------------------------------
 
     def start_requests(self):
-        # АТОМАРНО:
-        # - берём “следующий task_id после последнего collected” (round-robin)
-        # - если таких нет — берём минимальный task_id из pending
-        # - сразу ставим processing + time=NOW()
         row = fetch_one(
             """
             WITH last AS (
@@ -69,9 +73,7 @@ class GelbeSeitenCBSpider(scrapy.Spider):
                 JOIN cb_crawler c ON c.id = q.cb_crawler_id
                 WHERE q.status = 'pending'
                   AND c.collected = false
-                  AND (
-                        q.task_id > COALESCE((SELECT task_id FROM last), -1)
-                      )
+                  AND (q.task_id > COALESCE((SELECT task_id FROM last), -1))
                 ORDER BY q.task_id, q.rate, q.id
                 LIMIT 1
             ),
@@ -95,7 +97,9 @@ class GelbeSeitenCBSpider(scrapy.Spider):
                 time   = NOW()
             FROM cb_crawler c
             WHERE q.id = (SELECT id FROM chosen)
+              AND q.status = 'pending'      -- FIX #1
               AND c.id = q.cb_crawler_id
+              AND c.collected = false       -- FIX #1
             RETURNING
                 q.id,
                 q.cb_crawler_id,
@@ -106,15 +110,12 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         )
 
         if not row:
-            print("DEBUG: queue empty")
+            print("DEBUG: queue empty or already taken")
             return
 
         self.queue_id, self.cb_crawler_id, plz, city, branch = row
 
-        # ВАЖНО: branch в PATH -> quote (НЕ quote_plus)
         branch_q = quote(branch)
-
-        # ЗАРУБИЛИ: работает /suche/<branch>/<plz> (город НЕ нужен)
         start_url = f"https://www.gelbeseiten.de/suche/{branch_q}/{plz}"
 
         print(f"DEBUG: queue_id = {self.queue_id}")
@@ -133,19 +134,26 @@ class GelbeSeitenCBSpider(scrapy.Spider):
     # ------------------------------------------------------------
 
     def parse_list(self, response):
+        if self._abort_plz_mismatch:
+            print("DEBUG: aborted by PLZ mismatch — skip list parsing")
+            return
+
         plz = response.meta["plz"]
 
         print(
             f"DEBUG: LIST URL = {response.url} status={response.status} len={len(response.text)}"
         )
 
-        # В выдаче ссылки бывают абсолютные, поэтому ловим по contains
         gsbiz_links = response.css('a[href*="/gsbiz/"]::attr(href)').getall()
         gsbiz_links = list(dict.fromkeys(gsbiz_links))
 
         print(f"DEBUG: found gsbiz = {len(gsbiz_links)}")
 
         for href in gsbiz_links:
+            if self._abort_plz_mismatch:
+                print("DEBUG: aborted by PLZ mismatch — stop scheduling details")
+                return
+
             url = urljoin(response.url, href)
             print(f"DEBUG: -> detail {url}")
 
@@ -154,6 +162,10 @@ class GelbeSeitenCBSpider(scrapy.Spider):
                 callback=self.parse_detail,
                 meta={"plz": plz},
             )
+
+        if self._abort_plz_mismatch:
+            print("DEBUG: aborted by PLZ mismatch — no next page")
+            return
 
         next_href = response.css('a.pagination__next::attr(href)').get()
         if next_href:
@@ -170,6 +182,10 @@ class GelbeSeitenCBSpider(scrapy.Spider):
     # ------------------------------------------------------------
 
     def parse_detail(self, response):
+        if self._abort_plz_mismatch:
+            print("DEBUG: aborted by PLZ mismatch — skip detail")
+            return
+
         req_plz = response.meta["plz"]
 
         # ---------- name ----------
@@ -179,9 +195,7 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         name = _clean(name)
 
         # ---------- branches ----------
-        branches = response.css(
-            ".mod-TeilnehmerKopf__branchen span::text"
-        ).getall()
+        branches = response.css(".mod-TeilnehmerKopf__branchen span::text").getall()
         branches = [_clean(b) for b in branches]
         branches = [b for b in branches if b]
 
@@ -194,20 +208,17 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         address_text = _clean(" ".join(address_parts)) or ""
 
         parsed_plz = None
-        # часто второй span выглядит как "50739 Köln" или "70563 Stuttgart-Vaihingen"
         for part in address_parts:
             m = re.search(r"\b(\d{5})\b", part)
             if m:
                 parsed_plz = m.group(1)
                 break
 
-        # ---------- phone (ВАЖНО) ----------
-        # На GS телефон бывает:
-        # - span[data-role=telefonnummer] a span::text
-        # - span[data-role=telefonnummer] a::text
-        # - просто текст внутри a
+        # ---------- phone (FIX #2) ----------
         phone_candidates = response.css(
-            '[data-role="telefonnummer"] a::text, [data-role="telefonnummer"] span::text'
+            '[data-role="telefonnummer"] a::attr(href), '
+            '[data-role="telefonnummer"] a::text, '
+            '[data-role="telefonnummer"] span::text'
         ).getall()
         phone = _pick_phone(phone_candidates)
 
@@ -250,6 +261,13 @@ class GelbeSeitenCBSpider(scrapy.Spider):
 
         if parsed_plz != req_plz:
             print(f"DEBUG: skip — PLZ mismatch parsed={parsed_plz} req={req_plz}")
+
+            # FIX #3: если первый же detail не совпал — дальше смысла нет
+            if self.collected_num == 0:
+                self._abort_plz_mismatch = True
+                print("DEBUG: abort spider — first detail PLZ mismatch => all next will mismatch")
+                self.crawler.engine.close_spider(self, reason="plz_mismatch_first_detail")
+
             return
 
         self.collected_num += 1
