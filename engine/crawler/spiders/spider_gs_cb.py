@@ -1,7 +1,9 @@
-# FILE: engine/crawler/spiders/spider_gs_cb.py  (обновлено) 2025-12-15
-# Fix: (1) защита от двойного захвата queue_sys (UPDATE только если status='pending' + cb_crawler.collected=false)
-# Fix: (2) телефон берется и из href="tel:..."
-# Fix: (3) если первый detail дал PLZ mismatch (collected_num==0) — останавливаем паука (дальше 100% тоже мимо)
+# FILE: engine/crawler/spiders/spider_gs_cb.py  (новое) 2025-12-15
+# CB spider:
+# - task_id берём через ___crawler_priority_pick_task_id()
+# - из queue_sys атомарно забираем 1 pending для этого task_id
+# - FOR UPDATE SKIP LOCKED
+# - остальная логика без изменений
 
 from __future__ import annotations
 
@@ -48,69 +50,58 @@ class GelbeSeitenCBSpider(scrapy.Spider):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        self.task_id: int | None = None
         self.queue_id: int | None = None
         self.cb_crawler_id: int | None = None
         self.collected_num: int = 0
 
-        # если первый detail не совпал по PLZ — дальше смысла нет
         self._abort_plz_mismatch: bool = False
 
     # ------------------------------------------------------------
 
     def start_requests(self):
+        # 1) берём task_id по приоритету
+        row = fetch_one("SELECT ___crawler_priority_pick_task_id();")
+        if not row or not row[0]:
+            print("DEBUG: no task_id from priority picker")
+            return
+
+        self.task_id = row[0]
+        print(f"DEBUG: picked task_id = {self.task_id}")
+
+        # 2) атомарно забираем 1 queue_sys для этого task_id
         row = fetch_one(
             """
-            WITH last AS (
-                SELECT task_id
-                FROM queue_sys
-                WHERE status = 'collected' AND time IS NOT NULL
-                ORDER BY time DESC
-                LIMIT 1
-            ),
-            pick AS (
-                SELECT q.id
-                FROM queue_sys q
-                JOIN cb_crawler c ON c.id = q.cb_crawler_id
-                WHERE q.status = 'pending'
-                  AND c.collected = false
-                  AND (q.task_id > COALESCE((SELECT task_id FROM last), -1))
-                ORDER BY q.task_id, q.rate, q.id
-                LIMIT 1
-            ),
-            pick2 AS (
-                SELECT q.id
-                FROM queue_sys q
-                JOIN cb_crawler c ON c.id = q.cb_crawler_id
-                WHERE q.status = 'pending'
-                  AND c.collected = false
-                ORDER BY q.task_id, q.rate, q.id
-                LIMIT 1
-            ),
-            chosen AS (
-                SELECT id FROM pick
-                UNION ALL
-                SELECT id FROM pick2
-                LIMIT 1
-            )
             UPDATE queue_sys q
             SET status = 'processing',
                 time   = NOW()
             FROM cb_crawler c
-            WHERE q.id = (SELECT id FROM chosen)
-              AND q.status = 'pending'      -- FIX #1
+            WHERE q.id = (
+                SELECT q2.id
+                FROM queue_sys q2
+                JOIN cb_crawler c2 ON c2.id = q2.cb_crawler_id
+                WHERE q2.status = 'pending'
+                  AND q2.task_id = %s
+                  AND c2.collected = false
+                ORDER BY q2.rate, q2.id
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            )
+              AND q.status = 'pending'
               AND c.id = q.cb_crawler_id
-              AND c.collected = false       -- FIX #1
+              AND c.collected = false
             RETURNING
                 q.id,
                 q.cb_crawler_id,
                 c.plz,
                 c.city_name,
                 c.branch_slug
-            """
+            """,
+            (self.task_id,),
         )
 
         if not row:
-            print("DEBUG: queue empty or already taken")
+            print("DEBUG: no pending queue item for task_id")
             return
 
         self.queue_id, self.cb_crawler_id, plz, city, branch = row
@@ -135,76 +126,56 @@ class GelbeSeitenCBSpider(scrapy.Spider):
 
     def parse_list(self, response):
         if self._abort_plz_mismatch:
-            print("DEBUG: aborted by PLZ mismatch — skip list parsing")
             return
 
         plz = response.meta["plz"]
 
-        print(
-            f"DEBUG: LIST URL = {response.url} status={response.status} len={len(response.text)}"
-        )
-
         gsbiz_links = response.css('a[href*="/gsbiz/"]::attr(href)').getall()
         gsbiz_links = list(dict.fromkeys(gsbiz_links))
 
-        print(f"DEBUG: found gsbiz = {len(gsbiz_links)}")
-
         for href in gsbiz_links:
             if self._abort_plz_mismatch:
-                print("DEBUG: aborted by PLZ mismatch — stop scheduling details")
                 return
 
-            url = urljoin(response.url, href)
-            print(f"DEBUG: -> detail {url}")
-
             yield scrapy.Request(
-                url,
+                urljoin(response.url, href),
                 callback=self.parse_detail,
                 meta={"plz": plz},
             )
 
-        if self._abort_plz_mismatch:
-            print("DEBUG: aborted by PLZ mismatch — no next page")
-            return
-
         next_href = response.css('a.pagination__next::attr(href)').get()
-        if next_href:
-            next_url = urljoin(response.url, next_href)
-            print(f"DEBUG: NEXT PAGE {next_url}")
+        if next_href and not self._abort_plz_mismatch:
             yield scrapy.Request(
-                next_url,
+                urljoin(response.url, next_href),
                 callback=self.parse_list,
                 meta={"plz": plz},
             )
-        else:
-            print("DEBUG: no next page")
 
     # ------------------------------------------------------------
 
     def parse_detail(self, response):
         if self._abort_plz_mismatch:
-            print("DEBUG: aborted by PLZ mismatch — skip detail")
             return
 
         req_plz = response.meta["plz"]
 
-        # ---------- name ----------
-        name = response.css(
-            ".mod-TeilnehmerKopf__name::text, .gc-text--h2::text"
-        ).get()
-        name = _clean(name)
+        name = _clean(
+            response.css(".mod-TeilnehmerKopf__name::text, .gc-text--h2::text").get()
+        )
 
-        # ---------- branches ----------
-        branches = response.css(".mod-TeilnehmerKopf__branchen span::text").getall()
-        branches = [_clean(b) for b in branches]
-        branches = [b for b in branches if b]
+        branches = [
+            _clean(b)
+            for b in response.css(".mod-TeilnehmerKopf__branchen span::text").getall()
+            if _clean(b)
+        ]
 
-        # ---------- address + plz ----------
-        address_parts = response.css(
-            ".mod-Kontaktdaten__address-container .adresse-text span::text"
-        ).getall()
-        address_parts = [_clean(p) for p in address_parts]
-        address_parts = [p for p in address_parts if p]
+        address_parts = [
+            _clean(p)
+            for p in response.css(
+                ".mod-Kontaktdaten__address-container .adresse-text span::text"
+            ).getall()
+            if _clean(p)
+        ]
         address_text = _clean(" ".join(address_parts)) or ""
 
         parsed_plz = None
@@ -214,30 +185,40 @@ class GelbeSeitenCBSpider(scrapy.Spider):
                 parsed_plz = m.group(1)
                 break
 
-        # ---------- phone (FIX #2) ----------
-        phone_candidates = response.css(
-            '[data-role="telefonnummer"] a::attr(href), '
-            '[data-role="telefonnummer"] a::text, '
-            '[data-role="telefonnummer"] span::text'
-        ).getall()
-        phone = _pick_phone(phone_candidates)
+        phone = _pick_phone(
+            response.css(
+                '[data-role="telefonnummer"] a::attr(href), '
+                '[data-role="telefonnummer"] a::text, '
+                '[data-role="telefonnummer"] span::text'
+            ).getall()
+        )
 
-        # ---------- email ----------
-        email = response.css('#email_versenden::attr(data-link)').get()
-        email = _clean(email)
+        email = _clean(response.css('#email_versenden::attr(data-link)').get())
         if email and email.startswith("mailto:"):
-            email = email.replace("mailto:", "", 1).split("?")[0]
-            email = _clean(email)
+            email = _clean(email.replace("mailto:", "", 1).split("?")[0])
 
-        # ---------- website ----------
-        website = response.css('.contains-icon-big-homepage a::attr(href)').get()
-        website = _clean(website)
+        website = _clean(
+            response.css('.contains-icon-big-homepage a::attr(href)').get()
+        )
 
-        # ---------- description ----------
-        description = response.css("#beschreibung .mod-Beschreibung div::text").get()
-        description = _clean(description)
+        description = _clean(
+            response.css("#beschreibung .mod-Beschreibung div::text").get()
+        )
 
-        data = {
+        if not parsed_plz:
+            return
+
+        if parsed_plz != req_plz:
+            if self.collected_num == 0:
+                self._abort_plz_mismatch = True
+                self.crawler.engine.close_spider(
+                    self, reason="plz_mismatch_first_detail"
+                )
+            return
+
+        self.collected_num += 1
+
+        yield {
             "company_name": name,
             "email": email,
             "cb_crawler_id": self.cb_crawler_id,
@@ -252,40 +233,14 @@ class GelbeSeitenCBSpider(scrapy.Spider):
             },
         }
 
-        print("DEBUG: PARSED DATA:")
-        print(json.dumps(data, ensure_ascii=False, indent=2))
-
-        if not parsed_plz:
-            print("DEBUG: skip — no PLZ in address")
-            return
-
-        if parsed_plz != req_plz:
-            print(f"DEBUG: skip — PLZ mismatch parsed={parsed_plz} req={req_plz}")
-
-            # FIX #3: если первый же detail не совпал — дальше смысла нет
-            if self.collected_num == 0:
-                self._abort_plz_mismatch = True
-                print("DEBUG: abort spider — first detail PLZ mismatch => all next will mismatch")
-                self.crawler.engine.close_spider(self, reason="plz_mismatch_first_detail")
-
-            return
-
-        self.collected_num += 1
-        yield data
-
     # ------------------------------------------------------------
 
     def closed(self, reason):
         if not self.queue_id or not self.cb_crawler_id:
-            print("DEBUG: spider closed with no queue item")
             return
 
         execute(
-            """
-            UPDATE queue_sys
-            SET status='collected', time=NOW()
-            WHERE id=%s
-            """,
+            "UPDATE queue_sys SET status='collected', time=NOW() WHERE id=%s",
             (self.queue_id,),
         )
 
@@ -301,5 +256,5 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         )
 
         print(
-            f"DEBUG: FINISH OK cb_crawler_id={self.cb_crawler_id} collected_num={self.collected_num} reason={reason}"
+            f"DEBUG: FINISH OK task_id={self.task_id} cb_crawler_id={self.cb_crawler_id} collected_num={self.collected_num} reason={reason}"
         )
