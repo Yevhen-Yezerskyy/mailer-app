@@ -1,0 +1,2 @@
+Generate a short, clear task title (up to 5 words) based on the description below. Most important are the product and the company.
+Return only the text, without explanations.

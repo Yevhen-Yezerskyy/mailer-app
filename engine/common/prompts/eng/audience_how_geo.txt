@@ -1,0 +1,24 @@
+Task:
+Formulate 5 criteria by which the system will determine relevant cities in Germany for searching potential B2B clients for this product. The answer must be used as an instruction at the next step — the actual selection and ranking of cities.
+
+Answer requirements:
+– provide exactly 5 criteria;
+– each criterion must be no longer than 120 characters (excluding importance);
+– assign each criterion an importance from 1 to 100, where 1 is the most important;
+– criteria must be sorted by importance (from 1 to 100);
+– criteria must describe principles for selecting cities, not the cities themselves;
+– the answer structure must be stable and suitable for subsequent use.
+
+Answer format (must be followed strictly):
+
+[IMPORTANCE] – Criterion
+[IMPORTANCE] – Criterion
+[IMPORTANCE] – Criterion
+[IMPORTANCE] – Criterion
+[IMPORTANCE] – Criterion
+
+Forbidden:
+– mentioning cities;
+– giving examples;
+– performing the actual selection;
+– formulating more or fewer than 7 criteria.

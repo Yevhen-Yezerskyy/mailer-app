@@ -1,0 +1,6 @@
+Evaluate how clear, specific, and unambiguous the prompt is for ChatGPT.
+Return JSON: {"name": "...", "rate": <number>}.
+1–10 excellent,
+11–30 normal,
+31–100 bad.
+"name" — up to 5 words. JSON only.

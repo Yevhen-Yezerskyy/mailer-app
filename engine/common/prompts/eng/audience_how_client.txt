@@ -1,0 +1,25 @@
+Task:
+Formulate 5 criteria by which the system will determine the relative probability of a successful deal with a specific company. These criteria will be used in the next step to rank the found companies by likelihood of conversion.
+
+Answer requirements:
+– provide exactly 5 criteria;
+– each criterion must be no longer than 120 characters (excluding importance);
+– assign each criterion an importance from 1 to 100, where 1 is the most important;
+– criteria must be sorted by importance (from 1 to 100);
+– criteria must describe principles for assessing deal probability, not the companies themselves;
+– the answer must be structured and suitable for direct use as an instruction in the next step.
+
+Answer format (must be followed strictly):
+
+[IMPORTANCE] – Criterion
+[IMPORTANCE] – Criterion
+[IMPORTANCE] – Criterion
+[IMPORTANCE] – Criterion
+[IMPORTANCE] – Criterion
+
+
+Forbidden:
+– mention specific companies;
+– provide examples;
+– perform the assessment itself;
+– formulate more or fewer than 5 criteria.

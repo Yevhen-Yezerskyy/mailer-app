@@ -1,22 +1,92 @@
 {
   "prompt_quality": {
-    "name": "Оценка ясности промпта",
-    "rate": 9,
+    "name": "Ясность промпта ChatGPT",
+    "rate": 3,
     "source_mtime": 1765411080.5121949,
-    "last_eval": "2025-12-10T23:58:22",
-    "debug": "YES",
-    "name_en": "",
-    "rate_en": 0,
-    "eng_mtime": null
+    "last_eval": "2025-12-15T01:16:52",
+    "debug": "",
+    "name_en": "Clear and specific prompt",
+    "rate_en": 8,
+    "eng_mtime": 1765761414.2614176
   },
   "prompt_translate": {
-    "name": "Prompt translation clarity",
+    "name": "Prompt Translation Clarity",
     "rate": 2,
-    "source_mtime": 1765411153.0288548,
-    "last_eval": "2025-12-10T23:59:27",
-    "debug": "YES",
+    "source_mtime": 1765760907.3487866,
+    "last_eval": "2025-12-15T01:08:48",
+    "debug": "",
     "name_en": "",
-    "rate_en": 0,
-    "eng_mtime": null
+    "rate_en": 100,
+    "eng_mtime": 1765760930.2449946
+  },
+  "audience_how_system": {
+    "name": "Prompt Clarity Evaluation",
+    "rate": 7,
+    "source_mtime": 1765412102.7415206,
+    "last_eval": "2025-12-15T01:14:52",
+    "debug": "",
+    "name_en": "Very clear and structured prompt",
+    "rate_en": 9,
+    "eng_mtime": 1765761292.6882885
+  },
+  "audience_how_geo": {
+    "name": "Высокая ясность промпта",
+    "rate": 9,
+    "source_mtime": 1765513325.4698687,
+    "last_eval": "2025-12-15T01:16:35",
+    "debug": "",
+    "name_en": "Prompt clarity rating",
+    "rate_en": 40,
+    "eng_mtime": 1765761395.749246
+  },
+  "audience_how_name": {
+    "name": "Генерация названия задачи",
+    "rate": 75,
+    "source_mtime": 1765450398.8379252,
+    "last_eval": "2025-12-15T01:11:42",
+    "debug": "",
+    "name_en": "Оценка ясности промпта",
+    "rate_en": 18,
+    "eng_mtime": 1765761104.1825747
+  },
+  "audience_clar_city": {
+    "name": "German city ranking prompt",
+    "rate": 2,
+    "source_mtime": 1765650277.2878869,
+    "last_eval": "2025-12-15T01:18:58",
+    "debug": "",
+    "name_en": "City ranking prompt clarity",
+    "rate_en": 28,
+    "eng_mtime": 1765761541.758597
+  },
+  "audience_how_client": {
+    "name": "Оценка промпта по ясности",
+    "rate": 1,
+    "source_mtime": 1765513296.485605,
+    "last_eval": "2025-12-15T01:12:17",
+    "debug": "",
+    "name_en": "Clear five-criteria prompt",
+    "rate_en": 1,
+    "eng_mtime": 1765761141.0789099
+  },
+  "audience_how_branches": {
+    "name": "Оценка ясности промпта",
+    "rate": 9,
+    "source_mtime": 1765645722.798438,
+    "last_eval": "2025-12-15T01:14:28",
+    "debug": "",
+    "name_en": "Prompt clarity for five criteria",
+    "rate_en": 9,
+    "eng_mtime": 1765761271.8080974
+  },
+  "audience_clar_branch": {
+    "name": "Branch ranking module",
+    "rate": 18,
+    "source_mtime": 1765650388.3328981,
+    "last_eval": "2025-12-15T01:12:50",
+    "debug": "",
+    "name_en": "German branch ranking prompt",
+    "rate_en": 9,
+    "eng_mtime": 1765761175.879226
   }
 }
