@@ -50,14 +50,14 @@
     "eng_mtime": 1765761104.1825747
   },
   "audience_clar_city": {
-    "name": "German city ranking prompt",
-    "rate": 2,
-    "source_mtime": 1765650277.2878869,
-    "last_eval": "2025-12-15T01:18:58",
+    "name": "",
+    "rate": 100,
+    "source_mtime": 1765768718.371962,
+    "last_eval": "2025-12-15T03:19:02",
     "debug": "",
-    "name_en": "City ranking prompt clarity",
-    "rate_en": 28,
-    "eng_mtime": 1765761541.758597
+    "name_en": "Prompt clarity for city ranking",
+    "rate_en": 8,
+    "eng_mtime": 1765768746.5362172
   },
   "audience_how_client": {
     "name": "Оценка промпта по ясности",
@@ -80,13 +80,13 @@
     "eng_mtime": 1765761271.8080974
   },
   "audience_clar_branch": {
-    "name": "Branch ranking module",
-    "rate": 18,
-    "source_mtime": 1765650388.3328981,
-    "last_eval": "2025-12-15T01:12:50",
+    "name": "",
+    "rate": 100,
+    "source_mtime": 1765768144.37477,
+    "last_eval": "2025-12-15T03:19:29",
     "debug": "",
-    "name_en": "German branch ranking prompt",
-    "rate_en": 9,
-    "eng_mtime": 1765761175.879226
+    "name_en": "Prompt clarity rating",
+    "rate_en": 18,
+    "eng_mtime": 1765768773.2244592
   }
 }
