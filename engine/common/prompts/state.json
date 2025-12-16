@@ -50,14 +50,14 @@
     "eng_mtime": 1765761104.1825747
   },
   "audience_clar_city": {
-    "name": "",
-    "rate": 100,
-    "source_mtime": 1765768718.371962,
-    "last_eval": "2025-12-15T03:19:02",
+    "name": "Very detailed prompt",
+    "rate": 8,
+    "source_mtime": 1765843930.2636395,
+    "last_eval": "2025-12-16T00:20:21",
     "debug": "",
-    "name_en": "Prompt clarity for city ranking",
-    "rate_en": 8,
-    "eng_mtime": 1765768746.5362172
+    "name_en": "Germany city evaluation prompt",
+    "rate_en": 7,
+    "eng_mtime": 1765844427.0681496
   },
   "audience_how_client": {
     "name": "Оценка промпта по ясности",
