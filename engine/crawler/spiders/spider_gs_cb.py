@@ -1,43 +1,19 @@
-# FILE: engine/crawler/spiders/spider_gs_cb.py  (новое) 2025-12-15
-# CB spider:
-# - task_id берём через ___crawler_priority_pick_task_id()
-# - из queue_sys атомарно забираем 1 pending для этого task_id
-# - FOR UPDATE SKIP LOCKED
-# - остальная логика без изменений
+# FILE: engine/crawler/spiders/spider_gs_cb.py  (обновлено) 2025-12-16
+# Fix: spider использует parser_gs_cb.parse_gs_cb_detail только для карточек компаний;
+# - парсинг списка/пагинации остаётся в пауке
+# - yield-логика по email (0/1/2+) реализована в пауке (N yield’ов при 2+)
+# - company_data формат фиксированный (address, phone=list, email=string|list|null, fax/socials/parent)
+# - plz mismatch abort логика сохранена; collected_num увеличивается 1 раз на карточку (не на yield)
 
 from __future__ import annotations
 
-import json
 import re
 from urllib.parse import quote, urljoin
 
 import scrapy
 
-from engine.common.db import fetch_one, execute
-
-
-def _clean(s: str | None) -> str | None:
-    if not s:
-        return None
-    s = re.sub(r"\s+", " ", s).strip()
-    return s or None
-
-
-def _pick_phone(candidates: list[str]) -> str | None:
-    for raw in candidates:
-        s = _clean(raw)
-        if not s:
-            continue
-
-        if s.lower().startswith("tel:"):
-            s = s[4:].split("?", 1)[0].strip()
-            s = _clean(s)
-            if not s:
-                continue
-
-        if re.search(r"\d", s):
-            return s
-    return None
+from engine.common.db import execute, fetch_one
+from engine.crawler.parsers.parser_gs_cb import parse_gs_cb_detail
 
 
 class GelbeSeitenCBSpider(scrapy.Spider):
@@ -60,7 +36,6 @@ class GelbeSeitenCBSpider(scrapy.Spider):
     # ------------------------------------------------------------
 
     def start_requests(self):
-        # 1) берём task_id по приоритету
         row = fetch_one("SELECT ___crawler_priority_pick_task_id();")
         if not row or not row[0]:
             print("DEBUG: no task_id from priority picker")
@@ -69,7 +44,6 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         self.task_id = row[0]
         print(f"DEBUG: picked task_id = {self.task_id}")
 
-        # 2) атомарно забираем 1 queue_sys для этого task_id
         row = fetch_one(
             """
             UPDATE queue_sys q
@@ -116,11 +90,7 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         print(f"DEBUG: branch_slug = {branch}")
         print(f"DEBUG: start_url = {start_url}")
 
-        yield scrapy.Request(
-            start_url,
-            callback=self.parse_list,
-            meta={"plz": plz},
-        )
+        yield scrapy.Request(start_url, callback=self.parse_list, meta={"plz": plz})
 
     # ------------------------------------------------------------
 
@@ -136,7 +106,6 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         for href in gsbiz_links:
             if self._abort_plz_mismatch:
                 return
-
             yield scrapy.Request(
                 urljoin(response.url, href),
                 callback=self.parse_detail,
@@ -153,85 +122,79 @@ class GelbeSeitenCBSpider(scrapy.Spider):
 
     # ------------------------------------------------------------
 
+    def _expand_yields_by_email(self, parsed: dict):
+        """
+        Правило:
+        - 0 emails: 1 yield (email=None, company_data.email=None)
+        - 1 email : 1 yield (email=str, company_data.email=str)
+        - 2+      : N yield (email=str конкретный, company_data.email=[...])
+        """
+        emails: list[str] = parsed.get("emails") or []
+        company_name = parsed["company_name"]
+        base_cd: dict = parsed["company_data"]
+
+        # готовим базу company_data (не мутируем исходник)
+        if len(emails) == 0:
+            cd = dict(base_cd)
+            cd["email"] = None
+            yield {
+                "company_name": company_name,
+                "email": None,
+                "cb_crawler_id": self.cb_crawler_id,
+                "company_data": cd,
+            }
+            return
+
+        if len(emails) == 1:
+            cd = dict(base_cd)
+            cd["email"] = emails[0]
+            yield {
+                "company_name": company_name,
+                "email": emails[0],
+                "cb_crawler_id": self.cb_crawler_id,
+                "company_data": cd,
+            }
+            return
+
+        # 2+
+        cd_list = dict(base_cd)
+        cd_list["email"] = list(emails)
+        for e in emails:
+            yield {
+                "company_name": company_name,
+                "email": e,
+                "cb_crawler_id": self.cb_crawler_id,
+                "company_data": cd_list,
+            }
+
     def parse_detail(self, response):
         if self._abort_plz_mismatch:
             return
 
         req_plz = response.meta["plz"]
 
-        name = _clean(
-            response.css(".mod-TeilnehmerKopf__name::text, .gc-text--h2::text").get()
-        )
+        parsed = parse_gs_cb_detail(response)
+        if not parsed:
+            return
 
-        branches = [
-            _clean(b)
-            for b in response.css(".mod-TeilnehmerKopf__branchen span::text").getall()
-            if _clean(b)
-        ]
+        parsed_plz = parsed.get("company_data", {}).get("plz")
 
-        address_parts = [
-            _clean(p)
-            for p in response.css(
-                ".mod-Kontaktdaten__address-container .adresse-text span::text"
-            ).getall()
-            if _clean(p)
-        ]
-        address_text = _clean(" ".join(address_parts)) or ""
-
-        parsed_plz = None
-        for part in address_parts:
-            m = re.search(r"\b(\d{5})\b", part)
-            if m:
-                parsed_plz = m.group(1)
-                break
-
-        phone = _pick_phone(
-            response.css(
-                '[data-role="telefonnummer"] a::attr(href), '
-                '[data-role="telefonnummer"] a::text, '
-                '[data-role="telefonnummer"] span::text'
-            ).getall()
-        )
-
-        email = _clean(response.css('#email_versenden::attr(data-link)').get())
-        if email and email.startswith("mailto:"):
-            email = _clean(email.replace("mailto:", "", 1).split("?")[0])
-
-        website = _clean(
-            response.css('.contains-icon-big-homepage a::attr(href)').get()
-        )
-
-        description = _clean(
-            response.css("#beschreibung .mod-Beschreibung div::text").get()
-        )
-
+        # если плз не извлечён — не можем валидировать; пропускаем
         if not parsed_plz:
             return
 
         if parsed_plz != req_plz:
             if self.collected_num == 0:
                 self._abort_plz_mismatch = True
-                self.crawler.engine.close_spider(
-                    self, reason="plz_mismatch_first_detail"
-                )
+                self.crawler.engine.close_spider(self, reason="plz_mismatch_first_detail")
             return
 
+        # плз совпал: считаем 1 карточку (не yield)
         self.collected_num += 1
 
-        yield {
-            "company_name": name,
-            "email": email,
-            "cb_crawler_id": self.cb_crawler_id,
-            "company_data": {
-                "source_url": response.url,
-                "branches": branches,
-                "address_text": address_text,
-                "plz": parsed_plz,
-                "phone": phone,
-                "website": website,
-                "description": description,
-            },
-        }
+        # yield'им по email-правилу
+        for item in self._expand_yields_by_email(parsed):
+            yield item
 
     # ------------------------------------------------------------
 
