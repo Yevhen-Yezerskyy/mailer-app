@@ -21,7 +21,7 @@ ServiceTier = Literal["flex", "standard", "priority"]
 ALLOWED_TIERS: dict[TierName, str] = {
     "nano": "gpt-5-nano",
     "mini": "gpt-5-mini",
-    "maxi": "gpt-5.2",     # основной жир
+    "maxi": "gpt-5.1",     # основной жир
     "maxi-51": "gpt-5.1",  # фиксированный 5.1
 }
 

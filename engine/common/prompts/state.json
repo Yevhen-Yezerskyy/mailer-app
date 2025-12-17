@@ -98,5 +98,15 @@
     "name_en": "Open Source Email Prompt",
     "rate_en": 17,
     "eng_mtime": 1765936486.5778162
+  },
+  "engine_core_rate_contacts": {
+    "name": "B2B ranking prompt clarity",
+    "rate": 8,
+    "source_mtime": 1765965670.6709247,
+    "last_eval": "2025-12-17T10:01:43",
+    "debug": "",
+    "name_en": "B2B ranking prompt clarity",
+    "rate_en": 22,
+    "eng_mtime": 1765965709.0232728
   }
 }
