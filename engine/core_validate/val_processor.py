@@ -1,11 +1,11 @@
-# FILE: engine/core_validate/val_processor.py  (обновлено — 2025-12-16)
-# Смысл: процессор валидации/подготовки. Крутит Worker и периодически запускает:
-# - val_email: проверка email в raw_contacts_gb
-# - val_prepare: перенос/агрегация OK-email из raw_contacts_gb -> raw_contacts_aggr (dedup по email)
-# Параллельность=1.
+# FILE: engine/core_validate/val_processor.py  (обновлено) 2025-12-17
+# Fix:
+# - enrich_priority_updater переехал в engine/core_validate/val_enrich.py (val_enrich.run_priority_updater)
+# - every_sec=600 это раз в 10 минут
 
 from engine.common.worker import Worker
 from engine.core_validate import val_email, val_prepare
+#from engine.core_validate import val_enrich
 
 TASK_TIMEOUT_SEC = 900  # 15 минут
 
@@ -14,7 +14,7 @@ def main() -> None:
     w = Worker(
         name="val_processor",
         tick_sec=0.5,
-        max_parallel=1,  # DNS/MX + дедуп по email не параллелим
+        max_parallel=1,
     )
 
     w.register(
@@ -36,6 +36,26 @@ def main() -> None:
         heavy=False,
         priority=20,
     )
+# дорого и глупо пока что
+#    w.register(
+#        name="enrich_priority_updater",
+#        fn=val_enrich.run_priority_updater,
+#        every_sec=600,  # раз в 10 минут
+#        timeout_sec=TASK_TIMEOUT_SEC,
+#        singleton=True,
+#        heavy=True,
+#        priority=30,
+#    )
+
+#    w.register(
+#        name="val_enrich",
+#        fn=val_enrich.run_batch,
+#        every_sec=10,  # каждые 10 секунд
+#        timeout_sec=TASK_TIMEOUT_SEC,
+#        singleton=True,
+#        heavy=False,
+#        priority=40,
+#    )
 
     w.run_forever()
 

@@ -1,0 +1,30 @@
+Task: find the company email in open sources.
+Input: list of companies:
+- id
+- source_url (profile in the German "Yellow Pages")
+Actions:
+1. From the "Yellow Pages", take the company's identity and PLZ.
+2. Use web search to find the company's email.
+3. As you go, record the website and phone numbers.
+4. If there is enough data, write a description (≤ 4 sentences).
+Constraints:
+- Email from the "Yellow Pages" is forbidden.
+- Add an email only if you are sure it belongs to this company.
+- phones: do not search specifically.
+- description: do not invent; if there is not enough data — null.
+- sources[] — URL where the email or company data was found (not GS).
+- Return STRICTLY JSON. No text.
+Format:
+{
+  "items": [
+    {
+      "id": <int>,
+      "plz": <string|null>,
+      "emails": <string[]>,
+      "phones": <string[]>,
+      "website": <string|null>,
+      "description": <string|null>,
+      "sources": <string[]>
+    }
+  ]
+}

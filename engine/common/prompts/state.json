@@ -20,14 +20,14 @@
     "eng_mtime": 1765760930.2449946
   },
   "audience_how_system": {
-    "name": "Prompt Clarity Evaluation",
-    "rate": 7,
-    "source_mtime": 1765412102.7415206,
-    "last_eval": "2025-12-15T01:14:52",
+    "name": "Complex and lengthy instructions",
+    "rate": 28,
+    "source_mtime": 1765936384.6568882,
+    "last_eval": "2025-12-17T01:53:40",
     "debug": "",
-    "name_en": "Very clear and structured prompt",
-    "rate_en": 9,
-    "eng_mtime": 1765761292.6882885
+    "name_en": "Very clear and detailed",
+    "rate_en": 2,
+    "eng_mtime": 1765936420.5132146
   },
   "audience_how_geo": {
     "name": "Высокая ясность промпта",
@@ -88,5 +88,15 @@
     "name_en": "Prompt clarity rating",
     "rate_en": 18,
     "eng_mtime": 1765768773.2244592
+  },
+  "engine_core_validate_enrich": {
+    "name": "Email lookup from Gelbe Seiten",
+    "rate": 8,
+    "source_mtime": 1765932584.2902358,
+    "last_eval": "2025-12-17T01:54:43",
+    "debug": "",
+    "name_en": "Open Source Email Prompt",
+    "rate_en": 17,
+    "eng_mtime": 1765936486.5778162
   }
 }

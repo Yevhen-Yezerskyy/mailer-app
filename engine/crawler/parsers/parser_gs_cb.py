@@ -1,11 +1,5 @@
-# FILE: engine/crawler/parsers/parser_gs_cb.py  (новое) 2025-12-16
-# Fix: парсер карточки GS под фиксированный контракт company_data:
-# - address: берём из TeilnehmerKopf, но перезаписываем из mod-Kontaktdaten если найден
-# - phone: всегда list (0..N), собираем всё из .contains-icon-big-tel (href/text/data-suffix)
-# - email: парсер возвращает emails: list (0..N); spider решает, как yield'ить и какой тип company_data.email
-# - fax добавлен; bahndata удалён; parent yes/no по наличию mod-WeitereStandorte
-# - website: aktionsleiste как доп. источник, mod-Kontaktdaten перезаписывает
-# - socials list; description чистым текстом (без HTML)
+# FILE: engine/crawler/parsers/parser_gs_cb.py  (обновлено — 2025-12-17)
+# Fix: добавлен city в company_data — берём всё после 5-значного PLZ до конца address (trim по краям).
 
 from __future__ import annotations
 
@@ -203,12 +197,16 @@ def parse_gs_cb_detail(response):
         fax = None
         socials = []
 
-    # ---------- final plz ----------
+    # ---------- final plz + city ----------
     plz = None
+    city = None
     if address:
         m = re.search(r"\b(\d{5})\b", address)
         if m:
             plz = m.group(1)
+            tail = address[m.end():]
+            tail = tail.lstrip(" ,")
+            city = _clean(tail)
 
     emails = _dedup_keep_order([e for e in emails if e])
 
@@ -220,6 +218,7 @@ def parse_gs_cb_detail(response):
             "branches": branches,
             "address": address,
             "plz": plz,
+            "city": city,
             "phone": phones,
             "email": None,  # заполнит spider по правилу 0/1/2+
             "fax": fax,
