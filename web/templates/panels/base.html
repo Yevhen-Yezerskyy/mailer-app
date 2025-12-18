@@ -63,9 +63,15 @@
               <a href="{% url 'dashboard' %}" class="panel-topbar-link panel-topbar-link-main">
                 Дашборд
               </a>
-              <a href="{% url 'logout' %}" class="panel-topbar-link panel-topbar-link-danger">
-                Выйти
-              </a>
+              
+<form method="post" action="{% url 'logout' %}" style="display:inline;">
+  {% csrf_token %}
+  <button type="submit"
+          class="panel-topbar-link panel-topbar-link-danger"
+          style="background:none;border:0;padding:0;cursor:pointer;">
+    Выйти
+  </button>
+</form>
             </div>
           </nav>
         </header>

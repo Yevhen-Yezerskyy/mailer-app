@@ -1,15 +1,38 @@
-<!-- FILE: web/templates/public/login.html  (новое — 2025-12-18)
-     Смысл: единственная форма логина, ошибки выводятся здесь же -->
+{% extends "public/base.html" %}
+{% load i18n %}
 
-<h1>Login</h1>
+{% block title %}{% trans "Вход" %} — Serenity{% endblock %}
 
-{% if form.errors %}
-    <p style="color:red;">Неверный логин или пароль</p>
-{% endif %}
+{% block content %}
+<!-- FILE: web/templates/public/login.html  (обновлено — 2025-12-18)
+Смысл: публичный логин, центрированный box, заголовок + вход -->
+<div class="box" style="flex-direction: column;">
 
-<form method="post">
-    {% csrf_token %}
-    {{ form.username.label_tag }} {{ form.username }}<br>
-    {{ form.password.label_tag }} {{ form.password }}<br>
-    <button type="submit">Login</button>
-</form>
+
+    <h2 style="margin-bottom: 20px;">
+      {% trans "Интеллектуальные" %}<br>
+      {% trans "email-коммуникации" %}
+    </h2>
+
+    <h2>{% trans "Вход" %}</h2>
+    {% if form.errors %}
+      <p style="color:#750b00;margin-top:20px;">{% trans "Неверный логин или пароль" %}</p>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+
+      <p style="margin-top:20px;">{% trans "Имя пользователя:" %}</p>
+      <p>{{ form.username }}</p>
+      
+      <p style="margin-top:20px;">{% trans "Пароль:" %}</p>
+      <p>{{ form.password }}</p>
+
+       <p class="buttons" style="margin-top:20px;margin-bottom: 20px;"><a href="{% url 'public_index' %}" class="btn">&nbsp;&nbsp;&nbsp;&nbsp;{% trans "Отмена" %}&nbsp;&nbsp;&nbsp;&nbsp;</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<button type="submit" class="btn">&nbsp;&nbsp;&nbsp;&nbsp;{% trans "Войти" %}&nbsp;&nbsp;&nbsp;&nbsp;</button></p>
+   </form>
+
+
+</div>
+
+
+{% endblock %}

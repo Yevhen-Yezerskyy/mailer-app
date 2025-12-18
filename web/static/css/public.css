@@ -61,6 +61,17 @@ h1 {
   font-weight: normal;
   text-transform: uppercase;
 }
+
+h2 {
+  margin:10px 0 10px 0;
+  text-align: center;
+  font-size: 25px;
+  letter-spacing: 4px;
+  line-height: 1.1;
+  font-weight: normal;
+  text-transform: uppercase;
+}
+
 p, ul, li{
     font-size: 19px;
     line-height: 1.2;
@@ -98,6 +109,15 @@ p, ul, li{
   border: 1px solid #022a39;
   position: relative;
   font-family: "Times New Roman", Times, serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+button.btn {
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 /* белая стрелка псевдографикой */
@@ -151,6 +171,36 @@ p, ul, li{
 
 .about__text {
   flex: 1;
+}
+
+input[type="text"],
+input[type="password"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  font-size: 18px;
+  font-family: "Times New Roman", Times, serif;
+  color: #006991;
+
+  border: 1px solid #9aa7b0;
+  border-radius: 2px;
+  outline: none;
+}
+
+/* hover */
+input[type="text"]:hover,
+input[type="password"]:hover {
+  border-color: #022a39;
+}
+
+/* focus */
+input[type="text"]:focus,
+input[type="password"]:focus {
+  border-color: #0a5f85;
+}
+
+.buttons, .buttons button{
+  font-size:20px;
 }
 
 
