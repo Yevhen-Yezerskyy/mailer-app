@@ -1,0 +1,84 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-12-18 12:20+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+#: templates/public/base.html:11 templates/public/index.html:6
+msgid "Интеллектуальные email-коммуникации"
+msgstr "Intelligente E-Mail-Kommunikationen"
+
+#: templates/public/base.html:12
+msgid ""
+"Интеллектуальная система email-коммуникаций для малого и среднего бизнеса."
+msgstr "Intelligentes E-Mail-Kommunikationssystem für kleine und mittlere Unternehmen."
+
+#: templates/public/index.html:14
+msgid "Интеллектуальные"
+msgstr "intellektuelle"
+
+#: templates/public/index.html:14
+msgid "email-коммуникации"
+msgstr "E-Mail-Kommunikation"
+
+#: templates/public/index.html:18
+msgid "Вход для клиентов:"
+msgstr "Eingang für Kunden:"
+
+#: templates/public/index.html:19
+msgid "Перейти"
+msgstr "wechseln"
+
+#: templates/public/index.html:30
+msgid ""
+"интеллектуальная система email-коммуникаций для малого и среднего бизнеса, "
+"ориентированная на работу на рынке Германии."
+msgstr "Intelligentes E-Mail-Kommunikationssystem für kleine und mittlere Unternehmen, ausgerichtet auf den deutschen Markt."
+
+#: templates/public/index.html:34
+msgid ""
+"Платформа предназначена для компаний, которые регулярно взаимодействуют с "
+"другими предприятиями в рамках делового сотрудничества — как в продажах, так "
+"и в закупках."
+msgstr "Die Plattform ist für Unternehmen bestimmt, die regelmäßig im Rahmen geschäftlicher Zusammenarbeit mit anderen Unternehmen interagieren — sowohl im Verkauf als auch im Einkauf."
+
+#: templates/public/index.html:37
+msgid "Функциональные возможности:"
+msgstr "Funktionale Möglichkeiten:"
+
+#: templates/public/index.html:39
+msgid "Интеллектуальный подбор и приоритизация деловых контактов для продаж."
+msgstr "Intelligente Auswahl und Priorisierung von Geschäftskontakten für den Vertrieb."
+
+#: templates/public/index.html:40
+msgid "Интеллектуальный подбор и приоритизация деловых контактов для закупок."
+msgstr "Intelligente Auswahl und Priorisierung von Geschäftskontakten für Beschaffungen."
+
+#: templates/public/index.html:41
+msgid "Отправка коммерческих предложений целевым и релевантным получателям."
+msgstr "Versand kommerzieller Angebote an zielgerichtete und relevante Empfänger."
+
+#: templates/public/index.html:42
+msgid "Отправка запросов поставщикам и подрядчикам по заданным критериям."
+msgstr "Versand von Anfragen an Lieferanten und Auftragnehmer nach vorgegebenen Kriterien."
+
+#: templates/public/index.html:43
+msgid "Отслеживание отклика и последующих взаимодействий."
+msgstr "Nachverfolgung der Reaktion und der nachfolgenden Interaktionen."
+
+#: templates/public/index.html:44
+msgid "Информационные рассылки для существующих клиентов и партнёров."
+msgstr "Informationsversand für bestehende Kunden und Partner."

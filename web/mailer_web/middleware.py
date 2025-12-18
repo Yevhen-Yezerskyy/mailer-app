@@ -1,8 +1,11 @@
-# FILE: web/mailer_web/middleware.py
+# FILE: web/mailer_web/middleware.py  (обновлено — 2025-12-18)
+# Fix: закрываем /panel/* для anon (редирект на login), импорт UserWorkspace из mailer_web.models_accounts.
 
 from django.shortcuts import redirect
 from django.urls import reverse
-from accounts.models import UserWorkspace
+
+from mailer_web.models_accounts import UserWorkspace
+
 
 class WorkspaceMiddleware:
     def __init__(self, get_response):
@@ -10,6 +13,10 @@ class WorkspaceMiddleware:
 
     def __call__(self, request):
         request.workspace_id = None
+
+        # anon в панель нельзя
+        if request.path.startswith("/panel/") and not request.user.is_authenticated:
+            return redirect(reverse("login"))
 
         if request.user.is_authenticated:
             try:

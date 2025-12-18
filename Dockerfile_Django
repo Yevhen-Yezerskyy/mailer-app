@@ -1,0 +1,13 @@
+# FILE: Dockerfile_Django  (новое — 2025-12-18)
+# PURPOSE: Django image with system deps (gettext) for i18n
+
+FROM python:3.12
+
+# system deps for Django i18n
+RUN apt-get update \
+ && apt-get install -y gettext \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+# ничего не копируем — код монтируется volume’ом
+WORKDIR /app

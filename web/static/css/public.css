@@ -1,0 +1,156 @@
+/* FILE: web/static/css/public.css  (обновлено — 2025-12-18)
+Смысл: фон + page + header с корректными отступами и центрированным логотипом */
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: linear-gradient(
+    90deg,
+    #0a6f8f 0%,
+    #1786ab 30%,
+    #3fb3d8 50%,
+    #1786ab 70%,
+    #0a6f8f 100%
+  );
+}
+
+.page {
+  min-height: 100%;
+  width: 1100px;
+  margin: 0 auto;
+}
+
+.box {
+  margin: 0 0 30px 0;
+  padding: 30px 20px 30px 20px;
+  display: flex;
+  justify-content: center; /* центр */
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #022a39;
+}
+
+.header{
+    margin: 30px 0 30px 0;    
+    display: flex;
+    flex-direction: column;   /* вертикально */
+    align-items: center;      /* центр по горизонтали */
+}
+
+.header__logo {
+  height: 38px;
+  width: auto;
+}
+
+html, body,
+p, h1, h2, h3, h4, h5, h6,
+div, span, a, li, ul, ol {
+  font-family: "Times New Roman", Times, serif;
+  color: #006991;
+}
+
+h1 {
+  margin:10px 0 10px 0;
+  text-align: center;
+  font-size: 55px;
+  letter-spacing: 4px;
+  line-height: 1.1;
+  font-weight: normal;
+  text-transform: uppercase;
+}
+p, ul, li{
+    font-size: 19px;
+    line-height: 1.2;
+    margin: 0 0 10px 0;
+}
+
+.lang {
+  
+  font-size: 16px;
+  line-height: 1;
+  white-space: nowrap;
+  margin-bottom: 20px;
+}
+
+.lang__item {
+  text-decoration: none;
+}
+
+.lang__item:hover {
+  color: #750b00;
+}
+
+.lang__sep {
+  margin: 0 6px;
+}
+
+
+/* Универсальная кнопка */
+.btn {
+  display: inline-block;
+  padding: 12px 40px;
+  background: #0a5f85;
+  color: #ffffff;
+  text-decoration: none;
+  border: 1px solid #022a39;
+  position: relative;
+  font-family: "Times New Roman", Times, serif;
+}
+
+/* белая стрелка псевдографикой */
+.btn::after {
+  content: " →";
+  color: #ffffff;
+}
+
+/* hover для кнопки — красный фон, как у ссылок */
+.btn:hover {
+  background: #750b00;
+  color: #ffffff; /* на всякий, чтобы не переехало */
+}
+
+/* Блок входа (только компоновка) */
+.enter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 60px;
+  padding: 15px 0 15px 0;
+  margin: 65px 0 65px 0;
+}
+
+.enter p, .enter a {
+   font-size: 28px;
+}
+.enter p{
+  padding-top: 11px;
+}
+
+/* FILE: web/static/css/public.css  (обновлено — 2025-12-18)
+Смысл: нижний информационный блок (картинка + текст) */
+
+.about {
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 50px;
+  padding-left: 30px; 
+  padding-right: 30px;
+}
+
+.about__img {
+  flex: 0 0 495px;
+}
+
+.about__img img {
+  max-width: 100%;
+  display: block;
+}
+
+.about__text {
+  flex: 1;
+}
+
+

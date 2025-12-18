@@ -1,4 +1,5 @@
-# FILE: docker-compose.yml  (новое) 2025-12-11
+# FILE: docker-compose.yml  (обновлено — 2025-12-18)
+# CHANGE: mailer-web теперь собирается из Dockerfile_Django (с gettext), image убран
 
 services:
   # ------------ POSTGRES ------------
@@ -19,9 +20,11 @@ services:
 
   # ------------ DJANGO (DEV) ------------
   mailer-web:
-    image: python:3.12
+    build:
+      context: .
+      dockerfile: Dockerfile_Django
     container_name: mailer-web
-    working_dir: /app/web            # корень Django внутри общего репозитория
+    working_dir: /app/web
     restart: unless-stopped
     user: "1001:1001"
     depends_on:

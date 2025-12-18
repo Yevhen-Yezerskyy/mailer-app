@@ -1,0 +1,56 @@
+{% load static %}
+{% load i18n %}
+<!doctype html>
+<!-- FILE: web/templates/public/base.html -->
+<html lang="{{ request.LANGUAGE_CODE|default:'de' }}">
+<head>
+  <meta charset="utf-8" />
+
+  <title>{% block title %}Serenity{% endblock %}</title>
+
+  {% trans "Интеллектуальные email-коммуникации" as og_title %}
+  {% trans "Интеллектуальная система email-коммуникаций для малого и среднего бизнеса." as og_description %}
+
+  <!-- OpenGraph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Serenity Mail" />
+  <meta property="og:title" content="{{ og_title }}" />
+  <meta property="og:description" content="{{ og_description }}" />
+  <meta property="og:url" content="{{ request.build_absolute_uri }}" />
+  <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'img/og/mail-og.jpg' %}" />
+
+  <!-- Twitter / Telegram -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{{ og_title }}" />
+  <meta name="twitter:description" content="{{ og_description }}" />
+  <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'img/og/mail-og.jpg' %}" />
+
+  <link rel="icon" href="{% static 'img/favicon.ico' %}" />
+  <link rel="stylesheet" href="{% static 'css/public.css' %}" />
+</head>
+
+
+<body>
+  <div class="page">
+
+    <div class="box header">
+      <nav class="lang" aria-label="Language switch">
+        <a class="lang__item" href="/de/">DE</a>
+        <span class="lang__sep">|</span>
+        <a class="lang__item" href="/uk/">UK</a>
+        <span class="lang__sep">|</span>
+        <a class="lang__item" href="/ru/">RU</a>
+      </nav>
+
+      <img
+        class="header__logo"
+        src="{% static 'img/logo.main.svg' %}"
+        alt="Serenity"
+      />
+    </div>
+
+    {% block content %}{% endblock %}
+
+  </div>
+</body>
+</html>

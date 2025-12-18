@@ -1,4 +1,6 @@
 # FILE: web/mailer_web/settings.py
+# DATE: 2025-12-17
+# CHANGE: enable i18n + languages (ru/de/uk), LocaleMiddleware, GeoIP2 path (Country DB in logs/GeoLite2-Country)
 
 """
 Django settings for mailer_web project.
@@ -45,10 +47,13 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    "aap_console",
-    "aap_settings",
-    "aap_audience",
-    "accounts",
+    "mailer_web",
+    "public",
+    "panel",
+
+    # panel sub-apps (ОБЯЗАТЕЛЬНО)
+    "panel.aap_audience",
+    "panel.aap_settings",
 ]
 
 
@@ -57,6 +62,13 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+
+    # Django i18n — сначала
+    "django.middleware.locale.LocaleMiddleware",
+
+    # ТВОЯ логика выбора языка (cookie / geo / url)
+    "mailer_web.middleware_public_lang.PublicLangMiddleware",
+
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -117,11 +129,29 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # --- I18N / TIMEZONE ---
 
-LANGUAGE_CODE = "en-us"
+# Язык исходников/текстов (пишешь по-русски), но логика редиректов будет отдельно (middleware).
+LANGUAGE_CODE = "ru"
+
+LANGUAGES = [
+    ("ru", "Русский"),
+    ("de", "Deutsch"),
+    ("uk", "Українська"),
+]
+
 TIME_ZONE = "Europe/Berlin"
 
 USE_I18N = True
 USE_TZ = True
+
+LOCALE_PATHS = [
+    BASE_DIR / "locale",
+]
+
+
+# --- GEOIP (Country only) ---
+
+# logs/GeoLite2-Country/GeoLite2-Country.mmdb
+GEOIP_PATH = BASE_DIR / "logs" / "GeoLite2-Country"
 
 
 # --- STATIC FILES ---

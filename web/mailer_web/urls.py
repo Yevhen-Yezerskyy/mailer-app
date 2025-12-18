@@ -1,25 +1,27 @@
 # FILE: web/mailer_web/urls.py
+# DATE: 2025-12-18
+# CHANGE: public + panel split; public under i18n, panel without language prefix
 
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns
-
-from aap_console.views import dashboard  # одна страница → остаётся здесь
+from django.conf.urls.i18n import i18n_patterns
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("", include("accounts.urls")),
 
-    # Консоль (одна страница — остаётся здесь)
-    path("panel/", dashboard, name="dashboard"),
+    # language switch (cookie)
+    path("i18n/", include("django.conf.urls.i18n")),
 
-    # Настройки (несколько страниц → у аппа свой urls.py)
-    path("panel/settings/", include("aap_settings.urls")),
-
-    # Подбор адресатов
-    path("panel/audience/", include("aap_audience.urls")), 
+    # panel — только cookie, без /ru|de|uk
+    path("panel/", include("panel.urls")),
 ]
+
+# публичка — ВСЁ до логина
+urlpatterns += i18n_patterns(
+    path("", include("public.urls")),
+)
 
 if settings.DEBUG:
     urlpatterns += staticfiles_urlpatterns()
