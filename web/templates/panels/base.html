@@ -1,86 +1,140 @@
-<!-- FILE: web/templates/panels/base.html -->
-
 {% load static %}
 <!doctype html>
 <html lang="ru">
-  <head>
-    <meta charset="utf-8">
-    <title>{% block title %}Serenity Mailer — Панель{% endblock %}</title>
+<!-- FILE: web/templates/panels/base.html  (обновлено — 2025-12-18)
+Смысл: base панели: фикс-высота + scroll контента, toggle sidebar (js), favicon, logout в topbar -->
 
-    <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<head>
+  <meta charset="utf-8">
+  <title>{{ page_title|default:"" }} - Serenity Mailer</title>
 
-    <link rel="stylesheet" href="{% static 'css/panel.css' %}">
-  </head>
-  <body>
-    <div class="panel-layout">
+  <!-- 00.00 /panel/ BASE: favicon -->
+  <link rel="icon" href="{% static 'img/favicon.ico' %}" />
 
-      <!-- ЛЕВАЯ КОЛОНКА -->
-      <aside class="panel-sidebar">
-        <div class="panel-logo">
-          <a href="{% url 'public_index' %}" class="panel-logo-link">
-            <img src="{% static 'img/logo.main.svg' %}" class="panel-logo-img" alt="Serenity Mailer">
-          </a>
+  <!-- 00.01 /panel/ BASE: Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- 00.02 /panel/ BASE: наши стили поверх -->
+  <link rel="stylesheet" href="{% static 'css/panel.css' %}">
+</head>
+
+<body class="min-h-screen bg-slate-100">
+
+  <!-- 00.10 /panel/ ROOT LAYOUT -->
+  <div class="h-screen flex overflow-hidden">
+
+    <!-- ========================================================= -->
+    <!-- 01.00 /panel/ SIDEBAR (LEFT)                               -->
+    <!-- ========================================================= -->
+    <aside id="panel-sidebar" class="w-72 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+
+      <!-- 01.01 /panel/ SIDEBAR HEADER / LOGO -->
+      <div class="h-16 px-6 flex items-center border-b border-slate-200 justify-center">
+        <a href="/"><img src="{% static 'img/logo.main.svg' %}" alt="Serenity" class="h-6 w-auto"></a>
+      </div>
+
+      <!-- 01.02 /panel/ SIDEBAR NAVIGATION -->
+      <nav class="p-4 space-y-3 text-[15px]">
+
+        {% for sec in panel_menu %}
+          <details {% if sec.open %}open{% endif %} class="rounded-lg border border-slate-200 bg-[#effbff]">
+            <summary class="cursor-pointer select-none px-4 py-3 font-semibold text-[#006991] hover:bg-[#e3f6fb] rounded-lg">
+              {{ sec.title }}
+            </summary>
+
+            <div class="px-2 pb-2">
+              {% for it in sec.items %}
+                <a href="{{ it.url }}"
+                   class="block px-3 py-2 rounded-md hover:bg-white {% if it.active %}bg-white font-semibold{% endif %}">
+                  {{ it.title }}
+                </a>
+              {% endfor %}
+            </div>
+          </details>
+        {% endfor %}
+
+      </nav>
+
+      <!-- 01.90 /panel/ SIDEBAR FOOTER / USER -->
+      <div class="mt-auto p-4 border-t border-slate-200 text-xs text-slate-500">
+        {% if request.user.is_authenticated %}
+          {{ request.user.username }}
+        {% endif %}
+      </div>
+
+    </aside>
+
+    <!-- ========================================================= -->
+    <!-- 02.00 /panel/ MAIN AREA                                   -->
+    <!-- ========================================================= -->
+    <div class="flex-1 min-w-0 min-h-0 flex flex-col">
+
+      <!-- ========================================================= -->
+      <!-- 02.01 /panel/ TOPBAR                                      -->
+      <!-- ========================================================= -->
+      <header class="h-16 bg-white border-b border-slate-200 flex items-center px-6">
+
+        <!-- 02.01.01 /panel/topbar/sidebar-toggle -->
+        <button
+          type="button"
+          data-sidebar-toggle
+          class="mr-4 px-3 h-9 flex items-center justify-center
+                rounded-lg bg-[#effbff] text-[#006991] font-semibold
+                hover:bg-[#e3f6fb] border border-slate-200">
+          ☰
+        </button>
+
+        <!-- 02.01.02 /panel/topbar/title -->
+        <div class="flex-1">
+          <span class="text-[#006991] font-semibold uppercase">
+            {{ page_title|default:"" }}
+          </span>
         </div>
 
-        <nav class="panel-sidebar-menu">
-          {% block sidebar_menu %}
-            <a href="{% url 'dashboard' %}"
-               class="panel-menu-item {% if request.resolver_match.url_name == 'dashboard' %}panel-menu-item-active{% endif %}">
-              Dashboard
-            </a>
-          {% endblock %}
-        </nav>
-
-        <div class="panel-sidebar-user">
+        <!-- 02.01.03 /panel/topbar/user -->
+        <div class="mr-5 text-[#006991] font-semibold text-sm">
           {% if request.user.is_authenticated %}
-            <span class="panel-sidebar-user-label">Пользователь:</span>
-            <span class="panel-sidebar-user-name">{{ request.user.username }}</span>
+            {{ request.user.username }}
           {% endif %}
         </div>
-      </aside>
 
-      <!-- ПРАВАЯ ЧАСТЬ -->
-      <main class="panel-main">
-        <header class="panel-topbar">
-          <nav class="panel-topbar-nav">
-            <div class="panel-topbar-nav-left">
-                <a href="{% url 'audience:index' %}"
-                  class="panel-topbar-link {% if request.path|slice:":16" == "/panel/audience/" %}panel-topbar-link-active{% endif %}">
-                  Подбор адресатов
-                </a>
+        <!-- 02.01.04 /panel/topbar/logout -->
+        <form method="post" action="{% url 'logout' %}" class="inline">
+          {% csrf_token %}
+          <button
+            type="submit"
+            class="ml-4 px-4 h-9 flex items-center justify-center
+                  rounded-lg bg-[#effbff] text-[#006991] font-semibold
+                  hover:bg-[#e3f6fb] border border-slate-200">
+            Выйти
+          </button>
+        </form>
 
-                <!-- Настройки: активны для ЛЮБОГО урла аппа settings -->
-                <a href="{% url 'settings:sending' %}"
-                  class="panel-topbar-link {% if request.path|slice:":16" == "/panel/settings/" %}panel-topbar-link-active{% endif %}">
-                  Настройки
-                </a>
-              </div>
+      </header>
 
-            <div class="panel-topbar-nav-right">
-              <a href="{% url 'dashboard' %}" class="panel-topbar-link panel-topbar-link-main">
-                Дашборд
-              </a>
-              
-<form method="post" action="{% url 'logout' %}" style="display:inline;">
-  {% csrf_token %}
-  <button type="submit"
-          class="panel-topbar-link panel-topbar-link-danger"
-          style="background:none;border:0;padding:0;cursor:pointer;">
-    Выйти
-  </button>
-</form>
-            </div>
-          </nav>
-        </header>
-
-        <section class="panel-content">
-          {% block content %}{% endblock %}
-        </section>
+      <!-- 02.10 /panel/ CONTENT (scroll only here) -->
+      <main class="flex-1 min-h-0 p-6 overflow-y-auto">
+        {% block content %}{% endblock %}
       </main>
 
     </div>
-  </body>
+
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 99.00 /panel/ SCRIPTS                                      -->
+  <!-- ========================================================= -->
+  <script>
+    (function () {
+      const btn = document.querySelector('[data-sidebar-toggle]');
+      const sidebar = document.getElementById('panel-sidebar');
+      if (!btn || !sidebar) return;
+
+      btn.addEventListener('click', function () {
+        sidebar.classList.toggle('hidden');
+      });
+    })();
+  </script>
+
+</body>
 </html>

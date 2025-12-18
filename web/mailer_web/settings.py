@@ -84,20 +84,27 @@ ROOT_URLCONF = "mailer_web.urls"
 
 # --- TEMPLATES ---
 
+# FILE: web/mailer_web/settings.py  (обновлено — 2025-12-18)
+# Смысл: полный корректный TEMPLATES с panel context processor
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],
+        "DIRS": [
+            BASE_DIR / "templates",
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "panel.context_processors.panel_context",
             ],
         },
     },
 ]
+
 
 
 WSGI_APPLICATION = "mailer_web.wsgi.application"
