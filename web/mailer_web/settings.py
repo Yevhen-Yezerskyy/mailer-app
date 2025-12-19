@@ -23,14 +23,15 @@ SECRET_KEY = os.environ.get(
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    "mail.fenster-ukraine.de",
+    "serenity-mail.com",
+    "serenity-mail.de",
     "localhost",
     "127.0.0.1",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://mail.fenster-ukraine.de",
-    "http://mail.fenster-ukraine.de",
+    "https://serenity-mail.com",
+    "https://serenity-mail.de",
 ]
 
 # если Django стоит за nginx с HTTPS:

@@ -1,292 +1,392 @@
-{# FILE: web/templates/panels/aap_audience/how.html (новое) 2025-12-11 #}
-
 {% extends "panels/base.html" %}
-
-{% block title %}Подбор адресатов — Serenity Mailer{% endblock %}
-
-{% block sidebar_menu %}
-  {% include "panels/aap_audience/menu_left.html" %}
-{% endblock %}
+{% load i18n %}
 
 {% block content %}
 
-<div class="panel-page">
+<div class="w-[95%] max-w-none mx-auto">
+  <!-- FILE: web/templates/panels/aap_audience/how.html  (обновлено — 2025-12-19)
+       PURPOSE: Tailwind UI (форма+инструкция), GPT-вопросы/хинты, overlay "Думаю…" на process/save, clear через mode=clear, delete с confirm; без disable (overlay всё перекрывает) -->
 
-  {# Инструкция #}
-  <div class="panel-card" style="margin-bottom: 24px;">
-    <ol style="margin: 0; padding-left: 20px; line-height: 1.6;">
-      <li><strong>Напишите про себя и что вы продаёте.</strong> Всё остальное — лишнее.</li>
-      <li>
-        <strong>Дайте ссылку на сайт</strong> (например: <span style="white-space: nowrap;">https://mysite.ua</span>).
-        Система сама подтянет нужные факты.
-      </li>
-      <li><strong>Пишите как угодно</strong> — система сама разложит по полкам.</li>
-      <li><strong>Лишнее и неважное система выкинет.</strong></li>
-      <li><strong>Отвечайте коротко на вопросы.</strong></li>
-    </ol>
-  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 items-start">
 
-  <div class="panel-card">
-    <form method="post" class="panel-form" id="how-form">
-      {% csrf_token %}
+    <!-- ===================== LEFT: FORM CARD ===================== -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <form method="post" id="how-form" class="space-y-6">
+        {% csrf_token %}
 
-      {# -------- Что продаёте -------- #}
-      <div class="panel-form-group">
-        <label class="panel-form-label" for="id_what">Что продаёте</label>
-        {% if form.question_what.value %}
-          <div class="gpt-question-block">
-            <strong>Уточняющий вопрос:</strong> {{ form.question_what.value }}
-            {% if form.hint_what.value %}
-              <div class="gpt-hint">{{ form.hint_what.value }}</div>
-            {% endif %}
-          </div>
-        {% endif %}
+        <!-- WHAT -->
+        <div>
+          <label for="id_what" class="block text-sm font-semibold text-slate-700 mb-2">
+            {% trans "Что Вы продаёте" %}
+          </label>
 
-        <textarea
-          name="{{ form.what.name }}"
-          id="id_what"
-          rows="4"
-          class="panel-input-textarea"
-          placeholder="Опишите продукт или услугу в нескольких словах."
-          data-initial="{{ form.what.value|default_if_none:'' }}"
-        >{{ form.what.value|default_if_none:"" }}</textarea>
-
-        {% if form.what.errors %}
-          <div class="panel-form-error">{{ form.what.errors }}</div>
-        {% endif %}
-      </div>
-
-      {# -------- Кто вы как компания -------- #}
-      <div class="panel-form-group">
-        <label class="panel-form-label" for="id_who">Кто вы как компания</label>
-        {% if form.question_who.value %}
-          <div class="gpt-question-block">
-            <strong>Уточняющий вопрос:</strong> {{ form.question_who.value }}
-            {% if form.hint_who.value %}
-              <div class="gpt-hint">{{ form.hint_who.value }}</div>
-            {% endif %}
-          </div>
-        {% endif %}
-
-        <textarea
-          name="{{ form.who.name }}"
-          id="id_who"
-          rows="4"
-          class="panel-input-textarea"
-          placeholder="Название компании, сайт и факты о бизнесе."
-          data-initial="{{ form.who.value|default_if_none:'' }}"
-        >{{ form.who.value|default_if_none:"" }}</textarea>
-
-        {% if form.who.errors %}
-          <div class="panel-form-error">{{ form.who.errors }}</div>
-        {% endif %}
-      </div>
-
-      {# -------- География -------- #}
-      <div class="panel-form-group">
-        <label class="panel-form-label" for="id_geo">География работы</label>
-        {% if form.question_geo.value %}
-          <div class="gpt-question-block">
-            <strong>Уточняющий вопрос:</strong> {{ form.question_geo.value }}
-            {% if form.hint_geo.value %}
-              <div class="gpt-hint">{{ form.hint_geo.value }}</div>
-            {% endif %}
-          </div>
-        {% endif %}
-
-        <textarea
-          name="{{ form.geo.name }}"
-          id="id_geo"
-          rows="4"
-          class="panel-input-textarea"
-          placeholder="Факты, влияющие на поиск клиентов в Германии."
-          data-initial="{{ form.geo.value|default_if_none:'' }}"
-        >{{ form.geo.value|default_if_none:"" }}</textarea>
-
-        {% if form.geo.errors %}
-          <div class="panel-form-error">{{ form.geo.errors }}</div>
-        {% endif %}
-      </div>
-
-      {# hidden fields #}
-      {{ form.question_what }}{{ form.hint_what }}
-      {{ form.question_who }}{{ form.hint_who }}
-      {{ form.question_geo }}{{ form.hint_geo }}
-      {{ form.edit_id }}
-      <input type="hidden" name="mode" id="id_mode" value="">
-
-      <div class="panel-form-actions">
-        <button type="submit" class="panel-button-primary" id="submit-btn">
-          Обработать
-        </button>
-
-        <button type="submit" name="save" value="1" class="panel-button-secondary" id="save-btn" style="margin-left: 8px;">
-          {% if form.edit_id.value %}
-            Сохранить изменения
-          {% else %}
-            Сохранить задачу
+          {% if form.question_what.value %}
+            <div class="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div class="text-sm text-slate-800">
+                <strong>
+                  {% trans "Уточняющий вопрос:" %}
+                </strong>
+                {{ form.question_what.value }}
+              </div>
+              {% if form.hint_what.value %}
+                <div class="mt-2 text-sm text-slate-600">
+                  {{ form.hint_what.value }}
+                </div>
+              {% endif %}
+            </div>
           {% endif %}
-        </button>
 
-        <button type="button" class="panel-button-secondary" id="clear-btn" style="margin-left: 8px;">
-          Очистить
-        </button>
+          <textarea
+            name="{{ form.what.name }}"
+            id="id_what"
+            rows="4"
+            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800
+                   placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0a5f85]/30 focus:border-[#0a5f85]"
+            placeholder="{% trans 'Опишите продукт или услугу в нескольких словах.' %}"
+            data-initial="{{ form.what.value|default_if_none:'' }}"
+          >{{ form.what.value|default_if_none:"" }}</textarea>
+
+          {% if form.what.errors %}
+            <div class="mt-2 text-sm text-red-600">
+              {{ form.what.errors }}
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- WHO -->
+        <div>
+          <label for="id_who" class="block text-sm font-semibold text-slate-700 mb-2">
+            {% trans "Кратко опишите Вашу компанию" %}
+          </label>
+
+          {% if form.question_who.value %}
+            <div class="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div class="text-sm text-slate-800">
+                <strong>
+                  {% trans "Уточняющий вопрос:" %}
+                </strong>
+                {{ form.question_who.value }}
+              </div>
+              {% if form.hint_who.value %}
+                <div class="mt-2 text-sm text-slate-600">
+                  {{ form.hint_who.value }}
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          <textarea
+            name="{{ form.who.name }}"
+            id="id_who"
+            rows="4"
+            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800
+                   placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0a5f85]/30 focus:border-[#0a5f85]"
+            placeholder="{% trans 'Название компании, сайт и факты о бизнесе.' %}"
+            data-initial="{{ form.who.value|default_if_none:'' }}"
+          >{{ form.who.value|default_if_none:"" }}</textarea>
+
+          {% if form.who.errors %}
+            <div class="mt-2 text-sm text-red-600">
+              {{ form.who.errors }}
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- GEO -->
+        <div>
+          <label for="id_geo" class="block text-sm font-semibold text-slate-700 mb-2">
+            {% trans "Сведения, влияющие на географию поиска" %}
+          </label>
+
+          {% if form.question_geo.value %}
+            <div class="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div class="text-sm text-slate-800">
+                <strong>
+                  {% trans "Уточняющий вопрос:" %}
+                </strong>
+                {{ form.question_geo.value }}
+              </div>
+              {% if form.hint_geo.value %}
+                <div class="mt-2 text-sm text-slate-600">
+                  {{ form.hint_geo.value }}
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          <textarea
+            name="{{ form.geo.name }}"
+            id="id_geo"
+            rows="4"
+            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800
+                   placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0a5f85]/30 focus:border-[#0a5f85]"
+            placeholder="{% trans 'Факты, влияющие на поиск клиентов в Германии.' %}"
+            data-initial="{{ form.geo.value|default_if_none:'' }}"
+          >{{ form.geo.value|default_if_none:"" }}</textarea>
+
+          {% if form.geo.errors %}
+            <div class="mt-2 text-sm text-red-600">
+              {{ form.geo.errors }}
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- hidden fields -->
+        {{ form.question_what }}
+        {{ form.hint_what }}
+        {{ form.question_who }}
+        {{ form.hint_who }}
+        {{ form.question_geo }}
+        {{ form.hint_geo }}
+        {{ form.edit_id }}
+
+        <!-- actions -->
+        <div class="flex flex-wrap gap-3 pt-2">
+          <button
+            type="submit"
+            name="mode"
+            value="process"
+            id="submit-btn"
+            class="h-10 px-6 rounded-xl text-white font-semibold border border-[#084b69]"
+            style="background:#0a5f85">
+            {% trans "Обработать" %}
+          </button>
+
+          <button
+            type="submit"
+            name="mode"
+            value="save"
+            id="save-btn"
+            class="h-10 px-6 rounded-xl text-white font-semibold border border-[#084b69]"
+            style="background:#0a5f85">
+            {% if form.edit_id.value %}
+              {% trans "Сохранить изменения" %}
+            {% else %}
+              {% trans "Сохранить задачу" %}
+            {% endif %}
+          </button>
+
+          <button
+            type="submit"
+            name="mode"
+            value="clear"
+            id="clear-btn"
+            class="h-10 px-6 rounded-xl text-white font-semibold border border-[#084b69]"
+            style="background:#0a5f85">
+            {% trans "Очистить" %}
+          </button>
+        </div>
+
+        {% if form.non_field_errors %}
+          <div class="mt-2 text-sm text-red-600">
+            {{ form.non_field_errors }}
+          </div>
+        {% endif %}
+
+        <!-- overlay -->
+        <div id="thinking-overlay" class="hidden">
+          <div class="fixed inset-0 bg-slate-900/10"></div>
+          <div class="fixed inset-0 flex items-center justify-center">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 px-6 py-4 text-slate-800 font-semibold">
+              {% trans "Думаю…" %}
+            </div>
+          </div>
+        </div>
+
+      </form>
+    </div>
+
+    <!-- ===================== RIGHT: INSTRUCTION CARD ===================== -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+      <div class="text-slate-900 font-semibold mb-3">
+        {% trans "Инструкция" %}
       </div>
 
-      <div id="how-error" class="panel-form-error" style="display:none; margin-top: 8px;">
-        Пожалуйста, заполните хотя бы одно поле.
-      </div>
+      <ol class="list-decimal pl-5 space-y-3 text-slate-800 leading-relaxed">
+        <li>
+          <strong>
+            {% trans "Напишите что Вы продаёте, опишите Вашу компанию." %}
+          </strong>
+          {% trans "Всё остальное — лишнее." %}
+        </li>
+        <li>
+          <strong>
+            {% trans "Дайте ссылку на сайт Вашей компании в формате https://mysite.ua." %}
+          </strong>
+          {% trans "Система сама будет искать нужные факты. Ваш сайт будет обработан." %}
+        </li>
+        <li>
+          <strong>
+            {% trans "Пишите в любые поля полезную информацию." %}
+          </strong>
+          {% trans "Мы разберемся что к чему." %}
+        </li>
+        <li>
+          <strong>
+            {% trans "Не бойтесь ошибок. Лишнее и неважное система отбросит. Потом всегда можно исправить." %}
+          </strong>
+            {% trans "Это поможет Вам понять, что еще нужно добавить или исправить." %}
+        </li>
+        <li>
+          <strong>
+            {% trans "Отвечайте коротко и информативно. Меньше слов, больше информации" %}
+          </strong>
+        </li>
+        <li>
+          <strong>
+            {% trans "Если вы удовлетворены результатом - сохраните его." %}
+          </strong>
+            {% trans "Вопросы будут появляться бесконечно. Это всего лишь подсказки - вдруг Вы что-то важное вспомните." %}
+        </li>
 
-      <div class="panel-form-overlay">
-        <div class="panel-form-overlay-inner">Думаю…</div>
-      </div>
-    </form>
+      </ol>
+    </div>
+
   </div>
+
+  <!-- ===================== TASKS TABLE ===================== -->
+  {% if tasks %}
+    <div class="w-[100%] max-w-none mx-auto mt-6">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+              <tr class="text-left text-slate-700 font-semibold">
+                <th class="px-4 py-3 w-[25%]">
+                  {% trans "Аудитория" %}
+                </th>
+                <th class="px-4 py-3 w-[37%]">{% trans "Основная задача" %}</th>
+                  <th class="px-4 py-3 w-[37%]">
+                    {% trans "Критерии" %}
+                  </th>
+                <th class="px-4 py-3 w-[110px] text-right">
+                  {% trans "Действия" %}
+                </th>
+              </tr>
+            </thead>
+
+            <tbody class="divide-y divide-slate-200">
+              {% for t in tasks %}
+                <tr class="align-top">
+                  <td class="px-4 py-3 font-semibold text-slate-900">{{ t.title }}</td>
+                  <td class="px-4 py-3 text-slate-700">{{ t.task|linebreaksbr }}</td>
+                  <td class="px-4 py-3 text-slate-700">
+
+                    <!-- tabs -->
+                    <div class="flex gap-2 mb-2 text-xs font-semibold">
+                      <button
+                        type="button"
+                        class="criteria-tab px-2 py-1 rounded bg-slate-200 text-slate-800"
+                        data-target="branches-{{ t.id }}">
+                        {% trans "Категория" %}
+                      </button>
+                      <button
+                        type="button"
+                        class="criteria-tab px-2 py-1 rounded bg-slate-100 text-slate-600"
+                        data-target="geo-{{ t.id }}">
+                        {% trans "География" %}
+                      </button>
+                      <button
+                        type="button"
+                        class="criteria-tab px-2 py-1 rounded bg-slate-100 text-slate-600"
+                        data-target="client-{{ t.id }}">
+                        {% trans "Клиент" %}
+                      </button>
+                    </div>
+
+                    <!-- content -->
+                    <div class="criteria-content space-y-1 text-sm">
+                      <div id="branches-{{ t.id }}">
+                        {{ t.task_branches|linebreaksbr }}
+                      </div>
+                      <div id="geo-{{ t.id }}" class="hidden">
+                        {{ t.task_geo|linebreaksbr }}
+                      </div>
+                      <div id="client-{{ t.id }}" class="hidden">
+                        {{ t.task_client|linebreaksbr }}
+                      </div>
+                    </div>
+
+                  </td>
+                  <td class="px-4 py-3 text-right align-top">
+                    <div class="flex flex-col items-end gap-2">
+                      <a
+                        href="?edit={{ t.id }}"
+                        class="px-3 py-1.5 rounded-md text-sm font-semibold
+                               text-[#0a5f85] bg-[#eff6fb]
+                               hover:bg-[#e3f2f9] border border-slate-200">
+                        {% trans "Изменить" %}
+                      </a>
+
+                      <form method="post" class="m-0">
+                        {% csrf_token %}
+                        <input type="hidden" name="mode" value="delete">
+                        <input type="hidden" name="delete_id" value="{{ t.id }}">
+                        <button
+                          type="submit"
+                          onclick="return confirm('{% trans "Вы уверены, что хотите удалить задачу?" %}');"
+                          class="px-3 py-1.5 rounded-md text-sm font-semibold
+                                 text-red-700 bg-red-50
+                                 hover:bg-red-100 border border-red-200">
+                          {% trans "Удалить" %}
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+
+          </table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
 
 </div>
 
-{# ----- Таблица задач ----- #}
-{% if tasks %}
-  <div class="panel-card" style="margin-top: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
-    <h3 class="panel-card-title" style="margin-bottom: 12px;">Сохранённые задачи</h3>
-
-    <div class="panel-table-wrapper">
-      <table class="panel-table">
-        <thead>
-        <tr>
-          <th style="width: 8%;">Название</th>
-          <th style="width: 23%;">Task</th>
-          <th style="width: 23%;">Branches-задача</th>
-          <th style="width: 23%;">Geo-задача</th>
-          <th style="width: 23%;">Client-задача</th>
-          <th style="width: 110px; text-align: right;">Действия</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for t in tasks %}
-          <tr>
-            <td><strong>{{ t.title }}</strong></td>
-            <td>{{ t.task|linebreaksbr }}</td>
-            <td>{{ t.task_branches|linebreaksbr }}</td>
-            <td>{{ t.task_geo|linebreaksbr }}</td>
-            <td>{{ t.task_client|linebreaksbr }}</td>
-            <td style="text-align: right;">
-              <div style="display: inline-flex; gap: 8px;">
-                <a href="?edit={{ t.id }}" class="panel-link task-edit-link" style="font-size: 13px;">✏️</a>
-
-                <form method="post" style="margin: 0; display: inline;">
-                  {% csrf_token %}
-                  <input type="hidden" name="mode" value="delete">
-                  <input type="hidden" name="delete_id" value="{{ t.id }}">
-                  <button type="submit"
-                          class="panel-link"
-                          style="background: none; border: none; padding: 0; color: #b91c1c; cursor: pointer; font-size: 13px;"
-                          onclick="return confirm('Вы уверены, что хотите удалить задачу?');">🗑️</button>
-                </form>
-              </div>
-            </td>
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-{% endif %}
-
 <script>
 (function () {
-  const form = document.getElementById("how-form");
-  const submitBtn = document.getElementById("submit-btn");
-  const saveBtn = document.getElementById("save-btn");
-  const clearBtn = document.getElementById("clear-btn");
-  const errorBox = document.getElementById("how-error");
+  const overlay = document.getElementById("thinking-overlay");
+  const btnProcess = document.getElementById("submit-btn");
+  const btnSave = document.getElementById("save-btn");
 
-  const whatField = document.getElementById("id_what");
-  const whoField  = document.getElementById("id_who");
-  const geoField  = document.getElementById("id_geo");
-  const editIdField = document.getElementById("id_edit_id");
-  const modeField = document.getElementById("id_mode");
-
-  if (submitBtn) {
-    submitBtn.addEventListener("click", function () {
-      if (modeField) modeField.value = "process";
-    });
+  function showOverlay() {
+    if (overlay) overlay.classList.remove("hidden");
   }
 
-  if (saveBtn) {
-    saveBtn.addEventListener("click", function () {
-      if (modeField) modeField.value = "save";
+  // Только по клику на нужные кнопки.
+  // Никаких disable вообще — overlay и так перекрывает весь экран.
+  if (btnProcess) btnProcess.addEventListener("click", showOverlay);
+  if (btnSave) btnSave.addEventListener("click", showOverlay);
+})();
+</script>
+<script>
+(function () {
+  document.addEventListener("click", function (e) {
+    const btn = e.target.closest(".criteria-tab");
+    if (!btn) return;
+
+    const td = btn.closest("td");
+    if (!td) return;
+
+    const targetId = btn.dataset.target;
+
+    // переключаем кнопки
+    td.querySelectorAll(".criteria-tab").forEach(b => {
+      b.classList.remove("bg-slate-200", "text-slate-800");
+      b.classList.add("bg-slate-100", "text-slate-600");
     });
-  }
+    btn.classList.add("bg-slate-200", "text-slate-800");
 
-  if (form) {
-    form.addEventListener("submit", function (e) {
-      const whatText = (whatField?.value || "").trim();
-      const whoText  = (whoField?.value  || "").trim();
-      const geoText  = (geoField?.value  || "").trim();
-
-      // ---- Если все поля пустые ----
-      if (!whatText && !whoText && !geoText) {
-        e.preventDefault();
-        errorBox.style.display = "block";
-        (whatField || whoField || geoField).focus();
-        return;
-      }
-
-      // ---- Запрет обработки, если ничего не изменено ----
-      if (modeField.value === "process") {
-        const initialWhat = (whatField.dataset.initial || "").trim();
-        const initialWho  = (whoField.dataset.initial  || "").trim();
-        const initialGeo  = (geoField.dataset.initial  || "").trim();
-
-        if (whatText === initialWhat &&
-            whoText === initialWho &&
-            geoText === initialGeo) {
-          e.preventDefault();
-          alert("Вы ничего не изменили.");
-          return;
-        }
-      }
-
-      errorBox.style.display = "none";
-
-      form.classList.add("panel-form--loading");
-      submitBtn.disabled = true;
-      saveBtn.disabled = true;
+    // переключаем контент
+    td.querySelectorAll(".criteria-content > div").forEach(div => {
+      div.classList.add("hidden");
     });
-  }
 
-  if (clearBtn) {
-    clearBtn.addEventListener("click", function (e) {
-      e.preventDefault();
-      if (!confirm("Вы уверены?")) return;
-
-      if (whatField) whatField.value = "";
-      if (whoField)  whoField.value  = "";
-      if (geoField)  geoField.value  = "";
-
-      if (editIdField) editIdField.value = "";
-      if (modeField) modeField.value = "";
-
-      [
-        "id_question_what", "id_question_who", "id_question_geo",
-        "id_hint_what", "id_hint_who", "id_hint_geo",
-      ].forEach(function (id) {
-        const el = document.getElementById(id);
-        if (el) el.value = "";
-      });
-
-      document.querySelectorAll(".gpt-question-block").forEach(q => q.style.display = "none");
-      errorBox.style.display = "none";
-    });
-  }
-
-  document.querySelectorAll(".task-edit-link").forEach(function (link) {
-    link.addEventListener("click", function () {
-      if (form) form.classList.add("panel-form--loading");
-    });
+    const target = td.querySelector("#" + targetId);
+    if (target) target.classList.remove("hidden");
   });
-
 })();
 </script>
 

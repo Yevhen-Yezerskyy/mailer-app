@@ -6,15 +6,15 @@ from django.utils.translation import gettext_lazy as _
 PANEL_MENU = [
     {
         # DASHBOARD (корень панели)
-        "title": _("Dashboard"),
-        "page_title": _("DASHBOARD : ОБЗОР"),
-        "open_prefixes": ["/panel/"],
+        "title": _("Панель управления"),
+        "page_title": _("Панель управления"),
+        "open_prefixes": ["/panel/overview"],
         "items": [
             {
                 "title": _("Обзор"),
-                "page_title": _("DASHBOARD : ОБЗОР"),
+                "page_title": _("Обзор : Панель управления"),
                 "url_name": "dashboard",
-                "active_prefixes": ["/panel/", "/panel/overview/"],
+                "active_prefixes": ["/panel/overview/"],
             },
         ],
     },
@@ -24,23 +24,43 @@ PANEL_MENU = [
         "open_prefixes": ["/panel/audience/"],
         "items": [
             {
-                "title": _("Подбор"),
-                "page_title": _("AUDIENCE : ПОДБОР"),
+                "title": _("Критерии выбора"),
+                "page_title": _("Аудитория : Критерии выбора"),
                 "url_name": "audience:index",
-                "active_prefixes": ["/panel/audience/"],
+                "active_prefixes": ["/panel/audience/how/"],
             },
             {
-                "title": _("Списки"),
-                "page_title": _("AUDIENCE : СПИСКИ"),
-                "url_name": "audience:lists",
-                "active_prefixes": ["/panel/audience/lists/"],
+                "title": _("Построение аудитории"),
+                "page_title": _("Аудитория : Построение аудитории"),
+                "url_name": "audience:clar",
+                "active_prefixes": ["/panel/audience/clar/"],
             },
             {
-                "title": _("Импорт"),
-                "page_title": _("AUDIENCE : ИМПОРТ"),
-                "url_name": "audience:import",
-                "active_prefixes": ["/panel/audience/import/"],
+                "title": _("Собранные компании"),
+                "page_title": _("Аудитория : Собранные компании"),
+                "url_name": "audience:status",
+                "active_prefixes": ["/panel/audience/status/"],
             },
+        ],
+    },
+    {
+        # AUDIENCE
+    "title": _("Настройки"),
+        "open_prefixes": ["/panel/settings/"],
+        "items": [
+            {
+                "title": _("Отправка писем"),
+                "page_title": _("Настройки : Отправка писем"),
+                "url_name": "settings:sending",
+                "active_prefixes": ["/panel/settings/sending/"],
+            },
+            {
+                "title": _("Почтовые серверы"),
+                "page_title": _("Настройки : Почтовые серверы"),
+                "url_name": "settings:mail_servers",
+                "active_prefixes": ["/panel/settings/mail-servers/"],
+            },
+
         ],
     },
 ]

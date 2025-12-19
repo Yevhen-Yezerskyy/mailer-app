@@ -3,12 +3,11 @@
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
-#, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-12-18 12:20+0100\n"
+"POT-Creation-Date: 2025-12-19 07:36+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,6 +16,215 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: panel/menu.py:9 panel/menu.py:10
+msgid "Панель управления"
+msgstr "Bedienfeld"
+
+#: panel/menu.py:14
+msgid "Обзор"
+msgstr "Überblick"
+
+#: panel/menu.py:15
+msgid "Обзор : Панель управления"
+msgstr "Überblick: Systemsteuerung"
+
+#: panel/menu.py:23 templates/panels/aap_audience/how.html:256
+msgid "Аудитория"
+msgstr "Publikum"
+
+#: panel/menu.py:27
+msgid "Критерии выбора"
+msgstr "Auswahlkriterien"
+
+#: panel/menu.py:28
+msgid "Аудитория : Критерии выбора"
+msgstr "Zielgruppe: Auswahlkriterien"
+
+#: panel/menu.py:33
+msgid "Построение аудитории"
+msgstr "fertige Zielgruppe"
+
+#: panel/menu.py:34
+msgid "Аудитория : Построение аудитории"
+msgstr "Zielgruppe: Aufbau der Zielgruppe"
+
+#: panel/menu.py:39
+msgid "Собранные компании"
+msgstr "Kontaktdaten"
+
+#: panel/menu.py:40
+msgid "Аудитория : Собранные компании"
+msgstr "Funktionale Möglichkeiten:"
+
+#: panel/menu.py:48
+msgid "Настройки"
+msgstr "Einstellungen"
+
+#: panel/menu.py:52
+msgid "Отправка писем"
+msgstr "gesteuert"
+
+#: panel/menu.py:53
+msgid "Настройки : Отправка писем"
+msgstr "Einstellungen: E-Mail-Versand"
+
+#: panel/menu.py:58
+msgid "Почтовые серверы"
+msgstr "E-Mail-Server"
+
+#: panel/menu.py:59
+msgid "Настройки : Почтовые серверы"
+msgstr "Einstellungen: Mailserver"
+
+#: templates/panels/aap_audience/how.html:20
+msgid "Что Вы продаёте"
+msgstr "Sie erhalten"
+
+#: templates/panels/aap_audience/how.html:27
+#: templates/panels/aap_audience/how.html:66
+#: templates/panels/aap_audience/how.html:105
+msgid "Уточняющий вопрос:"
+msgstr "Klärende Frage:"
+
+#: templates/panels/aap_audience/how.html:45
+msgid "Опишите продукт или услугу в нескольких словах."
+msgstr "Beschreiben Sie das Produkt oder die Dienstleistung in wenigen Worten."
+
+#: templates/panels/aap_audience/how.html:59
+msgid "Кратко опишите Вашу компанию"
+msgstr "Beschreiben Sie kurz Ihr Unternehmen."
+
+#: templates/panels/aap_audience/how.html:84
+msgid "Название компании, сайт и факты о бизнесе."
+msgstr "Name des Unternehmens, Website und Fakten zum Unternehmen."
+
+#: templates/panels/aap_audience/how.html:98
+msgid "Сведения, влияющие на географию поиска"
+msgstr "Informationen, die die Geografie der Suche beeinflussen"
+
+#: templates/panels/aap_audience/how.html:123
+msgid "Факты, влияющие на поиск клиентов в Германии."
+msgstr "Fakten, die die Suche nach Kunden in Deutschland beeinflussen."
+
+#: templates/panels/aap_audience/how.html:152
+msgid "Обработать"
+msgstr "Verarbeiten"
+
+#: templates/panels/aap_audience/how.html:163
+msgid "Сохранить изменения"
+msgstr "Überblick: Systemsteuerung"
+
+#: templates/panels/aap_audience/how.html:165
+msgid "Сохранить задачу"
+msgstr "Aufgabe speichern"
+
+#: templates/panels/aap_audience/how.html:176
+msgid "Очистить"
+msgstr "Löschen"
+
+#: templates/panels/aap_audience/how.html:191
+msgid "Думаю…"
+msgstr "Ich denke…"
+
+#: templates/panels/aap_audience/how.html:202
+msgid "Инструкция"
+msgstr "Anleitung"
+
+#: templates/panels/aap_audience/how.html:208
+msgid "Напишите что Вы продаёте, опишите Вашу компанию."
+msgstr "Beschreiben Sie kurz Ihr Unternehmen."
+
+#: templates/panels/aap_audience/how.html:210
+msgid "Всё остальное — лишнее."
+msgstr "Alles andere ist überflüssig."
+
+#: templates/panels/aap_audience/how.html:214
+msgid "Дайте ссылку на сайт Вашей компании в формате https://mysite.ua."
+msgstr "Geben Sie einen Link zur Website im Format https://mysite.ua."
+
+#: templates/panels/aap_audience/how.html:216
+msgid "Система сама будет искать нужные факты. Ваш сайт будет обработан."
+msgstr "Das System ruft die benötigten Fakten selbst ab."
+
+#: templates/panels/aap_audience/how.html:220
+msgid "Пишите в любые поля полезную информацию."
+msgstr "Geben Sie in beliebige Felder nützliche Informationen ein."
+
+#: templates/panels/aap_audience/how.html:222
+msgid "Мы разберемся что к чему."
+msgstr "Wir werden herausfinden, was wozu gehört."
+
+#: templates/panels/aap_audience/how.html:226
+msgid ""
+"Не бойтесь ошибок. Лишнее и неважное система отбросит. Потом всегда можно "
+"исправить."
+msgstr ""
+"Habt keine Angst vor Fehlern. Überflüssiges und Unwichtiges wird das System "
+"aussortieren. Später kann man das immer noch korrigieren."
+
+#: templates/panels/aap_audience/how.html:228
+msgid "Это поможет Вам понять, что еще нужно добавить или исправить."
+msgstr ""
+"Das wird Ihnen helfen zu verstehen, was noch hinzugefügt oder korrigiert "
+"werden muss."
+
+#: templates/panels/aap_audience/how.html:232
+msgid "Отвечайте коротко и информативно. Меньше слов, больше информации"
+msgstr "Antworten Sie kurz auf Fragen."
+
+#: templates/panels/aap_audience/how.html:237
+msgid "Если вы удовлетворены результатом - сохраните его."
+msgstr "Wenn Sie mit dem Ergebnis zufrieden sind - speichern Sie es."
+
+#: templates/panels/aap_audience/how.html:239
+msgid ""
+"Вопросы будут появляться бесконечно. Это всего лишь подсказки - вдруг Вы что-"
+"то важное вспомните."
+msgstr ""
+"Fragen werden endlos auftauchen. Das sind nur Hinweise - vielleicht fällt "
+"Ihnen etwas Wichtiges ein."
+
+#: templates/panels/aap_audience/how.html:258
+msgid "Основная задача"
+msgstr "Hauptaufgabe"
+
+#: templates/panels/aap_audience/how.html:260
+msgid "Критерии"
+msgstr "Kriterien"
+
+#: templates/panels/aap_audience/how.html:263
+msgid "Действия"
+msgstr "Aktionen"
+
+#: templates/panels/aap_audience/how.html:281
+msgid "Категория"
+msgstr "Publikum"
+
+#: templates/panels/aap_audience/how.html:287
+msgid "География"
+msgstr "Geographie"
+
+#: templates/panels/aap_audience/how.html:293
+msgid "Клиент"
+msgstr "Kunde"
+
+#: templates/panels/aap_audience/how.html:318
+msgid "Изменить"
+msgstr "Ändern"
+
+#: templates/panels/aap_audience/how.html:327
+msgid "Вы уверены, что хотите удалить задачу?"
+msgstr "Sind Sie sicher, dass Sie die Aufgabe löschen möchten?"
+
+#: templates/panels/aap_audience/how.html:331
+msgid "Удалить"
+msgstr "Löschen"
+
+#: templates/panels/base.html:110
+msgid "Выйти"
+msgstr "Abmelden"
+
 #: templates/public/base.html:11 templates/public/index.html:6
 msgid "Интеллектуальные email-коммуникации"
 msgstr "Intelligente E-Mail-Kommunikationen"
@@ -24,13 +232,15 @@ msgstr "Intelligente E-Mail-Kommunikationen"
 #: templates/public/base.html:12
 msgid ""
 "Интеллектуальная система email-коммуникаций для малого и среднего бизнеса."
-msgstr "Intelligentes E-Mail-Kommunikationssystem für kleine und mittlere Unternehmen."
+msgstr ""
+"Intelligentes E-Mail-Kommunikationssystem für kleine und mittlere "
+"Unternehmen."
 
-#: templates/public/index.html:14
+#: templates/public/index.html:14 templates/public/login.html:13
 msgid "Интеллектуальные"
 msgstr "intellektuelle"
 
-#: templates/public/index.html:14
+#: templates/public/index.html:14 templates/public/login.html:14
 msgid "email-коммуникации"
 msgstr "E-Mail-Kommunikation"
 
@@ -46,14 +256,19 @@ msgstr "wechseln"
 msgid ""
 "интеллектуальная система email-коммуникаций для малого и среднего бизнеса, "
 "ориентированная на работу на рынке Германии."
-msgstr "Intelligentes E-Mail-Kommunikationssystem für kleine und mittlere Unternehmen, ausgerichtet auf den deutschen Markt."
+msgstr ""
+"Intelligentes E-Mail-Kommunikationssystem für kleine und mittlere "
+"Unternehmen, ausgerichtet auf den deutschen Markt."
 
 #: templates/public/index.html:34
 msgid ""
 "Платформа предназначена для компаний, которые регулярно взаимодействуют с "
 "другими предприятиями в рамках делового сотрудничества — как в продажах, так "
 "и в закупках."
-msgstr "Die Plattform ist für Unternehmen bestimmt, die regelmäßig im Rahmen geschäftlicher Zusammenarbeit mit anderen Unternehmen interagieren — sowohl im Verkauf als auch im Einkauf."
+msgstr ""
+"Die Plattform ist für Unternehmen bestimmt, die regelmäßig im Rahmen "
+"geschäftlicher Zusammenarbeit mit anderen Unternehmen interagieren — sowohl "
+"im Verkauf als auch im Einkauf."
 
 #: templates/public/index.html:37
 msgid "Функциональные возможности:"
@@ -61,19 +276,26 @@ msgstr "Funktionale Möglichkeiten:"
 
 #: templates/public/index.html:39
 msgid "Интеллектуальный подбор и приоритизация деловых контактов для продаж."
-msgstr "Intelligente Auswahl und Priorisierung von Geschäftskontakten für den Vertrieb."
+msgstr ""
+"Intelligente Auswahl und Priorisierung von Geschäftskontakten für den "
+"Vertrieb."
 
 #: templates/public/index.html:40
 msgid "Интеллектуальный подбор и приоритизация деловых контактов для закупок."
-msgstr "Intelligente Auswahl und Priorisierung von Geschäftskontakten für Beschaffungen."
+msgstr ""
+"Intelligente Auswahl und Priorisierung von Geschäftskontakten für "
+"Beschaffungen."
 
 #: templates/public/index.html:41
 msgid "Отправка коммерческих предложений целевым и релевантным получателям."
-msgstr "Versand kommerzieller Angebote an zielgerichtete und relevante Empfänger."
+msgstr ""
+"Versand kommerzieller Angebote an zielgerichtete und relevante Empfänger."
 
 #: templates/public/index.html:42
 msgid "Отправка запросов поставщикам и подрядчикам по заданным критериям."
-msgstr "Versand von Anfragen an Lieferanten und Auftragnehmer nach vorgegebenen Kriterien."
+msgstr ""
+"Versand von Anfragen an Lieferanten und Auftragnehmer nach vorgegebenen "
+"Kriterien."
 
 #: templates/public/index.html:43
 msgid "Отслеживание отклика и последующих взаимодействий."
@@ -82,3 +304,271 @@ msgstr "Nachverfolgung der Reaktion und der nachfolgenden Interaktionen."
 #: templates/public/index.html:44
 msgid "Информационные рассылки для существующих клиентов и партнёров."
 msgstr "Informationsversand für bestehende Kunden und Partner."
+
+#: templates/public/index.html:56
+msgid "Вы получаете"
+msgstr "Sie erhalten"
+
+#: templates/public/index.html:57
+msgid "понятный"
+msgstr "verständlich"
+
+#: templates/public/index.html:58
+msgid "и"
+msgstr "und"
+
+#: templates/public/index.html:59
+msgid "управляемый"
+msgstr "gesteuert"
+
+#: templates/public/index.html:60
+msgid ""
+"инструмент для автоматизации привлечения клиентов, а также поиска "
+"поставщиков и подрядчиков в B2B-сегменте."
+msgstr ""
+"Ein Instrument zur Automatisierung der Kundengewinnung sowie zur Suche nach "
+"Lieferanten und Auftragnehmern im B2B-Segment."
+
+#: templates/public/index.html:64
+msgid ""
+"С помощью искусственного интеллекта вы формируете точные критерии того, что "
+"хотите продать или приобрести. AI не принимает решений за вас, а помогает "
+"корректно сформулировать запрос, убрать неточности и упростить процесс."
+msgstr ""
+"Mithilfe künstlicher Intelligenz formulieren Sie präzise Kriterien dessen, "
+"was Sie verkaufen oder erwerben möchten. KI trifft keine Entscheidungen für "
+"Sie, sondern hilft dabei, die Anfrage korrekt zu formulieren, "
+"Ungenauigkeiten zu beseitigen und den Prozess zu vereinfachen."
+
+#: templates/public/index.html:68
+msgid ""
+"Вы указываете информацию о своей компании, о товаре или услуге, а также "
+"задаёте географические условия работы на рынке Германии."
+msgstr ""
+"Sie geben Informationen zu Ihrem Unternehmen, zu Ihrem Produkt oder Ihrer "
+"Dienstleistung an und legen außerdem die geografischen Bedingungen für die "
+"Tätigkeit auf dem deutschen Markt fest."
+
+#: templates/public/index.html:72
+msgid ""
+"На основе этих данных система анализирует и ранжирует города Германии и "
+"категории компаний, в которых вероятность заключения сделки наиболее высока. "
+"Сортировка выполняется с использованием AI и опирается на базу из 790 бизнес-"
+"категорий и 1 326 городов Германии с населением от 12 000 человек. Эти "
+"данные могут использоваться как для продаж, так и для закупок."
+msgstr ""
+"Auf Basis dieser Daten analysiert und rangiert das System die Städte "
+"Deutschlands und Unternehmenskategorien, in denen die Wahrscheinlichkeit "
+"eines Geschäftsabschlusses am höchsten ist. Die Sortierung wird mithilfe von "
+"KI durchgeführt und stützt sich auf eine Datenbasis von 790 "
+"Geschäftskategorien und 1.326 deutschen Städten mit mindestens 12.000 "
+"Einwohnern. Diese Daten können sowohl für den Vertrieb als auch für die "
+"Beschaffung verwendet werden."
+
+#: templates/public/index.html:84
+msgid "На основании сформированной задачи система собирает"
+msgstr "Auf der Grundlage der erstellten Aufgabe sammelt das System"
+
+#: templates/public/index.html:85
+msgid "контактные данные"
+msgstr "Kontaktdaten"
+
+#: templates/public/index.html:86
+msgid ""
+"компаний в соответствии с заданными приоритетами. Используются открытые "
+"источники: немецкие «Жёлтые страницы», бизнес-справочник 11880 и другие "
+"публичные базы. Совокупный охват этих источников превышает 4 млн компаний, "
+"работающих в Германии."
+msgstr ""
+"Unternehmen gemäß den vorgegebenen Prioritäten. Es werden offene Quellen "
+"verwendet: die deutschen „Gelben Seiten“, das Branchenverzeichnis 11880 und "
+"andere öffentliche Datenbanken. Die Gesamtabdeckung dieser Quellen "
+"übersteigt 4 Millionen Unternehmen, die in Deutschland tätig sind."
+
+#: templates/public/index.html:90
+msgid "Далее каждая компания оценивается индивидуально с применением"
+msgstr "Anschließend wird jedes Unternehmen individuell unter Anwendung von"
+
+#: templates/public/index.html:91
+msgid "AI"
+msgstr "KI"
+
+#: templates/public/index.html:92
+msgid ""
+"Анализируется вероятность успешного заключения сделки и ожидаемая скорость "
+"её достижения. Проводится многофакторная оценка и отбор, в результате чего "
+"формируется целевая аудитория под конкретное деловое предложение или запрос."
+msgstr ""
+"Es wird die Wahrscheinlichkeit eines erfolgreichen Abschlusses einer "
+"Transaktion und die erwartete Geschwindigkeit bis zu diesem Abschluss "
+"analysiert. Es erfolgt eine multifaktorielle Bewertung und Auswahl, "
+"woraufhin eine Zielgruppe für ein konkretes geschäftliches Angebot oder eine "
+"Anfrage gebildet wird."
+
+#: templates/public/index.html:96
+msgid ""
+"Все этапы работы системы прозрачны: вы можете корректировать как исходную "
+"задачу, так и промежуточные результаты."
+msgstr ""
+"Alle Arbeitsphasen des Systems sind transparent: Sie können sowohl die "
+"Ausgangsaufgabe als auch die Zwischenergebnisse korrigieren."
+
+#: templates/public/index.html:108
+msgid "После отбора формируется"
+msgstr "Nach der Auswahl wird gebildet"
+
+#: templates/public/index.html:109
+msgid "готовая аудитория"
+msgstr "fertige Zielgruppe"
+
+#: templates/public/index.html:110
+msgid ""
+"— список адресатов для деловой email-коммуникации. С помощью AI и "
+"подготовленных шаблонов вы формируете коммерческое предложение или деловой "
+"запрос, адаптированные под выбранную аудиторию."
+msgstr ""
+"— eine Liste von Adressaten für geschäftliche E‑Mail‑Kommunikation. Mithilfe "
+"von KI und vorbereiteten Vorlagen erstellen Sie ein kommerzielles Angebot "
+"oder eine geschäftliche Anfrage, angepasst an die gewählte Zielgruppe."
+
+#: templates/public/index.html:114
+msgid "Рассылка выполняется исключительно от вашего имени и с использованием"
+msgstr "Der Versand erfolgt ausschließlich in Ihrem Namen und unter Verwendung"
+
+#: templates/public/index.html:115
+msgid "корпоративного адреса"
+msgstr "Firmenadresse"
+
+#: templates/public/index.html:116
+msgid ""
+"электронной почты. Благодаря предварительной фильтрации и приоритизации "
+"контактов объём рассылки ограничивается 50–100 письмами в час (в зависимости "
+"от используемого почтового провайдера)."
+msgstr ""
+"E-Mail. Dank der Vorabfilterung und Priorisierung der Kontakte ist das "
+"Versandvolumen auf 50–100 E-Mails pro Stunde begrenzt (je nach verwendetem "
+"E‑Mail‑Anbieter)."
+
+#: templates/public/index.html:120
+msgid ""
+"Такой формат коммуникации основан на законном деловом интересе (berechtigtes "
+"Interesse) и соответствует требованиям UWG и DSGVO."
+msgstr ""
+"Dieses Kommunikationsformat basiert auf einem berechtigten geschäftlichen "
+"Interesse (berechtigtes Interesse) und entspricht den Anforderungen des UWG "
+"und der DSGVO."
+
+#: templates/public/index.html:132
+msgid "В процессе рассылки система фиксирует"
+msgstr "Während des Versands erfasst das System"
+
+#: templates/public/index.html:133
+msgid "реакцию адресатов"
+msgstr "Reaktion der Adressaten"
+
+#: templates/public/index.html:134
+msgid ""
+"на ваше сообщение. В режиме реального времени отображается, какие компании "
+"перешли на ваш сайт по ссылкам из отправленных писем. Для каждого такого "
+"перехода доступна информация о компании, связанная с конкретным отправленным "
+"сообщением."
+msgstr ""
+"Auf Ihre Nachricht. In Echtzeit wird angezeigt, welche Unternehmen über "
+"Links in den versendeten E‑Mails auf Ihre Website gelangt sind. Für jeden "
+"solchen Zugriff sind Informationen über das Unternehmen verfügbar, die mit "
+"der jeweiligen versendeten Nachricht verknüpft sind."
+
+#: templates/public/index.html:138
+msgid ""
+"Также автоматически учитываются ответы на письма, жалобы на рассылку и "
+"другие реакции. На основе этих данных формируется статистика и уточняются "
+"алгоритмы приоритизации для последующих коммуникаций."
+msgstr ""
+"Auch Antworten auf E-Mails, Beschwerden über den Versand und andere "
+"Reaktionen werden automatisch berücksichtigt. Auf Grundlage dieser Daten "
+"werden Statistiken erstellt und die Priorisierungsalgorithmen für "
+"nachfolgende Kommunikation verfeinert."
+
+#: templates/public/index.html:142
+msgid "Мы — предприниматели с"
+msgstr "Wir sind Unternehmer mit"
+
+#: templates/public/index.html:143
+msgid "практическим опытом"
+msgstr "mit praktischer Erfahrung"
+
+#: templates/public/index.html:144
+msgid ""
+"ведения бизнеса. Эта система была создана для решения собственных задач, "
+"поскольку на рынке не существовало решения с сопоставимой логикой и уровнем "
+"прозрачности. Сервис ориентирован на пользователей без технической "
+"подготовки и максимально упрощён в использовании. После подтверждения "
+"эффективности на практике мы приняли решение предложить этот инструмент "
+"другим предпринимателям."
+msgstr ""
+"Bei der Führung des Geschäfts. Dieses System wurde geschaffen, um unsere "
+"eigenen Aufgaben zu lösen, da es auf dem Markt keine Lösung mit "
+"vergleichbarer Logik und Transparenz gab. Der Service richtet sich an Nutzer "
+"ohne technische Vorkenntnisse und ist in der Anwendung möglichst einfach "
+"gehalten. Nachdem die Wirksamkeit in der Praxis bestätigt wurde, beschlossen "
+"wir, dieses Instrument anderen Unternehmern anzubieten."
+
+#: templates/public/login.html:4 templates/public/login.html:17
+msgid "Вход"
+msgstr "Eingang"
+
+#: templates/public/login.html:19
+msgid "Неверный логин или пароль"
+msgstr "Login oder Passwort ungültig"
+
+#: templates/public/login.html:25
+msgid "Имя пользователя:"
+msgstr "Benutzername:"
+
+#: templates/public/login.html:28
+msgid "Пароль:"
+msgstr "Passwort:"
+
+#: templates/public/login.html:31
+msgid "Отмена"
+msgstr "Abbrechen"
+
+#: templates/public/login.html:31
+msgid "Войти"
+msgstr "Anmelden"
+
+#~ msgid "Напишите про себя и что вы продаёте."
+#~ msgstr "Schreiben Sie etwas über sich und was Sie verkaufen."
+
+#~ msgid "Пишите как угодно."
+#~ msgstr "Schreiben Sie, wie Sie wollen."
+
+#~ msgid "Система сама разложит по полкам."
+#~ msgstr "Das System wird alles selbst in die Regale sortieren."
+
+#~ msgid "Лишнее и неважное система выкинет."
+#~ msgstr "Überflüssiges und Unwichtiges wird das System wegwerfen."
+
+#~ msgid "Подбор"
+#~ msgstr "Auswahl"
+
+#~ msgid "AUDIENCE : ПОДБОР"
+#~ msgstr "AUDIENCE : AUSWAHL"
+
+#~ msgid "Списки"
+#~ msgstr "Listen"
+
+#~ msgid "AUDIENCE : СПИСКИ"
+#~ msgstr "AUDIENCE: LISTEN"
+
+#~ msgid "Импорт"
+#~ msgstr "Import"
+
+#~ msgid "AUDIENCE : ИМПОРТ"
+#~ msgstr "AUDIENCE : IMPORT"
+
+#~ msgid "Dashboard"
+#~ msgstr "Dashboard"
+
+#~ msgid "DASHBOARD : ОБЗОР"
+#~ msgstr "DASHBOARD : ÜBERSICHT"

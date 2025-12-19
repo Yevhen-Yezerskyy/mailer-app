@@ -117,6 +117,9 @@ def how_view(request):
             ).delete()
         return redirect(request.path)
 
+    if request.POST.get("mode") == "clear":
+        return redirect(request.path)        
+
     form = AudienceHowForm(request.POST)
     if not form.is_valid():
         return render(

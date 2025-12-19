@@ -1,11 +1,11 @@
-# FILE: web/panel/urls.py  (новое — 2025-12-18)
-# PURPOSE: корень панели = dashboard, остальное — старые аппы (без console)
+# FILE: web/panel/urls.py  (обновлено — 2025-12-19)
+# PURPOSE: корень панели /panel/ редиректит на /panel/audience/
 
 from django.urls import path, include
-from .views import dashboard
+from django.views.generic import RedirectView
 
 urlpatterns = [
-    path("", dashboard, name="dashboard"),          # /panel/
+    path("", RedirectView.as_view(url="audience/", permanent=False), name="dashboard"),
     path("audience/", include("panel.aap_audience.urls")),
     path("settings/", include("panel.aap_settings.urls")),
 ]
