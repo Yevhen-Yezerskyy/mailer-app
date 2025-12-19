@@ -92,12 +92,41 @@
           </span>
         </div>
 
-        <!-- 02.01.03 /panel/topbar/user -->
-        <div class="mr-5 text-[#006991] font-semibold text-sm">
-          {% if request.user.is_authenticated %}
-            {{ request.user.username }}
-          {% endif %}
-        </div>
+        <!-- FILE: web/templates/panels/base.html  (обновлено — 2025-12-19)
+        Смысл изменения: вместо username в topbar — переключатель языков DE / UK / RU через set_language (cookie), без URL-префиксов -->
+
+      <!-- 02.01.03 /panel/topbar/language-switch -->
+      <div class="flex items-center gap-2 mr-5">
+<!-- FILE: web/templates/panels/base.html  (обновлено — 2025-12-19)
+Смысл: переключатель языка через cookie (set_language), одна форма, 3 submit-кнопки -->
+
+        <form method="post" action="{% url 'set_language' %}" class="flex items-center gap-2 mr-5">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+  <button type="submit" name="language" value="de"
+    class="w-9 h-9 flex items-center justify-center
+           rounded-lg bg-[#effbff] text-[#006991] font-semibold text-sm
+           hover:bg-[#e3f6fb] border border-slate-200">
+    DE
+  </button>
+
+  <button type="submit" name="language" value="uk"
+    class="w-9 h-9 flex items-center justify-center
+           rounded-lg bg-[#effbff] text-[#006991] font-semibold text-sm
+           hover:bg-[#e3f6fb] border border-slate-200">
+    UK
+  </button>
+
+  <button type="submit" name="language" value="ru"
+    class="w-9 h-9 flex items-center justify-center
+           rounded-lg bg-[#effbff] text-[#006991] font-semibold text-sm
+           hover:bg-[#e3f6fb] border border-slate-200">
+    RU
+  </button>
+</form>
+              
+      </div>
 
         <!-- 02.01.04 /panel/topbar/logout -->
         <form method="post" action="{% url 'logout' %}" class="inline">

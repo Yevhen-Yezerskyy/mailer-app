@@ -1,315 +1,498 @@
-<!-- FILE: web/templates/panels/aap_audience/clar.html  (обновлено) 2025-12-13 -->
-<!-- Смысл: добавлены run_processing + subscribers_limit в форму и печать в 1-й колонке таблицы. -->
-
 {% extends "panels/base.html" %}
-
-{% block title %}Уточнение задачи — Serenity Mailer{% endblock %}
-
-{% block sidebar_menu %}
-  {% include "panels/aap_audience/menu_left.html" %}
-{% endblock %}
-
+{% load i18n %}
 {% block content %}
+<div class="w-[95%] max-w-none mx-auto">
+<!-- FILE: web/templates/panels/aap_audience/clar.html  (обновлено — 2025-12-19)
+Смысл: привести clar.html к стилю how.html без старых классов/inline; form по умолчанию ВЫКЛ (только если form);
+верх в режиме редактирования: 2 равные колонки 50/50; справа города+категории (2 колонки) со скроллом, БЕЗ вкладок;
+в таблице: вкладки "Категории/География/Клиент" и вкладки "Города/Категории"; вывод ТОП 15; подтверждения на удаление городов/категорий;
+тексты сохранены, служебные поля (mode/edit_id/task_id/delete_id) сохранены -->  
 
-{% if form %}
-  <div class="panel-card" style="margin-bottom: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
+  {% if form %}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
-    <h3 class="panel-card-title" style="margin-bottom: 12px;">Редактирование задачи</h3>
+      <!-- ===================== LEFT (50%): EDIT FORM ===================== -->
+      <!-- FILE: web/templates/panels/aap_audience/clar.html  (обновлено — 2025-12-19)
+Смысл: исправлена форма редактирования: ширины, чекбокс справа, лимит справа, textarea на всю ширину, корректные кнопки -->
 
-    <div style="display: grid; grid-template-columns: 40% 30% 30%; gap: 20px;">
+<!-- FILE: web/templates/panels/aap_audience/clar.html  (обновлено — 2025-12-19)
+Смысл: полностью переписан блок формы редактирования (только этот блок): все поля 100% по ширине, textarea не зажаты;
+чекбокс рядом с текстом; subscribers_limit справа как нормальный input с рамкой; кнопки как в how.html; тексты НЕ менялись -->
 
-      <div>
-        <form method="post" class="panel-form">
-          {% csrf_token %}
-          <input type="hidden" name="mode" value="save">
-          {{ form.edit_id }}
+<div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
 
-          <div class="panel-form-group">
-            <label class="panel-form-label" for="{{ form.title.id_for_label }}">Название</label>
-            {{ form.title }}
-          </div>
+  <form method="post" class="space-y-6">
+    {% csrf_token %}
+    <input type="hidden" name="mode" value="save">
+    {{ form.edit_id }}
 
-          <div class="panel-form-group">
-            <label class="panel-form-label" for="{{ form.task.id_for_label }}">Основной task</label>
-            {{ form.task }}
-          </div>
+    <!-- Аудитория -->
+    <div>
+      <label for="id_title" class="block text-sm font-semibold text-slate-700 mb-2">
+        {% trans "Аудитория" %}
+      </label>
+      <input
+        type="text"
+        name="{{ form.title.name }}"
+        id="id_title"
+        value="{{ form.title.value|default_if_none:'' }}"
+        class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800
+               placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0a5f85]/30 focus:border-[#0a5f85]"
+      >
+      {% if form.title.errors %}
+        <div class="mt-2 text-sm text-red-600">
+          {{ form.title.errors }}
+        </div>
+      {% endif %}
+    </div>
 
-          <div class="panel-form-group">
-            <label class="panel-form-label" for="{{ form.task_branches.id_for_label }}">Branches-задача</label>
-            {{ form.task_branches }}
-          </div>
+    <!-- Основная задача -->
+    <div>
+      <label for="id_task" class="block text-sm font-semibold text-slate-700 mb-2">
+        {% trans "Основная задача" %}
+      </label>
+      <textarea
+        name="{{ form.task.name }}"
+        id="id_task"
+        rows="8"
+        class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800
+               placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0a5f85]/30 focus:border-[#0a5f85]"
+      >{{ form.task.value|default_if_none:"" }}</textarea>
+      {% if form.task.errors %}
+        <div class="mt-2 text-sm text-red-600">
+          {{ form.task.errors }}
+        </div>
+      {% endif %}
+    </div>
 
-          <div class="panel-form-group">
-            <label class="panel-form-label" for="{{ form.task_geo.id_for_label }}">Geo-задача</label>
-            {{ form.task_geo }}
-          </div>
+    <!-- Критерии для выбора категорий -->
+    <div>
+      <label for="id_task_branches" class="block text-sm font-semibold text-slate-700 mb-2">
+        {% trans "Критерии для выбора категорий" %}
+      </label>
+      <textarea
+        name="{{ form.task_branches.name }}"
+        id="id_task_branches"
+        rows="8"
+        class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800
+               placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0a5f85]/30 focus:border-[#0a5f85]"
+      >{{ form.task_branches.value|default_if_none:"" }}</textarea>
+      {% if form.task_branches.errors %}
+        <div class="mt-2 text-sm text-red-600">
+          {{ form.task_branches.errors }}
+        </div>
+      {% endif %}
+    </div>
 
-          <div class="panel-form-group">
-            <label class="panel-form-label" for="{{ form.task_client.id_for_label }}">Client-задача</label>
-            {{ form.task_client }}
-          </div>
+    <!-- Критерии, влияющие на географию поиска -->
+    <div>
+      <label for="id_task_geo" class="block text-sm font-semibold text-slate-700 mb-2">
+        {% trans "Критерии, влияющие на географию поиска" %}
+      </label>
+      <textarea
+        name="{{ form.task_geo.name }}"
+        id="id_task_geo"
+        rows="8"
+        class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800
+               placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0a5f85]/30 focus:border-[#0a5f85]"
+      >{{ form.task_geo.value|default_if_none:"" }}</textarea>
+      {% if form.task_geo.errors %}
+        <div class="mt-2 text-sm text-red-600">
+          {{ form.task_geo.errors }}
+        </div>
+      {% endif %}
+    </div>
 
-          <div class="panel-form-group" style="display:flex; align-items:center; gap:10px;">
-            {{ form.run_processing }}
-            <label class="panel-form-label" for="{{ form.run_processing.id_for_label }}" style="margin:0;">
-              {{ form.run_processing.label }}
-            </label>
-          </div>
+    <!-- Критерии для отбора клиентов -->
+    <div>
+      <label for="id_task_client" class="block text-sm font-semibold text-slate-700 mb-2">
+        {% trans "Критерии для отбора клиентов" %}
+      </label>
+      <textarea
+        name="{{ form.task_client.name }}"
+        id="id_task_client"
+        rows="8"
+        class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800
+               placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0a5f85]/30 focus:border-[#0a5f85]"
+      >{{ form.task_client.value|default_if_none:"" }}</textarea>
+      {% if form.task_client.errors %}
+        <div class="mt-2 text-sm text-red-600">
+          {{ form.task_client.errors }}
+        </div>
+      {% endif %}
+    </div>
 
-          <div class="panel-form-group">
-            <label class="panel-form-label" for="{{ form.subscribers_limit.id_for_label }}">
-              {{ form.subscribers_limit.label }}
-            </label>
-            {{ form.subscribers_limit }}
-          </div>
+    <!-- Обработка включена -->
+    <div class="flex items-center gap-3">
+      <label class="text-sm font-semibold text-slate-700" for="id_run_processing">
+        {% trans "Обработка включена:" %}
+      </label>
+      <input
+        type="checkbox"
+        name="{{ form.run_processing.name }}"
+        id="id_run_processing"
+        class="panel-checkbox"
+        {% if form.run_processing.value %}checked{% endif %}
+      >
+      {% if form.run_processing.errors %}
+        <div class="text-sm text-red-600">
+          {{ form.run_processing.errors }}
+        </div>
+      {% endif %}
+    </div>
 
-          <div class="panel-form-actions" style="display: flex; gap: 12px;">
-            <button type="submit"
-                    class="panel-btn panel-btn-primary"
-                    style="background: #2563eb; color: white; padding: 8px 18px; border-radius: 8px;">
-              💾 Сохранить
-            </button>
+    <!-- Ограничение на подбор компаний -->
+    <div class="flex items-center justify-between gap-6">
+      <label class="text-sm font-semibold text-slate-700" for="id_subscribers_limit">
+        {% trans "Ограничение на подбор компаний" %}
+      </label>
 
-            <a href="{% url 'audience:clar' %}"
-               class="panel-btn"
-               style="background: #e5e7eb; padding: 8px 18px; border-radius: 8px; color: #111;">
-              ✖ Закрыть
-            </a>
-          </div>
-
-        </form>
+      <input
+        type="number"
+        name="{{ form.subscribers_limit.name }}"
+        id="id_subscribers_limit"
+        value="{{ form.subscribers_limit.value|default_if_none:'' }}"
+        min="1"
+        max="1000000"
+        class="w-[140px] rounded-xl border border-slate-200 bg-white px-4 py-2 text-slate-800
+               focus:outline-none focus:ring-2 focus:ring-[#0a5f85]/30 focus:border-[#0a5f85]"
+      >
+    </div>
+    {% if form.subscribers_limit.errors %}
+      <div class="text-sm text-red-600">
+        {{ form.subscribers_limit.errors }}
       </div>
+    {% endif %}
 
-      <div>
-        <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">Города</h4>
+    <!-- actions (как в how.html) -->
+    <div class="flex flex-wrap gap-3 pt-2">
+      <button
+        type="submit"
+        class="h-10 px-6 rounded-xl text-white font-semibold border border-[#084b69]"
+        style="background:#0a5f85">
+        {% trans "Сохранить" %}
+      </button>
 
-        {% if current_task_id %}
-          <div style="display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
-            <form method="post" style="display: inline;">
-              {% csrf_token %}
-              <input type="hidden" name="edit_id" value="{{ current_task_id }}">
-              <input type="hidden" name="mode" value="gen_city">
-              <input type="hidden" name="task_id" value="{{ current_task_id }}">
-              <button type="submit"
-                      class="panel-btn panel-btn-primary"
-                      style="font-size: 13px; padding: 6px 12px; border-radius: 8px;">
-                ➕ Добавить города
-              </button>
-            </form>
+      <a
+        href="{% url 'audience:clar' %}"
+        class="h-10 px-6 rounded-xl text-white font-semibold border border-[#084b69] flex items-center justify-center"
+        style="background:#0a5f85">
+        {% trans "Закрыть" %}
+      </a>
+    </div>
 
-            <form method="post" style="display: inline;">
-              {% csrf_token %}
-              <input type="hidden" name="edit_id" value="{{ current_task_id }}">
-              <input type="hidden" name="mode" value="clear_city">
-              <input type="hidden" name="task_id" value="{{ current_task_id }}">
-              <button type="submit"
-                      class="panel-btn"
-                      style="font-size: 13px; padding: 6px 12px; border-radius: 8px; background: #fee2e2; color: #991b1b;">
-                🗑 Удалить города
-              </button>
-            </form>
-          </div>
+    {% if form.non_field_errors %}
+      <div class="mt-2 text-sm text-red-600">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
 
-          <p style="font-size: 13px; margin-bottom: 6px;">
-            Городов: {{ clar_city_count|default:0 }}
-          </p>
+  </form>
+</div>
 
-          <div style="max-height: 800px; max-width: 350px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; font-size: 13px;">
-            {% if clar_city_items %}
-              {% for item in clar_city_items %}
-                <div style="display: flex; justify-content: space-between; gap: 8px; padding: 2px 0;">
-                  <span>{{ item.value_text }}</span>
-                  <span style="opacity: 0.7;">{{ item.rate }}</span>
-                </div>
-              {% endfor %}
+
+
+      <!-- ===================== RIGHT (50%): CITIES + BRANCHES (NO TABS) ===================== -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <!-- ---------- CITIES ---------- -->
+          <div>
+            <h4 class="text-sm font-semibold text-slate-700 mb-3">{% trans "Города Германии" %}</h4>
+
+            {% if current_task_id %}
+              <div class="flex gap-2 mb-3 flex-wrap">
+                <form method="post" class="inline m-0">
+                  {% csrf_token %}
+                  <input type="hidden" name="edit_id" value="{{ current_task_id }}">
+                  <input type="hidden" name="mode" value="clear_city">
+                  <input type="hidden" name="task_id" value="{{ current_task_id }}">
+                  <button
+                    type="submit"
+                    onclick="return confirm('{% trans "Вы уверены, что хотите удалить города?" %}');"
+                    class="px-3 h-8 flex items-center justify-center rounded-lg
+                           text-red-700 bg-red-50 font-semibold text-sm
+                           hover:bg-red-100 border border-red-200">
+                    🗑 {% trans "Удалить города" %}
+                  </button>
+                </form>
+              </div>
+
+              <p class="text-sm text-slate-700 mb-2">
+                {% trans "Городов:" %} {{ clar_city_count|default:0 }}
+              </p>
+
+              <div class="max-h-[800px] overflow-y-auto border border-slate-200 rounded-xl bg-slate-50 p-3 text-sm">
+                {% if clar_city_items %}
+                  <div class="space-y-1">
+                    {% for item in clar_city_items %}
+                      <div class="flex justify-between gap-3">
+                        <span class="text-slate-800">{{ item.value_text }}</span>
+                        <span class="text-slate-500">{{ item.rate }}</span>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <div class="text-slate-500">{% trans "Пока нет городов." %}</div>
+                {% endif %}
+              </div>
             {% else %}
-              <div style="opacity: 0.7;">Пока нет сгенерированных городов.</div>
+              <p class="text-sm text-slate-500">
+                {% trans "Выберите задачу ниже (✏️), чтобы работать с городами." %}
+              </p>
             {% endif %}
           </div>
-        {% else %}
-          <p style="font-size: 13px; opacity: 0.7;">
-            Выберите задачу ниже (✏️), чтобы работать с городами.
-          </p>
-        {% endif %}
-      </div>
 
-      <div>
-        <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">Бранчи</h4>
+          <!-- ---------- BRANCHES ---------- -->
+          <div>
+            <h4 class="text-sm font-semibold text-slate-700 mb-3">{% trans "Категории" %}</h4>
 
-        {% if current_task_id %}
-          <div style="display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;">
-            <form method="post" style="display: inline;">
-              {% csrf_token %}
-              <input type="hidden" name="edit_id" value="{{ current_task_id }}">
-              <input type="hidden" name="mode" value="gen_branch">
-              <input type="hidden" name="task_id" value="{{ current_task_id }}">
-              <button type="submit"
-                      class="panel-btn panel-btn-primary"
-                      style="font-size: 13px; padding: 6px 12px; border-radius: 8px;">
-                ➕ Добавить бранчи
-              </button>
-            </form>
+            {% if current_task_id %}
+              <div class="flex gap-2 mb-3 flex-wrap">
+                <form method="post" class="inline m-0">
+                  {% csrf_token %}
+                  <input type="hidden" name="edit_id" value="{{ current_task_id }}">
+                  <input type="hidden" name="mode" value="clear_branch">
+                  <input type="hidden" name="task_id" value="{{ current_task_id }}">
+                  <button
+                    type="submit"
+                    onclick="return confirm('{% trans "Вы уверены, что хотите удалить категории?" %}');"
+                    class="px-3 h-8 flex items-center justify-center rounded-lg
+                           text-red-700 bg-red-50 font-semibold text-sm
+                           hover:bg-red-100 border border-red-200">
+                    🗑 {% trans "Удалить категории" %}
+                  </button>
+                </form>
+              </div>
 
-            <form method="post" style="display: inline;">
-              {% csrf_token %}
-              <input type="hidden" name="edit_id" value="{{ current_task_id }}">
-              <input type="hidden" name="mode" value="clear_branch">
-              <input type="hidden" name="task_id" value="{{ current_task_id }}">
-              <button type="submit"
-                      class="panel-btn"
-                      style="font-size: 13px; padding: 6px 12px; border-radius: 8px; background: #fee2e2; color: #991b1b;">
-                🗑 Удалить бранчи
-              </button>
-            </form>
-          </div>
+              <p class="text-sm text-slate-700 mb-2">
+                {% trans "Категорий:" %} {{ clar_branch_count|default:0 }}
+              </p>
 
-          <p style="font-size: 13px; margin-bottom: 6px;">
-            Бранчей: {{ clar_branch_count|default:0 }}
-          </p>
-
-          <div style="max-height: 800px; max-width: 350px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 10px; font-size: 13px;">
-            {% if clar_branch_items %}
-              {% for item in clar_branch_items %}
-                <div style="display: flex; justify-content: space-between; gap: 8px; padding: 2px 0;">
-                  <span>{{ item.value_text }}</span>
-                  <span style="opacity: 0.7;">{{ item.rate }}</span>
-                </div>
-              {% endfor %}
+              <div class="max-h-[800px] overflow-y-auto border border-slate-200 rounded-xl bg-slate-50 p-3 text-sm">
+                {% if clar_branch_items %}
+                  <div class="space-y-1">
+                    {% for item in clar_branch_items %}
+                      <div class="flex justify-between gap-3">
+                        <span class="text-slate-800">{{ item.value_text }}</span>
+                        <span class="text-slate-500">{{ item.rate }}</span>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% else %}
+                  <div class="text-slate-500">{% trans "Пока нет категорий." %}</div>
+                {% endif %}
+              </div>
             {% else %}
-              <div style="opacity: 0.7;">Пока нет сгенерированных бранчей.</div>
+              <p class="text-sm text-slate-500">
+                {% trans "Выберите задачу ниже (✏️), чтобы работать с бранчами." %}
+              </p>
             {% endif %}
           </div>
-        {% else %}
-          <p style="font-size: 13px; opacity: 0.7;">
-            Выберите задачу ниже (✏️), чтобы работать с бранчами.
-          </p>
-        {% endif %}
+
+        </div>
       </div>
 
     </div>
-  </div>
-{% endif %}
+  {% endif %}
 
-{% if tasks %}
-  <div class="panel-card" style="margin-top: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
-    <h3 class="panel-card-title" style="margin-bottom: 12px;">Задачи HOW</h3>
+  <!-- ===================== TABLE (same width as top) ===================== -->
+  {% if tasks %}
+    <div class="mt-6">
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="bg-slate-50 border-b border-slate-200">
+              <tr class="text-left text-slate-700 font-semibold">
+                <th class="px-4 py-3 w-[30%]">{% trans "Аудитория и основная задача" %}</th>
+                <th class="px-4 py-3 w-[35%]">{% trans "Критерии" %}</th>
+                <th class="px-4 py-3 w-[35%]">{% trans "ТОП 15 города и категории" %}</th>
+                <th class="px-4 py-3 w-[110px] text-right">{% trans "Действия" %}</th>
+              </tr>
+            </thead>
 
-    <div class="panel-table-wrapper">
-      <table class="panel-table">
-        <thead>
-          <tr>
-            <th style="width: 25%;">Название + Task</th>
-            <th style="width: 25%;">Branches / Geo / Client</th>
-            <th style="width: 25%;">Города (топ-50)</th>
-            <th style="width: 25%;">Бранчи (топ-50)</th>
-            <th style="width: 110px; text-align: right;">Действия</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for t in tasks %}
-            <tr>
-              <td>
-                <strong>{{ t.title }}</strong><br><br>
-                <b>Основной task</b><br><br>
-                {{ t.task|linebreaksbr }}
+            <tbody class="divide-y divide-slate-200">
+              {% for t in tasks %}
+                <tr class="align-top">
+                  <td class="px-4 py-3">
+                    <strong>{{ t.title }}</strong><br><br>
+                    <b>{% trans "Основная задача" %}</b><br>
+                    {{ t.task|linebreaksbr }}
 
-                <br><br>
-                <div style="font-size: 12px; opacity: 0.85;">
-                  <div>Процессинг: {% if t.run_processing %}да{% else %}нет{% endif %}</div>
-                  <div>Сабскрайберов: {{ t.subscribers_limit }}</div>
-                </div>
-              </td>
-
-              <td>
-                <b>Бранчи task</b><br><br>
-                {{ t.task_branches|linebreaksbr }}<br><br><br>
-                <b>Гео task</b><br><br>
-                {{ t.task_geo|linebreaksbr }}<br><br><br>
-                <b>Client task</b><br><br><br>
-                {{ t.task_client|linebreaksbr }}
-              </td>
-
-              <td style="font-size: 12px; vertical-align: top;">
-                {% with items=t.clar_city_items %}
-                  {% if items %}
-                    <div style="margin-bottom: 4px;">
-                      Городов: {{ items|length }}
+                    <br><br>
+                    <div class="text-xs text-slate-600 space-y-1">
+                      <div>
+                        {% trans "Обработка включена:" %}
+                        {% if t.run_processing %}{% trans "да" %}{% else %}{% trans "нет" %}{% endif %}
+                      </div>
+                      <div>
+                        {% trans "Ограничение поиска компаний:" %} {{ t.subscribers_limit }}
+                      </div>
                     </div>
-                    <div style="max-height: 500px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px;">
-                      {% for item in items|slice:":50" %}
-                        <div style="display: flex; justify-content: space-between; gap: 6px;">
-                          <span>{{ item.value_text }}</span>
-                          <span style="opacity: 0.65;">{{ item.rate }}</span>
-                        </div>
-                      {% endfor %}
-                      {% if items|length > 50 %}
-                        <div style="text-align: center; opacity: 0.7; margin-top: 4px;">...</div>
-                        <div style="text-align: center; opacity: 0.7;">...</div>
-                      {% endif %}
-                    </div>
-                  {% else %}
-                    <span style="opacity: 0.6;">Города не сгенерированы.</span>
-                  {% endif %}
-                {% endwith %}
-              </td>
+                  </td>
 
-              <td style="font-size: 12px; vertical-align: top;">
-                {% with items=t.clar_branch_items %}
-                  {% if items %}
-                    <div style="margin-bottom: 4px;">
-                      Бранчей: {{ items|length }}
+                  <!-- ===== CRITERIA TABS: Категории / География / Клиент ===== -->
+                  <td class="px-4 py-3 text-slate-700">
+                    <div class="flex gap-2 mb-2 text-xs font-semibold" data-tab-group="crit-{{ t.id }}">
+                      <button type="button"
+                        class="tab-btn px-2 py-1 rounded bg-slate-200 text-slate-800"
+                        data-target="crit-branches-{{ t.id }}">
+                        {% trans "Категории" %}
+                      </button>
+                      <button type="button"
+                        class="tab-btn px-2 py-1 rounded bg-slate-100 text-slate-600"
+                        data-target="crit-geo-{{ t.id }}">
+                        {% trans "География" %}
+                      </button>
+                      <button type="button"
+                        class="tab-btn px-2 py-1 rounded bg-slate-100 text-slate-600"
+                        data-target="crit-client-{{ t.id }}">
+                        {% trans "Клиент" %}
+                      </button>
                     </div>
-                    <div style="max-height: 500px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px; padding: 6px 8px;">
-                      {% for item in items|slice:":50" %}
-                        <div style="display: flex; justify-content: space-between; gap: 6px;">
-                          <span>{{ item.value_text }}</span>
-                          <span style="opacity: 0.65;">{{ item.rate }}</span>
-                        </div>
-                      {% endfor %}
-                      {% if items|length > 50 %}
-                        <div style="text-align: center; opacity: 0.7; margin-top: 4px;">...</div>
-                        <div style="text-align: center; opacity: 0.7;">...</div>
-                      {% endif %}
+
+                    <div class="tab-scope text-sm">
+                      <div id="crit-branches-{{ t.id }}" class="tab-content">
+                        {{ t.task_branches|linebreaksbr }}
+                      </div>
+                      <div id="crit-geo-{{ t.id }}" class="tab-content hidden">
+                        {{ t.task_geo|linebreaksbr }}
+                      </div>
+                      <div id="crit-client-{{ t.id }}" class="tab-content hidden">
+                        {{ t.task_client|linebreaksbr }}
+                      </div>
                     </div>
-                  {% else %}
-                    <span style="opacity: 0.6;">Бранчи не сгенерированы.</span>
-                  {% endif %}
-                {% endwith %}
-              </td>
+                  </td>
 
-              <td style="text-align: right;">
-                <div style="display: inline-flex; gap: 8px; align-items: center;">
-                  <a href="?edit={{ t.id }}"
-                     class="panel-link task-edit-link"
-                     style="font-size: 13px;"
-                     title="Изменить задачу">
-                    ✏️
-                  </a>
+                  <!-- ===== RESULTS TABS: Города / Категории (TOP 15) ===== -->
+                  <td class="px-4 py-3 text-slate-700">
+                    <div class="flex gap-2 mb-2 text-xs font-semibold" data-tab-group="res-{{ t.id }}">
+                      <button type="button"
+                        class="tab-btn px-2 py-1 rounded bg-slate-200 text-slate-800"
+                        data-target="res-cities-{{ t.id }}">
+                        {% trans "Города" %}
+                      </button>
+                      <button type="button"
+                        class="tab-btn px-2 py-1 rounded bg-slate-100 text-slate-600"
+                        data-target="res-branches-{{ t.id }}">
+                        {% trans "Категории" %}
+                      </button>
+                    </div>
 
-                  <form method="post" style="margin: 0; display: inline;">
-                    {% csrf_token %}
-                    <input type="hidden" name="mode" value="delete">
-                    <input type="hidden" name="delete_id" value="{{ t.id }}">
-                    <button type="submit"
-                            class="panel-link"
-                            style="background: none; border: none; padding-left: 4px; font-size: 13px; color: #b91c1c; cursor: pointer;"
-                            title="Удалить задачу"
-                            onclick="return confirm('Вы уверены, что хотите удалить задачу?');">
-                      🗑️
-                    </button>
-                  </form>
-                </div>
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+                    <div class="tab-scope">
+                      <div id="res-cities-{{ t.id }}" class="tab-content">
+                        {% with items=t.clar_city_items %}
+                          {% if items %}
+                            <div class="text-xs text-slate-600 mb-2">
+                              {% trans "Городов:" %} {{ items|length }}
+                            </div>
+                            <div class="border border-slate-200 rounded-xl bg-slate-50 p-3 text-sm space-y-1">
+                              {% for item in items|slice:":15" %}
+                                <div class="flex justify-between gap-3">
+                                  <span class="text-slate-800">{{ item.value_text }}</span>
+                                  <span class="text-slate-500">{{ item.rate }}</span>
+                                </div>
+                              {% endfor %}
+                            </div>
+                          {% else %}
+                            <span class="text-sm text-slate-500">{% trans "Города в обработке." %}</span>
+                          {% endif %}
+                        {% endwith %}
+                      </div>
+
+                      <div id="res-branches-{{ t.id }}" class="tab-content hidden">
+                        {% with items=t.clar_branch_items %}
+                          {% if items %}
+                            <div class="text-xs text-slate-600 mb-2">
+                              {% trans "Категорий:" %} {{ items|length }}
+                            </div>
+                            <div class="border border-slate-200 rounded-xl bg-slate-50 p-3 text-sm space-y-1">
+                              {% for item in items|slice:":15" %}
+                                <div class="flex justify-between gap-3">
+                                  <span class="text-slate-800">{{ item.value_text }}</span>
+                                  <span class="text-slate-500">{{ item.rate }}</span>
+                                </div>
+                              {% endfor %}
+                            </div>
+                          {% else %}
+                            <span class="text-sm text-slate-500">{% trans "Категории в обработке не сгенерированы." %}</span>
+                          {% endif %}
+                        {% endwith %}
+                      </div>
+                    </div>
+                  </td>
+
+                  <td class="px-4 py-3 text-right align-top">
+                    <div class="flex flex-col items-end gap-2">
+
+                      <a
+                        href="?edit={{ t.id }}"
+                        class="px-3 py-1.5 rounded-md text-sm font-semibold
+                              text-[#0a5f85] bg-[#eff6fb]
+                              hover:bg-[#e3f2f9] border border-slate-200">
+                        {% trans "Изменить" %}
+                      </a>
+
+                      <form method="post" class="m-0">
+                        {% csrf_token %}
+                        <input type="hidden" name="mode" value="delete">
+                        <input type="hidden" name="delete_id" value="{{ t.id }}">
+                        <button
+                          type="submit"
+                          onclick="return confirm('{% trans "Вы уверены, что хотите удалить задачу?" %}');"
+                          class="px-3 py-1.5 rounded-md text-sm font-semibold
+                                text-red-700 bg-red-50
+                                hover:bg-red-100 border border-red-200">
+                          {% trans "Удалить" %}
+                        </button>
+                      </form>
+
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+
+          </table>
+        </div>
+      </div>
     </div>
-  </div>
-{% else %}
-  <div class="panel-card" style="margin-top: 24px;">
-    <p>Задач пока нет. Создайте первую задачу на вкладке «Как ищем?».</p>
-  </div>
-{% endif %}
+  {% else %}
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mt-6">
+      <p class="text-slate-700">
+        {% trans "Задач пока нет. Создайте первую задачу на вкладке «Критерии выбора»." %}
+      </p>
+    </div>
+  {% endif %}
 
+</div>
+
+<script>
+(function () {
+  document.addEventListener("click", function (e) {
+    const btn = e.target.closest(".tab-btn");
+    if (!btn) return;
+
+    const groupEl = btn.closest("[data-tab-group]");
+    if (!groupEl) return;
+
+    const targetId = btn.getAttribute("data-target");
+    if (!targetId) return;
+
+    // Переключаем вид кнопок в рамках группы
+    groupEl.querySelectorAll(".tab-btn").forEach(b => {
+      b.classList.remove("bg-slate-200", "text-slate-800");
+      b.classList.add("bg-slate-100", "text-slate-600");
+    });
+    btn.classList.add("bg-slate-200", "text-slate-800");
+
+    // Ищем область контента (tab-scope) рядом с группой
+    const scope = groupEl.parentElement.querySelector(".tab-scope") || groupEl.parentElement;
+    scope.querySelectorAll(".tab-content").forEach(div => div.classList.add("hidden"));
+
+    const target = scope.querySelector("#" + CSS.escape(targetId));
+    if (target) target.classList.remove("hidden");
+  });
+})();
+</script>
 {% endblock %}

@@ -113,16 +113,24 @@ class PublicLangMiddleware:
     def __call__(self, request: HttpRequest) -> HttpResponse:
         cfg = _cfg()
         path = request.path or "/"
+
         cookie_lang = request.COOKIES.get(cfg.cookie_name)
 
         # --- PANEL: без редиректов, только activate ---
         if path.startswith("/panel/") or path == "/panel":
+            django_cookie_name = getattr(settings, "LANGUAGE_COOKIE_NAME", "django_language")
+            django_lang = request.COOKIES.get(django_cookie_name)
+
             try:
-                lang = cookie_lang or _pick_geo_lang(cfg, request)
+                lang = (django_lang or cookie_lang or _pick_geo_lang(cfg, request))
                 _activate(request, lang)
+
                 resp = self.get_response(request)
-                if not cookie_lang:
+
+                # синхронизируем serenity_lang, чтобы public/panel не жили разными языками
+                if (lang != cookie_lang) and (lang in cfg.public_langs):
                     resp.set_cookie(cfg.cookie_name, lang, max_age=cfg.cookie_max_age, samesite="Lax")
+
                 return resp
             finally:
                 translation.deactivate()
