@@ -16,7 +16,6 @@ class FrontUser(models.Model):
     )
 
     class Meta:
-        app_label = "accounts"
         db_table = "accounts_frontuser"
 
     def __str__(self) -> str:
@@ -38,7 +37,6 @@ class UserWorkspace(models.Model):
     )
 
     class Meta:
-        app_label = "accounts"
         db_table = "accounts_userworkspace"
 
     def __str__(self) -> str:

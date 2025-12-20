@@ -1,12 +1,6 @@
-# FILE: engine/common/worker.py  (новое) 2025-12-14
-# Смысл: Простой тикер-планировщик задач: регистрируешь функции с периодом, всё запускается ТОЛЬКО в отдельных процессах.
-# Правила:
-# - тикер никогда не падает
-# - ретраев нет
-# - если задача упала/ничего не вернула — просто лог
-# - singleton: если задача ещё running — второй раз не стартуем
-# - heavy: пока heavy running — не стартуем НИЧЕГО нового (уже запущенное не трогаем)
-# - timeout: если задан, по истечении — terminate/kill (если не задан, можно висеть вечно)
+# FILE: engine/common/worker.py  (обновлено — 2025-12-19)
+# Смысл: тикер-планировщик задач. Фикс: больше не плодим зомби — всегда делаем proc.join() для завершившихся/убитых задач,
+# и аккуратно закрываем Queue (close/join_thread).
 
 from __future__ import annotations
 
@@ -16,7 +10,7 @@ import signal
 import sys
 import time
 import traceback
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from multiprocessing import Process, Queue
 from typing import Any, Callable, Dict, Optional
@@ -121,8 +115,17 @@ class Worker:
         self._specs[name] = spec
         self._next_run_at[name] = _now_ts()  # можно стартовать сразу
 
-        self._log("registered", {"task": name, "every_sec": spec.every_sec, "timeout_sec": spec.timeout_sec,
-                                "singleton": spec.singleton, "heavy": spec.heavy, "priority": spec.priority})
+        self._log(
+            "registered",
+            {
+                "task": name,
+                "every_sec": spec.every_sec,
+                "timeout_sec": spec.timeout_sec,
+                "singleton": spec.singleton,
+                "heavy": spec.heavy,
+                "priority": spec.priority,
+            },
+        )
 
     def decorator(
         self,
@@ -178,7 +181,7 @@ class Worker:
 
     def _due_specs(self) -> list[TaskSpec]:
         now = _now_ts()
-        specs = []
+        specs: list[TaskSpec] = []
         for name, spec in self._specs.items():
             if self._next_run_at.get(name, 0) <= now:
                 specs.append(spec)
@@ -256,20 +259,25 @@ class Worker:
         return True
 
     def _collect_finished(self) -> None:
-        finished_keys = []
+        finished_keys: list[str] = []
 
         for key, rt in list(self._running.items()):
             if rt.proc.is_alive():
                 continue
 
-            # процесс завершился
+            # ВАЖНО: забрать exit-status у завершившегося процесса, иначе он останется zombie (<defunct>)
+            try:
+                rt.proc.join(timeout=0)
+            except Exception:
+                pass
+
             end_at = _now_ts()
             duration_ms = int((end_at - rt.started_at) * 1000)
 
-            payload = {"task": rt.spec.name, "pid": rt.pid, "duration_ms": duration_ms}
+            payload: Dict[str, Any] = {"task": rt.spec.name, "pid": rt.pid, "duration_ms": duration_ms}
 
             # попытка забрать результат (если есть)
-            result = None
+            result: Any = None
             try:
                 if not rt.q.empty():
                     result = rt.q.get_nowait()
@@ -287,9 +295,18 @@ class Worker:
                 payload["traceback"] = result.get("traceback", "")
                 self._log("exception", payload)
             else:
-                # ничего не вернул / очередь пустая — тоже норм
                 payload["event"] = "ended_empty"
                 self._log("ended_empty", payload)
+
+            # аккуратно прибираем очередь (ресурсы/потоки)
+            try:
+                rt.q.close()
+            except Exception:
+                pass
+            try:
+                rt.q.join_thread()
+            except Exception:
+                pass
 
             # планируем следующий запуск
             self._next_run_at[rt.spec.name] = end_at + rt.spec.every_sec
@@ -313,7 +330,6 @@ class Worker:
             if now <= rt.deadline_at:
                 continue
 
-            # таймаут
             self._log("timeout", {"task": rt.spec.name, "pid": rt.pid, "timeout_sec": rt.spec.timeout_sec})
 
             # terminate -> wait -> kill
@@ -328,14 +344,17 @@ class Worker:
 
             if rt.proc.is_alive():
                 try:
-                    # kill (py3.7+)
                     rt.proc.kill()
                 except Exception:
                     pass
 
-            # НЕ ждём корректного завершения: в следующем цикле _collect_finished уберёт
-            # следующий запуск по твоей логике: "на следующий раз запускает опять"
-            # => ставим next_run_at в "сейчас + every_sec"
+            # ВАЖНО: после terminate/kill тоже нужен join(), иначе zombie
+            try:
+                rt.proc.join(timeout=0.2)
+            except Exception:
+                pass
+
+            # следующий запуск: "сейчас + every_sec"
             self._next_run_at[rt.spec.name] = _now_ts() + rt.spec.every_sec
 
     def _log(self, event: str, data: Dict[str, Any]) -> None:
@@ -368,7 +387,7 @@ def _child_entry(task_name: str, fn: Callable[[], Any], q: Queue) -> None:
     """
     try:
         res = fn()
-        payload = {"ok": True}
+        payload: Dict[str, Any] = {"ok": True}
         if res is not None:
             payload["result"] = res
         try:
@@ -376,16 +395,11 @@ def _child_entry(task_name: str, fn: Callable[[], Any], q: Queue) -> None:
         except Exception:
             pass
     except Exception as e:
-        payload = {
-            "ok": False,
-            "error": str(e),
-            "traceback": traceback.format_exc(),
-        }
+        payload = {"ok": False, "error": str(e), "traceback": traceback.format_exc()}
         try:
             q.put(payload, block=False)
         except Exception:
             pass
-        # выходим с ненулевым кодом — но тикеру это не важно
         try:
             sys.exit(1)
         except Exception:

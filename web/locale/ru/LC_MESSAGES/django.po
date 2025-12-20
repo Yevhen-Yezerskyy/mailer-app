@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-12-19 07:21+0100\n"
+"POT-Creation-Date: 2025-12-19 09:45+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -31,7 +31,8 @@ msgstr ""
 msgid "Обзор : Панель управления"
 msgstr ""
 
-#: panel/menu.py:23 templates/panels/aap_audience/how.html:256
+#: panel/menu.py:23 templates/panels/aap_audience/clar.html:32
+#: templates/panels/aap_audience/how.html:256
 msgid "Аудитория"
 msgstr ""
 
@@ -77,6 +78,164 @@ msgstr ""
 
 #: panel/menu.py:59
 msgid "Настройки : Почтовые серверы"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:52
+#: templates/panels/aap_audience/clar.html:319
+#: templates/panels/aap_audience/how.html:258
+msgid "Основная задача"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:71
+msgid "Критерии для выбора категорий"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:90
+msgid "Критерии, влияющие на географию поиска"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:109
+msgid "Критерии для отбора клиентов"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:128
+#: templates/panels/aap_audience/clar.html:325
+msgid "Обработка включена:"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:147
+msgid "Ограничение на подбор компаний"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:173
+msgid "Сохранить"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:180
+msgid "Закрыть"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:201
+msgid "Города Германии"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:212
+msgid "Вы уверены, что хотите удалить города?"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:216
+msgid "Удалить города"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:222
+#: templates/panels/aap_audience/clar.html:387
+msgid "Городов:"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:236
+msgid "Пока нет городов."
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:241
+msgid "Выберите задачу ниже (✏️), чтобы работать с городами."
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:248
+#: templates/panels/aap_audience/clar.html:340
+#: templates/panels/aap_audience/clar.html:378
+msgid "Категории"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:259
+msgid "Вы уверены, что хотите удалить категории?"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:263
+msgid "Удалить категории"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:269
+#: templates/panels/aap_audience/clar.html:407
+msgid "Категорий:"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:283
+msgid "Пока нет категорий."
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:288
+msgid "Выберите задачу ниже (✏️), чтобы работать с бранчами."
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:307
+msgid "Аудитория и основная задача"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:308
+#: templates/panels/aap_audience/how.html:260
+msgid "Критерии"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:309
+msgid "ТОП 15 города и категории"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:310
+#: templates/panels/aap_audience/how.html:263
+msgid "Действия"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:326
+msgid "да"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:326
+msgid "нет"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:329
+msgid "Ограничение поиска компаний:"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:345
+#: templates/panels/aap_audience/how.html:287
+msgid "География"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:350
+#: templates/panels/aap_audience/how.html:293
+msgid "Клиент"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:373
+msgid "Города"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:398
+msgid "Города в обработке."
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:418
+msgid "Категории в обработке не сгенерированы."
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:433
+#: templates/panels/aap_audience/how.html:318
+msgid "Изменить"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:442
+#: templates/panels/aap_audience/how.html:327
+msgid "Вы уверены, что хотите удалить задачу?"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:446
+#: templates/panels/aap_audience/how.html:331
+msgid "Удалить"
+msgstr ""
+
+#: templates/panels/aap_audience/clar.html:463
+msgid "Задач пока нет. Создайте первую задачу на вкладке «Критерии выбора»."
 msgstr ""
 
 #: templates/panels/aap_audience/how.html:20
@@ -181,43 +340,11 @@ msgid ""
 "то важное вспомните."
 msgstr ""
 
-#: templates/panels/aap_audience/how.html:258
-msgid "Основная задача"
-msgstr ""
-
-#: templates/panels/aap_audience/how.html:260
-msgid "Критерии"
-msgstr ""
-
-#: templates/panels/aap_audience/how.html:263
-msgid "Действия"
-msgstr ""
-
 #: templates/panels/aap_audience/how.html:281
 msgid "Категория"
 msgstr ""
 
-#: templates/panels/aap_audience/how.html:287
-msgid "География"
-msgstr ""
-
-#: templates/panels/aap_audience/how.html:293
-msgid "Клиент"
-msgstr ""
-
-#: templates/panels/aap_audience/how.html:318
-msgid "Изменить"
-msgstr ""
-
-#: templates/panels/aap_audience/how.html:327
-msgid "Вы уверены, что хотите удалить задачу?"
-msgstr ""
-
-#: templates/panels/aap_audience/how.html:331
-msgid "Удалить"
-msgstr ""
-
-#: templates/panels/base.html:110
+#: templates/panels/base.html:139
 msgid "Выйти"
 msgstr ""
 
