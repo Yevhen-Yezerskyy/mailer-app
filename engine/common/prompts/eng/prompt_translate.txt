@@ -1,7 +1,0 @@
-Translate the prompt below into English.
-Rules:
-- Preserve the logic, structure, and all meanings 1:1.
-- Do not add or remove anything.
-- Maximum clarity, conciseness, and unambiguity.
-- Preserve all formatting and requirements.
-- The answer must be text only (no comments or formatting).

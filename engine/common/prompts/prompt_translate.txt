@@ -1,7 +1,1 @@
-Переведи приведённый ниже промпт на английский.
-Правила:
-- Сохраняй логику, структуру и все смыслы 1:1.
-- Ничего не добавляй и не убирай.
-- Максимальная ясность, краткость и однозначность.
-- Сохраняй все форматы и требования.
-- Ответ — только текст (без комментариев и оформления).
+If the text language matches {LANG}, return it unchanged, character for character. Otherwise, translate it into {LANG} as a GPT prompt: no loss of meaning, shorter, unambiguous. Return only the text.
