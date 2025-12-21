@@ -1,25 +1,20 @@
 {% load static %}
 {% load i18n %}
 <!doctype html>
+<!-- FILE: web/templates/panels/base.html -->
+<!-- DATE: 2025-12-21 -->
 <html lang="ru">
-<!-- FILE: web/templates/panels/base.html  (обновлено — 2025-12-18)
-Смысл: base панели: фикс-высота + scroll контента, toggle sidebar (js), favicon, logout в topbar -->
-
 <head>
   <meta charset="utf-8">
   <title>{{ page_title|default:"" }} - Serenity Mailer</title>
 
-  <!-- 00.00 /panel/ BASE: favicon -->
   <link rel="icon" href="{% static 'img/favicon.ico' %}" />
-
-  <!-- 00.01 /panel/ BASE: Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- 00.02 /panel/ BASE: наши стили поверх -->
   <link rel="stylesheet" href="{% static 'css/panel.css' %}">
 </head>
 
 <body class="min-h-screen bg-slate-100">
+
 <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
   <symbol id="icon-arrow-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
     <path stroke-linecap="round" stroke-linejoin="round"
@@ -27,142 +22,127 @@
   </symbol>
 </svg>
 
-  <!-- 00.10 /panel/ ROOT LAYOUT -->
-  <div class="h-screen flex overflow-hidden">
+<div class="h-screen flex overflow-hidden">
 
-    <!-- ========================================================= -->
-    <!-- 01.00 /panel/ SIDEBAR (LEFT)                               -->
-    <!-- ========================================================= -->
-    <aside id="panel-sidebar" class="w-80 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+  <!-- SIDEBAR -->
+<aside id="panel-sidebar"
+       class="w-80 shrink-0 bg-white border border-slate-400 border-[#006991] border-t-0 !border-t-0 flex flex-col">
 
-      <!-- 01.01 /panel/ SIDEBAR HEADER / LOGO -->
-      <div class="h-16 px-6 flex items-center border-b border-slate-200 justify-center">
-        <a href="/"><img src="{% static 'img/logo.main.svg' %}" alt="Serenity" class="h-6 w-auto"></a>
-      </div>
-
-      <!-- 01.02 /panel/ SIDEBAR NAVIGATION -->
-      <nav class="p-4 space-y-3 text-[15px]">
-
-        {% for sec in panel_menu %}
-          <details {% if sec.open %}open{% endif %} class="YY-MENU-CARD-BLUE">
-            <summary class="YY-MENU-SUMMARY">
-              {{ sec.title }}
-            </summary>
-
-            <div class="px-0">
-              {% for it in sec.items %}
-                <a href="{{ it.url }}"
-                   class="YY-MENU-DETAIL {% if it.active %}YY-MENU-DETAIL-ACTIVE{% endif %}">
-                  {{ it.title }}
-                </a>
-              {% endfor %}
-            </div>
-          </details>
-        {% endfor %}
-
-      </nav>
-
-      <!-- 01.90 /panel/ SIDEBAR FOOTER / USER -->
-      <div class="mt-auto p-4 border-t border-slate-200 text-xs text-slate-500">
-        {% if request.user.is_authenticated %}
-          {{ request.user.username }}
-        {% endif %}
-      </div>
-
-    </aside>
-
-    <!-- ========================================================= -->
-    <!-- 02.00 /panel/ MAIN AREA                                   -->
-    <!-- ========================================================= -->
-    <div class="flex-1 min-w-0 min-h-0 flex flex-col">
-
-      <!-- ========================================================= -->
-      <!-- 02.01 /panel/ TOPBAR                                      -->
-      <!-- ========================================================= -->
-      <header class="h-16 bg-white border-b border-slate-200 flex items-center px-6">
-
-        <!-- 02.01.01 /panel/topbar/sidebar-toggle -->
-        <button
-          type="button"
-          data-sidebar-toggle
-          class="mr-4 px-3 h-9 flex items-center justify-center
-                rounded-lg bg-[#effbff] text-[#006991] font-semibold
-                hover:bg-[#e3f6fb] border border-slate-200">
-          ☰
-        </button>
-
-        <!-- 02.01.02 /panel/topbar/title -->
-        <div class="flex-1">
-          <span class="text-[#006991] font-semibold uppercase">
-            {{ page_title|default:"" }}
-          </span>
-        </div>
-
-        <!-- FILE: web/templates/panels/base.html  (обновлено — 2025-12-19)
-        Смысл изменения: вместо username в topbar — переключатель языков DE / UK / RU через set_language (cookie), без URL-префиксов -->
-
-      <!-- 02.01.03 /panel/topbar/language-switch -->
-      <div class="flex items-center gap-2 mr-5">
-<!-- FILE: web/templates/panels/base.html  (обновлено — 2025-12-19)
-Смысл: переключатель языка через cookie (set_language), одна форма, 3 submit-кнопки -->
-
-        <form method="post" action="{% url 'set_language' %}" class="flex items-center gap-2 mr-5">
-  {% csrf_token %}
-  <input type="hidden" name="next" value="{{ request.get_full_path }}">
-
-  <button type="submit" name="language" value="de"
-    class="w-9 h-9 flex items-center justify-center
-           rounded-lg bg-[#effbff] text-[#006991] font-semibold text-sm
-           hover:bg-[#e3f6fb] border border-slate-200">
-    DE
-  </button>
-
-  <button type="submit" name="language" value="uk"
-    class="w-9 h-9 flex items-center justify-center
-           rounded-lg bg-[#effbff] text-[#006991] font-semibold text-sm
-           hover:bg-[#e3f6fb] border border-slate-200">
-    UK
-  </button>
-
-  <button type="submit" name="language" value="ru"
-    class="w-9 h-9 flex items-center justify-center
-           rounded-lg bg-[#effbff] text-[#006991] font-semibold text-sm
-           hover:bg-[#e3f6fb] border border-slate-200">
-    RU
-  </button>
-</form>
-              
-      </div>
-
-        <!-- 02.01.04 /panel/topbar/logout -->
-        <form method="post" action="{% url 'logout' %}" class="inline">
-          {% csrf_token %}
-          <button
-            type="submit"
-            class="ml-4 px-4 h-9 flex items-center justify-center
-                  rounded-lg bg-[#effbff] text-[#006991] font-semibold
-                  hover:bg-[#e3f6fb] border border-slate-200">
-            {% trans "Выйти" %}
-          </button>
-        </form>
-
-      </header>
-
-      <!-- 02.10 /panel/ CONTENT (scroll only here) -->
-      <main class="flex-1 min-h-0 p-6 overflow-y-auto">
-        {% block content %}{% endblock %}
-      </main>
-
+    <div class="h-16 px-6 flex items-center border-b border-slate-400 border-[#006991] border-t-0 justify-center">
+      <a href="/">
+        <img src="{% static 'img/logo.main.svg' %}" alt="Serenity" class="h-6 w-auto">
+      </a>
     </div>
 
-  </div>
+    <nav class="px-4 pt-10 space-y-3">
+      {% for sec in panel_menu %}
+      <details {% if sec.open %}open{% endif %} class="YY-MENU-CARD-BLUE">
+        <summary class="YY-MENU-SUMMARY">
+          {{ sec.title }}
+        </summary>
 
-  <!-- ========================================================= -->
-  <!-- 99.00 /panel/ SCRIPTS                                      -->
-  <!-- ========================================================= -->
-<!-- FILE: web/templates/base.html -->
+        <div class="px-0">
+          {% for it in sec.items %}
+          <a href="{{ it.url }}"
+             class="YY-MENU-DETAIL {% if it.active %}YY-MENU-DETAIL-ACTIVE{% endif %}">
+            {{ it.title }}
+          </a>
+          {% endfor %}
+        </div>
+      </details>
+      {% endfor %}
+    </nav>
+
+    <div class="mt-auto p-4 border-t border-slate-400 border-[#006991]">
+
+    <details class="YY-MENU-CARD-BLUE">
+        <summary class="YY-MENU-SUMMARY">
+            {% if request.user.is_authenticated %}
+              {{ request.user.username }}
+            {% endif %}
+        </summary>
+    </details>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="flex-1 min-w-0 min-h-0 flex flex-col">
+
+    <!-- TOPBAR -->
+    <header class="h-16 bg-white border-b border-slate-400 border-[#006991] flex items-center">
+      <table class="YY-MAIN_TABLE_TOP mt-0 mb-0">
+        <tr>
+          <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+            <div class="flex items-center gap-4">
+              <button
+                type="button"
+                data-sidebar-toggle
+                class="YY-BUTTON_MAIN mr-4">
+                ☰
+              </button>
+
+              <span class="text-[#006991] font-semibold uppercase text-[22px] pt-1">
+                {{ page_title|default:"" }}
+              </span>
+            </div>
+          </td>
+
+          <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+            <div class="flex items-center justify-end gap-3">
+
+              <form method="post" action="{% url 'set_language' %}" class="flex items-center gap-2">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+                <button type="submit" name="language" value="de"
+                  class="YY-BUTTON_MAIN">
+                  DEU
+                </button>
+
+                <button type="submit" name="language" value="uk"
+                  class="YY-BUTTON_MAIN">
+                  UKR
+                </button>
+
+                <button type="submit" name="language" value="ru"
+                  class="YY-BUTTON_MAIN">
+                  RUS
+                </button>
+              </form>
+
+              <form method="post" action="{% url 'logout' %}" class="inline">
+                {% csrf_token %}
+                <button
+                  type="submit"
+                  class="YY-BUTTON_MAIN ml-6">
+                  {% trans "Выйти" %}
+                </button>
+              </form>
+
+            </div>
+          </td>
+        </tr>
+      </table>
+    </header>
+
+    <main class="flex-1 min-h-0 overflow-y-auto">
+      {% block content %}{% endblock %}
+    </main>
+
+  </div>
+</div>
+
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+  const sidebar = document.getElementById("panel-sidebar");
+  const btn = document.querySelector("[data-sidebar-toggle]");
+
+  if (btn && sidebar) {
+    btn.addEventListener("click", () => {
+      sidebar.classList.toggle("hidden");
+    });
+  }
+
   document.querySelectorAll("details > summary").forEach(summary => {
     if (summary.querySelector("[data-icon]")) return;
 
@@ -185,7 +165,6 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 </script>
-
 
 </body>
 </html>

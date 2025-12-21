@@ -5,8 +5,20 @@
 # пример:
 # panel-textarea: w-full rounded-xl border border-slate-200 px-3 py-2
 
+#BUTTONS
+YY-BUTTON_MAIN: px-5 py-1.5 flex items-center justify-center rounded-md bg-[#effbff] text-[#006991] font-semibold hover:bg-[#f8fdff] hover:text-[#007c09] border border-slate-400 border-[#006991] uppercase text-sm
+
+#MAIN GRID
+YY-CARD_WHITE: px-5 py-5 rounded-md border border-slate-400 bg-[#FFFFFF] border-[#006991]  
+
+YY-MAIN_TABLE:     w-full max-w-[2000px] table-fixed border-collapse mt-10
+YY-MAIN_TABLE_TOP: w-full max-w-[2000px] table-fixed border-collapse
+YY-MAIN_TOP_LEFT_TD: pt-0 pb-0 pl-8 pr-4 align-top 
+YY-MAIN_TOP_RIGHT_TD: pt-0 pb-0 pl-4 pr-8 align-top
+YY-MAIN_BOTTOM_TD: pt-0 pb-10 px-8 align-top
+
 # MENU
-YY-MENU-CARD-BLUE: rounded-md border border-slate-300 bg-[#effbff] border-[#006991]
-YY-MENU-SUMMARY: flex items-center gap-3 pl-4 py-3 font-bold text-[#006991] hover:bg-[#f8fdff] rounded-lg cursor-pointer leading-none
+YY-MENU-CARD-BLUE: rounded-md bg-[#effbff] border border-slate-400 border-[#006991]
+YY-MENU-SUMMARY: flex items-center gap-3 pl-4 py-3 font-bold text-[#006991] hover:bg-[#f8fdff] hover:text-[#007c09] rounded-md cursor-pointer leading-none
 YY-MENU-DETAIL: flex rounded-md font-semibold text-[#006991] py-3 pl-12 hover:bg-[#f8fdff] hover:text-[#007c09]
 YY-MENU-DETAIL-ACTIVE: bg-[#f8fdff] text-[#007c09]
