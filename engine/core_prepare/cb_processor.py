@@ -15,11 +15,6 @@ from engine.common.gpt import GPTClient
 from engine.common.worker import Worker
 
 
-# -------------------- GLOBAL FLAGS --------------------
-
-GPT_DEBUG = True  # True = всегда nano, без web и кеша
-
-# ----------------------------------------------------
 
 TypeName = Literal["city", "branch"]
 
@@ -285,7 +280,7 @@ def _add_for_one_task(
 
         ranked = gpt_rank_candidates(
             gpt=gpt,
-            tier="maxi",  # debug=True → фактически nano
+            tier="mini",  
             workspace_id=t.workspace_id,
             user_id=t.user_id,
             main_task=t.task,
@@ -382,7 +377,7 @@ def task_cb_status_updater() -> Dict[str, Any]:
 
 
 def task_cb_city_adder() -> Dict[str, Any]:
-    gpt = GPTClient(debug=GPT_DEBUG)
+    gpt = GPTClient()
 
     with get_connection() as conn:
         tasks = _fetch_tasks_by_status(conn, STATUS_COLLECTING)
@@ -396,7 +391,7 @@ def task_cb_city_adder() -> Dict[str, Any]:
 
 
 def task_cb_branch_adder() -> Dict[str, Any]:
-    gpt = GPTClient(debug=GPT_DEBUG)
+    gpt = GPTClient()
 
     with get_connection() as conn:
         tasks = _fetch_tasks_by_status(conn, STATUS_COLLECTING)
