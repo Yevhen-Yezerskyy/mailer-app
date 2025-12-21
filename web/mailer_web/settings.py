@@ -76,6 +76,9 @@ MIDDLEWARE = [
 
     "mailer_web.middleware.WorkspaceMiddleware",
 
+    # tailwind class-map (работает только если request._tw_classmap_enabled=True)
+    "mailer_web.tw_classmap_middleware.TailwindClassMapMiddleware",
+
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]

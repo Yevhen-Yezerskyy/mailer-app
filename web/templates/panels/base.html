@@ -20,6 +20,12 @@
 </head>
 
 <body class="min-h-screen bg-slate-100">
+<svg xmlns="http://www.w3.org/2000/svg" class="hidden">
+  <symbol id="icon-arrow-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <path stroke-linecap="round" stroke-linejoin="round"
+          d="m12.75 15 3-3m0 0-3-3m3 3h-7.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+  </symbol>
+</svg>
 
   <!-- 00.10 /panel/ ROOT LAYOUT -->
   <div class="h-screen flex overflow-hidden">
@@ -27,7 +33,7 @@
     <!-- ========================================================= -->
     <!-- 01.00 /panel/ SIDEBAR (LEFT)                               -->
     <!-- ========================================================= -->
-    <aside id="panel-sidebar" class="w-72 shrink-0 bg-white border-r border-slate-200 flex flex-col">
+    <aside id="panel-sidebar" class="w-80 shrink-0 bg-white border-r border-slate-200 flex flex-col">
 
       <!-- 01.01 /panel/ SIDEBAR HEADER / LOGO -->
       <div class="h-16 px-6 flex items-center border-b border-slate-200 justify-center">
@@ -38,15 +44,15 @@
       <nav class="p-4 space-y-3 text-[15px]">
 
         {% for sec in panel_menu %}
-          <details {% if sec.open %}open{% endif %} class="rounded-lg border border-slate-200 bg-[#effbff]">
-            <summary class="cursor-pointer select-none px-4 py-3 font-semibold text-[#006991] hover:bg-[#e3f6fb] rounded-lg">
+          <details {% if sec.open %}open{% endif %} class="YY-MENU-CARD-BLUE">
+            <summary class="YY-MENU-SUMMARY">
               {{ sec.title }}
             </summary>
 
-            <div class="px-2 pb-2">
+            <div class="px-0">
               {% for it in sec.items %}
                 <a href="{{ it.url }}"
-                   class="block px-3 py-2 rounded-md hover:bg-white {% if it.active %}bg-white font-semibold{% endif %}">
+                   class="YY-MENU-DETAIL {% if it.active %}YY-MENU-DETAIL-ACTIVE{% endif %}">
                   {{ it.title }}
                 </a>
               {% endfor %}
@@ -154,17 +160,32 @@
   <!-- ========================================================= -->
   <!-- 99.00 /panel/ SCRIPTS                                      -->
   <!-- ========================================================= -->
-  <script>
-    (function () {
-      const btn = document.querySelector('[data-sidebar-toggle]');
-      const sidebar = document.getElementById('panel-sidebar');
-      if (!btn || !sidebar) return;
+<!-- FILE: web/templates/base.html -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("details > summary").forEach(summary => {
+    if (summary.querySelector("[data-icon]")) return;
 
-      btn.addEventListener('click', function () {
-        sidebar.classList.toggle('hidden');
-      });
-    })();
-  </script>
+    summary.insertAdjacentHTML(
+      "afterbegin",
+      `<svg data-icon class="ui-icon size-5 transition-transform">
+         <use href="#icon-arrow-circle"></use>
+       </svg>`
+    );
+
+    const details = summary.parentElement;
+    const icon = summary.querySelector("[data-icon]");
+
+    const sync = () => {
+      icon.classList.toggle("rotate-90", details.hasAttribute("open"));
+    };
+
+    sync();
+    details.addEventListener("toggle", sync);
+  });
+});
+</script>
+
 
 </body>
 </html>

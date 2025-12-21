@@ -1,5 +1,5 @@
-# FILE: docker-compose.yml  (обновлено — 2025-12-18)
-# CHANGE: mailer-web теперь собирается из Dockerfile_Django (с gettext), image убран
+# FILE: docker-compose.yml  (обновлено — 2025-12-21)
+# PURPOSE: ЧИСТЫЙ DEV на Django runserver — без gunicorn, без кешей, без боли
 
 services:
   # ------------ POSTGRES ------------
@@ -18,7 +18,7 @@ services:
     networks:
       - webnet
 
-  # ------------ DJANGO (DEV) ------------
+  # ------------ DJANGO (DEV, RUNSERVER) ------------
   mailer-web:
     build:
       context: .
@@ -32,43 +32,33 @@ services:
 
     environment:
       # DB
-      - DB_HOST=mailer-db
-      - DB_PORT=5432
-      - DB_NAME=mailersys
-      - DB_USER=mailersys_user
-      - DB_PASSWORD=secret
+      DB_HOST: mailer-db
+      DB_PORT: 5432
+      DB_NAME: mailersys
+      DB_USER: mailersys_user
+      DB_PASSWORD: secret
 
-      # Python path — оба аппа доступны одинаково локально и в контейнере
-      - PYTHONPATH=/app
+      # DEV
+      DEBUG: "1"
+      PYTHONPATH: /app
 
-      # API key (если есть в окружении хоста — прокинется)
-      - OPENAI_API_KEY
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
 
     volumes:
-      # Монтируем ВЕСЬ проект в контейнер
+      # весь проект — live
       - ./:/app
-
-      # статика остаётся volume, чтобы collectstatic мог записывать
-      - mailer-static:/app/web/staticfiles
 
     ports:
       - "8000:8000"
 
     command: >
-      /app/.venv/bin/gunicorn mailer_web.wsgi:application
-      --bind 0.0.0.0:8000
-      --reload
-      --workers 1
-      --timeout 180
-      --graceful-timeout 30
-      --worker-tmp-dir /dev/shm
+      /app/.venv/bin/python manage.py runserver 0.0.0.0:8000
 
     networks:
       - webnet
 
 volumes:
   mailer-db-data:
-  mailer-static:
 
 networks:
   webnet:

@@ -1,0 +1,12 @@
+# FILE: web/mailer_web/tw_classmap.txt  (новое — 2025-12-21)
+# Формат: key: value
+# Комментарии с #, пустые строки игнорируются.
+
+# пример:
+# panel-textarea: w-full rounded-xl border border-slate-200 px-3 py-2
+
+# MENU
+YY-MENU-CARD-BLUE: rounded-md border border-slate-300 bg-[#effbff] border-[#006991]
+YY-MENU-SUMMARY: flex items-center gap-3 pl-4 py-3 font-bold text-[#006991] hover:bg-[#f8fdff] rounded-lg cursor-pointer leading-none
+YY-MENU-DETAIL: flex rounded-md font-semibold text-[#006991] py-3 pl-12 hover:bg-[#f8fdff] hover:text-[#007c09]
+YY-MENU-DETAIL-ACTIVE: bg-[#f8fdff] text-[#007c09]
