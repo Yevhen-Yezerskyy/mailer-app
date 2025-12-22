@@ -1,0 +1,160 @@
+<!-- FILE: web/templates/panels/aap_audience/how.html -->
+<!-- DATE: 2025-12-21 -->
+<!-- PURPOSE: Эталонная разметка HOW. Верх: форма (с вопросами) + инструкция. Низ: пусто под список задач. Без логики, без trans, чистая разметка. -->
+
+{% extends "panels/base.html" %}
+{% load i18n %}
+
+{% block content %}
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+
+    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+          <div class="YY-CARD_IN_FORM_BLANK mb-5">
+            <form method="get" class="flex gap-3">
+              <input type="hidden" name="state" value="{{ state }}">
+
+              <button
+                type="submit"
+                name="type"
+                value="sell"
+                class="{% if type == 'sell' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}">
+                {% trans "Поиск клиентов" %}
+              </button>
+
+              <button
+                type="submit"
+                name="type"
+                value="buy"
+                class="{% if type == 'buy' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}">
+                {% trans "Поиск поставщиков / подрядчиков" %}
+              </button>
+            </form>
+          </div>        
+        <form method="post">
+          {% csrf_token %}
+
+          <!-- WHAT -->
+          <label class="YY-LABEL">
+            {{ form.what.label }}
+          </label>
+
+          {% if q_what or h_what %}
+            <div class="YY-CARD_IN_FORM">
+              {% if q_what %}<p>{{ q_what }}</p>{% endif %}
+              {% if h_what %}<p>{{ h_what }}</p>{% endif %}
+            </div>
+          {% endif %}
+
+          {{ form.what }}
+
+
+          <!-- WHO -->
+          <label class="YY-LABEL">
+            {{ form.who.label }}
+          </label>
+
+          {% if q_who or h_who %}
+            <div class="YY-CARD_IN_FORM">
+              {% if q_who %}<p>{{ q_who }}</p>{% endif %}
+              {% if h_who %}<p>{{ h_who }}</p>{% endif %}
+            </div>
+          {% endif %}
+
+          {{ form.who }}
+
+
+          <!-- GEO -->
+          <label class="YY-LABEL">
+            {{ form.geo.label }}
+          </label>
+
+          {% if q_geo or h_geo %}
+            <div class="YY-CARD_IN_FORM">
+              {% if q_geo %}<p>{{ q_geo }}</p>{% endif %}
+              {% if h_geo %}<p>{{ h_geo }}</p>{% endif %}
+            </div>
+          {% endif %}
+
+          {{ form.geo }}
+          {% if form.non_field_errors %}
+            <div class="YY-CARD_IN_FORM_ERROR">
+              {{ form.non_field_errors }}
+            </div>
+          {% endif %}
+
+          {% if state == "how" %}
+            <div class="flex flex-wrap gap-3 pt-2">
+              <button type="submit" name="action" value="process" class="YY-BUTTON_MAIN" data-loading="1">
+                {% trans "Обработать" %}
+              </button>
+              <button type="submit" name="action" value="clear" class="YY-BUTTON_MAIN">
+                {% trans "Очистить" %}
+              </button>
+              <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN" data-loading="1">
+                {% trans "Сохранить" %}
+              </button>
+            </div>
+          {% endif %}
+
+        </form>
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+      <div class="YY-CARD_BLUE">
+
+        <p class="YY-TEXT">
+          <strong>Инструкции</strong>
+        </p>
+
+          <ol class="YY-TEXT_OL">
+            <li class="YY-TEXT_LI">
+              <strong>{% trans "Напишите что Вы продаёте и опишите Вашу компанию." %}</strong>
+              {% trans "Всё остальное — лишнее." %}
+            </li>
+
+            <li class="YY-TEXT_LI">
+              <strong>{% trans "Дайте ссылку на сайт Вашей компании." %}</strong>
+              {% trans "В формате https://mysite.ua. Система сама найдёт нужные факты и обработает сайт." %}
+            </li>
+
+            <li class="YY-TEXT_LI">
+              <strong>{% trans "Пишите в любые поля полезную информацию." %}</strong>
+              {% trans "Мы разберёмся, что к чему." %}
+            </li>
+
+            <li class="YY-TEXT_LI">
+              <strong>{% trans "Не бойтесь ошибок." %}</strong>
+              {% trans "Лишнее и неважное система отбросит. Потом всё можно исправить — это поможет понять, что ещё стоит добавить." %}
+            </li>
+
+            <li class="YY-TEXT_LI">
+              <strong>{% trans "Отвечайте коротко и информативно." %}</strong>
+              {% trans "Меньше слов — больше информации." %}
+            </li>
+
+            <li class="YY-TEXT_LI">
+              <strong>{% trans "Если результат вас устраивает — сохраните его." %}</strong>
+              {% trans "Вопросы будут появляться и дальше. Это всего лишь подсказки — вдруг вы вспомните что-то важное." %}
+            </li>
+          </ol>
+      </div>
+    </td>
+
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <div class="YY-CARD_WHITE">
+        <!-- reserved for tasks table -->
+      </div>
+    </td>
+  </tr>
+</table>
+
+{% endblock %}

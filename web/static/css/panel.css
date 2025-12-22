@@ -2,3 +2,44 @@
 .ui-icon {
   transform: translateY(0);
 }
+
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"] {
+  border-color: #f3a7a7 !important; /* red */
+  outline: 0;
+}
+
+.yy-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+}
+
+.yy-loading__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 42, 57, 0.25);
+  backdrop-filter: blur(2px);
+}
+
+.yy-loading__box {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.yy-loading__spinner {
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  border: 6px solid rgba(255, 255, 255, 0.45);
+  border-top-color: rgba(255, 255, 255, 0.95);
+  animation: yy-spin 0.9s linear infinite;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+
+@keyframes yy-spin {
+  to { transform: rotate(360deg); }
+}

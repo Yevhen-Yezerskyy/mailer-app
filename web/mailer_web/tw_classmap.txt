@@ -1,24 +1,35 @@
-# FILE: web/mailer_web/tw_classmap.txt  (новое — 2025-12-21)
+# FILE: web/mailer_web/tw_classmap.txt  (обновлено — 2025-12-22)
+# PURPOSE: Заменены arbitrary border-цвета на border-blue / border-red во всех классах (CDN-tailwind).
 # Формат: key: value
 # Комментарии с #, пустые строки игнорируются.
 
-# пример:
-# panel-textarea: w-full rounded-xl border border-slate-200 px-3 py-2
+#FORMS
+YY-LABEL: ml-4 mb-2 block font-semibold
+YY-CARD_IN_FORM: px-4 py-2 mb-2 rounded-md bg-[#f8fdff] border border-[#71d0f4] text-[#016b09]
+YY-CARD_IN_FORM_BLANK: px-4 py-2 mb-2 rounded-md bg-[#ffffff] border border-[#71d0f4]
+YY-CARD_IN_FORM_ERROR: px-4 py-2 mb-5 rounded-md bg-[#fff8f8] text-[#8e0000] border  border-[#f3a7a7]
+YY-TEXTAREA: px-4 py-2 mb-5 w-full rounded-md border border-[#71d0f4] bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007c09]/10 focus:border-[#007c09]
 
 #BUTTONS
-YY-BUTTON_MAIN: px-5 py-1.5 flex items-center justify-center rounded-md bg-[#effbff] text-[#006991] font-semibold hover:bg-[#f8fdff] hover:text-[#007c09] border border-slate-400 border-[#006991] uppercase text-sm
+YY-BUTTON_MAIN: px-5 py-1.5 flex items-center justify-center rounded-md bg-[#effbff] text-[#006991] font-semibold hover:bg-[#f8fdff] border border-[#71d0f4] uppercase text-sm
+YY-BUTTON_GREEN: px-5 py-1.5 flex items-center justify-center rounded-md bg-[#d6fdda] text-[#016b09] font-semibold hover:bg-[#f2fff3] border border-[#71d0f4] uppercase text-sm
+
+#TEXTS
+YY-TEXT: block mb-3
+YY-TEXT_OL: block list-decimal pl-5 space-y-4 leading-relaxed
 
 #MAIN GRID
-YY-CARD_WHITE: px-5 py-5 rounded-md border border-slate-400 bg-[#FFFFFF] border-[#006991]  
+YY-CARD_WHITE: px-5 py-5 rounded-md bg-[#FFFFFF] border border-[#71d0f4] text-[#006991]
+YY-CARD_BLUE: px-5 py-5 rounded-md bg-[#f8fdff] border border-[#71d0f4] text-[#006991]
 
 YY-MAIN_TABLE:     w-full max-w-[2000px] table-fixed border-collapse mt-10
 YY-MAIN_TABLE_TOP: w-full max-w-[2000px] table-fixed border-collapse
-YY-MAIN_TOP_LEFT_TD: pt-0 pb-0 pl-8 pr-4 align-top 
+YY-MAIN_TOP_LEFT_TD: pt-0 pb-0 pl-8 pr-4 align-top
 YY-MAIN_TOP_RIGHT_TD: pt-0 pb-0 pl-4 pr-8 align-top
 YY-MAIN_BOTTOM_TD: pt-0 pb-10 px-8 align-top
 
 # MENU
-YY-MENU-CARD-BLUE: rounded-md bg-[#effbff] border border-slate-400 border-[#006991]
+YY-MENU-CARD-BLUE: rounded-md bg-[#effbff] border border-[#71d0f4]
 YY-MENU-SUMMARY: flex items-center gap-3 pl-4 py-3 font-bold text-[#006991] hover:bg-[#f8fdff] hover:text-[#007c09] rounded-md cursor-pointer leading-none
 YY-MENU-DETAIL: flex rounded-md font-semibold text-[#006991] py-3 pl-12 hover:bg-[#f8fdff] hover:text-[#007c09]
 YY-MENU-DETAIL-ACTIVE: bg-[#f8fdff] text-[#007c09]

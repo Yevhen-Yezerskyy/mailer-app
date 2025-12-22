@@ -9,11 +9,19 @@
   <title>{{ page_title|default:"" }} - Serenity Mailer</title>
 
   <link rel="icon" href="{% static 'img/favicon.ico' %}" />
-  <script src="https://cdn.tailwindcss.com"></script>
+
+<script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="{% static 'css/panel.css' %}">
 </head>
 
 <body class="min-h-screen bg-slate-100">
+  
+<div id="yy-global-loading" class="yy-loading hidden" aria-hidden="true">
+  <div class="yy-loading__backdrop"></div>
+  <div class="yy-loading__box" role="status" aria-live="polite" aria-label="Loading">
+    <div class="yy-loading__spinner"></div>
+  </div>
+</div>
 
 <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
   <symbol id="icon-arrow-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -26,9 +34,9 @@
 
   <!-- SIDEBAR -->
 <aside id="panel-sidebar"
-       class="w-80 shrink-0 bg-white border border-slate-400 border-[#006991] border-t-0 !border-t-0 flex flex-col">
+       class="w-80 shrink-0 bg-white border border-[#71d0f4] border-t-0 !border-t-0 flex flex-col">
 
-    <div class="h-16 px-6 flex items-center border-b border-slate-400 border-[#006991] border-t-0 justify-center">
+    <div class="h-16 px-6 flex items-center border-b border-[#71d0f4] border-t-0 justify-center">
       <a href="/">
         <img src="{% static 'img/logo.main.svg' %}" alt="Serenity" class="h-6 w-auto">
       </a>
@@ -53,7 +61,7 @@
       {% endfor %}
     </nav>
 
-    <div class="mt-auto p-4 border-t border-slate-400 border-[#006991]">
+    <div class="mt-auto p-4 border-t border-[#71d0f4]">
 
     <details class="YY-MENU-CARD-BLUE">
         <summary class="YY-MENU-SUMMARY">
@@ -69,7 +77,7 @@
   <div class="flex-1 min-w-0 min-h-0 flex flex-col">
 
     <!-- TOPBAR -->
-    <header class="h-16 bg-white border-b border-slate-400 border-[#006991] flex items-center">
+    <header class="h-16 bg-white border-b border-[#71d0f4] flex items-center">
       <table class="YY-MAIN_TABLE_TOP mt-0 mb-0">
         <tr>
           <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
@@ -131,40 +139,6 @@
 
   </div>
 </div>
-
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const sidebar = document.getElementById("panel-sidebar");
-  const btn = document.querySelector("[data-sidebar-toggle]");
-
-  if (btn && sidebar) {
-    btn.addEventListener("click", () => {
-      sidebar.classList.toggle("hidden");
-    });
-  }
-
-  document.querySelectorAll("details > summary").forEach(summary => {
-    if (summary.querySelector("[data-icon]")) return;
-
-    summary.insertAdjacentHTML(
-      "afterbegin",
-      `<svg data-icon class="ui-icon size-5 transition-transform">
-         <use href="#icon-arrow-circle"></use>
-       </svg>`
-    );
-
-    const details = summary.parentElement;
-    const icon = summary.querySelector("[data-icon]");
-
-    const sync = () => {
-      icon.classList.toggle("rotate-90", details.hasAttribute("open"));
-    };
-
-    sync();
-    details.addEventListener("toggle", sync);
-  });
-});
-</script>
-
+<script src="{% static 'js/script.js' %}"></script>
 </body>
 </html>

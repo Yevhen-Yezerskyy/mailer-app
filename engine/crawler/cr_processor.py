@@ -15,7 +15,7 @@ def main() -> None:
     w = Worker(
         name="cb_processor",
         tick_sec=0.5,
-        max_parallel=5,
+        max_parallel=1,
     )
 
     w.register(
