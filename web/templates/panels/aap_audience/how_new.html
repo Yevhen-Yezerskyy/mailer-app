@@ -9,7 +9,6 @@
 
 <table class="YY-MAIN_TABLE">
   <tr>
-
     <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
       <div class="YY-CARD_WHITE">
           <div class="YY-CARD_IN_FORM_BLANK mb-5">
@@ -86,7 +85,7 @@
           {% endif %}
 
           {% if state == "how" %}
-            <div class="flex flex-wrap gap-3 pt-2">
+            <div class="flex gap-3">
               <button type="submit" name="action" value="process" class="YY-BUTTON_MAIN" data-loading="1">
                 {% trans "Обработать" %}
               </button>
@@ -147,12 +146,118 @@
   </tr>
 </table>
 
-<table class="YY-MAIN_TABLE">
+  <table class="YY-MAIN_TABLE">
   <tr>
     <td class="YY-MAIN_BOTTOM_TD">
-      <div class="YY-CARD_WHITE">
-        <!-- reserved for tasks table -->
-      </div>
+      {% if tasks %}
+        <div class="YY-MAIN_BOTTOM_DIV">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH w-[40%]">{% trans "Задача" %}</th>
+                <th class="YY-TH_TH w-[40%]">{% trans "Критерии выбора" %}</th>
+                <th class="YY-TH_TH">{% trans "Статус" %}</th>
+                <th class="YY-TH_TH">{% trans "Действия" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in tasks %}
+                <tr class="YY-TB_TR">
+                  <!-- ЗАДАЧА -->
+                  <td class="YY-TB_TD">
+                      {% if t.type == "sell" %}
+                      <div class="YY-STATUS_GREEN mb-3">
+                        {% trans "Поиск клиентов" %}
+                      </div>
+                      {% else %}
+                      <div class="YY-STATUS_YELLOW">
+                        {% trans "Поиск поставщиков / подрядчиков" %}
+                      </div>
+                      {% endif %}
+
+                      <div class="mb-3 font-semibold">
+                        {{ t.title }}
+                      </div>
+                      <div>
+                        {{ t.task }}
+                      </div>
+                  </td>
+
+                  <!-- КРИТЕРИИ -->
+                  <td class="YY-TB_TD">
+                   <div data-tabs="choice-{{ t.id }}">
+                      <div class="flex gap-3 mb-3">
+                        <button type="button"
+                          data-tab="client"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_GREEN">
+                          {% trans "Клиент" %}
+                        </button>
+
+                        <button type="button"
+                          data-tab="branches"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_MAIN">
+                          {% trans "Категории" %}
+                        </button>
+
+                        <button type="button"
+                          data-tab="geo"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_MAIN">
+                          {% trans "География" %}
+                        </button>
+
+                      </div>
+                        <div data-panel="client">
+                          {{ t.task_client|linebreaksbr }}
+                        </div>
+                        <div data-panel="branches" class="hidden">
+                          {{ t.task_branches|linebreaksbr }}
+                        </div>
+                        <div data-panel="geo" class="hidden">
+                          {{ t.task_geo|linebreaksbr }}
+                        </div>
+
+                    </div>
+
+                  </td>
+
+                  <!-- СТАТУС -->
+                  <td class="YY-TB_TD">
+                    {% if t.run_processing %}
+                    <div class="YY-STATUS_GREEN">
+                      {% trans "В работе" %}
+                    </div>
+                    {% else %}
+                    <div class="YY-STATUS_YELLOW">
+                      {% trans "Не запущено" %}
+                    </div>   
+                    {% endif %}
+                  </td>
+
+                  <!-- ДЕЙСТВИЯ -->
+                  <td class="YY-TB_TD">
+                      <button type="button" class="YY-BUTTON_TAB_MAIN mb-2">
+                        {% trans "Изменить" %}
+                      </button>
+                      <button type="button" class="YY-BUTTON_TAB_RED">
+                        {% trans "Удалить" %}
+                      </button>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
+      {% endif %}
     </td>
   </tr>
 </table>

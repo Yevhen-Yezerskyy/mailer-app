@@ -38,9 +38,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 });
 
-/* ===============================
-   BUTTON LOADING OVERLAY
-   =============================== */
 
 (function () {
   function showGlobalLoading() {
@@ -69,3 +66,34 @@ document.addEventListener("DOMContentLoaded", () => {
     el.setAttribute("aria-hidden", "true");
   });
 })();
+
+// FILE: web/static/js/script.js  (обновлено — 2025-12-23)
+// PURPOSE: Простые табы по data-tabs/data-tab/data-panel. Кнопки переключаются через полную замену className (idle/active строки с пробелами).
+
+document.addEventListener("click", function (e) {
+  const btn = e.target.closest("[data-tab]");
+  if (!btn) return;
+
+  const box = btn.closest("[data-tabs]");
+  if (!box) return;
+
+  const tab = btn.dataset.tab;
+
+  // buttons: set idle for all, active for clicked
+  box.querySelectorAll("[data-tab]").forEach(b => {
+    const idle = b.dataset.idleClass || "";
+    if (idle) b.className = idle;
+  });
+
+  const active = btn.dataset.activeClass || "";
+  if (active) btn.className = active;
+
+  // panels: hide all, show target
+  box.querySelectorAll("[data-panel]").forEach(p => {
+    p.classList.add("hidden");
+  });
+
+  const panel = box.querySelector(`[data-panel="${tab}"]`);
+  if (panel) panel.classList.remove("hidden");
+});
+
