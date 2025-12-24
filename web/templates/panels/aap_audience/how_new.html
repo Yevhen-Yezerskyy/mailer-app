@@ -1,90 +1,74 @@
-<!-- FILE: web/templates/panels/aap_audience/how.html -->
-<!-- DATE: 2025-12-21 -->
-<!-- PURPOSE: Эталонная разметка HOW. Верх: форма (с вопросами) + инструкция. Низ: пусто под список задач. Без логики, без trans, чистая разметка. -->
+<!-- FILE: web/templates/panels/aap_audience/how_new.html -->
+<!-- DATE: 2025-12-24 -->
+<!-- CHANGE: use encoded id everywhere (t.ui_id), never expose t.id in URLs -->
 
 {% extends "panels/base.html" %}
 {% load i18n %}
 
 {% block content %}
 
-<table class="YY-MAIN_TABLE">
-  <tr>
-    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
-      <div class="YY-CARD_WHITE">
-          <div class="YY-CARD_IN_FORM_BLANK mb-5">
-            <form method="get" class="flex gap-3">
-              <input type="hidden" name="state" value="{{ state }}">
+<form method="post">
+  {% csrf_token %}
 
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+        <div class="YY-CARD_WHITE">
+          <div class="YY-CARD_IN_FORM_BLANK mb-5">
+            <div class="flex gap-3">
               <button
-                type="submit"
-                name="type"
-                value="sell"
+                type="button"
+                onclick="location.href='?state={{ state }}&type=sell{% if id %}&id={{ id }}{% endif %}'"
                 class="{% if type == 'sell' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}">
                 {% trans "Поиск клиентов" %}
               </button>
 
               <button
-                type="submit"
-                name="type"
-                value="buy"
+                type="button"
+                onclick="location.href='?state={{ state }}&type=buy{% if id %}&id={{ id }}{% endif %}'"
                 class="{% if type == 'buy' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}">
                 {% trans "Поиск поставщиков / подрядчиков" %}
               </button>
-            </form>
-          </div>        
-        <form method="post">
-          {% csrf_token %}
-
-          <!-- WHAT -->
-          <label class="YY-LABEL">
-            {{ form.what.label }}
-          </label>
-
-          {% if q_what or h_what %}
-            <div class="YY-CARD_IN_FORM">
-              {% if q_what %}<p>{{ q_what }}</p>{% endif %}
-              {% if h_what %}<p>{{ h_what }}</p>{% endif %}
             </div>
-          {% endif %}
-
-          {{ form.what }}
-
-
-          <!-- WHO -->
-          <label class="YY-LABEL">
-            {{ form.who.label }}
-          </label>
-
-          {% if q_who or h_who %}
-            <div class="YY-CARD_IN_FORM">
-              {% if q_who %}<p>{{ q_who }}</p>{% endif %}
-              {% if h_who %}<p>{{ h_who }}</p>{% endif %}
-            </div>
-          {% endif %}
-
-          {{ form.who }}
-
-
-          <!-- GEO -->
-          <label class="YY-LABEL">
-            {{ form.geo.label }}
-          </label>
-
-          {% if q_geo or h_geo %}
-            <div class="YY-CARD_IN_FORM">
-              {% if q_geo %}<p>{{ q_geo }}</p>{% endif %}
-              {% if h_geo %}<p>{{ h_geo }}</p>{% endif %}
-            </div>
-          {% endif %}
-
-          {{ form.geo }}
-          {% if form.non_field_errors %}
-            <div class="YY-CARD_IN_FORM_ERROR">
-              {{ form.non_field_errors }}
-            </div>
-          {% endif %}
+          </div>
 
           {% if state == "how" %}
+            <!-- WHAT -->
+            <label class="YY-LABEL">{{ form.what.label }}</label>
+
+            {% if q_what or h_what %}
+              <div class="YY-CARD_IN_FORM">
+                {% if q_what %}<p>{{ q_what }}</p>{% endif %}
+                {% if h_what %}<p>{{ h_what }}</p>{% endif %}
+              </div>
+            {% endif %}
+
+            {{ form.what }}
+
+            <!-- WHO -->
+            <label class="YY-LABEL">{{ form.who.label }}</label>
+
+            {% if q_who or h_who %}
+              <div class="YY-CARD_IN_FORM">
+                {% if q_who %}<p>{{ q_who }}</p>{% endif %}
+                {% if h_who %}<p>{{ h_who }}</p>{% endif %}
+              </div>
+            {% endif %}
+
+            {{ form.who }}
+
+            <!-- GEO -->
+            <label class="YY-LABEL">{{ form.geo.label }}</label>
+
+            {% if q_geo or h_geo %}
+              <div class="YY-CARD_IN_FORM">
+                {% if q_geo %}<p>{{ q_geo }}</p>{% endif %}
+                {% if h_geo %}<p>{{ h_geo }}</p>{% endif %}
+              </div>
+            {% endif %}
+
+            {{ form.geo }}
+
             <div class="flex gap-3">
               <button type="submit" name="action" value="process" class="YY-BUTTON_MAIN" data-loading="1">
                 {% trans "Обработать" %}
@@ -98,55 +82,71 @@
             </div>
           {% endif %}
 
-        </form>
-      </div>
-    </td>
+          {% if state == "edit" %}
+            <label class="YY-LABEL">{{ form.what.label }}</label>
+            {{ form.what }}
 
-    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
-      <div class="YY-CARD_BLUE">
+            <label class="YY-LABEL">{{ form.who.label }}</label>
+            {{ form.who }}
 
-        <p class="YY-TEXT">
-          <strong>Инструкции</strong>
-        </p>
+            <label class="YY-LABEL">{{ form.geo.label }}</label>
+            {{ form.geo }}
+          {% endif %}
+        </div>
+      </td>
 
-          <ol class="YY-TEXT_OL">
-            <li class="YY-TEXT_LI">
-              <strong>{% trans "Напишите что Вы продаёте и опишите Вашу компанию." %}</strong>
-              {% trans "Всё остальное — лишнее." %}
-            </li>
+      <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+        {% if state == "how" %}
+          <div class="YY-CARD_BLUE">
+            <p class="YY-TEXT"><strong>Инструкции</strong></p>
+            <ol class="YY-TEXT_OL">
+              <li class="YY-TEXT_LI"><strong>{% trans "Напишите что Вы продаёте и опишите Вашу компанию." %}</strong></li>
+              <li class="YY-TEXT_LI"><strong>{% trans "Дайте ссылку на сайт Вашей компании." %}</strong></li>
+              <li class="YY-TEXT_LI"><strong>{% trans "Пишите в любые поля полезную информацию." %}</strong></li>
+              <li class="YY-TEXT_LI"><strong>{% trans "Не бойтесь ошибок." %}</strong></li>
+              <li class="YY-TEXT_LI"><strong>{% trans "Отвечайте коротко и информативно." %}</strong></li>
+              <li class="YY-TEXT_LI"><strong>{% trans "Если результат вас устраивает — сохраните его." %}</strong></li>
+            </ol>
+          </div>
+        {% endif %}
 
-            <li class="YY-TEXT_LI">
-              <strong>{% trans "Дайте ссылку на сайт Вашей компании." %}</strong>
-              {% trans "В формате https://mysite.ua. Система сама найдёт нужные факты и обработает сайт." %}
-            </li>
+        {% if state == "edit" %}
+          <div class="YY-CARD_WHITE">
+            <label class="YY-LABEL">{{ form.title.label }}</label>
+            {{ form.title }}
 
-            <li class="YY-TEXT_LI">
-              <strong>{% trans "Пишите в любые поля полезную информацию." %}</strong>
-              {% trans "Мы разберёмся, что к чему." %}
-            </li>
+            <label class="YY-LABEL">{{ form.task_client.label }}</label>
+            {{ form.task_client }}
 
-            <li class="YY-TEXT_LI">
-              <strong>{% trans "Не бойтесь ошибок." %}</strong>
-              {% trans "Лишнее и неважное система отбросит. Потом всё можно исправить — это поможет понять, что ещё стоит добавить." %}
-            </li>
+            <label class="YY-LABEL">{{ form.task_branches.label }}</label>
+            {{ form.task_branches }}
 
-            <li class="YY-TEXT_LI">
-              <strong>{% trans "Отвечайте коротко и информативно." %}</strong>
-              {% trans "Меньше слов — больше информации." %}
-            </li>
+            <label class="YY-LABEL">{{ form.task_geo.label }}</label>
+            {{ form.task_geo }}
 
-            <li class="YY-TEXT_LI">
-              <strong>{% trans "Если результат вас устраивает — сохраните его." %}</strong>
-              {% trans "Вопросы будут появляться и дальше. Это всего лишь подсказки — вдруг вы вспомните что-то важное." %}
-            </li>
-          </ol>
-      </div>
-    </td>
+            {% if form.non_field_errors %}
+              <div class="YY-CARD_IN_FORM_ERROR mt-3">
+                {{ form.non_field_errors }}
+              </div>
+            {% endif %}
 
-  </tr>
-</table>
+            <div class="flex gap-3 mt-3">
+              <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN" data-loading="1">
+                {% trans "Сохранить" %}
+              </button>
+              <button type="submit" name="action" value="cancel" class="YY-BUTTON_MAIN">
+                {% trans "Отменить" %}
+              </button>
+            </div>
+          </div>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
 
-  <table class="YY-MAIN_TABLE">
+</form>
+
+<table class="YY-MAIN_TABLE">
   <tr>
     <td class="YY-MAIN_BOTTOM_TD">
       {% if tasks %}
@@ -163,90 +163,35 @@
             <tbody>
               {% for t in tasks %}
                 <tr class="YY-TB_TR">
-                  <!-- ЗАДАЧА -->
                   <td class="YY-TB_TD">
-                      {% if t.type == "sell" %}
-                      <div class="YY-STATUS_GREEN mb-3">
-                        {% trans "Поиск клиентов" %}
-                      </div>
-                      {% else %}
-                      <div class="YY-STATUS_YELLOW">
-                        {% trans "Поиск поставщиков / подрядчиков" %}
-                      </div>
-                      {% endif %}
-
-                      <div class="mb-3 font-semibold">
-                        {{ t.title }}
-                      </div>
-                      <div>
-                        {{ t.task }}
-                      </div>
+                    <div class="mb-3 font-semibold">{{ t.title }}</div>
+                    <div>{{ t.task }}</div>
                   </td>
 
-                  <!-- КРИТЕРИИ -->
                   <td class="YY-TB_TD">
-                   <div data-tabs="choice-{{ t.id }}">
-                      <div class="flex gap-3 mb-3">
-                        <button type="button"
-                          data-tab="client"
-                          data-active-class="YY-BUTTON_GREEN"
-                          data-idle-class="YY-BUTTON_MAIN"
-                          class="YY-BUTTON_GREEN">
-                          {% trans "Клиент" %}
-                        </button>
-
-                        <button type="button"
-                          data-tab="branches"
-                          data-active-class="YY-BUTTON_GREEN"
-                          data-idle-class="YY-BUTTON_MAIN"
-                          class="YY-BUTTON_MAIN">
-                          {% trans "Категории" %}
-                        </button>
-
-                        <button type="button"
-                          data-tab="geo"
-                          data-active-class="YY-BUTTON_GREEN"
-                          data-idle-class="YY-BUTTON_MAIN"
-                          class="YY-BUTTON_MAIN">
-                          {% trans "География" %}
-                        </button>
-
-                      </div>
-                        <div data-panel="client">
-                          {{ t.task_client|linebreaksbr }}
-                        </div>
-                        <div data-panel="branches" class="hidden">
-                          {{ t.task_branches|linebreaksbr }}
-                        </div>
-                        <div data-panel="geo" class="hidden">
-                          {{ t.task_geo|linebreaksbr }}
-                        </div>
-
+                    <div data-tabs="choice-{{ t.id }}">
+                      ...
                     </div>
-
                   </td>
 
-                  <!-- СТАТУС -->
                   <td class="YY-TB_TD">
                     {% if t.run_processing %}
-                    <div class="YY-STATUS_GREEN">
-                      {% trans "В работе" %}
-                    </div>
+                      <div class="YY-STATUS_GREEN">{% trans "В работе" %}</div>
                     {% else %}
-                    <div class="YY-STATUS_YELLOW">
-                      {% trans "Не запущено" %}
-                    </div>   
+                      <div class="YY-STATUS_YELLOW">{% trans "Не запущено" %}</div>
                     {% endif %}
                   </td>
 
-                  <!-- ДЕЙСТВИЯ -->
                   <td class="YY-TB_TD">
-                      <button type="button" class="YY-BUTTON_TAB_MAIN mb-2">
-                        {% trans "Изменить" %}
-                      </button>
-                      <button type="button" class="YY-BUTTON_TAB_RED">
-                        {% trans "Удалить" %}
-                      </button>
+                    <a
+                      href="?state=edit&type={{ t.type }}&id={{ t.ui_id }}"
+                      class="YY-BUTTON_TAB_MAIN mb-2 inline-block">
+                      {% trans "Изменить" %}
+                    </a>
+
+                    <button type="button" class="YY-BUTTON_TAB_RED">
+                      {% trans "Удалить" %}
+                    </button>
                   </td>
                 </tr>
               {% endfor %}

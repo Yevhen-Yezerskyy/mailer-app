@@ -1,18 +1,34 @@
-# FILE: web/panel/aap_audience/views/how.py  (новое — 2025-12-23)
-# PURPOSE: FSM HOW/ADD/EDIT в одном URL: how=GPT-диалог без БД, add=создание AudienceTask (4 GPT поля), edit=заглушка. Внизу — список задач.
+# FILE: web/panel/aap_audience/views/how.py  (обновлено — 2025-12-24)
+# CHANGE:
+# - switch edit identifier from line_id -> id (obid)
+# - use centralized resolver: mailer_web.access.resolve_pk_or_redirect(request, AudienceTask)
+# - never expose raw t.id in URLs: add t.ui_id = encode_id(t.id) for template
+# - keep core HOW logic (state/type/forms/GPT/save) unchanged
 
 import json
 from typing import Any, Tuple
 
 from django.shortcuts import render, redirect
+from django.http import HttpResponseRedirect
 
-from panel.aap_audience.forms import AudienceHowSellForm, AudienceHowBuyForm
+from panel.aap_audience.forms import (
+    AudienceHowSellForm,
+    AudienceHowBuyForm,
+    AudienceEditSellForm,
+    AudienceEditBuyForm,
+)
 from panel.aap_audience.models import AudienceTask
 from engine.common.gpt import GPTClient
 from engine.common.prompts.process import get_prompt
 
+from mailer_web.access import encode_id, resolve_pk_or_redirect
+
 
 # ---------- helpers ----------
+
+def _redirect_how(request, *, type_: str):
+    return redirect(f"{request.path}?state=how&type={type_}")
+
 
 def _canonical_redirect(request):
     return redirect(f"{request.path}?state=how&type=sell")
@@ -34,6 +50,25 @@ def _parse_how_json(raw: str, fallback: dict) -> dict:
         }
 
 
+def _parse_task_split_json(raw: str, fallback_task: str) -> dict:
+    try:
+        data = json.loads((raw or "").strip())
+        if not isinstance(data, dict):
+            raise ValueError
+
+        what = (data.get("what") or "").strip()
+        who = (data.get("who") or "").strip()
+        geo = (data.get("geo") or "").strip()
+
+        # минимальная страховка
+        if not any([what, who, geo]):
+            raise ValueError
+
+        return {"what": what, "who": who, "geo": geo}
+    except Exception:
+        return {"what": (fallback_task or "").strip(), "who": "", "geo": ""}
+
+
 def _clean_multiline(text: str) -> str:
     if not text:
         return ""
@@ -47,6 +82,10 @@ def _get_form_class(type_: str):
     return AudienceHowBuyForm if type_ == "buy" else AudienceHowSellForm
 
 
+def _get_edit_form_class(type_: str):
+    return AudienceEditBuyForm if type_ == "buy" else AudienceEditSellForm
+
+
 def _get_system_prompt(type_: str) -> str:
     return "audience_how_system_buy" if type_ == "buy" else "audience_how_system_sell"
 
@@ -57,6 +96,25 @@ def _get_tasks(request):
     if not ws_id or not getattr(user, "is_authenticated", False):
         return AudienceTask.objects.none()
     return AudienceTask.objects.filter(workspace_id=ws_id, user=user).order_by("-created_at")[:50]
+
+
+def _with_ui_ids(tasks):
+    # IMPORTANT: template must use t.ui_id for URLs; never raw t.id
+    for t in tasks:
+        t.ui_id = encode_id(int(t.id))
+    return tasks
+
+
+def _get_task_obj_or_redirect(request, *, pk: int):
+    ws_id = request.workspace_id
+    user = request.user
+    if not ws_id or not getattr(user, "is_authenticated", False):
+        return None
+
+    try:
+        return AudienceTask.objects.get(id=int(pk), workspace_id=ws_id, user=user)
+    except Exception:
+        return None
 
 
 def _build_task_text(*, what: str, who: str, geo: str) -> str:
@@ -74,18 +132,12 @@ def _gpt_fill_task_fields(
     user_id: Any,
     task_text: str,
 ) -> Tuple[str, str, str, str]:
-    """
-    4 GPT-запроса как в старом HOW:
-    - title (nano)
-    - task_branches (maxi)
-    - task_geo (maxi)
-    - task_client (maxi)
-    """
     title_resp = client.ask(
         model="nano",
         instructions=get_prompt("audience_how_name"),
         input=task_text,
         user_id=user_id,
+        service_tier="flex",
     )
     title = (title_resp.content or "").strip()
 
@@ -94,6 +146,7 @@ def _gpt_fill_task_fields(
         instructions=get_prompt("audience_how_branches"),
         input=task_text,
         user_id=user_id,
+        service_tier="flex",
     )
     task_branches = _clean_multiline(branches_resp.content or "")
 
@@ -102,6 +155,7 @@ def _gpt_fill_task_fields(
         instructions=get_prompt("audience_how_geo"),
         input=task_text,
         user_id=user_id,
+        service_tier="flex",
     )
     task_geo = _clean_multiline(geo_resp.content or "")
 
@@ -110,10 +164,22 @@ def _gpt_fill_task_fields(
         instructions=get_prompt("audience_how_client"),
         input=task_text,
         user_id=user_id,
+        service_tier="flex",
     )
     task_client = _clean_multiline(client_resp.content or "")
 
     return title, task_branches, task_geo, task_client
+
+
+def _gpt_split_task_to_3(*, client: GPTClient, user_id: Any, task_text: str) -> dict:
+    resp = client.ask(
+        model="maxi",
+        instructions=get_prompt("audience_how_split"),
+        input=(task_text or "").strip(),
+        user_id=user_id,
+        service_tier="flex",
+    )
+    return _parse_task_split_json(resp.content or "", task_text or "")
 
 
 # ---------- handlers ----------
@@ -121,7 +187,7 @@ def _gpt_fill_task_fields(
 def _handle_how(request, *, type_: str):
     FormClass = _get_form_class(type_)
     system_prompt = _get_system_prompt(type_)
-    tasks = _get_tasks(request)
+    tasks = _with_ui_ids(_get_tasks(request))
 
     if request.method == "GET":
         return render(
@@ -134,7 +200,7 @@ def _handle_how(request, *, type_: str):
     action = request.POST.get("action")
 
     if action == "clear":
-        return _canonical_redirect(request)
+        return _redirect_how(request, type_=type_)
 
     form = FormClass(request.POST)
     if not form.is_valid():
@@ -185,12 +251,13 @@ GEO:
 Верни ТОЛЬКО JSON строго по SYSTEM_PROMPT.
 """
 
-    client = GPTClient(service_tier="flex")
+    client = GPTClient()
     resp = client.ask(
         model="maxi",
         instructions=get_prompt(system_prompt),
         input=user_input,
         user_id=request.user.id,
+        service_tier="flex",
     )
 
     result = _parse_how_json(resp.content, payload)
@@ -222,14 +289,13 @@ GEO:
 
 
 def _handle_add(request, *, type_: str, payload: dict, form):
-    # add = только POST (создание записи)
     if request.method != "POST":
-        return _canonical_redirect(request)
+        return _redirect_how(request, type_=type_)
 
     ws_id = request.workspace_id
     user = request.user
     if not ws_id or not getattr(user, "is_authenticated", False):
-        return _canonical_redirect(request)
+        return _redirect_how(request, type_=type_)
 
     task_text = _build_task_text(
         what=payload.get("what", ""),
@@ -238,21 +304,21 @@ def _handle_add(request, *, type_: str, payload: dict, form):
     )
     if not task_text:
         form.add_error(None, "Заполните хотя бы одно поле.")
-        tasks = _get_tasks(request)
+        tasks = _with_ui_ids(_get_tasks(request))
         return render(
             request,
             "panels/aap_audience/how_new.html",
             {"form": form, "state": "how", "type": type_, "tasks": tasks},
         )
 
-    client = GPTClient(service_tier="flex")
+    client = GPTClient()
     title, task_branches, task_geo, task_client = _gpt_fill_task_fields(
         client=client,
         user_id=user.id,
         task_text=task_text,
     )
 
-    obj = AudienceTask.objects.create(
+    AudienceTask.objects.create(
         workspace_id=ws_id,
         user=user,
         type=type_,
@@ -263,27 +329,86 @@ def _handle_add(request, *, type_: str, payload: dict, form):
         task_client=task_client,
     )
 
-    # предусмотреть edit (пока не включаем)
-    _edit_url = f"{request.path}?state=edit&type={type_}&line_id={obj.id}"
-
-    # сейчас: редирект на дефолтный GET
-    return _canonical_redirect(request)
+    return _redirect_how(request, type_=type_)
 
 
-def _handle_edit_stub(request, *, type_: str, line_id: str):
-    # пока заглушка
-    tasks = _get_tasks(request)
-    return render(
-        request,
-        "panels/aap_audience/how_new.html",
-        {
-            "state": "edit",
-            "type": type_,
-            "line_id": line_id,
-            "tasks": tasks,
-            "edit_stub": True,
-        },
+def _handle_edit(request, *, type_: str, pk: int):
+    tasks = _with_ui_ids(_get_tasks(request))
+    obj = _get_task_obj_or_redirect(request, pk=int(pk))
+    if not obj:
+        # rule: if missed workspace / not found -> clean URL (no GET)
+        return redirect(request.path)
+
+    FormClass = _get_edit_form_class(type_)
+
+    if request.method == "GET":
+        client = GPTClient()
+        parts = _gpt_split_task_to_3(
+            client=client,
+            user_id=request.user.id,
+            task_text=(obj.task or ""),
+        )
+
+        form = FormClass(
+            initial={
+                "what": parts.get("what", ""),
+                "who": parts.get("who", ""),
+                "geo": parts.get("geo", ""),
+                "title": obj.title or "",
+                "task_client": obj.task_client or "",
+                "task_branches": obj.task_branches or "",
+                "task_geo": obj.task_geo or "",
+            }
+        )
+
+        return render(
+            request,
+            "panels/aap_audience/how_new.html",
+            {
+                "form": form,
+                "state": "edit",
+                "type": type_,
+                "id": encode_id(int(obj.id)),
+                "tasks": tasks,
+            },
+        )
+
+    # POST edit
+    action = request.POST.get("action")
+
+    if action == "cancel":
+        return _redirect_how(request, type_=type_)
+
+    form = FormClass(request.POST)
+    if not form.is_valid():
+        return render(
+            request,
+            "panels/aap_audience/how_new.html",
+            {
+                "form": form,
+                "state": "edit",
+                "type": type_,
+                "id": encode_id(int(obj.id)),
+                "tasks": tasks,
+            },
+        )
+
+    # собрать task обратно из 3 полей (без GPT)
+    task_text = _build_task_text(
+        what=form.cleaned_data.get("what", ""),
+        who=form.cleaned_data.get("who", ""),
+        geo=form.cleaned_data.get("geo", ""),
     )
+
+    obj.type = type_
+    obj.task = task_text
+    obj.title = (form.cleaned_data.get("title") or "").strip()
+    obj.task_client = (form.cleaned_data.get("task_client") or "").strip()
+    obj.task_branches = (form.cleaned_data.get("task_branches") or "").strip()
+    obj.task_geo = (form.cleaned_data.get("task_geo") or "").strip()
+    obj.save(update_fields=["type", "task", "title", "task_client", "task_branches", "task_geo", "updated_at"])
+
+    return _redirect_how(request, type_=type_)
 
 
 # ---------- view ----------
@@ -291,7 +416,6 @@ def _handle_edit_stub(request, *, type_: str, line_id: str):
 def how_view(request):
     state = request.GET.get("state")
     type_ = request.GET.get("type")
-    line_id = request.GET.get("line_id")
 
     if type_ not in ("sell", "buy"):
         return _canonical_redirect(request)
@@ -299,15 +423,13 @@ def how_view(request):
     if state not in ("how", "add", "edit"):
         return _canonical_redirect(request)
 
-    if state == "edit" and not line_id:
-        return _canonical_redirect(request)
-
-    # GET: state=add не существует
     if request.method == "GET" and state == "add":
-        return _canonical_redirect(request)
+        return _redirect_how(request, type_=type_)
 
     if state == "edit":
-        return _handle_edit_stub(request, type_=type_, line_id=str(line_id))
+        res = resolve_pk_or_redirect(request, AudienceTask, param="id")
+        if isinstance(res, HttpResponseRedirect):
+            return res
+        return _handle_edit(request, type_=type_, pk=int(res))
 
-    # state=how (и POST save/process/clear внутри)
     return _handle_how(request, type_=type_)

@@ -151,6 +151,165 @@ class AudienceHowBuyForm(AudienceHowSellForm):
             "Регионы Германии, допустимая логистика, удаленная или локальная работа."
         )
 
+# FILE: web/panel/aap_audience/forms.py
+# DATE: 2025-12-24
+# FIX: Edit-формы без миксинов (чтобы не было KeyError). Две явные формы: Sell наследует AudienceHowSellForm, Buy наследует AudienceHowBuyForm.
+#      В edit: все поля обязательны (и слева what/who/geo, и справа title/task_*).
+
+from django import forms
+from django.utils.translation import gettext_lazy as _
+
+# ... (оставь твой текущий код выше без изменений)
+
+
+class AudienceEditSellForm(AudienceHowSellForm):
+    title = forms.CharField(
+        label=_("Название задачи"),
+        required=True,
+        widget=forms.TextInput(
+            attrs={"class": "YY-INPUT", "placeholder": _("Коротко и по делу")}
+        ),
+    )
+
+    task_client = forms.CharField(
+        label=_("Клиент"),
+        required=True,
+        widget=forms.Textarea(
+            attrs={
+                "class": "YY-TEXTAREA",
+                "rows": 6,
+                "placeholder": _("Опишите, кто ваш целевой клиент."),
+            }
+        ),
+    )
+
+    task_branches = forms.CharField(
+        label=_("Категории"),
+        required=True,
+        widget=forms.Textarea(
+            attrs={
+                "class": "YY-TEXTAREA",
+                "rows": 6,
+                "placeholder": _("Какие категории/ниши подходят."),
+            }
+        ),
+    )
+
+    task_geo = forms.CharField(
+        label=_("География"),
+        required=True,
+        widget=forms.Textarea(
+            attrs={
+                "class": "YY-TEXTAREA",
+                "rows": 6,
+                "placeholder": _("Какая география подходит."),
+            }
+        ),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+
+        # В edit ВСЁ обязательно
+        required_fields = [
+            "what",
+            "who",
+            "geo",
+            "title",
+            "task_client",
+            "task_branches",
+            "task_geo",
+        ]
+
+        missing = []
+        for f in required_fields:
+            val = (cleaned.get(f) or "").strip()
+            if not val:
+                missing.append(f)
+
+        if missing:
+            self.add_error(None, _("Заполните все поля."))
+            for f in missing:
+                self.add_error(f, "")
+
+        return cleaned
+
+
+class AudienceEditBuyForm(AudienceHowBuyForm):
+    title = forms.CharField(
+        label=_("Название задачи (покупка)"),
+        required=True,
+        widget=forms.TextInput(
+            attrs={
+                "class": "YY-INPUT",
+                "placeholder": _("Например: найти подрядчиков/поставщиков"),
+            }
+        ),
+    )
+
+    task_client = forms.CharField(
+        label=_("Покупатель / заказчик"),
+        required=True,
+        widget=forms.Textarea(
+            attrs={
+                "class": "YY-TEXTAREA",
+                "rows": 6,
+                "placeholder": _("Опишите компанию-заказчика и профиль закупки."),
+            }
+        ),
+    )
+
+    task_branches = forms.CharField(
+        label=_("Категории поставщиков / подрядчиков"),
+        required=True,
+        widget=forms.Textarea(
+            attrs={
+                "class": "YY-TEXTAREA",
+                "rows": 6,
+                "placeholder": _("Какие типы компаний/специализаций подходят."),
+            }
+        ),
+    )
+
+    task_geo = forms.CharField(
+        label=_("География поиска (поставщики/подрядчики)"),
+        required=True,
+        widget=forms.Textarea(
+            attrs={
+                "class": "YY-TEXTAREA",
+                "rows": 6,
+                "placeholder": _("Регионы Германии, логистика, удаленная/локальная работа."),
+            }
+        ),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+
+        required_fields = [
+            "what",
+            "who",
+            "geo",
+            "title",
+            "task_client",
+            "task_branches",
+            "task_geo",
+        ]
+
+        missing = []
+        for f in required_fields:
+            val = (cleaned.get(f) or "").strip()
+            if not val:
+                missing.append(f)
+
+        if missing:
+            self.add_error(None, _("Заполните все поля."))
+            for f in missing:
+                self.add_error(f, "")
+
+        return cleaned
+
+
 
 class AudienceClarForm(forms.Form):
     title = forms.CharField(

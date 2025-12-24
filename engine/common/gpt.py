@@ -1,22 +1,24 @@
-# FILE: engine/common/gpt.py  (обновлено — 2025-12-20)
+# FILE: engine/common/gpt.py  (обновлено — 2025-12-24)
 # Смысл: единая точка общения с OpenAI (Responses API) + dev IPC-cache через common/cache (daemon).
-# Итоговая фиксация:
-# - temperature УДАЛЁН полностью (GPT-5 / Responses API его не поддерживает)
-# - user_id — стандартный параметр
-# - service_tier задаётся при инициализации клиента
-# - всё игнорируемое ранее — выпилено
-# - кеш: ключ = (model, instructions, input), service_tier сознательно НЕ участвует
-# - web автоматически включается для 5.1 / 5.2
+# Правки:
+# - service_tier НЕ хранится в объекте: только аргумент ask() (default=flex).
+# - Разрешены tier'ы: flex|standard|priority.
+# - Guard: если вызвали из engine и tier=standard ИЛИ priority → raise (до запроса).
+# - override НЕ ограничиваем (bypass guard'ов; логируем как platform-call).
+# - Логи пишутся ТОЛЬКО на моменте реального ответа платформы; cache-hit не логируется.
+# - Один общий лог-файл logs/gpt.requests.log, без ротации/разбиения.
 
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from engine.common.cache.client import memo as cache_memo
 
@@ -44,6 +46,7 @@ MODEL_ALIASES: dict[str, str] = {
 MODEL_WEB_TOOL: dict[str, str] = {
     "gpt-5.1": "web_search",
     "gpt-5.2": "web_search",
+    # legacy (не обязательно, но пусть остаётся)
     "maxi": "web_search",
     "maxi-51": "web_search",
 }
@@ -52,8 +55,9 @@ ALLOWED_SERVICE_TIERS: set[str] = {"flex", "standard", "priority"}
 OPENAI_ENV_VAR = "OPENAI_API_KEY"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-LOG_BASE_DIR = PROJECT_ROOT / "logs" / "gpt"
-LOG_BASE_DIR.mkdir(parents=True, exist_ok=True)
+LOG_DIR = PROJECT_ROOT / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / "gpt.requests.log"
 
 
 class GptConfigError(RuntimeError):
@@ -94,53 +98,90 @@ def _optional_str(value: Any) -> str:
     return str(value).strip()
 
 
-def _make_log_dir(service_tier: ServiceTier, model_name: str) -> Path:
-    d = LOG_BASE_DIR / service_tier / model_name
-    d.mkdir(parents=True, exist_ok=True)
-    return d
-
-
 def _short_hash(s: str, n_hex: int = 16) -> str:
     h = hashlib.sha1(s.encode("utf-8", errors="replace")).hexdigest()
     return h[: max(1, int(n_hex))]
 
 
-def _log_call(
+def _pretty_json(obj: Any) -> str:
+    try:
+        return json.dumps(obj, ensure_ascii=False, indent=2, sort_keys=True)
+    except Exception:
+        return str(obj)
+
+
+def _write_log_block(*lines: str) -> None:
+    with LOG_FILE.open("a", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def _detect_call_origin() -> str:
+    """
+    Определяем источник: web или engine.
+    Практическое правило: если в стеке есть '/web/' — считаем web, иначе engine.
+    """
+    try:
+        for fr in inspect.stack()[2:]:
+            p = (fr.filename or "").replace("\\", "/")
+            if "/web/" in p:
+                return "web"
+        return "engine"
+    except Exception:
+        return "engine"
+
+
+def _guard_tier_for_engine(service_tier: ServiceTier) -> None:
+    """
+    Если вызов из engine — запрещаем standard и priority (как ты просил).
+    """
+    if service_tier not in ("standard", "priority"):
+        return
+    if _detect_call_origin() == "engine":
+        raise GptValidationError(
+            f"service_tier={service_tier!r} запрещён для вызовов из engine."
+        )
+
+
+def _log_platform_call(
     *,
+    now: datetime,
     model_name: str,
     service_tier: ServiceTier,
     user_id: str,
     instructions: str,
     input_text: str,
-    response: Optional[Dict[str, Any]],
     usage: Optional[GptUsage],
+    output_text: str,
+    raw: Any,
     status: str,
     error_message: Optional[str] = None,
 ) -> None:
-    log_dir = _make_log_dir(service_tier, model_name)
-    now = datetime.now()
-    log_file = log_dir / f"{now.date().isoformat()}.log"
-
-    lines: List[str] = []
-    lines.append(
+    head = (
         f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] "
-        f"MODEL={model_name} SERVICE_TIER={service_tier} USER={user_id} "
-        f"TOKENS(in={getattr(usage, 'prompt_tokens', None)},out={getattr(usage, 'completion_tokens', None)},"
-        f"total={getattr(usage, 'total_tokens', None)}) "
-        f"STATUS={status}"
+        f"STATUS={status} MODEL={model_name} SERVICE_TIER={service_tier} USER={user_id} "
+        f"TOKENS(in={getattr(usage, 'prompt_tokens', None)},"
+        f"out={getattr(usage, 'completion_tokens', None)},"
+        f"total={getattr(usage, 'total_tokens', None)})"
     )
 
+    lines: List[str] = [head]
     if error_message:
         lines.append(f"ERROR: {error_message}")
 
-    lines.append(f"INSTRUCTIONS: {instructions}")
-    lines.append(f"INPUT: {input_text}")
-    if response is not None:
-        lines.append(f"RESPONSE: {json.dumps(response, ensure_ascii=False)}")
-    lines.append("-" * 80)
+    lines.append("INSTRUCTIONS:")
+    lines.append(instructions or "")
+    lines.append("INPUT:")
+    lines.append(input_text or "")
 
-    with log_file.open("a", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
+    if isinstance(raw, (dict, list)):
+        lines.append("RESPONSE_JSON:")
+        lines.append(_pretty_json(raw))
+    else:
+        lines.append("OUTPUT_TEXT:")
+        lines.append(output_text or "")
+
+    lines.append("-" * 120)
+    _write_log_block(*lines)
 
 
 # ---------- OPENAI CLIENT ----------
@@ -187,14 +228,8 @@ def _build_payload(
 
 
 class GPTClient:
-    def __init__(
-        self,
-        *,
-        service_tier: ServiceTier = "flex",
-    ) -> None:
-        if service_tier not in ALLOWED_SERVICE_TIERS:
-            raise GptValidationError(f"Unsupported service_tier {service_tier!r}.")
-        self._service_tier: ServiceTier = service_tier
+    def __init__(self) -> None:
+        # Объект без состояния tier. Ключ проверим по месту вызова.
         _require_api_key()
 
     def ask(
@@ -206,51 +241,71 @@ class GPTClient:
         override: Optional[Dict[str, Any]] = None,
         use_cache: bool = True,
         user_id: Any = "SET USER URGENTLY",
+        service_tier: Optional[ServiceTier] = None,
 
-        #--- Legacy ---#
+        # --- Legacy --- #
         tier: TierName = "nano",
         system: str = "",
         user: str = "",
         **kwargs,
     ) -> GptResponse:
-        user_id_str = _optional_str(user_id) or "SET USER URGENTLY"
+        _require_api_key()
 
+        user_id_str = _optional_str(user_id) or "SET USER URGENTLY"
+        effective_tier: ServiceTier = service_tier or "flex"
+        if effective_tier not in ALLOWED_SERVICE_TIERS:
+            raise GptValidationError(f"Unsupported service_tier {effective_tier!r}.")
+
+        # override: bypass всех guard'ов (как ты и хотел)
         if override is not None:
             if not isinstance(override, dict):
                 raise GptValidationError("override must be a dict.")
-
             try:
                 client = _get_openai_client()
                 resp = client.responses.create(**override)
+
                 raw = resp.model_dump()
                 content = str(getattr(resp, "output_text", "") or "")
-            except Exception as exc:
-                _log_call(
+                usage = self._extract_usage(raw)
+
+                log_tier = (
+                    str(override.get("service_tier")).strip()
+                    if str(override.get("service_tier", "")).strip()
+                    else effective_tier
+                )
+                _log_platform_call(
+                    now=datetime.now(),
                     model_name=str(override.get("model", "-")),
-                    service_tier=self._service_tier,
+                    service_tier=log_tier if log_tier in ALLOWED_SERVICE_TIERS else effective_tier,
                     user_id=user_id_str,
                     instructions=str(override.get("instructions", "")),
                     input_text=str(override.get("input", "")),
-                    response=None,
+                    usage=usage,
+                    output_text=content,
+                    raw=raw,
+                    status="ok",
+                )
+                return GptResponse(content=content, raw=raw, usage=usage)
+            except Exception as exc:
+                log_tier = (
+                    str(override.get("service_tier")).strip()
+                    if str(override.get("service_tier", "")).strip()
+                    else effective_tier
+                )
+                _log_platform_call(
+                    now=datetime.now(),
+                    model_name=str(override.get("model", "-")),
+                    service_tier=log_tier if log_tier in ALLOWED_SERVICE_TIERS else effective_tier,
+                    user_id=user_id_str,
+                    instructions=str(override.get("instructions", "")),
+                    input_text=str(override.get("input", "")),
                     usage=None,
+                    output_text="",
+                    raw={},
                     status="error",
                     error_message=str(exc),
                 )
                 raise
-
-            usage = self._extract_usage(raw)
-
-            _log_call(
-                model_name=str(override.get("model", "-")),
-                service_tier=self._service_tier,
-                user_id=user_id_str,
-                instructions=str(override.get("instructions", "")),
-                input_text=str(override.get("input", "")),
-                response=raw,
-                usage=usage,
-                status="ok",
-            )
-            return GptResponse(content=content, raw=raw, usage=usage)
 
         instr = _optional_str(instructions) if instructions is not None else _optional_str(system)
         inp = _optional_str(input) if input is not None else _optional_str(user)
@@ -262,73 +317,90 @@ class GPTClient:
             model_name = TIER_TO_MODEL.get(str(tier), "gpt-5-nano")
 
         if not instr and not inp:
-            _log_call(
-                model_name=model_name,
-                service_tier=self._service_tier,
-                user_id=user_id_str,
-                instructions="",
-                input_text="",
-                response=None,
-                usage=None,
-                status="empty request",
-            )
+            # Пустой запрос — платформу не зовём, и лог не пишем.
             return GptResponse(content="", raw={}, usage=GptUsage())
 
-        query = (model_name, instr, inp)
+        query: Tuple[str, str, str] = (model_name, instr, inp)
 
-        def _fn(q: tuple[str, str, str]) -> str:
+        last_raw: Optional[Dict[str, Any]] = None
+        last_usage: Optional[GptUsage] = None
+
+        def _fn(q: Tuple[str, str, str]) -> str:
+            nonlocal last_raw, last_usage
+
             m, ins, inpt = q
             payload = _build_payload(
                 model_name=m,
                 instructions=ins,
                 input_text=inpt,
-                service_tier=self._service_tier,
+                service_tier=effective_tier,
             )
-            client = _get_openai_client()
-            resp = client.responses.create(**payload)
-            return str(getattr(resp, "output_text", "") or "")
 
-        try:
-            if use_cache:
-                content = cache_memo(
-                    query,
-                    _fn,
-                    ttl=DEFAULT_TTL_SEC,
-                    version="gpt.content.v1",
-                    update=False,
+            # Guard: только для НЕ-override вызовов, прямо перед платформой
+            _guard_tier_for_engine(effective_tier)
+
+            api_tier = "default" if effective_tier == "standard" else effective_tier
+            payload["service_tier"] = api_tier
+
+            
+            try:
+                t0 = time.monotonic()
+                client = _get_openai_client()
+                resp = client.responses.create(**payload)
+                elapsed_ms = int((time.monotonic() - t0) * 1000)
+
+                raw = resp.model_dump()
+                usage = self._extract_usage(raw)
+                out_text = str(getattr(resp, "output_text", "") or "")
+
+                last_raw = raw
+                last_usage = usage
+
+                _log_platform_call(
+                    now=datetime.now(),
+                    model_name=m,
+                    service_tier=effective_tier,
+                    user_id=user_id_str,
+                    instructions=ins,
+                    input_text=inpt,
+                    usage=usage,
+                    output_text=out_text,
+                    raw=raw,
+                    status=f"ok ({elapsed_ms} ms)",
                 )
-                raw = {"cached_via": "daemon-memo"}
-            else:
-                content = _fn(query)
-                raw = {"cached_via": "no-cache"}
-        except Exception as exc:
-            _log_call(
-                model_name=model_name,
-                service_tier=self._service_tier,
-                user_id=user_id_str,
-                instructions=instr,
-                input_text=inp,
-                response=None,
-                usage=None,
-                status="error",
-                error_message=str(exc),
+                return out_text
+            except Exception as exc:
+                _log_platform_call(
+                    now=datetime.now(),
+                    model_name=m,
+                    service_tier=effective_tier,
+                    user_id=user_id_str,
+                    instructions=ins,
+                    input_text=inpt,
+                    usage=None,
+                    output_text="",
+                    raw={},
+                    status="error",
+                    error_message=str(exc),
+                )
+                raise
+
+        # cache-hit не вызывает _fn → логов не будет.
+        if use_cache:
+            content = cache_memo(
+                query,
+                _fn,
+                ttl=DEFAULT_TTL_SEC,
+                version="gpt.content.v1",
+                update=False,
             )
-            raise
+            if last_raw is None:
+                # cache-hit: ничего не логируем
+                return GptResponse(content=str(content or ""), raw={"cached": True}, usage=GptUsage())
+            return GptResponse(content=str(content or ""), raw=last_raw or {}, usage=last_usage or GptUsage())
 
-        usage = GptUsage()
-
-        _log_call(
-            model_name=model_name,
-            service_tier=self._service_tier,
-            user_id=user_id_str,
-            instructions=instr,
-            input_text=inp,
-            response=raw,
-            usage=usage,
-            status="ok",
-        )
-
-        return GptResponse(content=str(content or ""), raw=raw, usage=usage)
+        content = _fn(query)
+        return GptResponse(content=str(content or ""), raw=last_raw or {}, usage=last_usage or GptUsage())
 
     @staticmethod
     def _extract_usage(raw: Dict[str, Any]) -> GptUsage:
