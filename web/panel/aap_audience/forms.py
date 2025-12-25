@@ -7,52 +7,6 @@ from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
 
 
-class AudienceHowForm(forms.Form):
-    what = forms.CharField(
-        label=_("Что Вы продаете? Товар, услуга, характеристики"),
-        required=False,
-        widget=forms.Textarea(
-            attrs={
-                "class": "YY-TEXTAREA",
-                "rows": 4,
-                "placeholder": _(
-                    "Опишите продукт или услугу в нескольких коротких предложениях."
-                ),
-            }
-        ),
-    )
-    who = forms.CharField(
-        label=_(
-            "Кто продает? Информация о компании, которая будет осуществлять продажу"
-        ),
-        required=False,
-        widget=forms.Textarea(
-            attrs={
-                "class": "YY-TEXTAREA",
-                "rows": 4,
-                "placeholder": _(
-                    "Название компании, сайт, страна и ключевые факты о вашем бизнесе."
-                ),
-            }
-        ),
-    )
-    geo = forms.CharField(
-        label=_(
-            "Где в Германии? Все, что поможет уточнить, где искать клиентов"
-        ),
-        required=False,
-        widget=forms.Textarea(
-            attrs={
-                "class": "YY-TEXTAREA",
-                "rows": 4,
-                "placeholder": _(
-                    "Ваше присутствие в Германии - адреса компании, дилеров, представителей. "
-                    "Опишите логистику, географические ограничения"
-                ),
-            }
-        ),
-    )
-
 # FILE: web/panel/aap_audience/forms.py
 # DATE: 2025-12-22
 # PURPOSE: HOW-формы для sell / buy. Buy наследует Sell и меняет ТОЛЬКО label + placeholder.
@@ -60,45 +14,44 @@ class AudienceHowForm(forms.Form):
 
 class AudienceHowSellForm(forms.Form):
     what = forms.CharField(
-        label=_("Что Вы продаете? Товар, услуга, характеристики"),
+        label=_("Ваш продукт / услуга. Что именно продаётся? Суть, бизнес-характеристики"),
         required=False,
         widget=forms.Textarea(
             attrs={
                 "class": "YY-TEXTAREA",
-                "rows": 4,
+                "rows": 5,
                 "placeholder": _(
-                    "Опишите продукт или услугу в нескольких коротких предложениях."
+                    "Кратко опишите продукт / услугу. Что именно продаётся. Что получает покупатель.."
                 ),
             }
         ),
     )
     who = forms.CharField(
         label=_(
-            "Кто продает? Информация о компании, которая будет осуществлять продажу"
+            "Компания-продавец. Кто Вы? Направление деятельности, опыт, достижения, репутация."
         ),
         required=False,
         widget=forms.Textarea(
             attrs={
                 "class": "YY-TEXTAREA",
-                "rows": 4,
+                "rows": 5,
                 "placeholder": _(
-                    "Название компании, сайт, страна и ключевые факты о вашем бизнесе."
+                    "Название компании, страна, адрес, юридическая форма, адрес сайта, размер компании, специализация, сколько лет на рынке."
                 ),
             }
         ),
     )
     geo = forms.CharField(
         label=_(
-            "Где в Германии? Все, что поможет уточнить, где искать клиентов"
+            "География работы в Германии. Возможности и ограничения. Территория, логистика."
         ),
         required=False,
         widget=forms.Textarea(
             attrs={
                 "class": "YY-TEXTAREA",
-                "rows": 4,
+                "rows": 5,
                 "placeholder": _(
-                    "Ваше присутствие в Германии - адреса компании, дилеров, представителей. "
-                    "Опишите логистику, географические ограничения"
+                    "Партнеры, дилеры, представители в Германии, их адреса. Логистика поставок. Территория предоставления услуг. Где продукт применим в Германии."
                 ),
             }
         ),
@@ -131,40 +84,41 @@ class AudienceHowBuyForm(AudienceHowSellForm):
         super().__init__(*args, **kwargs)
 
         self.fields["what"].label = _(
-            "Что Вы хотите купить? Товар, услуга, требования"
+            "Продукт / услуга. Что именно Вы приобретаете? Суть, бизнес-характеристики"
         )
         self.fields["what"].widget.attrs["placeholder"] = _(
-            "Опишите, что именно Вы ищете и какие требования важны."
+            "Продукт / услуга. Что именно Вы приобретаете? Суть, бизнес-характеристики"
         )
-
+        self.fields["what"].initial = _(
+            "Необходимо приобрести: "
+        )
+        
         self.fields["who"].label = _(
-            "Кто покупает? Информация о компании-заказчике"
+            "Компания-покупатель. Кто Вы? Направление деятельности, опыт, достижения, репутация."
         )
         self.fields["who"].widget.attrs["placeholder"] = _(
-            "Название компании, сайт, страна и краткая информация о заказчике."
+            "Название компании, сайт, страна и краткая информация о покупателе"
+        )
+        self.fields["who"].initial = _(
+            "Покупатель:"
         )
 
         self.fields["geo"].label = _(
-            "Где в Германии? География поиска поставщиков или подрядчиков"
+            "География покупки в Германии. Возможности и ограничения. Территория, логистика."
         )
         self.fields["geo"].widget.attrs["placeholder"] = _(
-            "Регионы Германии, допустимая логистика, удаленная или локальная работа."
+            "Регионы Германии, допустимая логистика, требования к месту доставки / месту оказания услуги."
+        )
+        self.fields["geo"].initial = _(
+            "География:"
         )
 
-# FILE: web/panel/aap_audience/forms.py
-# DATE: 2025-12-24
-# FIX: Edit-формы без миксинов (чтобы не было KeyError). Две явные формы: Sell наследует AudienceHowSellForm, Buy наследует AudienceHowBuyForm.
-#      В edit: все поля обязательны (и слева what/who/geo, и справа title/task_*).
 
-from django import forms
-from django.utils.translation import gettext_lazy as _
-
-# ... (оставь твой текущий код выше без изменений)
 
 
 class AudienceEditSellForm(AudienceHowSellForm):
     title = forms.CharField(
-        label=_("Название задачи"),
+        label=_("Название задачи ПОИСК КЛИЕНТОВ"),
         required=True,
         widget=forms.TextInput(
             attrs={"class": "YY-INPUT", "placeholder": _("Коротко и по делу")}
@@ -172,36 +126,36 @@ class AudienceEditSellForm(AudienceHowSellForm):
     )
 
     task_client = forms.CharField(
-        label=_("Клиент"),
+        label=_("КЛИЕНТ: Критерии для ранжирования клиентов"),
         required=True,
         widget=forms.Textarea(
             attrs={
                 "class": "YY-TEXTAREA",
-                "rows": 6,
-                "placeholder": _("Опишите, кто ваш целевой клиент."),
+                "rows": 5,
+                "placeholder": _("КЛИЕНТ: Критерии для ранжирования клиентов"),
             }
         ),
     )
 
     task_branches = forms.CharField(
-        label=_("Категории"),
+        label=_("КАТЕГОРИИ: Критерии для ранжирования бизнес-категорий"),
         required=True,
         widget=forms.Textarea(
             attrs={
                 "class": "YY-TEXTAREA",
-                "rows": 6,
-                "placeholder": _("Какие категории/ниши подходят."),
+                "rows": 5,
+                "placeholder": _("КАТЕГОРИИ: Критерии для ранжирования бизнес-категорий"),
             }
         ),
     )
 
     task_geo = forms.CharField(
-        label=_("География"),
+        label=_("ГЕОГРАФИЯ: Критерии для ранжирования городов (Германия)"),
         required=True,
         widget=forms.Textarea(
             attrs={
                 "class": "YY-TEXTAREA",
-                "rows": 6,
+                "rows": 5,
                 "placeholder": _("Какая география подходит."),
             }
         ),
@@ -237,30 +191,30 @@ class AudienceEditSellForm(AudienceHowSellForm):
 
 class AudienceEditBuyForm(AudienceHowBuyForm):
     title = forms.CharField(
-        label=_("Название задачи (покупка)"),
+        label=_("Название задачи"),
         required=True,
         widget=forms.TextInput(
             attrs={
                 "class": "YY-INPUT",
-                "placeholder": _("Например: найти подрядчиков/поставщиков"),
+                "placeholder": _("Название задачи ПОИСК ПОСТАВЩИКОВ / ПОДРЯДЧИКОВ"),
             }
         ),
     )
 
     task_client = forms.CharField(
-        label=_("Покупатель / заказчик"),
+        label=_("ПРОДАВЕЦ: Критерии для ранжирования продавцов"),
         required=True,
         widget=forms.Textarea(
             attrs={
                 "class": "YY-TEXTAREA",
                 "rows": 6,
-                "placeholder": _("Опишите компанию-заказчика и профиль закупки."),
+                "placeholder": _("Критерии для ранжирования продавцов."),
             }
         ),
     )
 
     task_branches = forms.CharField(
-        label=_("Категории поставщиков / подрядчиков"),
+        label=_("КАТЕГОРИИ: Критерии для ранжирования бизнес-категорий"),
         required=True,
         widget=forms.Textarea(
             attrs={
@@ -272,7 +226,7 @@ class AudienceEditBuyForm(AudienceHowBuyForm):
     )
 
     task_geo = forms.CharField(
-        label=_("География поиска (поставщики/подрядчики)"),
+        label=_("ГЕОГРАФИЯ: Критерии для ранжирования городов (Германия)"),
         required=True,
         widget=forms.Textarea(
             attrs={

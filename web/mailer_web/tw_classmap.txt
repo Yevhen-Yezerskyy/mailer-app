@@ -9,6 +9,7 @@ YY-CARD_IN_FORM: px-4 py-2 mb-2 rounded-md bg-[#f8fdff] border border-[#71d0f4] 
 YY-CARD_IN_FORM_BLANK: px-4 py-2 mb-2 rounded-md bg-[#ffffff] border border-[#71d0f4]
 YY-CARD_IN_FORM_ERROR: px-4 py-2 mb-5 rounded-md bg-[#fff8f8] text-[#8e0000] border border-[#f3a7a7]
 YY-TEXTAREA: px-4 py-2 mb-5 w-full rounded-md border border-[#71d0f4] bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007c09]/10 focus:border-[#007c09]
+YY-INPUT: px-4 py-2 mb-5 w-full rounded-md border border-[#71d0f4] bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007c09]/10 focus:border-[#007c09]
 
 #TABLES
 YY-TH_TR: bg-[#f8fdff] border-b border-[#71d0f4] text-[#006991] text-left 
@@ -25,8 +26,8 @@ YY-MAIN_BOTTOM_DIV: border rounded-md bg-[#ffffff] border border-[#71d0f4] overf
 YY-BUTTON_MAIN: px-5 py-1.5 flex items-center justify-center rounded-md bg-[#effbff] text-[#006991] font-semibold hover:bg-[#f8fdff] border border-[#71d0f4] uppercase text-sm
 YY-BUTTON_GREEN: px-5 py-1.5 flex items-center justify-center rounded-md bg-[#d6fdda] text-[#016b09] font-semibold hover:bg-[#f2fff3] border border-[#71d0f4] uppercase text-sm
 
-YY-BUTTON_TAB_MAIN: px-5 py-1.5 flex items-center rounded-md bg-[#effbff] text-[#006991] font-semibold hover:bg-[#f8fdff] border border-[#71d0f4] uppercase text-sm min-w-[130px]
-YY-BUTTON_TAB_RED: px-5 py-1.5 flex items-center rounded-md bg-[#fff8f8] text-[#8e0000] font-semibold hover:bg-[#fff2f2] border border-[#f3a7a7] uppercase text-sm min-w-[130px]
+YY-BUTTON_TAB_MAIN: px-5 py-1.5 flex rounded-md bg-[#effbff] text-[#006991] font-semibold hover:bg-[#f8fdff] border border-[#71d0f4] uppercase text-sm min-w-[130px]
+YY-BUTTON_TAB_RED: px-5 py-1.5 flex rounded-md bg-[#fff8f8] text-[#8e0000] font-semibold hover:bg-[#fff2f2] border border-[#f3a7a7] uppercase text-sm min-w-[130px]
 
 
 

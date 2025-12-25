@@ -1,393 +1,311 @@
+<!-- FILE: web/templates/panels/aap_audience/how.html -->
+<!-- DATE: 2025-12-24 -->
+
 {% extends "panels/base.html" %}
 {% load i18n %}
 
 {% block content %}
 
-<div class="w-[95%] max-w-none mx-auto">
-  <!-- FILE: web/templates/panels/aap_audience/how.html  (обновлено — 2025-12-19)
-       PURPOSE: Tailwind UI (форма+инструкция), GPT-вопросы/хинты, overlay "Думаю…" на process/save, clear через mode=clear, delete с confirm; без disable (overlay всё перекрывает) -->
+<form method="post">
+  {% csrf_token %}
 
-  <div class="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6 items-start">
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+        <div class="YY-CARD_WHITE">
+          <div class="YY-CARD_IN_FORM_BLANK mb-5">
+            <div class="flex gap-3">
+              <button
+                type="button"
+                onclick="location.href='?state={{ state }}&type=sell{% if id %}&id={{ id }}{% endif %}'"
+                class="{% if type == 'sell' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}">
+                {% trans "Поиск клиентов" %}
+              </button>
 
-    <!-- ===================== LEFT: FORM CARD ===================== -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-      <form method="post" id="how-form" class="space-y-6">
-        {% csrf_token %}
+              <button
+                type="button"
+                onclick="location.href='?state={{ state }}&type=buy{% if id %}&id={{ id }}{% endif %}'"
+                class="{% if type == 'buy' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}">
+                {% trans "Поиск поставщиков / подрядчиков" %}
+              </button>
+            </div>
+          </div>
 
-        <!-- WHAT -->
-        <div>
-          <label for="id_what" class="block text-sm font-semibold text-slate-700 mb-2">
-            {% trans "Что Вы продаёте" %}
-          </label>
+          {% if state == "how" %}
+            <!-- WHAT -->
+            <label class="YY-LABEL">
+              {{ form.what.label }}
+            </label>
 
-          {% if form.question_what.value %}
-            <div class="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <div class="text-sm text-slate-800">
-                <strong>
-                  {% trans "Уточняющий вопрос:" %}
-                </strong>
-                {{ form.question_what.value }}
+            {% if q_what or h_what %}
+              <div class="YY-CARD_IN_FORM">
+                {% if q_what %}<p>{{ q_what }}</p>{% endif %}
+                {% if h_what %}<p>{{ h_what }}</p>{% endif %}
               </div>
-              {% if form.hint_what.value %}
-                <div class="mt-2 text-sm text-slate-600">
-                  {{ form.hint_what.value }}
-                </div>
-              {% endif %}
-            </div>
-          {% endif %}
-
-          <textarea
-            name="{{ form.what.name }}"
-            id="id_what"
-            rows="4"
-            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800
-                   placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0a5f85]/30 focus:border-[#0a5f85]"
-            placeholder="{% trans 'Опишите продукт или услугу в нескольких словах.' %}"
-            data-initial="{{ form.what.value|default_if_none:'' }}"
-          >{{ form.what.value|default_if_none:"" }}</textarea>
-
-          {% if form.what.errors %}
-            <div class="mt-2 text-sm text-red-600">
-              {{ form.what.errors }}
-            </div>
-          {% endif %}
-        </div>
-
-        <!-- WHO -->
-        <div>
-          <label for="id_who" class="block text-sm font-semibold text-slate-700 mb-2">
-            {% trans "Кратко опишите Вашу компанию" %}
-          </label>
-
-          {% if form.question_who.value %}
-            <div class="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <div class="text-sm text-slate-800">
-                <strong>
-                  {% trans "Уточняющий вопрос:" %}
-                </strong>
-                {{ form.question_who.value }}
-              </div>
-              {% if form.hint_who.value %}
-                <div class="mt-2 text-sm text-slate-600">
-                  {{ form.hint_who.value }}
-                </div>
-              {% endif %}
-            </div>
-          {% endif %}
-
-          <textarea
-            name="{{ form.who.name }}"
-            id="id_who"
-            rows="4"
-            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800
-                   placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0a5f85]/30 focus:border-[#0a5f85]"
-            placeholder="{% trans 'Название компании, сайт и факты о бизнесе.' %}"
-            data-initial="{{ form.who.value|default_if_none:'' }}"
-          >{{ form.who.value|default_if_none:"" }}</textarea>
-
-          {% if form.who.errors %}
-            <div class="mt-2 text-sm text-red-600">
-              {{ form.who.errors }}
-            </div>
-          {% endif %}
-        </div>
-
-        <!-- GEO -->
-        <div>
-          <label for="id_geo" class="block text-sm font-semibold text-slate-700 mb-2">
-            {% trans "Сведения, влияющие на географию поиска" %}
-          </label>
-
-          {% if form.question_geo.value %}
-            <div class="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-              <div class="text-sm text-slate-800">
-                <strong>
-                  {% trans "Уточняющий вопрос:" %}
-                </strong>
-                {{ form.question_geo.value }}
-              </div>
-              {% if form.hint_geo.value %}
-                <div class="mt-2 text-sm text-slate-600">
-                  {{ form.hint_geo.value }}
-                </div>
-              {% endif %}
-            </div>
-          {% endif %}
-
-          <textarea
-            name="{{ form.geo.name }}"
-            id="id_geo"
-            rows="4"
-            class="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-800
-                   placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0a5f85]/30 focus:border-[#0a5f85]"
-            placeholder="{% trans 'Факты, влияющие на поиск клиентов в Германии.' %}"
-            data-initial="{{ form.geo.value|default_if_none:'' }}"
-          >{{ form.geo.value|default_if_none:"" }}</textarea>
-
-          {% if form.geo.errors %}
-            <div class="mt-2 text-sm text-red-600">
-              {{ form.geo.errors }}
-            </div>
-          {% endif %}
-        </div>
-
-        <!-- hidden fields -->
-        {{ form.question_what }}
-        {{ form.hint_what }}
-        {{ form.question_who }}
-        {{ form.hint_who }}
-        {{ form.question_geo }}
-        {{ form.hint_geo }}
-        {{ form.edit_id }}
-
-        <!-- actions -->
-        <div class="flex flex-wrap gap-3 pt-2">
-          <button
-            type="submit"
-            name="mode"
-            value="process"
-            id="submit-btn"
-            class="h-10 px-6 rounded-xl text-white font-semibold border border-[#084b69]"
-            style="background:#0a5f85">
-            {% trans "Обработать" %}
-          </button>
-
-          <button
-            type="submit"
-            name="mode"
-            value="save"
-            id="save-btn"
-            class="h-10 px-6 rounded-xl text-white font-semibold border border-[#084b69]"
-            style="background:#0a5f85">
-            {% if form.edit_id.value %}
-              {% trans "Сохранить изменения" %}
-            {% else %}
-              {% trans "Сохранить задачу" %}
             {% endif %}
-          </button>
 
-          <button
-            type="submit"
-            name="mode"
-            value="clear"
-            id="clear-btn"
-            class="h-10 px-6 rounded-xl text-white font-semibold border border-[#084b69]"
-            style="background:#0a5f85">
-            {% trans "Очистить" %}
-          </button>
+            {{ form.what }}
+
+            <label class="YY-LABEL">
+              {{ form.who.label }}
+            </label>
+
+            {% if q_who or h_who %}
+              <div class="YY-CARD_IN_FORM">
+                {% if q_who %}<p>{{ q_who }}</p>{% endif %}
+                {% if h_who %}<p>{{ h_who }}</p>{% endif %}
+              </div>
+            {% endif %}
+
+            {{ form.who }}
+
+            <label class="YY-LABEL">
+              {{ form.geo.label }}
+            </label>
+
+            {% if q_geo or h_geo %}
+              <div class="YY-CARD_IN_FORM">
+                {% if q_geo %}<p>{{ q_geo }}</p>{% endif %}
+                {% if h_geo %}<p>{{ h_geo }}</p>{% endif %}
+              </div>
+            {% endif %}
+
+            {{ form.geo }}
+
+            <div class="flex gap-3">
+              <button type="submit" name="action" value="process" class="YY-BUTTON_MAIN" data-loading="1">
+                {% trans "Обработать" %}
+              </button>
+              <button type="submit" name="action" value="clear" class="YY-BUTTON_MAIN">
+                {% trans "Очистить" %}
+              </button>
+              <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN" data-loading="1">
+                {% trans "Сохранить" %}
+              </button>
+            </div>
+          {% endif %}
+
+          {% if state == "edit" %}
+            <!-- WHAT -->
+            <label class="YY-LABEL">
+              {{ form.what.label }}
+            </label>
+            {{ form.what }}
+
+            <!-- WHO -->
+            <label class="YY-LABEL">
+              {{ form.who.label }}
+            </label>
+            {{ form.who }}
+
+            <!-- GEO -->
+            <label class="YY-LABEL">
+              {{ form.geo.label }}
+            </label>
+            {{ form.geo }}
+          {% endif %}
         </div>
+      </td>
 
-        {% if form.non_field_errors %}
-          <div class="mt-2 text-sm text-red-600">
-            {{ form.non_field_errors }}
+      <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+        {% if state == "how" %}
+          <div class="YY-CARD_BLUE">
+            <p class="YY-TEXT">
+              <strong>Инструкции</strong>
+            </p>
+            <ol class="YY-TEXT_OL">
+              <li class="YY-TEXT_LI">
+                <strong>{% trans "Предоставленная Вами информация является непубличной и не передаётся третьим лицам." %}</strong>
+                {% trans "Она используется исключительно для оценки вероятности заключения сделки с контрагентами." %}
+                <strong>{% trans "Недостоверные данные искажают результат и снижают эффективность подбора контрагентов." %}</strong>
+                {% trans "Поэтому указывайте реальные факты, а не маркетинговые формулировки — это в Ваших интересах." %}
+              </li>
+
+              <li class="YY-TEXT_LI">
+                <strong>{% trans "Это вспомогательный ассистент для формулирования критериев отбора и ранжирования контрагентов." %}</strong>
+                {% trans "Ответственность за сохранённые данные лежит на Вас: Вы должны исправлять ошибки, удалять неверные предположения и добавлять корректные факты. Недостоверная информация искажает оценку вероятности сделки." %}
+                
+              </li>
+
+              <li class="YY-TEXT_LI">
+                <strong>{% trans "Ассистент задаёт вопросы, чтобы подсказать, какую информацию ещё можно добавить." %}</strong>
+                {% trans "Отвечать на них не обязательно. Если вопрос кажется лишним или у Вас нет ответа, просто пропустите его. Вопросы будут появляться постоянно. Когда результат Вас устроит, сохраните его." %}
+              </li>
+
+              <li class="YY-TEXT_LI">
+                <strong>{% trans "«Обработать» — вызвать ассистента для корректировки и дополнения введённой Вами информации." %}</strong>
+                {% trans "При сохранении формируются критерии выбора контрагентов, бизнес-категорий и городов Германии. Вы сможете отредактировать эти данные. Сбор и ранжирование контрагентов запускаются отдельно." %}
+              </li>
+
+              <li class="YY-TEXT_LI">
+                <strong>{% trans "Указывайте интернет-адреса в виде ссылок (https://mysite.com)." %}</strong>
+                {% trans "Если сомневаетесь, скопируйте адрес из строки браузера. Иначе ассистент не распознает, что это ссылка." %}
+              </li>
+            </ol>
           </div>
         {% endif %}
+        {% if state == "edit" %}
+          <div class="YY-CARD_WHITE">
+            <label class="YY-LABEL">
+              {{ form.title.label }}
+            </label>
+            {{ form.title }}
 
-        <!-- overlay -->
-        <div id="thinking-overlay" class="hidden">
-          <div class="fixed inset-0 bg-slate-900/10"></div>
-          <div class="fixed inset-0 flex items-center justify-center">
-            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 px-6 py-4 text-slate-800 font-semibold">
-              {% trans "Думаю…" %}
+            <label class="YY-LABEL">
+              {{ form.task_client.label }}
+            </label>
+            {{ form.task_client }}
+
+            <label class="YY-LABEL">
+              {{ form.task_branches.label }}
+            </label>
+            {{ form.task_branches }}
+
+            <label class="YY-LABEL">
+              {{ form.task_geo.label }}
+            </label>
+            {{ form.task_geo }}
+
+            {% if form.non_field_errors %}
+              <div class="YY-CARD_IN_FORM_ERROR mt-3">
+                {{ form.non_field_errors }}
+              </div>
+            {% endif %}
+
+            <div class="flex gap-3 mt-3">
+              <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">
+                {% trans "Сохранить изменения" %}
+              </button>
+              <button type="submit" name="action" value="cancel" class="YY-BUTTON_MAIN" formnovalidate>
+                {% trans "Отменить" %}
+              </button>
             </div>
           </div>
-        </div>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
 
-      </form>
-    </div>
+</form>
 
-    <!-- ===================== RIGHT: INSTRUCTION CARD ===================== -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-      <div class="text-slate-900 font-semibold mb-3">
-        {% trans "Инструкция" %}
-      </div>
-
-      <ol class="list-decimal pl-5 space-y-3 text-slate-800 leading-relaxed">
-        <li>
-          <strong>
-            {% trans "Напишите что Вы продаёте, опишите Вашу компанию." %}
-          </strong>
-          {% trans "Всё остальное — лишнее." %}
-        </li>
-        <li>
-          <strong>
-            {% trans "Дайте ссылку на сайт Вашей компании в формате https://mysite.ua." %}
-          </strong>
-          {% trans "Система сама будет искать нужные факты. Ваш сайт будет обработан." %}
-        </li>
-        <li>
-          <strong>
-            {% trans "Пишите в любые поля полезную информацию." %}
-          </strong>
-          {% trans "Мы разберемся что к чему." %}
-        </li>
-        <li>
-          <strong>
-            {% trans "Не бойтесь ошибок. Лишнее и неважное система отбросит. Потом всегда можно исправить." %}
-          </strong>
-            {% trans "Это поможет Вам понять, что еще нужно добавить или исправить." %}
-        </li>
-        <li>
-          <strong>
-            {% trans "Отвечайте коротко и информативно. Меньше слов, больше информации" %}
-          </strong>
-        </li>
-        <li>
-          <strong>
-            {% trans "Если вы удовлетворены результатом - сохраните его." %}
-          </strong>
-            {% trans "Вопросы будут появляться бесконечно. Это всего лишь подсказки - вдруг Вы что-то важное вспомните." %}
-        </li>
-
-      </ol>
-    </div>
-
-  </div>
-
-  <!-- ===================== TASKS TABLE ===================== -->
-  {% if tasks %}
-    <div class="w-[100%] max-w-none mx-auto mt-6">
-      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="overflow-x-auto">
-          <table class="w-full text-sm">
-            <thead class="bg-slate-50 border-b border-slate-200">
-              <tr class="text-left text-slate-700 font-semibold">
-                <th class="px-4 py-3 w-[25%]">
-                  {% trans "Аудитория" %}
-                </th>
-                <th class="px-4 py-3 w-[37%]">{% trans "Основная задача" %}</th>
-                  <th class="px-4 py-3 w-[37%]">
-                    {% trans "Критерии" %}
-                  </th>
-                <th class="px-4 py-3 w-[110px] text-right">
-                  {% trans "Действия" %}
-                </th>
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      {% if tasks %}
+        <div class="YY-MAIN_BOTTOM_DIV">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH w-[40%]">{% trans "Задача" %}</th>
+                <th class="YY-TH_TH w-[40%]">{% trans "Критерии выбора" %}</th>
+                <th class="YY-TH_TH">{% trans "Статус" %}</th>
+                <th class="YY-TH_TH">{% trans "Действия" %}</th>
               </tr>
             </thead>
-
-            <tbody class="divide-y divide-slate-200">
+            <tbody>
               {% for t in tasks %}
-                <tr class="align-top">
-                  <td class="px-4 py-3 font-semibold text-slate-900">{{ t.title }}</td>
-                  <td class="px-4 py-3 text-slate-700">{{ t.task|linebreaksbr }}</td>
-                  <td class="px-4 py-3 text-slate-700">
+                <tr class="YY-TB_TR">
+                  <td class="YY-TB_TD">
+                    {% if t.type == "sell" %}
+                      <div class="YY-STATUS_GREEN mb-3">
+                        {% trans "Поиск клиентов" %}
+                      </div>
+                    {% else %}
+                      <div class="YY-STATUS_YELLOW mb-3">
+                        {% trans "Поиск поставщиков / подрядчиков" %}
+                      </div>
+                    {% endif %}
 
-                    <!-- tabs -->
-                    <div class="flex gap-2 mb-2 text-xs font-semibold">
-                      <button
-                        type="button"
-                        class="criteria-tab px-2 py-1 rounded bg-slate-200 text-slate-800"
-                        data-target="branches-{{ t.id }}">
-                        {% trans "Категория" %}
-                      </button>
-                      <button
-                        type="button"
-                        class="criteria-tab px-2 py-1 rounded bg-slate-100 text-slate-600"
-                        data-target="geo-{{ t.id }}">
-                        {% trans "География" %}
-                      </button>
-                      <button
-                        type="button"
-                        class="criteria-tab px-2 py-1 rounded bg-slate-100 text-slate-600"
-                        data-target="client-{{ t.id }}">
-                        {% trans "Клиент" %}
-                      </button>
+                    <div class="mb-3 font-semibold">
+                      {{ t.title }}
                     </div>
+                    <div>
+                      {{ t.task }}
+                    </div>
+                  </td>
 
-                    <!-- content -->
-                    <div class="criteria-content space-y-1 text-sm">
-                      <div id="branches-{{ t.id }}">
-                        {{ t.task_branches|linebreaksbr }}
+                  <td class="YY-TB_TD">
+                    <div data-tabs="choice-{{ t.id }}">
+                      <div class="flex gap-3 mb-3">
+                        <button type="button"
+                          data-tab="client"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_GREEN">
+                          {% trans "Клиент" %}
+                        </button>
+
+                        <button type="button"
+                          data-tab="branches"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_MAIN">
+                          {% trans "Категории" %}
+                        </button>
+
+                        <button type="button"
+                          data-tab="geo"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_MAIN">
+                          {% trans "География" %}
+                        </button>
                       </div>
-                      <div id="geo-{{ t.id }}" class="hidden">
-                        {{ t.task_geo|linebreaksbr }}
-                      </div>
-                      <div id="client-{{ t.id }}" class="hidden">
+
+                      <div data-panel="client">
                         {{ t.task_client|linebreaksbr }}
                       </div>
+                      <div data-panel="branches" class="hidden">
+                        {{ t.task_branches|linebreaksbr }}
+                      </div>
+                      <div data-panel="geo" class="hidden">
+                        {{ t.task_geo|linebreaksbr }}
+                      </div>
                     </div>
-
                   </td>
-                  <td class="px-4 py-3 text-right align-top">
-                    <div class="flex flex-col items-end gap-2">
-                      <a
-                        href="?edit={{ t.id }}"
-                        class="px-3 py-1.5 rounded-md text-sm font-semibold
-                               text-[#0a5f85] bg-[#eff6fb]
-                               hover:bg-[#e3f2f9] border border-slate-200">
-                        {% trans "Изменить" %}
-                      </a>
 
-                      <form method="post" class="m-0">
-                        {% csrf_token %}
-                        <input type="hidden" name="mode" value="delete">
-                        <input type="hidden" name="delete_id" value="{{ t.id }}">
-                        <button
-                          type="submit"
-                          onclick="return confirm('{% trans "Вы уверены, что хотите удалить задачу?" %}');"
-                          class="px-3 py-1.5 rounded-md text-sm font-semibold
-                                 text-red-700 bg-red-50
-                                 hover:bg-red-100 border border-red-200">
-                          {% trans "Удалить" %}
-                        </button>
-                      </form>
-                    </div>
+                  <td class="YY-TB_TD">
+                    {% if t.run_processing %}
+                      <div class="YY-STATUS_GREEN">
+                        {% trans "В работе" %}
+                      </div>
+                    {% else %}
+                      <div class="YY-STATUS_YELLOW">
+                        {% trans "Не запущено" %}
+                      </div>
+                    {% endif %}
+                  </td>
+
+                  <td class="YY-TB_TD">
+                    <a
+                      href="?state=edit&type={{ t.type }}&id={{ t.ui_id }}"
+                      class="YY-BUTTON_TAB_MAIN mb-2 inline-block">
+                      {% trans "Изменить" %}
+                    </a>
+                    {% if not t.run_processing %}
+                    <form method="post" class="inline-block"
+                          onsubmit="return confirm('{% trans "Удалить задачу?" %}')">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete">
+                      <input type="hidden" name="id" value="{{ t.ui_id }}">
+                      <button type="submit" class="YY-BUTTON_TAB_RED">
+                        {% trans "Удалить" %}
+                      </button>
+                    </form>
+                    {% endif %}
                   </td>
                 </tr>
               {% endfor %}
             </tbody>
-
           </table>
         </div>
-      </div>
-    </div>
-  {% endif %}
-
-</div>
-
-<script>
-(function () {
-  const overlay = document.getElementById("thinking-overlay");
-  const btnProcess = document.getElementById("submit-btn");
-  const btnSave = document.getElementById("save-btn");
-
-  function showOverlay() {
-    if (overlay) overlay.classList.remove("hidden");
-  }
-
-  // Только по клику на нужные кнопки.
-  // Никаких disable вообще — overlay и так перекрывает весь экран.
-  if (btnProcess) btnProcess.addEventListener("click", showOverlay);
-  if (btnSave) btnSave.addEventListener("click", showOverlay);
-})();
-</script>
-<script>
-(function () {
-  document.addEventListener("click", function (e) {
-    const btn = e.target.closest(".criteria-tab");
-    if (!btn) return;
-
-    const td = btn.closest("td");
-    if (!td) return;
-
-    const targetId = btn.dataset.target;
-
-    // переключаем кнопки
-    td.querySelectorAll(".criteria-tab").forEach(b => {
-      b.classList.remove("bg-slate-200", "text-slate-800");
-      b.classList.add("bg-slate-100", "text-slate-600");
-    });
-    btn.classList.add("bg-slate-200", "text-slate-800");
-
-    // переключаем контент
-    td.querySelectorAll(".criteria-content > div").forEach(div => {
-      div.classList.add("hidden");
-    });
-
-    const target = td.querySelector("#" + targetId);
-    if (target) target.classList.remove("hidden");
-  });
-})();
-</script>
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
+      {% endif %}
+    </td>
+  </tr>
+</table>
 
 {% endblock %}

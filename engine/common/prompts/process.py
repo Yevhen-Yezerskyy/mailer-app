@@ -1,4 +1,4 @@
-# FILE: engine/common/prompts/__init__.py  (новое) 2025-12-20
+# FILE: engine/common/prompts/process.py  (новое) 2025-12-20
 # Минимальный prompt API: файл -> GPT-перевод через instructions с {LANG}
 
 from pathlib import Path
