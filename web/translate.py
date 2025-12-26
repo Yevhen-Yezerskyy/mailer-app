@@ -22,7 +22,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 LOCALE_DIR = PROJECT_ROOT / "locale"
 
 SOURCE_LANG = "ru"
-TARGET_LANGS = ["de", "uk"]
+TARGET_LANGS = ["de", "uk", "en"]
 ALL_LANGS = [SOURCE_LANG] + TARGET_LANGS
 
 SYSTEM_PROMPT = """You are a professional technical translator.
@@ -189,13 +189,10 @@ def set_msgstr(e: PoEntry, text: str) -> None:
 
 def translate_text(client: GPTClient, src: str, lang: str) -> str:
     resp = client.ask(
-        tier="mini",
-        workspace_id="system",
-        user_id="translate",
-        system=SYSTEM_PROMPT + f"\nTarget language: {lang}",
-        user=src,
-        with_web=False,
-        endpoint="i18n-translate",
+        model="mini",
+        user_id="system",
+        instructions=SYSTEM_PROMPT + f"\nTarget language: {lang}",
+        input=src,
     )
     return resp.content.strip()
 
@@ -209,7 +206,7 @@ def process_lang(lang: str) -> None:
         return
 
     header, entries = parse_po(path.read_text(encoding="utf-8"))
-    client = GPTClient(debug=False)
+    client = GPTClient()
     changed = False
 
     for e in entries:
@@ -242,7 +239,7 @@ def main() -> None:
     print("[2/4] strip fuzzy")
     strip_fuzzy_all()
 
-    print("[3/4] translate empty msgstr (de/uk)")
+    print("[3/4] translate empty msgstr (de/uk/en)")
     for lang in TARGET_LANGS:
         process_lang(lang)
 

@@ -147,6 +147,7 @@ LANGUAGES = [
     ("ru", "Русский"),
     ("de", "Deutsch"),
     ("uk", "Українська"),
+    ("en", "English"),
 ]
 
 TIME_ZONE = "Europe/Berlin"

@@ -1,39 +1,20 @@
-# FILE: web/panel/aap_audience/views/clar.py  (обновлено — 2025-12-18)
-# CHANGE: фиксим импорты после переезда аппа под panel/,
-#         логика, SQL и GPT — без изменений. БД/таблицы не трогаем.
+# FILE: web/panel/aap_audience/views/clar.py  (обновлено — 2025-12-26)
+# CHANGE:
+# - rating branches/geo полностью независим от edit_task.run_processing
+# - __tasks_rating: только INSERT (append-only), done не трогаем
+# - хеш только через engine.common.utils.h64_text
+# - UI-ветки/тексты остаются в шаблоне; view отдаёт только данные/состояния
 
-import json
+from __future__ import annotations
 
 from django.db import connection
-from django.shortcuts import render, redirect, get_object_or_404
+from django.http import HttpResponseRedirect
+from django.shortcuts import redirect, render
 
+from engine.common.utils import h64_text
+from mailer_web.access import encode_id, resolve_pk_or_redirect
+from panel.aap_audience.forms import AudienceClarBuyForm, AudienceClarSellForm
 from panel.aap_audience.models import AudienceTask
-from panel.aap_audience.forms import AudienceClarForm
-from engine.common.gpt import GPTClient
-from engine.common.prompts.process import get_prompt
-
-
-_gpt_client = GPTClient()
-
-
-def _load_crawl_items(workspace_id, user_id, task_id, type_):
-    if not task_id:
-        return []
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            SELECT value_id, value_text, rate
-            FROM crawl_tasks_labeled
-            WHERE workspace_id = %s
-              AND user_id      = %s
-              AND task_id      = %s
-              AND type         = %s
-            ORDER BY rate ASC, value_text ASC
-            """,
-            [str(workspace_id), int(user_id), int(task_id), type_],
-        )
-        rows = cur.fetchall()
-    return [{"value_id": r[0], "value_text": r[1], "rate": r[2]} for r in rows]
 
 
 def _load_all_crawl_items_for_tasks(workspace_id, user_id, task_ids):
@@ -62,308 +43,212 @@ def _load_all_crawl_items_for_tasks(workspace_id, user_id, task_ids):
             out[task_id][type_].append(
                 {"value_id": value_id, "value_text": value_text, "rate": rate}
             )
+
     return out
 
 
-def _delete_crawl_items(workspace_id, user_id, task_id, type_):
-    if not task_id:
-        return
+def _get_tasks(request):
+    ws_id = request.workspace_id
+    user = request.user
+    if not ws_id or not getattr(user, "is_authenticated", False):
+        return AudienceTask.objects.none()
+    return (
+        AudienceTask.objects.filter(workspace_id=ws_id, user=user)
+        .order_by("-created_at")[:50]
+    )
+
+
+def _with_ui_ids(tasks):
+    for t in tasks:
+        t.ui_id = encode_id(int(t.id))
+    return tasks
+
+
+def _bind_clar_items(ws_id, user_id, tasks):
+    task_ids = [t.id for t in tasks]
+    all_items = _load_all_crawl_items_for_tasks(ws_id, user_id, task_ids) if task_ids else {}
+
+    for t in tasks:
+        bucket = all_items.get(t.id, {"city": [], "branch": []})
+        t.clar_city_items = bucket["city"]
+        t.clar_branch_items = bucket["branch"]
+
+
+def _get_edit_task_or_redirect(request):
+    if request.GET.get("state") != "edit":
+        return None, None
+
+    ws_id = request.workspace_id
+    user = request.user
+
+    if not ws_id or not getattr(user, "is_authenticated", False):
+        return None, redirect(request.path)
+
+    if not request.GET.get("id"):
+        return None, redirect(request.path)
+
+    res = resolve_pk_or_redirect(request, AudienceTask, param="id")
+    if isinstance(res, HttpResponseRedirect):
+        return None, res
+
+    pk = int(res)
+    task = AudienceTask.objects.filter(id=pk, workspace_id=ws_id, user=user).first()
+    if task is None:
+        return None, redirect(request.path)
+
+    return task, None
+
+
+def _tasks_rating_fetch(task_id: int):
+    """
+    {
+      "has_any": bool,
+      "branches": {"running": bool, "last_done_hash": int|None},
+      "geo":      {"running": bool, "last_done_hash": int|None},
+    }
+    """
     with connection.cursor() as cur:
         cur.execute(
             """
-            DELETE FROM crawl_tasks
-            WHERE workspace_id = %s
-              AND user_id      = %s
-              AND task_id      = %s
-              AND type         = %s
+            SELECT type, hash_task, done, updated_at
+            FROM public.__tasks_rating
+            WHERE task_id = %s
+              AND type IN ('branches','geo')
+            ORDER BY updated_at DESC
             """,
-            [str(workspace_id), int(user_id), int(task_id), type_],
+            [int(task_id)],
         )
-
-
-def _insert_crawl_items(workspace_id, user_id, task_id, type_, items):
-    if not items:
-        return
-    params = [
-        (str(workspace_id), int(user_id), int(task_id), type_, int(it["value_id"]), int(it["rate"]))
-        for it in items
-    ]
-    with connection.cursor() as cur:
-        cur.executemany(
-            """
-            INSERT INTO crawl_tasks (workspace_id, user_id, task_id, type, value_id, rate)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ON CONFLICT (workspace_id, user_id, task_id, type, value_id) DO NOTHING
-            """,
-            params,
-        )
-
-
-def _pick_random_candidates(workspace_id, user_id, task_id, type_, limit=25):
-    if type_ == "branch":
-        sql = """
-            SELECT b.id, b.name
-            FROM gb_branches b
-            WHERE NOT EXISTS (
-                SELECT 1
-                FROM crawl_tasks ct
-                WHERE ct.workspace_id = %s
-                  AND ct.user_id      = %s
-                  AND ct.task_id      = %s
-                  AND ct.type         = 'branch'
-                  AND ct.value_id     = b.id
-            )
-            ORDER BY random()
-            LIMIT %s
-        """
-        with connection.cursor() as cur:
-            cur.execute(sql, [str(workspace_id), int(user_id), int(task_id), int(limit)])
-            rows = cur.fetchall()
-        return [{"id": int(r[0]), "name": str(r[1])} for r in rows]
-
-    sql = """
-        SELECT
-            c.id,
-            c.name,
-            c.state_name      AS land,
-            c.urban_code,
-            c.urban_name,
-            c.travel_code,
-            c.travel_name,
-            c.pop_total,
-            c.area_km2,
-            c.pop_density
-        FROM cities_sys c
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM crawl_tasks ct
-            WHERE ct.workspace_id = %s
-              AND ct.user_id      = %s
-              AND ct.task_id      = %s
-              AND ct.type         = 'city'
-              AND ct.value_id     = c.id
-        )
-        ORDER BY random()
-        LIMIT %s
-    """
-    with connection.cursor() as cur:
-        cur.execute(sql, [str(workspace_id), int(user_id), int(task_id), int(limit)])
         rows = cur.fetchall()
 
-    return [
-        {
-            "id": int(r[0]),
-            "name": str(r[1]),
-            "land": r[2],
-            "urban_code": r[3],
-            "urban_name": r[4],
-            "travel_code": r[5],
-            "travel_name": r[6],
-            "pop_total": r[7],
-            "area_km2": r[8],
-            "pop_density": r[9],
-        }
-        for r in rows
-    ]
+    out = {
+        "has_any": False,
+        "branches": {"running": False, "last_done_hash": None},
+        "geo": {"running": False, "last_done_hash": None},
+    }
+    if not rows:
+        return out
 
+    out["has_any"] = True
 
-def _parse_strict_ranked_list(raw_content: str):
-    if not raw_content:
-        return None
+    seen_last_done = {"branches": False, "geo": False}
+    for type_, hash_task, done, _updated_at in rows:
+        if type_ not in ("branches", "geo"):
+            continue
 
-    s = raw_content.strip()
-    if "```" in s or not (s.startswith("[") and s.endswith("]")):
-        return None
+        if done is False:
+            out[type_]["running"] = True
 
-    try:
-        data = json.loads(s)
-    except Exception:
-        return None
+        if done is True and not seen_last_done[type_]:
+            out[type_]["last_done_hash"] = hash_task
+            seen_last_done[type_] = True
 
-    if not isinstance(data, list):
-        return None
-
-    out = []
-    for item in data:
-        if not isinstance(item, dict) or set(item.keys()) != {"id", "name", "rate"}:
-            return None
-        try:
-            _id = int(item["id"])
-            rate = int(item["rate"])
-        except Exception:
-            return None
-        if rate < 1 or rate > 100:
-            return None
-        name = item["name"]
-        if not isinstance(name, str) or not name.strip():
-            return None
-        out.append({"id": _id, "name": name.strip(), "rate": rate})
     return out
 
 
-def _generate_items_for_task(*, tier, workspace_id, user_id, task, type_):
-    candidates = _pick_random_candidates(workspace_id, user_id, task.id, type_, limit=25)
-    if not candidates:
-        return []
-
-    cand_map = {c["id"]: c["name"] for c in candidates}
-
-    if type_ == "city":
-        system_prompt = get_prompt("audience_clar_city")
-        user_prompt = (
-            f"Основная задача:\n{task.task}\n\n"
-            f"Geo task:\n{task.task_geo}\n\n"
-            f"Кандидаты (оценить ВСЕ):\n"
-            f"{json.dumps(candidates, ensure_ascii=False)}"
+def _tasks_rating_insert(task_id: int, type_: str, hash_task: int):
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO public.__tasks_rating (task_id, type, hash_task, done, created_at, updated_at)
+            VALUES (%s, %s, %s, false, now(), now())
+            """,
+            [int(task_id), str(type_), int(hash_task)],
         )
-    else:
-        system_prompt = get_prompt("audience_clar_branch")
-        user_prompt = (
-            f"Основная задача:\n{task.task}\n\n"
-            f"Branches task:\n{task.task_branches}\n\n"
-            f"Кандидаты (оценить ВСЕ):\n"
-            f"{json.dumps(candidates, ensure_ascii=False)}"
-        )
-
-    resp = _gpt_client.ask(
-        tier=tier,
-        workspace_id=str(workspace_id),
-        user_id=str(user_id),
-        system=system_prompt,
-        user=user_prompt,
-        with_web=True if tier == "maxi" else None,
-        endpoint=f"aap_audience_clar_{type_}",
-        use_cache=True,
-    )
-
-    parsed = _parse_strict_ranked_list(resp.content)
-    if parsed is None:
-        return []
-
-    seen = set()
-    result = []
-    for it in parsed:
-        _id = it["id"]
-        if _id not in cand_map or it["name"] != cand_map[_id] or _id in seen:
-            return []
-        seen.add(_id)
-        result.append({"value_id": _id, "rate": it["rate"]})
-    return result
 
 
 def clar_view(request):
     ws_id = request.workspace_id
     user = request.user
 
-    tasks = AudienceTask.objects.filter(workspace_id=ws_id, user=user)
+    edit_task, r = _get_edit_task_or_redirect(request)
+    if r is not None:
+        return r
+
+    state = "edit" if edit_task else ""
     form = None
-    current_task = None
+    rating = None
+    rating_hashes = None
 
-    mode = request.POST.get("mode") if request.method == "POST" else None
+    if edit_task:
+        FormClass = AudienceClarBuyForm if edit_task.type == "buy" else AudienceClarSellForm
 
-    if request.method == "POST" and mode == "delete":
-        delete_id = request.POST.get("delete_id")
-        if delete_id:
-            AudienceTask.objects.filter(id=delete_id, workspace_id=ws_id, user=user).delete()
-        return redirect(request.path)
+        if request.method == "POST":
+            action = request.POST.get("action")
 
-    if request.method == "POST" and mode in {"gen_city", "gen_branch", "clear_city", "clear_branch"}:
-        task_id = request.POST.get("task_id")
-        if task_id:
-            obj = get_object_or_404(AudienceTask, id=task_id, workspace_id=ws_id, user=user)
-            current_task = obj
+            if action == "cancel":
+                return redirect(request.path)
 
-            if mode == "clear_city":
-                _delete_crawl_items(ws_id, user.id, obj.id, "city")
-            elif mode == "clear_branch":
-                _delete_crawl_items(ws_id, user.id, obj.id, "branch")
-            elif mode == "gen_city":
-                items = _generate_items_for_task(
-                    tier="maxi", workspace_id=ws_id, user_id=user.id, task=obj, type_="city"
-                )
-                _insert_crawl_items(ws_id, user.id, obj.id, "city", items)
-            elif mode == "gen_branch":
-                items = _generate_items_for_task(
-                    tier="maxi", workspace_id=ws_id, user_id=user.id, task=obj, type_="branch"
-                )
-                _insert_crawl_items(ws_id, user.id, obj.id, "branch", items)
+            if action == "toggle_processing":
+                AudienceTask.objects.filter(
+                    id=edit_task.id, workspace_id=ws_id, user=user
+                ).update(run_processing=not edit_task.run_processing)
+                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
-            form = AudienceClarForm(initial={
-                "edit_id": obj.id,
-                "title": obj.title,
-                "task": obj.task,
-                "task_branches": obj.task_branches,
-                "task_geo": obj.task_geo,
-                "task_client": obj.task_client,
-                "run_processing": obj.run_processing,
-                "subscribers_limit": obj.subscribers_limit,
-            })
+            # rating actions (append-only inserts)
+            hash_branches = h64_text((edit_task.task or "") + (edit_task.task_branches or ""))
+            hash_geo = h64_text((edit_task.task or "") + (edit_task.task_geo or ""))
 
-    elif request.method == "POST":
-        form = AudienceClarForm(request.POST)
-        if form.is_valid():
-            edit_id = form.cleaned_data.get("edit_id")
-            obj = get_object_or_404(AudienceTask, id=edit_id, workspace_id=ws_id, user=user)
+            if action == "rating_start_all":
+                _tasks_rating_insert(int(edit_task.id), "branches", hash_branches)
+                _tasks_rating_insert(int(edit_task.id), "geo", hash_geo)
+                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
-            obj.title = form.cleaned_data["title"]
-            obj.task = form.cleaned_data["task"]
-            obj.task_branches = form.cleaned_data["task_branches"]
-            obj.task_geo = form.cleaned_data["task_geo"]
-            obj.task_client = form.cleaned_data["task_client"]
-            obj.run_processing = form.cleaned_data["run_processing"]
-            obj.subscribers_limit = form.cleaned_data["subscribers_limit"]
-            obj.save()
+            if action == "rating_restart_branches":
+                _tasks_rating_insert(int(edit_task.id), "branches", hash_branches)
+                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
-            current_task = obj
-            form = AudienceClarForm(initial={
-                "edit_id": obj.id,
-                "title": obj.title,
-                "task": obj.task,
-                "task_branches": obj.task_branches,
-                "task_geo": obj.task_geo,
-                "task_client": obj.task_client,
-                "run_processing": obj.run_processing,
-                "subscribers_limit": obj.subscribers_limit,
-            })
+            if action == "rating_restart_geo":
+                _tasks_rating_insert(int(edit_task.id), "geo", hash_geo)
+                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
-    if request.method == "GET":
-        edit_id = request.GET.get("edit")
-        if edit_id:
-            obj = get_object_or_404(AudienceTask, id=edit_id, workspace_id=ws_id, user=user)
-            current_task = obj
-            form = AudienceClarForm(initial={
-                "edit_id": obj.id,
-                "title": obj.title,
-                "task": obj.task,
-                "task_branches": obj.task_branches,
-                "task_geo": obj.task_geo,
-                "task_client": obj.task_client,
-                "run_processing": obj.run_processing,
-                "subscribers_limit": obj.subscribers_limit,
-            })
+            if action == "save":
+                form = FormClass(request.POST)
+                if form.is_valid():
+                    cd = form.cleaned_data
+                    AudienceTask.objects.filter(
+                        id=edit_task.id, workspace_id=ws_id, user=user
+                    ).update(
+                        title=cd["title"].strip(),
+                        task=cd["task"].strip(),
+                        task_client=cd["task_client"].strip(),
+                        task_branches=cd["task_branches"].strip(),
+                        task_geo=cd["task_geo"].strip(),
+                    )
+                    return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
+            else:
+                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
-    clar_city_items, clar_branch_items = [], []
-    if current_task is not None:
-        clar_city_items = _load_crawl_items(ws_id, user.id, current_task.id, "city")
-        clar_branch_items = _load_crawl_items(ws_id, user.id, current_task.id, "branch")
+        else:
+            form = FormClass(
+                initial={
+                    "title": edit_task.title or "",
+                    "task": edit_task.task or "",
+                    "task_client": edit_task.task_client or "",
+                    "task_branches": edit_task.task_branches or "",
+                    "task_geo": edit_task.task_geo or "",
+                }
+            )
 
-    task_ids = [t.id for t in tasks]
-    all_items = _load_all_crawl_items_for_tasks(ws_id, user.id, task_ids)
-    for t in tasks:
-        bucket = all_items.get(t.id, {"city": [], "branch": []})
-        t.clar_city_items = bucket["city"]
-        t.clar_branch_items = bucket["branch"]
+        # rating data для шаблона — независимо от run_processing
+        rating = _tasks_rating_fetch(int(edit_task.id))
+        rating_hashes = {
+            "branches": h64_text((edit_task.task or "") + (edit_task.task_branches or "")),
+            "geo": h64_text((edit_task.task or "") + (edit_task.task_geo or "")),
+        }
+
+    tasks = _with_ui_ids(_get_tasks(request))
+    if ws_id and getattr(user, "is_authenticated", False) and tasks:
+        _bind_clar_items(ws_id, user.id, tasks)
 
     return render(
         request,
         "panels/aap_audience/clar.html",
         {
-            "form": form,
             "tasks": tasks,
-            "current_task_id": current_task.id if current_task else None,
-            "clar_city_items": clar_city_items,
-            "clar_city_count": len(clar_city_items),
-            "clar_branch_items": clar_branch_items,
-            "clar_branch_count": len(clar_branch_items),
+            "state": state,
+            "form": form,
+            "edit_task": edit_task,
+            "rating": rating,
+            "rating_hashes": rating_hashes,
         },
     )

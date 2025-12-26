@@ -20,23 +20,23 @@ PANEL_MENU = [
     },
     {
         # AUDIENCE
-        "title": _("Аудитория"),
+        "title": _("Аудитории"),
         "open_prefixes": ["/panel/audience/"],
         "items": [
             {
-                "title": _("Критерии выбора"),
-                "page_title": _("Аудитория : Критерии выбора"),
+                "title": _("Создание аудиторий"),
+                "page_title": _("Аудитории : создание"),
                 "url_name": "audience:index",
                 "active_prefixes": ["/panel/audience/how/"],
             },
             {
-                "title": _("Построение аудитории"),
-                "page_title": _("Аудитория : Построение аудитории"),
+                "title": _("Города и бизнес-категории"),
+                "page_title": _("Города и бизнес-категории"),
                 "url_name": "audience:clar",
                 "active_prefixes": ["/panel/audience/clar/"],
             },
             {
-                "title": _("Собранные компании"),
+                "title": _("Готовые аудитории"),
                 "page_title": _("Аудитория : Собранные компании"),
                 "url_name": "audience:status",
                 "active_prefixes": ["/panel/audience/status/"],

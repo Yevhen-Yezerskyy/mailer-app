@@ -34,7 +34,7 @@
 
   <!-- SIDEBAR -->
 <aside id="panel-sidebar"
-       class="w-80 shrink-0 bg-white border border-[#71d0f4] border-t-0 !border-t-0 flex flex-col">
+       class="w-[320px] shrink-0 bg-white border border-[#71d0f4] border-t-0 !border-t-0 flex flex-col">
 
     <div class="h-16 px-6 flex items-center border-b border-[#71d0f4] border-t-0 justify-center">
       <a href="/">
@@ -116,6 +116,10 @@
                   class="YY-BUTTON_MAIN">
                   RUS
                 </button>
+                <button type="submit" name="language" value="en"
+                  class="YY-BUTTON_MAIN">
+                  ENG
+                </button>                
               </form>
 
               <form method="post" action="{% url 'logout' %}" class="inline">

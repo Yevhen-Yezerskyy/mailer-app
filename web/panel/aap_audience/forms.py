@@ -191,7 +191,7 @@ class AudienceEditSellForm(AudienceHowSellForm):
 
 class AudienceEditBuyForm(AudienceHowBuyForm):
     title = forms.CharField(
-        label=_("Название задачи"),
+        label=_("Название задачи ПОИСК ПОСТАВЩИКОВ / ПОДРЯДЧИКОВ"),
         required=True,
         widget=forms.TextInput(
             attrs={
@@ -265,46 +265,80 @@ class AudienceEditBuyForm(AudienceHowBuyForm):
 
 
 
-class AudienceClarForm(forms.Form):
-    title = forms.CharField(
-        label="Название задачи",
-        required=True,
-        widget=forms.TextInput(attrs={"class": "panel-input"}),
-    )
-    task = forms.CharField(
-        label="Основной task",
-        required=True,
-        widget=forms.Textarea(attrs={"class": "panel-textarea", "rows": 8}),
-    )
-    task_branches = forms.CharField(
-        label="Branches-задача",
-        required=True,
-        widget=forms.Textarea(attrs={"class": "panel-textarea", "rows": 8}),
-    )
-    task_geo = forms.CharField(
-        label="Geo-задача",
-        required=True,
-        widget=forms.Textarea(attrs={"class": "panel-textarea", "rows": 8}),
-    )
-    task_client = forms.CharField(
-        label="Client-задача",
-        required=False,
-        widget=forms.Textarea(attrs={"class": "panel-textarea", "rows": 8}),
-    )
+class _AudienceClarBaseMixin:
+    """
+    База CLAR:
+    - оставляем только: title, task, task_client, task_branches, task_geo
+    - what/who/geo удаляем (если пришли от родителя)
+    - task добавляем централизованно (YY-TEXTAREA)
+    - общий clean (без вызова super().clean() родителей, чтобы не требовать what/who/geo)
+    """
 
-    run_processing = forms.BooleanField(
-        label="Запустить в процессинг",
-        required=False,
-        widget=forms.CheckboxInput(attrs={"class": "panel-checkbox"}),
-    )
+    TASK_LABEL = _("Задача")
+    TASK_PLACEHOLDER = _("Опишите основную задачу.")
+    TASK_INITIAL = ""
 
-    subscribers_limit = forms.IntegerField(
-        label="Найти сабскрайберов",
-        required=True,
-        initial=500,
-        min_value=1,
-        max_value=1_000_000,
-        widget=forms.NumberInput(attrs={"class": "panel-input"}),
-    )
+    REQUIRED_FIELDS = ["title", "task", "task_client", "task_branches", "task_geo"]
 
-    edit_id = forms.IntegerField(required=True, widget=forms.HiddenInput())
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # убрать HOW-поля, если они пришли от родителя (AudienceHow*/AudienceEdit*)
+        for f in ("what", "who", "geo"):
+            self.fields.pop(f, None)
+
+        # добавить/переопределить task централизованно
+        self.fields["task"] = forms.CharField(
+            label=self.TASK_LABEL,
+            required=True,
+            widget=forms.Textarea(
+                attrs={
+                    "class": "YY-TEXTAREA",
+                    "rows": 6,
+                    "placeholder": self.TASK_PLACEHOLDER,
+                }
+            ),
+        )
+        if self.TASK_INITIAL:
+            self.fields["task"].initial = self.TASK_INITIAL
+
+    def clean(self):
+        # ВАЖНО: не вызываем super().clean(), потому что у AudienceEdit* clean() требует what/who/geo
+        cleaned = forms.Form.clean(self)
+
+        missing = []
+        for f in self.REQUIRED_FIELDS:
+            val = (cleaned.get(f) or "").strip()
+            if not val:
+                missing.append(f)
+
+        if missing:
+            self.add_error(None, _("Заполните все поля."))
+            for f in missing:
+                self.add_error(f, "")
+
+        return cleaned
+
+
+class AudienceClarSellForm(_AudienceClarBaseMixin, AudienceEditSellForm):
+    """
+    CLAR SELL: фиксация задачи + критериев ранжирования для поиска клиентов.
+    """
+
+    TASK_LABEL = _("Задача. Что продаём и кого хотим привлечь")
+    TASK_PLACEHOLDER = _(
+        "1–2 предложения: что продаёте (суть), кто целевой клиент в Германии и какой результат нужен (лиды/встречи/заявки)."
+    )
+    TASK_INITIAL = _("Нужно найти клиентов: ")
+
+
+class AudienceClarBuyForm(_AudienceClarBaseMixin, AudienceEditBuyForm):
+    """
+    CLAR BUY: фиксация задачи + критериев ранжирования для поиска поставщиков/подрядчиков.
+    """
+
+    TASK_LABEL = _("Задача. Что нужно купить и какой подрядчик подходит")
+    TASK_PLACEHOLDER = _(
+        "1–2 предложения: что нужно купить/заказать, ключевые требования и какой поставщик/подрядчик нужен (тип, опыт, условия)."
+    )
+    TASK_INITIAL = _("Нужно найти поставщиков / подрядчиков: ")

@@ -32,7 +32,7 @@ def _cfg() -> _Cfg:
     return _Cfg(
         cookie_name=getattr(settings, "PUBLIC_LANG_COOKIE_NAME", "serenity_lang"),
         cookie_max_age=int(getattr(settings, "PUBLIC_LANG_COOKIE_MAX_AGE", 3600 * 24 * 365)),
-        public_langs=tuple(getattr(settings, "PUBLIC_LANGS", ("ru", "de", "uk"))),
+        public_langs=tuple(getattr(settings, "PUBLIC_LANGS", ("ru", "de", "uk", "en"))),
         default_lang=str(getattr(settings, "PUBLIC_LANG_DEFAULT", "de")),
         geo_db_path=Path(getattr(settings, "PUBLIC_GEOIP_DB_PATH", getattr(settings, "GEOIP_PATH", "")))
         / "GeoLite2-Country.mmdb",
