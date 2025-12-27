@@ -43,3 +43,34 @@ select[aria-invalid="true"] {
 @keyframes yy-spin {
   to { transform: rotate(360deg); }
 }
+
+.yy-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+}
+
+.yy-modal.hidden {
+  display: none;
+}
+
+.yy-modal_backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 112, 235, 0.055);
+}
+
+.yy-modal_card_wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  pointer-events: none;
+}
+
+.yy_modal_card {
+  pointer-events: auto;   /* ← КЛЮЧЕВОЕ */
+  position: relative;     /* для кнопки закрыть внутри */
+}

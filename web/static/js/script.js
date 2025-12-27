@@ -97,3 +97,67 @@ document.addEventListener("click", function (e) {
   if (panel) panel.classList.remove("hidden");
 });
 
+// FILE: web/static/js/script.js  (обновлено — 2025-12-26)
+// PURPOSE: модалка (open/close) + open по data-yy-modal-url (fetch, 404 ок) + close по фону/крестику/ESC.
+
+// FILE: web/static/js/script.js  (обновлено — 2025-12-26)
+// PURPOSE: минимальная модалка: open(arg) где arg = "url=..." или "text=..."; close по фону/крестику/ESC.
+
+(function () {
+  const $ = (s) => document.querySelector(s);
+
+  function openModal(html) {
+    const m = $("#yy-modal");
+    if (!m) return;
+    $("#yy-modal-body").innerHTML = html || "";
+    m.classList.remove("hidden");
+  }
+
+  function closeModal() {
+    const m = $("#yy-modal");
+    if (!m) return;
+    m.classList.add("hidden");
+  }
+
+  async function open(arg) {
+    const s = String(arg || "");
+
+    if (s.startsWith("url=")) {
+      const url = s.slice(4).trim();
+      let html = "";
+      try {
+        const r = await fetch(url, { credentials: "same-origin" });
+        if (r && r.ok) html = await r.text();
+      } catch (_) {}
+      openModal(html);
+      return;
+    }
+
+    if (s.startsWith("text=")) {
+      openModal(s.slice(5));
+      return;
+    }
+
+    openModal("");
+  }
+
+  document.addEventListener("click", (e) => {
+    if (e.target.closest("[data-yy-modal-close]")) {
+      e.preventDefault();
+      closeModal();
+      return;
+    }
+
+    const opener = e.target.closest("[data-yy-modal]");
+    if (opener) {
+      e.preventDefault();
+      open(opener.getAttribute("data-yy-modal") || "");
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeModal();
+  });
+
+  window.YYModal = { open, close: closeModal };
+})();

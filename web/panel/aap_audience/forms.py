@@ -118,10 +118,10 @@ class AudienceHowBuyForm(AudienceHowSellForm):
 
 class AudienceEditSellForm(AudienceHowSellForm):
     title = forms.CharField(
-        label=_("Название задачи ПОИСК КЛИЕНТОВ"),
+        label=_("Название задачи"),
         required=True,
         widget=forms.TextInput(
-            attrs={"class": "YY-INPUT", "placeholder": _("Коротко и по делу")}
+            attrs={"class": "YY-INPUT", "placeholder": _("Название задачи")}
         ),
     )
 
@@ -191,12 +191,12 @@ class AudienceEditSellForm(AudienceHowSellForm):
 
 class AudienceEditBuyForm(AudienceHowBuyForm):
     title = forms.CharField(
-        label=_("Название задачи ПОИСК ПОСТАВЩИКОВ / ПОДРЯДЧИКОВ"),
+        label=_("Название задачи"),
         required=True,
         widget=forms.TextInput(
             attrs={
                 "class": "YY-INPUT",
-                "placeholder": _("Название задачи ПОИСК ПОСТАВЩИКОВ / ПОДРЯДЧИКОВ"),
+                "placeholder": _("Название задачи"),
             }
         ),
     )

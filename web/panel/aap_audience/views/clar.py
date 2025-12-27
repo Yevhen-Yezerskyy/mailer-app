@@ -1,9 +1,9 @@
 # FILE: web/panel/aap_audience/views/clar.py  (обновлено — 2025-12-26)
 # CHANGE:
+# - Для списка tasks добавлены t.rating и t.rating_hashes (шаблон сам рисует статусы/цвета).
 # - rating branches/geo полностью независим от edit_task.run_processing
 # - __tasks_rating: только INSERT (append-only), done не трогаем
 # - хеш только через engine.common.utils.h64_text
-# - UI-ветки/тексты остаются в шаблоне; view отдаёт только данные/состояния
 
 from __future__ import annotations
 
@@ -66,7 +66,9 @@ def _with_ui_ids(tasks):
 
 def _bind_clar_items(ws_id, user_id, tasks):
     task_ids = [t.id for t in tasks]
-    all_items = _load_all_crawl_items_for_tasks(ws_id, user_id, task_ids) if task_ids else {}
+    all_items = (
+        _load_all_crawl_items_for_tasks(ws_id, user_id, task_ids) if task_ids else {}
+    )
 
     for t in tasks:
         bucket = all_items.get(t.id, {"city": [], "branch": []})
@@ -156,6 +158,21 @@ def _tasks_rating_insert(task_id: int, type_: str, hash_task: int):
         )
 
 
+def _bind_tasks_statuses(tasks):
+    """
+    Для списка tasks:
+    - t.rating: текущее состояние обработки (running/last_done_hash)
+    - t.rating_hashes: текущие хеши (task+branches / task+geo)
+    Шаблон сам решает статусы/кнопки/цвета.
+    """
+    for t in tasks:
+        t.rating = _tasks_rating_fetch(int(t.id))
+        t.rating_hashes = {
+            "branches": h64_text((t.task or "") + (t.task_branches or "")),
+            "geo": h64_text((t.task or "") + (t.task_geo or "")),
+        }
+
+
 def clar_view(request):
     ws_id = request.workspace_id
     user = request.user
@@ -170,7 +187,9 @@ def clar_view(request):
     rating_hashes = None
 
     if edit_task:
-        FormClass = AudienceClarBuyForm if edit_task.type == "buy" else AudienceClarSellForm
+        FormClass = (
+            AudienceClarBuyForm if edit_task.type == "buy" else AudienceClarSellForm
+        )
 
         if request.method == "POST":
             action = request.POST.get("action")
@@ -182,24 +201,34 @@ def clar_view(request):
                 AudienceTask.objects.filter(
                     id=edit_task.id, workspace_id=ws_id, user=user
                 ).update(run_processing=not edit_task.run_processing)
-                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
+                return redirect(
+                    f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}"
+                )
 
             # rating actions (append-only inserts)
-            hash_branches = h64_text((edit_task.task or "") + (edit_task.task_branches or ""))
+            hash_branches = h64_text(
+                (edit_task.task or "") + (edit_task.task_branches or "")
+            )
             hash_geo = h64_text((edit_task.task or "") + (edit_task.task_geo or ""))
 
             if action == "rating_start_all":
                 _tasks_rating_insert(int(edit_task.id), "branches", hash_branches)
                 _tasks_rating_insert(int(edit_task.id), "geo", hash_geo)
-                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
+                return redirect(
+                    f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}"
+                )
 
             if action == "rating_restart_branches":
                 _tasks_rating_insert(int(edit_task.id), "branches", hash_branches)
-                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
+                return redirect(
+                    f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}"
+                )
 
             if action == "rating_restart_geo":
                 _tasks_rating_insert(int(edit_task.id), "geo", hash_geo)
-                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
+                return redirect(
+                    f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}"
+                )
 
             if action == "save":
                 form = FormClass(request.POST)
@@ -214,9 +243,13 @@ def clar_view(request):
                         task_branches=cd["task_branches"].strip(),
                         task_geo=cd["task_geo"].strip(),
                     )
-                    return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
+                    return redirect(
+                        f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}"
+                    )
             else:
-                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
+                return redirect(
+                    f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}"
+                )
 
         else:
             form = FormClass(
@@ -232,13 +265,17 @@ def clar_view(request):
         # rating data для шаблона — независимо от run_processing
         rating = _tasks_rating_fetch(int(edit_task.id))
         rating_hashes = {
-            "branches": h64_text((edit_task.task or "") + (edit_task.task_branches or "")),
+            "branches": h64_text(
+                (edit_task.task or "") + (edit_task.task_branches or "")
+            ),
             "geo": h64_text((edit_task.task or "") + (edit_task.task_geo or "")),
         }
 
     tasks = _with_ui_ids(_get_tasks(request))
     if ws_id and getattr(user, "is_authenticated", False) and tasks:
         _bind_clar_items(ws_id, user.id, tasks)
+        _bind_tasks_statuses(tasks)
+
 
     return render(
         request,

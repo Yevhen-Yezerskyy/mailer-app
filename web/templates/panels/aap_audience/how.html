@@ -30,6 +30,15 @@
               </button>
             </div>
           </div>
+          {% if type == "sell" %}
+             <div class="YY-STATUS_GREEN mb-5">
+                 {% trans "Поиск клиентов" %}
+              </div>
+          {% else %}
+              <div class="YY-STATUS_YELLOW mb-5">
+                 {% trans "Поиск поставщиков / подрядчиков" %}
+               </div>
+          {% endif %}
 
           {% if state == "how" %}
             <!-- WHAT -->
@@ -146,6 +155,15 @@
         {% endif %}
         {% if state == "edit" %}
           <div class="YY-CARD_WHITE">
+              {% if type == "sell" %}
+                <div class="YY-STATUS_GREEN mb-5">
+                    {% trans "Поиск клиентов" %}
+                  </div>
+              {% else %}
+                  <div class="YY-STATUS_YELLOW mb-5">
+                    {% trans "Поиск поставщиков / подрядчиков" %}
+                  </div>
+              {% endif %}            
             <label class="YY-LABEL">
               {{ form.title.label }}
             </label>

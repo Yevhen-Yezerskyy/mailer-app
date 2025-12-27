@@ -6,6 +6,7 @@ from django.shortcuts import redirect
 
 from .views.how import how_view
 from .views.clar import clar_view
+from .views.modal_clar import modal_clar_view
 from .views.status import status_view
 from .views.status_task import status_task_view
 from .views.result import result_view
@@ -17,7 +18,10 @@ urlpatterns = [
 
     path("how/", how_view, name="how"),
     path("clar/", clar_view, name="clar"),
+    path("clar/modal/", modal_clar_view, name="clar_modal"),
+    
     path("status/", status_view, name="status"),
     path("status/task-<int:task_id>/", status_task_view, name="status_task"),
+
     path("result/", result_view, name="result"),
 ]

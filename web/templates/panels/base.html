@@ -2,7 +2,8 @@
 {% load i18n %}
 <!doctype html>
 <!-- FILE: web/templates/panels/base.html -->
-<!-- DATE: 2025-12-21 -->
+<!-- DATE: 2025-12-26 -->
+<!-- CHANGE: добавлен глобальный контейнер модалки (include components/modal_base.html). -->
 <html lang="ru">
 <head>
   <meta charset="utf-8">
@@ -15,13 +16,15 @@
 </head>
 
 <body class="min-h-screen bg-[#f9fafb]">
-  
+
 <div id="yy-global-loading" class="yy-loading hidden" aria-hidden="true">
   <div class="yy-loading__backdrop"></div>
   <div class="yy-loading__box" role="status" aria-live="polite" aria-label="Loading">
     <div class="yy-loading__spinner"></div>
   </div>
 </div>
+
+{% include "panels/components/modal_base.html" %}
 
 <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
   <symbol id="icon-arrow-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -119,7 +122,7 @@
                 <button type="submit" name="language" value="en"
                   class="YY-BUTTON_MAIN">
                   ENG
-                </button>                
+                </button>
               </form>
 
               <form method="post" action="{% url 'logout' %}" class="inline">

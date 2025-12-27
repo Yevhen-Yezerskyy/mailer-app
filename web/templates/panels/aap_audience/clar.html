@@ -52,6 +52,11 @@
 
         <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
            <div class="YY-CARD_WHITE">
+<a href="#"
+   class="YY-STATUS_GREEN w-full inline-block text-center"
+   data-yy-modal="text=<div class='YY-TEXT'><b>Lorem ipsum</b> dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</div>">
+  Открыть модалку (Lorem ipsum)
+</a>
 
               <form method="post">
                 {% csrf_token %}
@@ -115,13 +120,7 @@
 
                 {% endif %}
               </form>
-
-
-
-
-
-            
-             
+           
             {% if edit_task.run_processing %}
               <form method="post">
               {% csrf_token %}
@@ -235,60 +234,54 @@
                       </div>
                     </td>
                     <td class="YY-TB_TD">
-                      <div data-tabs="res-{{ t.id }}">
-                        <div class="flex gap-3 mb-3">
-                          <button type="button"
-                            data-tab="cities"
-                            data-active-class="YY-BUTTON_GREEN"
-                            data-idle-class="YY-BUTTON_MAIN"
-                            class="YY-BUTTON_GREEN">
-                            {% trans "Города" %}
-                          </button>
-                          <button type="button"
-                            data-tab="branches"
-                            data-active-class="YY-BUTTON_GREEN"
-                            data-idle-class="YY-BUTTON_MAIN"
-                            class="YY-BUTTON_MAIN">
-                            {% trans "Категории" %}
-                          </button>
-                        </div>
-                        <div data-panel="cities">
-                          {% with items=t.clar_city_items %}
-                            {% if items %}
-                              {% for item in items|slice:":15" %}
-                                <div class="flex justify-between">
-                                  <span>{{ item.value_text }}</span>
-                                  <span class="text-slate-500">{{ item.rate }}</span>
-                                </div>
-                              {% endfor %}
+
+                        {# 1) Processing on/off #}
+                        {% if t.run_processing %}
+                          <div class="YY-STATUS_GREEN w-full mb-2">Обработка задачи включена</div>
+                        {% else %}
+                          <div class="YY-STATUS_GREEN w-full mb-2">Обработка задачи выключена</div>
+                        {% endif %}
+
+                        {# 3) BRANCHES status #}
+                        {% if t.rating.branches.running %}
+                          <div class="YY-STATUS_GREEN w-full">Категории в обработке</div>
+                        {% else %}
+                          {% if t.rating.branches.last_done_hash %}
+                            {% if t.rating.branches.last_done_hash == t.rating_hashes.branches %}
+                              <div class="YY-STATUS_GREEN w-full">Категории обработаны</div>
+                              <a href="#" class="YY-BUTTON_MAIN" data-yy-modal="url=/panel/audience/clar/modal/?mode=branches&id={{ t.ui_id }}">
+                                  Посмотреть категории
+                              </a>
                             {% else %}
-                              <span class="text-slate-500 text-sm">
-                                {% trans "В обработке" %}
-                              </span>
+                              <div class="YY-STATUS_GREEN w-full">Категории не обработаны</div>
                             {% endif %}
-                          {% endwith %}
-                        </div>
-                        <div data-panel="branches" class="hidden">
-                          {% with items=t.clar_branch_items %}
-                            {% if items %}
-                              {% for item in items|slice:":15" %}
-                                <div class="flex justify-between">
-                                  <span>{{ item.value_text }}</span>
-                                  <span class="text-slate-500">{{ item.rate }}</span>
-                                </div>
-                              {% endfor %}
+                          {% else %}
+                            <div class="YY-STATUS_GREEN w-full">Категории не обработаны</div>
+                          {% endif %}
+                        {% endif %}
+
+                        {# 2) GEO status #}
+                        {% if t.rating.geo.running %}
+                          <div class="YY-STATUS_GREEN w-full mb-2">Города в обработке</div>
+                        {% else %}
+                          {% if t.rating.geo.last_done_hash %}
+                            {% if t.rating.geo.last_done_hash == t.rating_hashes.geo %}
+                              <div class="YY-STATUS_GREEN w-full mb-2">Города обработаны</div>
+                              <a href="#" class="YY-BUTTON_MAIN" data-yy-modal="url=/panel/audience/clar/modal/?mode=cities&id={{ t.ui_id }}">
+                                  Посмотреть города
+                              </a>                              
                             {% else %}
-                              <span class="text-slate-500 text-sm">
-                                {% trans "В обработке" %}
-                              </span>
+                              <div class="YY-STATUS_GREEN w-full mb-2">Города не обработаны</div>
                             {% endif %}
-                          {% endwith %}
-                        </div>
-                      </div>
+                          {% else %}
+                            <div class="YY-STATUS_GREEN w-full mb-2">Города не обработаны</div>
+                          {% endif %}
+                        {% endif %}
+                      
                     </td>
-                    <!-- ===== ДЕЙСТВИЯ ===== -->
+
                     <td class="YY-TB_TD">
-                      <a href="?state=edit&id={{ t.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2 inline-block">
+                      <a href="?state=edit&id={{ t.ui_id }}" class="YY-BUTTON_TAB_MAIN inline-block">
                         {% trans "Управлять" %}
                       </a>
                  </td>
