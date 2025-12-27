@@ -1,5 +1,10 @@
 <!-- FILE: web/templates/panels/aap_audience/clar.html -->
 <!-- DATE: 2025-12-27 -->
+<!-- CHANGE:
+- Добавлен прогресс (%) везде, где статус "в обработке" для категорий и городов.
+- Прогресс берётся из t.rating.*.progress / rating.*.progress (может быть >100%).
+- Остальные правки из предыдущей версии сохранены (cities 1:1 как branches, единые классы, trans везде кроме OK).
+-->
 
 {% extends "panels/base.html" %}
 {% load i18n %}
@@ -89,7 +94,7 @@
 
               {% if rating.branches.running %}
                 <div class="YY-STATUS_YELLOW w-full mb-2">
-                  {% trans "Бизнес-категории: обрабатываются" %}
+                  {% trans "Бизнес-категории: обрабатываются" %}{% if rating.branches.progress is not None %} ({{ rating.branches.progress }}%){% endif %}
                 </div>
 
               {% elif rating.branches.last_done_hash %}
@@ -124,7 +129,7 @@
 
               {% if rating.geo.running %}
                 <div class="YY-STATUS_YELLOW w-full mb-2">
-                  {% trans "География: обрабатывается" %}
+                  {% trans "География: обрабатывается" %}{% if rating.geo.progress is not None %} ({{ rating.geo.progress }}%){% endif %}
                 </div>
 
               {% elif rating.geo.last_done_hash %}
@@ -195,7 +200,6 @@
                     readonly
                     data-selected-label="branch"
                   >
-
                   <input
                     name="rate"
                     type="text"
@@ -403,7 +407,7 @@
 
                     {% if t.rating.branches.running %}
                       <div class="YY-STATUS_YELLOW w-full mb-2">
-                        {% trans "Бизнес-категории в обработке" %}
+                        {% trans "Бизнес-категории в обработке" %}{% if t.rating.branches.progress is not None %} ({{ t.rating.branches.progress }}%){% endif %}
                       </div>
                     {% else %}
                       {% if t.rating.branches.last_done_hash %}
@@ -430,7 +434,7 @@
 
                     {% if t.rating.geo.running %}
                       <div class="YY-STATUS_YELLOW w-full mb-2">
-                        {% trans "Города в обработке" %}
+                        {% trans "Города в обработке" %}{% if t.rating.geo.progress is not None %} ({{ t.rating.geo.progress }}%){% endif %}
                       </div>
                     {% else %}
                       {% if t.rating.geo.last_done_hash %}

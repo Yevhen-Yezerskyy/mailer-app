@@ -1,20 +1,38 @@
 # FILE: web/panel/aap_audience/views/clar_items.py  (обновлено — 2025-12-27)
 # (новое — 2025-12-27)
-# - Добавлены *args/**kwargs для совместимости со старыми вызовами
+# - Полная совместимость со старым вызовом: (ws_id, user_id, task_id, ...)
 # - workspace_id / user_id игнорируются
+# - load_sorted_cities теперь тоже берёт task_id как 3-й позиционный аргумент (как branches)
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from django.db import connection
 
 
-def load_sorted_cities(task_id: int, *args, **kwargs) -> List[Dict[str, Any]]:
+def _extract_task_id(args, kwargs) -> int:
+    """
+    Поддерживаем 2 варианта:
+      1) старый: (ws_id, user_id, task_id, ...)
+      2) новый: (task_id) или task_id=...
+    """
+    if len(args) >= 3:
+        return int(args[2])
+    if len(args) == 1 and "task_id" not in kwargs:
+        return int(args[0])
+    return int(kwargs.get("task_id"))
+
+
+def load_sorted_cities(*args, **kwargs) -> List[Dict[str, Any]]:
     """
     Совместимо со старым вызовом:
-    load_sorted_cities(ws_id, user_id, task_id)
+      load_sorted_cities(ws_id, user_id, task_id)
+    И с новым:
+      load_sorted_cities(task_id) или load_sorted_cities(task_id=...)
     """
+    task_id = _extract_task_id(args, kwargs)
+
     with connection.cursor() as cur:
         cur.execute(
             """
@@ -55,14 +73,8 @@ def load_sorted_branches(*args, **kwargs) -> List[Dict[str, Any]]:
     """
     Совместимо со старым вызовом:
       load_sorted_branches(ws_id, user_id, task_id, ui_lang=ui_lang)
-    Здесь принимаем всё через *args/**kwargs, чтобы не словить
-    "multiple values for argument 'ui_lang'".
     """
-    # task_id: третий позиционный аргумент в старом вызове
-    if len(args) >= 3:
-        task_id = int(args[2])
-    else:
-        task_id = int(kwargs.get("task_id"))
+    task_id = _extract_task_id(args, kwargs)
 
     ui_lang = (kwargs.get("ui_lang") or "").strip().lower() or "ru"
 
@@ -113,11 +125,25 @@ def load_sorted_branches(*args, **kwargs) -> List[Dict[str, Any]]:
     return out
 
 
-def update_rate(task_id: int, type_: str, value_id: int, rate: int, *args, **kwargs) -> None:
+def update_rate(*args, **kwargs) -> None:
     """
     Совместимо со старым вызовом:
-    update_rate(ws_id, user_id, task_id, type_, value_id, rate)
+      update_rate(ws_id, user_id, task_id, type_, value_id, rate)
+    И с новым:
+      update_rate(task_id=..., type_=..., value_id=..., rate=...)
     """
+    # старый позиционный
+    if len(args) >= 6:
+        task_id = int(args[2])
+        type_ = args[3]
+        value_id = int(args[4])
+        rate = args[5]
+    else:
+        task_id = int(kwargs.get("task_id"))
+        type_ = kwargs.get("type_")
+        value_id = int(kwargs.get("value_id"))
+        rate = kwargs.get("rate")
+
     type_ = (type_ or "").strip().lower()
     if type_ not in ("city", "branch"):
         return

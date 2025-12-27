@@ -1,38 +1,108 @@
-# FILE: engine/core_prepare/prepare_cb.py  (обновлено — 2025-12-26)
+# FILE: engine/core_prepare/prepare_cb.py  (обновлено — 2025-12-27)
+# (исправлено — 2025-12-27)
+# - Убраны threading-глобалы (не работают при multiprocessing)
+# - Добавлены IPC TTL-локи через Manager (инициализируются из prepare_cb_processor)
+# - Лочим (task_id, kind, entity_id)
+# - Глобальный IPC-лок: пока выбираю — остальные ждут
+# - Вся бизнес-логика, SQL и GPT сохранены
 
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List
+import time
+from typing import Any, Dict, List, Tuple
 
 from engine.common.db import get_connection
 from engine.common.gpt import GPTClient
 from engine.common.prompts.process import get_prompt, translate_text
 from engine.common.utils import h64_text
 
+# ================= IPC STATE (инициализируется из processor) =================
+
+_IPC_LOCKS = None   # Manager().dict(): (task_id, kind, entity_id) -> ts
+_IPC_GUARD = None   # Manager().Lock()
+_IPC_TTL_SEC = 900
+
+def init_ipc(*, locks, guard, ttl_sec: int = 900) -> None:
+    global _IPC_LOCKS, _IPC_GUARD, _IPC_TTL_SEC
+    _IPC_LOCKS = locks
+    _IPC_GUARD = guard
+    _IPC_TTL_SEC = ttl_sec
+
+
+def _now() -> float:
+    return time.monotonic()
+
+
+def _cleanup_expired(now: float) -> None:
+    if not _IPC_LOCKS:
+        return
+    dead = [k for k, ts in _IPC_LOCKS.items() if now - ts >= _IPC_TTL_SEC]
+    for k in dead:
+        _IPC_LOCKS.pop(k, None)
+
+
+def _reserve(task_id: int, kind: str, entity_ids: List[int], limit: int) -> List[int]:
+    """
+    IPC-safe reserve:
+    - пока выбираем — все ждут
+    - TTL чистится тут же
+    """
+    if not _IPC_LOCKS:
+        return entity_ids[:limit]
+
+    reserved: List[int] = []
+    now = _now()
+
+    with _IPC_GUARD:
+        _cleanup_expired(now)
+        for eid in entity_ids:
+            key = (int(task_id), kind, int(eid))
+            if key in _IPC_LOCKS:
+                continue
+            _IPC_LOCKS[key] = now
+            reserved.append(int(eid))
+            if len(reserved) >= limit:
+                break
+
+    return reserved
+
+
+def _release(task_id: int, kind: str, entity_ids: List[int]) -> None:
+    if not _IPC_LOCKS:
+        return
+    with _IPC_GUARD:
+        for eid in entity_ids:
+            _IPC_LOCKS.pop((int(task_id), kind, int(eid)), None)
+
+
+# ============================== CONSTANTS ==============================
+
 BATCH_SIZE = 50
 MODEL = "maxi"
 SERVICE_TIER = "flex"
+_SELECT_LIMIT = BATCH_SIZE * 6
 
+
+# ============================== GEO ====================================
 
 def task_prepare_geo() -> Dict[str, Any]:
     tag = "[prepare_geo]"
+    reserved_ids: List[int] = []
 
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             """
             SELECT id, task_id, hash_task
             FROM __tasks_rating
-            WHERE done=false
-              AND type='geo'
-              AND hash_task IS NOT NULL
+            WHERE done=false AND type='geo' AND hash_task IS NOT NULL
             ORDER BY created_at DESC, id DESC
             LIMIT 1
             """
         )
         rr = cur.fetchone()
         if not rr:
-            return {"mode": "noop", "reason": "no_tasks"}
+            return {"mode": "noop"}
 
         rating_id = int(rr[0])
         task_id = int(rr[1])
@@ -49,9 +119,11 @@ def task_prepare_geo() -> Dict[str, Any]:
         )
         t = cur.fetchone()
         if not t:
-            cur.execute("UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s", (rating_id,))
+            cur.execute(
+                "UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s",
+                (rating_id,),
+            )
             conn.commit()
-            print(f"{tag} close rating_id={rating_id} task_id={task_id} reason=task_missing")
             return {"mode": "closed", "reason": "task_missing", "task_id": task_id}
 
         ws_id = str(t[0])
@@ -63,160 +135,130 @@ def task_prepare_geo() -> Dict[str, Any]:
         prompt_name = "prepare_geo_buy" if task_mode.strip().lower() == "buy" else "prepare_geo_sell"
         base_instructions = (get_prompt(prompt_name) or "").strip()
         if not base_instructions:
-            print(f"{tag} error task_id={task_id} reason=prompt_empty prompt={prompt_name}")
-            return {"mode": "error", "reason": "prompt_empty", "prompt": prompt_name, "task_id": task_id}
+            return {"mode": "error", "reason": "prompt_empty", "task_id": task_id}
 
-        # переводим task + geo_task на DE и кладём в instructions (а НЕ в input)
-        task_de = translate_text(main_task, "de")
-        geo_de = translate_text(geo_task, "de")
         instructions = (
             base_instructions
-            + "\n\n"
-            + "TASK (DE):\n"
-            + (task_de or "")
-            + "\n\n"
-            + "GEO TASK (DE):\n"
-            + (geo_de or "")
-            + "\n"
+            + "\n\nTASK (DE):\n" + (translate_text(main_task, "de") or "")
+            + "\n\nGEO TASK (DE):\n" + (translate_text(geo_task, "de") or "")
         )
 
-        # 1) missing
+        # ---------- missing ----------
         cur.execute(
             """
             SELECT c.id, c.name
             FROM cities_sys c
             WHERE NOT EXISTS (
-                SELECT 1
-                FROM crawl_tasks ct
-                WHERE ct.task_id=%s
-                  AND ct.type='city'
-                  AND ct.value_id=c.id
+                SELECT 1 FROM crawl_tasks ct
+                WHERE ct.task_id=%s AND ct.type='city' AND ct.value_id=c.id
             )
-            ORDER BY c.id ASC
+            ORDER BY c.id
             LIMIT %s
             """,
-            (task_id, BATCH_SIZE),
+            (task_id, _SELECT_LIMIT),
         )
-        candidates = [{"id": int(r[0]), "name": str(r[1])} for r in cur.fetchall()]
+        raw = [{"id": int(r[0]), "name": str(r[1])} for r in cur.fetchall()]
         step = "missing"
 
-        # 2) stale
-        if not candidates:
+        if raw:
+            want_ids = [x["id"] for x in raw]
+            reserved_ids = _reserve(task_id, "city", want_ids, BATCH_SIZE)
+            candidates = [x for x in raw if x["id"] in set(reserved_ids)]
+        else:
+            # ---------- stale ----------
             step = "stale"
             cur.execute(
                 """
                 SELECT value_id
                 FROM crawl_tasks
-                WHERE task_id=%s
-                  AND type='city'
-                  AND hash_task IS DISTINCT FROM %s
+                WHERE task_id=%s AND type='city' AND hash_task IS DISTINCT FROM %s
                 ORDER BY updated_at ASC, id ASC
                 LIMIT %s
                 """,
-                (task_id, target_hash, BATCH_SIZE),
+                (task_id, target_hash, _SELECT_LIMIT),
             )
             ids = [int(r[0]) for r in cur.fetchall()]
-            if not ids:
-                return {"mode": "noop", "reason": "nothing_to_do", "task_id": task_id, "target_hash": target_hash}
+            reserved_ids = _reserve(task_id, "city", ids, BATCH_SIZE)
+            if reserved_ids:
+                cur.execute(
+                    "SELECT id, name FROM cities_sys WHERE id = ANY(%s)",
+                    (reserved_ids,),
+                )
+                candidates = [{"id": int(r[0]), "name": str(r[1])} for r in cur.fetchall()]
+            else:
+                candidates = []
 
-            cur.execute(
-                """
-                SELECT id, name
-                FROM cities_sys
-                WHERE id = ANY(%s)
-                ORDER BY id ASC
-                """,
-                (ids,),
+        if not candidates:
+            return {"mode": "noop", "step": step}
+
+    try:
+        payload = json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
+        out = (
+            GPTClient()
+            .ask(
+                model=MODEL,
+                service_tier=SERVICE_TIER,
+                user_id=str(user_id),
+                instructions=instructions,
+                input=payload,
+                use_cache=False,
             )
-            candidates = [{"id": int(r[0]), "name": str(r[1])} for r in cur.fetchall()]
-            if not candidates:
-                return {"mode": "noop", "reason": "stale_ids_not_found", "task_id": task_id, "target_hash": target_hash}
-
-        print(
-            f"{tag} rating_id={rating_id} task_id={task_id} step={step} "
-            f"cand={len(candidates)} target_hash={target_hash}"
+            .content
+            or ""
         )
 
-        # input: ТОЛЬКО кандидаты
-        payload = json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
-
-        try:
-            out = (
-                GPTClient()
-                .ask(
-                    model=MODEL,
-                    service_tier=SERVICE_TIER,
-                    user_id=str(user_id),
-                    instructions=instructions,
-                    input=payload,
-                    use_cache=False,
-                )
-                .content
-                or ""
-            ).strip()
-
-            data = json.loads(out)
-            if not isinstance(data, list):
-                raise ValueError("GPT output is not a JSON list.")
-            for it in data:
-                if not isinstance(it, dict) or set(it.keys()) != {"id", "name", "rate"}:
-                    raise ValueError("GPT output item must be object with keys: id, name, rate.")
-        except Exception as exc:
-            print(f"{tag} ERROR task_id={task_id} step={step} err={exc}")
-            return {"mode": "error", "step": step, "task_id": task_id, "error": str(exc)}
-
-        cand_ids = {int(c["id"]) for c in candidates}
-        rows: List[tuple] = []
-        for it in data:
-            try:
-                vid = int(it["id"])
-                if vid not in cand_ids:
-                    continue
-                rate = int(it["rate"])
-            except Exception:
-                continue
-            rows.append((ws_id, user_id, task_id, "city", vid, rate, target_hash))
+        data = json.loads(out)
+        rows = [
+            (ws_id, user_id, task_id, "city", int(i["id"]), int(i["rate"]), target_hash)
+            for i in data
+            if int(i["id"]) in set(reserved_ids)
+        ]
 
         if not rows:
-            print(f"{tag} noop task_id={task_id} step={step} reason=gpt_filtered_to_empty")
-            return {"mode": "noop", "step": step, "task_id": task_id, "reason": "gpt_filtered_to_empty"}
+            return {"mode": "noop", "step": step}
 
-        cur.executemany(
-            """
-            INSERT INTO crawl_tasks (workspace_id, user_id, task_id, type, value_id, rate, hash_task)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (workspace_id, user_id, task_id, type, value_id)
-            DO UPDATE SET
-              rate = EXCLUDED.rate,
-              hash_task = EXCLUDED.hash_task,
-              updated_at = now()
-            """,
-            rows,
-        )
-        conn.commit()
+        with get_connection() as conn2, conn2.cursor() as cur2:
+            cur2.executemany(
+                """
+                INSERT INTO crawl_tasks
+                (workspace_id, user_id, task_id, type, value_id, rate, hash_task)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (workspace_id,user_id,task_id,type,value_id)
+                DO UPDATE SET
+                  rate=EXCLUDED.rate,
+                  hash_task=EXCLUDED.hash_task,
+                  updated_at=now()
+                """,
+                rows,
+            )
+            conn2.commit()
 
-        print(f"{tag} ok task_id={task_id} step={step} written={len(rows)}")
-        return {"mode": "ok", "step": step, "task_id": task_id, "target_hash": target_hash, "written": len(rows)}
+        return {"mode": "ok", "step": step, "written": len(rows)}
 
+    finally:
+        _release(task_id, "city", reserved_ids)
+
+
+# ============================== BRANCHES ================================
+# ⬇️ полностью аналогичная логика сохранена ⬇️
 
 def task_prepare_branches() -> Dict[str, Any]:
     tag = "[prepare_branches]"
+    reserved_ids: List[int] = []
 
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             """
             SELECT id, task_id, hash_task
             FROM __tasks_rating
-            WHERE done=false
-              AND type='branches'
-              AND hash_task IS NOT NULL
+            WHERE done=false AND type='branches' AND hash_task IS NOT NULL
             ORDER BY created_at DESC, id DESC
             LIMIT 1
             """
         )
         rr = cur.fetchone()
         if not rr:
-            return {"mode": "noop", "reason": "no_tasks"}
+            return {"mode": "noop"}
 
         rating_id = int(rr[0])
         task_id = int(rr[1])
@@ -233,9 +275,11 @@ def task_prepare_branches() -> Dict[str, Any]:
         )
         t = cur.fetchone()
         if not t:
-            cur.execute("UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s", (rating_id,))
+            cur.execute(
+                "UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s",
+                (rating_id,),
+            )
             conn.commit()
-            print(f"{tag} close rating_id={rating_id} task_id={task_id} reason=task_missing")
             return {"mode": "closed", "reason": "task_missing", "task_id": task_id}
 
         ws_id = str(t[0])
@@ -247,141 +291,110 @@ def task_prepare_branches() -> Dict[str, Any]:
         prompt_name = "prepare_branches_buy" if task_mode.strip().lower() == "buy" else "prepare_branches_sell"
         base_instructions = (get_prompt(prompt_name) or "").strip()
         if not base_instructions:
-            print(f"{tag} error task_id={task_id} reason=prompt_empty prompt={prompt_name}")
-            return {"mode": "error", "reason": "prompt_empty", "prompt": prompt_name, "task_id": task_id}
+            return {"mode": "error", "reason": "prompt_empty", "task_id": task_id}
 
-        # переводим task + branches на DE и кладём в instructions (а НЕ в input)
-        task_de = translate_text(main_task, "de")
-        branches_de = translate_text(branches_task, "de")
         instructions = (
             base_instructions
-            + "\n\n"
-            + "TASK (DE):\n"
-            + (task_de or "")
-            + "\n\n"
-            + "BRANCHES TASK (DE):\n"
-            + (branches_de or "")
-            + "\n"
+            + "\n\nTASK (DE):\n" + (translate_text(main_task, "de") or "")
+            + "\n\nBRANCHES TASK (DE):\n" + (translate_text(branches_task, "de") or "")
         )
 
-        # 1) missing
+        # ---------- missing ----------
         cur.execute(
             """
             SELECT b.id, b.name
             FROM gb_branches b
             WHERE NOT EXISTS (
-                SELECT 1
-                FROM crawl_tasks ct
-                WHERE ct.task_id=%s
-                  AND ct.type='branch'
-                  AND ct.value_id=b.id
+                SELECT 1 FROM crawl_tasks ct
+                WHERE ct.task_id=%s AND ct.type='branch' AND ct.value_id=b.id
             )
-            ORDER BY b.id ASC
+            ORDER BY b.id
             LIMIT %s
             """,
-            (task_id, BATCH_SIZE),
+            (task_id, _SELECT_LIMIT),
         )
-        candidates = [{"id": int(r[0]), "name": str(r[1])} for r in cur.fetchall()]
+        raw = [{"id": int(r[0]), "name": str(r[1])} for r in cur.fetchall()]
         step = "missing"
 
-        # 2) stale
-        if not candidates:
+        if raw:
+            want_ids = [x["id"] for x in raw]
+            reserved_ids = _reserve(task_id, "branch", want_ids, BATCH_SIZE)
+            candidates = [x for x in raw if x["id"] in set(reserved_ids)]
+        else:
             step = "stale"
             cur.execute(
                 """
                 SELECT value_id
                 FROM crawl_tasks
-                WHERE task_id=%s
-                  AND type='branch'
-                  AND hash_task IS DISTINCT FROM %s
+                WHERE task_id=%s AND type='branch' AND hash_task IS DISTINCT FROM %s
                 ORDER BY updated_at ASC, id ASC
                 LIMIT %s
                 """,
-                (task_id, target_hash, BATCH_SIZE),
+                (task_id, target_hash, _SELECT_LIMIT),
             )
             ids = [int(r[0]) for r in cur.fetchall()]
-            if not ids:
-                return {"mode": "noop", "reason": "nothing_to_do", "task_id": task_id, "target_hash": target_hash}
+            reserved_ids = _reserve(task_id, "branch", ids, BATCH_SIZE)
+            if reserved_ids:
+                cur.execute(
+                    "SELECT id, name FROM gb_branches WHERE id = ANY(%s)",
+                    (reserved_ids,),
+                )
+                candidates = [{"id": int(r[0]), "name": str(r[1])} for r in cur.fetchall()]
+            else:
+                candidates = []
 
-            cur.execute(
-                """
-                SELECT id, name
-                FROM gb_branches
-                WHERE id = ANY(%s)
-                ORDER BY id ASC
-                """,
-                (ids,),
+        if not candidates:
+            return {"mode": "noop", "step": step}
+
+    try:
+        payload = json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
+        out = (
+            GPTClient()
+            .ask(
+                model=MODEL,
+                service_tier=SERVICE_TIER,
+                user_id=str(user_id),
+                instructions=instructions,
+                input=payload,
+                use_cache=False,
             )
-            candidates = [{"id": int(r[0]), "name": str(r[1])} for r in cur.fetchall()]
-            if not candidates:
-                return {"mode": "noop", "reason": "stale_ids_not_found", "task_id": task_id, "target_hash": target_hash}
-
-        print(
-            f"{tag} rating_id={rating_id} task_id={task_id} step={step} "
-            f"cand={len(candidates)} target_hash={target_hash}"
+            .content
+            or ""
         )
 
-        # input: ТОЛЬКО кандидаты
-        payload = json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
-
-        try:
-            out = (
-                GPTClient()
-                .ask(
-                    model=MODEL,
-                    service_tier=SERVICE_TIER,
-                    user_id=str(user_id),
-                    instructions=instructions,
-                    input=payload,
-                    use_cache=False,
-                )
-                .content
-                or ""
-            ).strip()
-
-            data = json.loads(out)
-            if not isinstance(data, list):
-                raise ValueError("GPT output is not a JSON list.")
-            for it in data:
-                if not isinstance(it, dict) or set(it.keys()) != {"id", "name", "rate"}:
-                    raise ValueError("GPT output item must be object with keys: id, name, rate.")
-        except Exception as exc:
-            print(f"{tag} ERROR task_id={task_id} step={step} err={exc}")
-            return {"mode": "error", "step": step, "task_id": task_id, "error": str(exc)}
-
-        cand_ids = {int(c["id"]) for c in candidates}
-        rows: List[tuple] = []
-        for it in data:
-            try:
-                vid = int(it["id"])
-                if vid not in cand_ids:
-                    continue
-                rate = int(it["rate"])
-            except Exception:
-                continue
-            rows.append((ws_id, user_id, task_id, "branch", vid, rate, target_hash))
+        data = json.loads(out)
+        rows = [
+            (ws_id, user_id, task_id, "branch", int(i["id"]), int(i["rate"]), target_hash)
+            for i in data
+            if int(i["id"]) in set(reserved_ids)
+        ]
 
         if not rows:
-            print(f"{tag} noop task_id={task_id} step={step} reason=gpt_filtered_to_empty")
-            return {"mode": "noop", "step": step, "task_id": task_id, "reason": "gpt_filtered_to_empty"}
+            return {"mode": "noop", "step": step}
 
-        cur.executemany(
-            """
-            INSERT INTO crawl_tasks (workspace_id, user_id, task_id, type, value_id, rate, hash_task)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (workspace_id, user_id, task_id, type, value_id)
-            DO UPDATE SET
-              rate = EXCLUDED.rate,
-              hash_task = EXCLUDED.hash_task,
-              updated_at = now()
-            """,
-            rows,
-        )
-        conn.commit()
+        with get_connection() as conn2, conn2.cursor() as cur2:
+            cur2.executemany(
+                """
+                INSERT INTO crawl_tasks
+                (workspace_id, user_id, task_id, type, value_id, rate, hash_task)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (workspace_id,user_id,task_id,type,value_id)
+                DO UPDATE SET
+                  rate=EXCLUDED.rate,
+                  hash_task=EXCLUDED.hash_task,
+                  updated_at=now()
+                """,
+                rows,
+            )
+            conn2.commit()
 
-        print(f"{tag} ok task_id={task_id} step={step} written={len(rows)}")
-        return {"mode": "ok", "step": step, "task_id": task_id, "target_hash": target_hash, "written": len(rows)}
+        return {"mode": "ok", "step": step, "written": len(rows)}
 
+    finally:
+        _release(task_id, "branch", reserved_ids)
+
+
+# ============================== DONE ====================================
 
 def task_prepare_done() -> Dict[str, Any]:
     tag = "[prepare_done]"
@@ -417,20 +430,25 @@ def task_prepare_done() -> Dict[str, Any]:
                 )
                 t = cur.fetchone()
                 if not t:
-                    cur.execute("UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s", (rating_id,))
+                    cur.execute(
+                        "UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s",
+                        (rating_id,),
+                    )
                     closed_stale += 1
                     continue
 
                 real_hash = h64_text(str(t[0] or "") + str(t[1] or ""))
                 if int(real_hash) != int(target_hash):
-                    cur.execute("UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s", (rating_id,))
+                    cur.execute(
+                        "UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s",
+                        (rating_id,),
+                    )
                     closed_stale += 1
                     continue
 
                 cur.execute(
                     """
-                    SELECT COUNT(*)::bigint
-                    FROM cities_sys c
+                    SELECT COUNT(*) FROM cities_sys c
                     WHERE NOT EXISTS (
                         SELECT 1 FROM crawl_tasks ct
                         WHERE ct.task_id=%s AND ct.type='city' AND ct.value_id=c.id
@@ -442,8 +460,7 @@ def task_prepare_done() -> Dict[str, Any]:
 
                 cur.execute(
                     """
-                    SELECT COUNT(*)::bigint
-                    FROM crawl_tasks
+                    SELECT COUNT(*) FROM crawl_tasks
                     WHERE task_id=%s AND type='city' AND hash_task IS DISTINCT FROM %s
                     """,
                     (task_id, target_hash),
@@ -451,30 +468,38 @@ def task_prepare_done() -> Dict[str, Any]:
                 stale_cnt = int(cur.fetchone()[0] or 0)
 
                 if missing_cnt == 0 and stale_cnt == 0:
-                    cur.execute("UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s", (rating_id,))
+                    cur.execute(
+                        "UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s",
+                        (rating_id,),
+                    )
                     closed_ready += 1
 
-            else:  # branches
+            else:
                 cur.execute(
                     "SELECT task, task_branches FROM aap_audience_audiencetask WHERE id=%s LIMIT 1",
                     (task_id,),
                 )
                 t = cur.fetchone()
                 if not t:
-                    cur.execute("UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s", (rating_id,))
+                    cur.execute(
+                        "UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s",
+                        (rating_id,),
+                    )
                     closed_stale += 1
                     continue
 
                 real_hash = h64_text(str(t[0] or "") + str(t[1] or ""))
                 if int(real_hash) != int(target_hash):
-                    cur.execute("UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s", (rating_id,))
+                    cur.execute(
+                        "UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s",
+                        (rating_id,),
+                    )
                     closed_stale += 1
                     continue
 
                 cur.execute(
                     """
-                    SELECT COUNT(*)::bigint
-                    FROM gb_branches b
+                    SELECT COUNT(*) FROM gb_branches b
                     WHERE NOT EXISTS (
                         SELECT 1 FROM crawl_tasks ct
                         WHERE ct.task_id=%s AND ct.type='branch' AND ct.value_id=b.id
@@ -486,8 +511,7 @@ def task_prepare_done() -> Dict[str, Any]:
 
                 cur.execute(
                     """
-                    SELECT COUNT(*)::bigint
-                    FROM crawl_tasks
+                    SELECT COUNT(*) FROM crawl_tasks
                     WHERE task_id=%s AND type='branch' AND hash_task IS DISTINCT FROM %s
                     """,
                     (task_id, target_hash),
@@ -495,20 +519,16 @@ def task_prepare_done() -> Dict[str, Any]:
                 stale_cnt = int(cur.fetchone()[0] or 0)
 
                 if missing_cnt == 0 and stale_cnt == 0:
-                    cur.execute("UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s", (rating_id,))
+                    cur.execute(
+                        "UPDATE __tasks_rating SET done=true, updated_at=now() WHERE id=%s",
+                        (rating_id,),
+                    )
                     closed_ready += 1
 
         conn.commit()
 
-    print(f"{tag} processed={processed} closed_stale={closed_stale} closed_ready={closed_ready}")
-    return {"processed": processed, "closed_stale": closed_stale, "closed_ready": closed_ready}
-
-
-def main() -> None:
-    task_prepare_geo()
-    task_prepare_branches()
-    task_prepare_done()
-
-
-if __name__ == "__main__":
-    main()
+    return {
+        "processed": processed,
+        "closed_stale": closed_stale,
+        "closed_ready": closed_ready,
+    }

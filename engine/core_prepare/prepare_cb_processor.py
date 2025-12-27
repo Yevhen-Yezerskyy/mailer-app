@@ -1,28 +1,43 @@
-# FILE: engine/core_prepare/prepare_cb_processor.py  (новое — 2025-12-26)
-# Смысл: процессор подготовки (geo/branches/done) через Worker. Каждую секунду делает один шаг по каждой задаче.
+# FILE: engine/core_prepare/prepare_cb_processor.py
+# (новое — 2025-12-27)
+# - Shared-memory через multiprocessing.Manager
+# - Глобальный mutex + TTL-локи для prepare_cb
+# - Worker НЕ ТРОГАЕМ
+
+from multiprocessing import Manager
+import time
 
 from engine.common.worker import Worker
-from engine.core_prepare.prepare_cb import (
-    task_prepare_geo,
-    task_prepare_branches,
-    task_prepare_done,
-)
+from engine.core_prepare import prepare_cb
 
-TASK_TIMEOUT_SEC = 900  # 15 минут
+TASK_TIMEOUT_SEC = 900
+LOCK_TTL_SEC = 900
 
 
 def main() -> None:
-    w = Worker(
-        name="prepare_cb_processor",
-        tick_sec=0.5,
-        max_parallel=16,
+    manager = Manager()
+
+    # shared между всеми процессами Worker
+    ipc_locks = manager.dict()     # (task_id, kind, entity_id) -> ts
+    ipc_guard = manager.Lock()     # глобальный mutex
+
+    # инициализируем IPC-контекст В prepare_cb
+    prepare_cb.init_ipc(
+        locks=ipc_locks,
+        guard=ipc_guard,
+        ttl_sec=LOCK_TTL_SEC,
     )
 
-    # Каждую секунду. LIFO по created_at внутри задач.
+    w = Worker(
+        name="prepare_cb_processor",
+        tick_sec=3,
+        max_parallel=3,
+    )
+
     w.register(
         name="prepare_geo",
-        fn=task_prepare_geo,
-        every_sec=2,
+        fn=prepare_cb.task_prepare_geo,
+        every_sec=3,
         timeout_sec=TASK_TIMEOUT_SEC,
         singleton=False,
         heavy=False,
@@ -31,19 +46,18 @@ def main() -> None:
 
     w.register(
         name="prepare_branches",
-        fn=task_prepare_branches,
-        every_sec=3,
+        fn=prepare_cb.task_prepare_branches,
+        every_sec=5,
         timeout_sec=TASK_TIMEOUT_SEC,
         singleton=False,
         heavy=False,
         priority=10,
     )
 
-    # done всегда последним
     w.register(
         name="prepare_done",
-        fn=task_prepare_done,
-        every_sec=20,
+        fn=prepare_cb.task_prepare_done,
+        every_sec=30,
         timeout_sec=TASK_TIMEOUT_SEC,
         singleton=True,
         heavy=False,

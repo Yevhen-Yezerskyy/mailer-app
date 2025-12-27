@@ -1,10 +1,10 @@
 # FILE: web/panel/aap_audience/views/clar.py  (обновлено — 2025-12-27)
-# CHANGE:
-# - Убрано использование crawl_tasks_labeled (оно не подходит под i18n).
-# - Для списка задач и для правой панели edit используются crawl_tasks + joins (через clar_items.py).
-# - Добавлено сохранение rate для city/branch (всегда разрешено).
-# - В edit-режиме, если edit_task.run_processing=True: всегда показываем блоки Cities/Branches;
-#   если списки пустые — показываем "не обработаны".
+# (новое — 2025-12-27)
+# - Для статусов "в обработке" добавлен прогресс (%):
+#   branches: count(crawl_tasks where task_id + type='branch' + hash_task) / 790 * 100
+#   geo(cities): count(crawl_tasks where task_id + type='city' + hash_task) / 1326 * 100
+# - Процент НЕ ограничивается сверху (если 1000% — значит баг виден всем).
+# - Прогресс считается по hash_task из последней running-записи (__tasks_rating done=false).
 
 from __future__ import annotations
 
@@ -21,7 +21,6 @@ from panel.aap_audience.views.clar_items import (
     load_sorted_cities,
     update_rate,
 )
-
 
 
 def _get_tasks(request):
@@ -70,11 +69,14 @@ def _tasks_rating_fetch(task_id: int):
     """
     {
       "has_any": bool,
-      "branches": {"running": bool, "last_done_hash": int|None},
-      "geo":      {"running": bool, "last_done_hash": int|None},
+      "branches": {"running": bool, "last_done_hash": int|None, "progress": int|None, "running_hash": int|None},
+      "geo":      {"running": bool, "last_done_hash": int|None, "progress": int|None, "running_hash": int|None},
     }
     """
     from django.db import connection
+
+    BRANCHES_TOTAL = 790
+    GEO_TOTAL = 1326
 
     with connection.cursor() as cur:
         cur.execute(
@@ -91,8 +93,13 @@ def _tasks_rating_fetch(task_id: int):
 
     out = {
         "has_any": False,
-        "branches": {"running": False, "last_done_hash": None},
-        "geo": {"running": False, "last_done_hash": None},
+        "branches": {
+            "running": False,
+            "last_done_hash": None,
+            "progress": None,
+            "running_hash": None,
+        },
+        "geo": {"running": False, "last_done_hash": None, "progress": None, "running_hash": None},
     }
     if not rows:
         return out
@@ -100,16 +107,55 @@ def _tasks_rating_fetch(task_id: int):
     out["has_any"] = True
 
     seen_last_done = {"branches": False, "geo": False}
+    seen_running = {"branches": False, "geo": False}
+
     for type_, hash_task, done, _updated_at in rows:
         if type_ not in ("branches", "geo"):
             continue
 
-        if done is False:
+        if done is False and not seen_running[type_]:
             out[type_]["running"] = True
+            out[type_]["running_hash"] = hash_task
+            seen_running[type_] = True
 
         if done is True and not seen_last_done[type_]:
             out[type_]["last_done_hash"] = hash_task
             seen_last_done[type_] = True
+
+    def _progress(crawl_type: str, hash_task: int, total: int) -> int:
+        if not hash_task:
+            return 0
+        if not total:
+            return 0
+
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                SELECT COUNT(*)
+                FROM public.crawl_tasks
+                WHERE task_id = %s
+                  AND type = %s
+                  AND hash_task = %s
+                """,
+                [int(task_id), str(crawl_type), int(hash_task)],
+            )
+            cnt = int(cur.fetchone()[0] or 0)
+
+        return int(round((cnt * 100.0) / float(total)))
+
+    if out["branches"]["running"] and out["branches"]["running_hash"]:
+        out["branches"]["progress"] = _progress(
+            "branch",
+            int(out["branches"]["running_hash"]),
+            BRANCHES_TOTAL,
+        )
+
+    if out["geo"]["running"] and out["geo"]["running_hash"]:
+        out["geo"]["progress"] = _progress(
+            "city",
+            int(out["geo"]["running_hash"]),
+            GEO_TOTAL,
+        )
 
     return out
 
@@ -130,7 +176,7 @@ def _tasks_rating_insert(task_id: int, type_: str, hash_task: int):
 def _bind_tasks_statuses(tasks):
     """
     Для списка tasks:
-    - t.rating: текущее состояние обработки (running/last_done_hash)
+    - t.rating: текущее состояние обработки (running/last_done_hash/progress)
     - t.rating_hashes: текущие хеши (task+branches / task+geo)
     """
     for t in tasks:
@@ -167,14 +213,11 @@ def clar_view(request):
     rating = None
     rating_hashes = None
 
-    # правые списки для edit
     edit_cities = []
     edit_branches = []
 
     if edit_task:
-        FormClass = (
-            AudienceClarBuyForm if edit_task.type == "buy" else AudienceClarSellForm
-        )
+        FormClass = AudienceClarBuyForm if edit_task.type == "buy" else AudienceClarSellForm
 
         if request.method == "POST":
             action = (request.POST.get("action") or "").strip()
@@ -188,11 +231,14 @@ def clar_view(request):
                 ).update(run_processing=not edit_task.run_processing)
                 return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
-            # rate update (ВСЕГДА разрешено)
             if action in ("rate_city", "rate_branch"):
                 type_ = "city" if action == "rate_city" else "branch"
-                value_id = request.POST.get("value_id") or ""
-                rate_val = request.POST.get("rate") or ""
+                value_id = (request.POST.get("value_id") or "").strip()
+                rate_val = (request.POST.get("rate") or "").strip()
+
+                if not value_id or not rate_val:
+                    return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
+
                 try:
                     update_rate(
                         ws_id=ws_id,
@@ -204,9 +250,9 @@ def clar_view(request):
                     )
                 except Exception:
                     pass
+
                 return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
-            # rating actions (append-only inserts)
             hash_branches = h64_text((edit_task.task or "") + (edit_task.task_branches or ""))
             hash_geo = h64_text((edit_task.task or "") + (edit_task.task_geo or ""))
 
@@ -256,7 +302,6 @@ def clar_view(request):
             "geo": h64_text((edit_task.task or "") + (edit_task.task_geo or "")),
         }
 
-        # списки справа (только если run_processing=True, но грузим всегда — чтобы шаблон решал)
         edit_cities = load_sorted_cities(ws_id, user.id, int(edit_task.id))
         edit_branches = load_sorted_branches(ws_id, user.id, int(edit_task.id), ui_lang=ui_lang)
 
