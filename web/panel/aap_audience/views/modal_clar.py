@@ -1,32 +1,16 @@
-# FILE: web/panel/aap_audience/views/modal_clar.py  (новое — 2025-12-27)
+# FILE: web/panel/aap_audience/views/modal_clar.py  (обновлено — 2025-12-27)
 # PURPOSE: HTML-фрагмент для модалки clar. Показывает города/категории по task (ui_id) и mode (cities|branches).
+#          Источник: crawl_tasks + joins (НЕ crawl_tasks_labeled).
 
 from __future__ import annotations
 
-from django.db import connection
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 
 from mailer_web.access import resolve_pk_or_redirect
 from panel.aap_audience.models import AudienceTask
 
-
-def _load_items(ws_id, user_id: int, task_id: int, type_: str):
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            SELECT value_id, value_text, rate
-            FROM crawl_tasks_labeled
-            WHERE workspace_id = %s
-              AND user_id      = %s
-              AND task_id      = %s
-              AND type         = %s
-            ORDER BY rate ASC, value_text ASC
-            """,
-            [str(ws_id), int(user_id), int(task_id), str(type_)],
-        )
-        rows = cur.fetchall()
-    return [{"value_id": r[0], "value_text": r[1], "rate": r[2]} for r in rows]
+from .clar_items import load_sorted_branches, load_sorted_cities
 
 
 def _is_running(task_id: int, rating_type: str) -> bool:
@@ -34,6 +18,8 @@ def _is_running(task_id: int, rating_type: str) -> bool:
     __tasks_rating: append-only.
     running = есть хотя бы одна запись done=false для данного type.
     """
+    from django.db import connection
+
     with connection.cursor() as cur:
         cur.execute(
             """
@@ -71,12 +57,14 @@ def modal_clar_view(request):
     if task is None:
         return redirect("/")
 
+    ui_lang = getattr(request, "LANGUAGE_CODE", "") or "ru"
+
     if mode == "cities":
-        items = _load_items(ws_id, user.id, task.id, "city")
+        items = load_sorted_cities(ws_id, user.id, task.id)
         running = _is_running(task.id, "geo")
         title = "Города"
     else:
-        items = _load_items(ws_id, user.id, task.id, "branch")
+        items = load_sorted_branches(ws_id, user.id, task.id, ui_lang=ui_lang)
         running = _is_running(task.id, "branches")
         title = "Категории"
 

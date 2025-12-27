@@ -1,20 +1,20 @@
 <!-- FILE: web/templates/panels/aap_audience/clar.html -->
-<!-- DATE: 2025-12-26 -->
+<!-- DATE: 2025-12-27 -->
 
 {% extends "panels/base.html" %}
 {% load i18n %}
+{% load static %}
+
 {% block content %}
 
-
-<!-- FILE: web/templates/panels/aap_audience/clar.html  (обновлено — 2025-12-26) -->
-<!-- CHANGE: добавлен верхний глобальный блок (2 колонки) только для state=edit: слева форма, справа пусто. -->
-
 {% if state == "edit" %}
-    <table class="YY-MAIN_TABLE">
-      <tr>
-        <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
-          <div class="YY-CARD_WHITE">
-            <form method="post">
+  <script src="{% static 'js/clar_items.js' %}"></script>
+
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+        <div class="YY-CARD_WHITE">
+          <form method="post">
             {% csrf_token %}
 
             {% if form.non_field_errors %}
@@ -46,258 +46,437 @@
                 {% trans "Отменить" %}
               </button>
             </div>
+          </form>
+        </div>
+      </td>
+
+      <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+        <div class="YY-CARD_WHITE">
+
+          {% if edit_task.run_processing %}
+            <form method="post" class="mb-5">
+              {% csrf_token %}
+              <div class="YY-STATUS_GREEN w-full mb-2">
+                {% trans "Обработка задачи включена" %}
+              </div>
+              <button type="submit" name="action" value="toggle_processing" class="YY-BUTTON_MAIN w-full mb-5">
+                {% trans "Отключить обработку задачи" %}
+              </button>
             </form>
-          </div>
-        </td>
-
-        <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
-           <div class="YY-CARD_WHITE">
-<a href="#"
-   class="YY-STATUS_GREEN w-full inline-block text-center"
-   data-yy-modal="text=<div class='YY-TEXT'><b>Lorem ipsum</b> dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</div>">
-  Открыть модалку (Lorem ipsum)
-</a>
-
-              <form method="post">
-                {% csrf_token %}
-
-                {% if not rating.has_any %}
-                  <p class="YY-TEXT mb-3">Категории и география не обрабатываются</p>
-                  <button type="submit" name="action" value="rating_start_all" class="YY-BUTTON_MAIN">
-                    Включить обработку
-                  </button>
-                {% else %}
-
-                  <!-- BRANCHES -->
-                  <div class="mb-5">
-                    <div class="YY-TEXT font-semibold mb-2">Категории</div>
-
-                    {% if rating.branches.running %}
-                      <div class="YY-TEXT">Обрабатываются</div>
-                    {% else %}
-                      {% if rating.branches.last_done_hash %}
-                        {% if rating.branches.last_done_hash == rating_hashes.branches %}
-                          <div class="YY-TEXT">Обработаны</div>
-                        {% else %}
-                          <div class="YY-TEXT mb-2">Задача изменилась</div>
-                          <button type="submit" name="action" value="rating_restart_branches" class="YY-BUTTON_MAIN">
-                            Обработать категории снова
-                          </button>
-                        {% endif %}
-                      {% else %}
-                        <div class="YY-TEXT mb-2">Не обрабатываются</div>
-                        <button type="submit" name="action" value="rating_restart_branches" class="YY-BUTTON_MAIN">
-                          Обработать категории
-                        </button>
-                      {% endif %}
-                    {% endif %}
-                  </div>
-
-                  <!-- GEO -->
-                  <div class="mb-5">
-                    <div class="YY-TEXT font-semibold mb-2">География</div>
-
-                    {% if rating.geo.running %}
-                      <div class="YY-TEXT">Обрабатывается</div>
-                    {% else %}
-                      {% if rating.geo.last_done_hash %}
-                        {% if rating.geo.last_done_hash == rating_hashes.geo %}
-                          <div class="YY-TEXT">Обработана</div>
-                        {% else %}
-                          <div class="YY-TEXT mb-2">Задача изменилась</div>
-                          <button type="submit" name="action" value="rating_restart_geo" class="YY-BUTTON_MAIN">
-                            Обработать географию снова
-                          </button>
-                        {% endif %}
-                      {% else %}
-                        <div class="YY-TEXT mb-2">Не обрабатывается</div>
-                        <button type="submit" name="action" value="rating_restart_geo" class="YY-BUTTON_MAIN">
-                          Обработать географию
-                        </button>
-                      {% endif %}
-                    {% endif %}
-                  </div>
-
-                {% endif %}
-              </form>
-           
-            {% if edit_task.run_processing %}
-              <form method="post">
+          {% else %}
+            <form method="post" class="mb-5">
               {% csrf_token %}
-              <p class="YY-TEXT font-semibold mb-3">
-                Обработка задачи включена
-              </p>
-              <button
-                type="submit"
-                name="action"
-                value="toggle_processing"
-                class="YY-BUTTON_MAIN">
-                Отключить обработку задачи
+              <div class="YY-STATUS_GRAY w-full mb-2">
+                {% trans "Обработка задачи отключена" %}
+              </div>
+              <button type="submit" name="action" value="toggle_processing" class="YY-BUTTON_MAIN w-full mb-5">
+                {% trans "Включить обработку задачи" %}
               </button>
-              </form>
+            </form>
+          {% endif %}
+
+          <form method="post" class="mb-5">
+            {% csrf_token %}
+
+            {% if not rating.has_any %}
+              <div class="YY-STATUS_GRAY w-full mb-2">
+                {% trans "Категории и география не обрабатываются" %}
+              </div>
+              <button type="submit" name="action" value="rating_start_all" class="YY-BUTTON_MAIN w-full mb-5">
+                {% trans "Запустить обработку географии и категории" %}
+              </button>
             {% else %}
-              <form method="post">
-              {% csrf_token %}
-              <p class="YY-TEXT font-semibold mb-3">
-                Обработка задачи отключена
-              </p>
-              <button
-                type="submit"
-                name="action"
-                value="toggle_processing"
-                class="YY-BUTTON_MAIN">
-                Включить обработку задачи
-              </button>
-              </form>
+
+              {% if rating.branches.running %}
+                <div class="YY-STATUS_YELLOW w-full mb-2">
+                  {% trans "Бизнес-категории: обрабатываются" %}
+                </div>
+
+              {% elif rating.branches.last_done_hash %}
+                {% if rating.branches.last_done_hash == rating_hashes.branches %}
+                  <div class="YY-STATUS_GREEN w-full mb-2">
+                    {% trans "Бизнес-категории: обработаны" %}
+                  </div>
+                {% else %}
+                  <div class="YY-STATUS_YELLOW w-full mb-2">
+                    {% trans "Бизнес-категории: задача изменилась" %}
+                  </div>
+                  <button
+                    type="submit"
+                    name="action"
+                    value="rating_restart_branches"
+                    class="YY-BUTTON_MAIN w-full mb-5">
+                    {% trans "Обработать категории снова" %}
+                  </button>
+                {% endif %}
+              {% else %}
+                <div class="YY-STATUS_GRAY w-full mb-2">
+                  {% trans "Бизнес-категории: не обработаны" %}
+                </div>
+                <button
+                  type="submit"
+                  name="action"
+                  value="rating_restart_branches"
+                  class="YY-BUTTON_MAIN w-full mb-5">
+                  {% trans "Обработать категории" %}
+                </button>
+              {% endif %}
+
+              {% if rating.geo.running %}
+                <div class="YY-STATUS_YELLOW w-full mb-2">
+                  {% trans "География: обрабатывается" %}
+                </div>
+
+              {% elif rating.geo.last_done_hash %}
+                {% if rating.geo.last_done_hash == rating_hashes.geo %}
+                  <div class="YY-STATUS_GREEN w-full mb-2">
+                    {% trans "География: обработана" %}
+                  </div>
+                {% else %}
+                  <div class="YY-STATUS_YELLOW w-full mb-2">
+                    {% trans "География: задача изменилась" %}
+                  </div>
+                  <button
+                    type="submit"
+                    name="action"
+                    value="rating_restart_geo"
+                    class="YY-BUTTON_MAIN w-full mb-5">
+                    {% trans "Обработать географию снова" %}
+                  </button>
+                {% endif %}
+              {% else %}
+                <div class="YY-STATUS_GRAY w-full mb-2">
+                  {% trans "География: не обработана" %}
+                </div>
+                <button
+                  type="submit"
+                  name="action"
+                  value="rating_restart_geo"
+                  class="YY-BUTTON_MAIN w-full mb-5">
+                  {% trans "Обработать географию" %}
+                </button>
+              {% endif %}
+
             {% endif %}
+          </form>
 
-          </div>
-        </td>
-      </tr>
-    </table>
+          {% if edit_task.run_processing %}
+            <div data-yy-clar-items="1" data-ui-lang="{{ ui_lang }}" class="mt-10">
+              <div class="flex gap-3 mb-2">
+                <button
+                  type="button"
+                  data-tab="branches"
+                  data-active-class="YY-BUTTON_GREEN"
+                  data-idle-class="YY-BUTTON_MAIN"
+                  class="YY-BUTTON_GREEN">
+                  {% trans "Категории" %}
+                </button>
+                <button
+                  type="button"
+                  data-tab="cities"
+                  data-active-class="YY-BUTTON_GREEN"
+                  data-idle-class="YY-BUTTON_MAIN"
+                  class="YY-BUTTON_MAIN">
+                  {% trans "Города" %}
+                </button>
+              </div>
+
+              <!-- BRANCHES PANEL -->
+              <div data-panel="branches">
+                <form method="post" class="mb-0 flex gap-3 items-center" data-rate-form="branch">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="rate_branch">
+                  <input type="hidden" name="value_id" value="">
+
+                  <input
+                    type="text"
+                    class="YY-INPUT flex-1 mt-5"
+                    value=""
+                    readonly
+                    data-selected-label="branch"
+                  >
+
+                  <input
+                    name="rate"
+                    type="text"
+                    class="YY-INPUT w-[50px] mt-5"
+                    value=""
+                  >
+
+                  <button type="submit" class="YY-BUTTON_MAIN py-2.5" disabled>
+                    OK
+                  </button>
+                </form>
+
+                {% if edit_branches %}
+                  <div class="YY-CARD_WHITE overflow-auto" style="max-height: 480px;">
+                    <div class="">
+                      {% for it in edit_branches %}
+                        <div
+                          class="cursor-pointer hover:bg-[#f8fdff]"
+                          data-clar-item="branch"
+                          data-value-id="{{ it.value_id }}"
+                          data-value-text="{{ it.value_text|escape }}"
+                          data-rate="{{ it.rate }}">
+                          <div class="flex justify-between gap-3">
+                            <div class="YY-TEXT">{{ it.value_text }}</div>
+                            <div class="YY-TEXT">{{ it.rate }}</div>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% else %}
+                  <div class="YY-TEXT">
+                    {% trans "Бизнес-категории не обработаны" %}
+                  </div>
+                {% endif %}
+
+                <div class="mt-3">
+                  <label class="YY-LABEL">{% trans "Поиск" %}</label>
+                  <input
+                    type="text"
+                    class="YY-INPUT w-full"
+                    placeholder="{% trans "Начните вводить." %}"
+                    data-clar-search="branch">
+                </div>
+              </div>
+
+              <!-- CITIES PANEL -->
+              <div data-panel="cities" class="hidden">
+                <form method="post" class="mb-0 flex gap-3 items-center" data-rate-form="city">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="rate_city">
+                  <input type="hidden" name="value_id" value="">
+
+                  <input
+                    type="text"
+                    class="YY-INPUT flex-1 mt-5"
+                    value=""
+                    readonly
+                    data-selected-label="city"
+                  >
+
+                  <input
+                    name="rate"
+                    type="text"
+                    class="YY-INPUT w-[50px] mt-5"
+                    value=""
+                  >
+
+                  <button type="submit" class="YY-BUTTON_MAIN py-2.5" disabled>
+                    OK
+                  </button>
+                </form>
+
+                {% if edit_cities %}
+                  <div class="YY-CARD_WHITE overflow-auto" style="max-height: 480px;">
+                    <div class="">
+                      {% for it in edit_cities %}
+                        <div
+                          class="cursor-pointer hover:bg-[#f8fdff]"
+                          data-clar-item="city"
+                          data-value-id="{{ it.value_id }}"
+                          data-value-text="{{ it.value_text|escape }}"
+                          data-rate="{{ it.rate }}">
+                          <div class="flex justify-between gap-3">
+                            <div class="YY-TEXT">{{ it.value_text }}</div>
+                            <div class="YY-TEXT">{{ it.rate }}</div>
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% else %}
+                  <div class="YY-TEXT">
+                    {% trans "Города не обработаны" %}
+                  </div>
+                {% endif %}
+
+                <div class="mt-3">
+                  <label class="YY-LABEL">{% trans "Поиск" %}</label>
+                  <input
+                    type="text"
+                    class="YY-INPUT w-full"
+                    placeholder="{% trans "Начните вводить." %}"
+                    data-clar-search="city">
+                </div>
+              </div>
+
+            </div>
+          {% endif %}
+
+        </div>
+      </td>
+    </tr>
+  </table>
 {% endif %}
-
 
 <table class="YY-MAIN_TABLE">
   <tr>
     <td class="YY-MAIN_BOTTOM_TD">
-        {% if tasks %}
-          <div class="YY-MAIN_BOTTOM_DIV">
+      {% if tasks %}
+        <div class="YY-MAIN_BOTTOM_DIV">
 
-            <table class="w-full text-left">
-              <thead>
-                <tr class="YY-TH_TR">
-                  <th class="YY-TH_TH w-[30%]">{% trans "Аудитория" %}</th>
-                  <th class="YY-TH_TH w-[35%]">{% trans "Критерии" %}</th>
-                  <th class="YY-TH_TH w-[35%]">{% trans "ТОП-15" %}</th>
-                  <th class="YY-TH_TH" >{% trans "Действия" %}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for t in tasks %}
-                  <tr class="YY-TB_TR align-top">
-                    <td class="YY-TB_TD">
-                  
-                      {% if t.type == "sell" %}
-                        <div class="YY-STATUS_GREEN mb-3">
-                          {% trans "Поиск клиентов" %}
-                        </div>
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH w-[30%]">{% trans "Аудитория" %}</th>
+                <th class="YY-TH_TH w-[35%]">{% trans "Критерии" %}</th>
+                <th class="YY-TH_TH w-[35%]">{% trans "Статус" %}</th>
+                <th class="YY-TH_TH">{% trans "Действия" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in tasks %}
+                <tr class="YY-TB_TR align-top">
+                  <td class="YY-TB_TD">
+
+                    {% if t.type == "sell" %}
+                      <div class="YY-STATUS_GREEN mb-3">
+                        {% trans "Поиск клиентов" %}
+                      </div>
+                    {% else %}
+                      <div class="YY-STATUS_YELLOW mb-3">
+                        {% trans "Поиск поставщиков / подрядчиков" %}
+                      </div>
+                    {% endif %}
+
+                    <div class="mb-3 font-semibold">
+                      {{ t.title }}
+                    </div>
+                    <div>
+                      {{ t.task }}
+                    </div>
+
+                  </td>
+
+                  <td class="YY-TB_TD">
+                    <div data-tabs="crit-{{ t.id }}">
+                      <div class="flex gap-3 mb-3">
+                        <button type="button"
+                          data-tab="branches"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_GREEN">
+                          {% trans "Категории" %}
+                        </button>
+                        <button type="button"
+                          data-tab="geo"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_MAIN">
+                          {% trans "География" %}
+                        </button>
+                        <button type="button"
+                          data-tab="client"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_MAIN">
+                          {% trans "Клиент" %}
+                        </button>
+                      </div>
+
+                      <div data-panel="branches">
+                        {{ t.task_branches|linebreaksbr }}
+                      </div>
+                      <div data-panel="geo" class="hidden">
+                        {{ t.task_geo|linebreaksbr }}
+                      </div>
+                      <div data-panel="client" class="hidden">
+                        {{ t.task_client|linebreaksbr }}
+                      </div>
+                    </div>
+                  </td>
+
+                  <td class="YY-TB_TD">
+
+                    {% if t.run_processing %}
+                      <div class="YY-STATUS_GREEN w-full mb-2">
+                        {% trans "Обработка задачи включена" %}
+                      </div>
+                    {% else %}
+                      <div class="YY-STATUS_GRAY w-full mb-2">
+                        {% trans "Обработка задачи отключена" %}
+                      </div>
+                    {% endif %}
+
+                    {% if t.rating.branches.running %}
+                      <div class="YY-STATUS_YELLOW w-full mb-2">
+                        {% trans "Бизнес-категории в обработке" %}
+                      </div>
+                    {% else %}
+                      {% if t.rating.branches.last_done_hash %}
+                        {% if t.rating.branches.last_done_hash == t.rating_hashes.branches %}
+                          <div class="YY-STATUS_GREEN w-full mb-2">
+                            {% trans "Бизнес-категории обработаны" %}
+                          </div>
+                          <a href="#"
+                             class="YY-BUTTON_MAIN w-full mb-5"
+                             data-yy-modal="url=/panel/audience/clar/modal/?mode=branches&id={{ t.ui_id }}">
+                            {% trans "Посмотреть бизнес-категории" %}
+                          </a>
+                        {% else %}
+                          <div class="YY-STATUS_GRAY w-full mb-2">
+                            {% trans "Бизнес-категории не обработаны" %}
+                          </div>
+                        {% endif %}
                       {% else %}
-                        <div class="YY-STATUS_YELLOW mb-3">
-                          {% trans "Поиск поставщиков / подрядчиков" %}
+                        <div class="YY-STATUS_GRAY w-full mb-2">
+                          {% trans "Бизнес-категории не обработаны" %}
                         </div>
                       {% endif %}
+                    {% endif %}
 
-                      <div class="mb-3 font-semibold">
-                        {{ t.title }}
+                    {% if t.rating.geo.running %}
+                      <div class="YY-STATUS_YELLOW w-full mb-2">
+                        {% trans "Города в обработке" %}
                       </div>
-                      <div>
-                        {{ t.task }}
-                      </div>
-
-                    </td>
-                    <td class="YY-TB_TD">
-                      <div data-tabs="crit-{{ t.id }}">
-                        <div class="flex gap-3 mb-3">
-                          <button type="button"
-                            data-tab="branches"
-                            data-active-class="YY-BUTTON_GREEN"
-                            data-idle-class="YY-BUTTON_MAIN"
-                            class="YY-BUTTON_GREEN">
-                            {% trans "Категории" %}
-                          </button>
-                          <button type="button"
-                            data-tab="geo"
-                            data-active-class="YY-BUTTON_GREEN"
-                            data-idle-class="YY-BUTTON_MAIN"
-                            class="YY-BUTTON_MAIN">
-                            {% trans "География" %}
-                          </button>
-                          <button type="button"
-                            data-tab="client"
-                            data-active-class="YY-BUTTON_GREEN"
-                            data-idle-class="YY-BUTTON_MAIN"
-                            class="YY-BUTTON_MAIN">
-                            {% trans "Клиент" %}
-                          </button>
-                        </div>
-
-                        <div data-panel="branches">
-                          {{ t.task_branches|linebreaksbr }}
-                        </div>
-                        <div data-panel="geo" class="hidden">
-                          {{ t.task_geo|linebreaksbr }}
-                        </div>
-                        <div data-panel="client" class="hidden">
-                          {{ t.task_client|linebreaksbr }}
-                        </div>
-                      </div>
-                    </td>
-                    <td class="YY-TB_TD">
-
-                        {# 1) Processing on/off #}
-                        {% if t.run_processing %}
-                          <div class="YY-STATUS_GREEN w-full mb-2">Обработка задачи включена</div>
+                    {% else %}
+                      {% if t.rating.geo.last_done_hash %}
+                        {% if t.rating.geo.last_done_hash == t.rating_hashes.geo %}
+                          <div class="YY-STATUS_GREEN w-full mb-2">
+                            {% trans "Города обработаны" %}
+                          </div>
+                          <a href="#"
+                             class="YY-BUTTON_MAIN w-full mb-5"
+                             data-yy-modal="url=/panel/audience/clar/modal/?mode=cities&id={{ t.ui_id }}">
+                            {% trans "Посмотреть города" %}
+                          </a>
                         {% else %}
-                          <div class="YY-STATUS_GREEN w-full mb-2">Обработка задачи выключена</div>
+                          <div class="YY-STATUS_GRAY w-full mb-2">
+                            {% trans "Города не обработаны" %}
+                          </div>
                         {% endif %}
+                      {% else %}
+                        <div class="YY-STATUS_GRAY w-full mb-2">
+                          {% trans "Города не обработаны" %}
+                        </div>
+                      {% endif %}
+                    {% endif %}
 
-                        {# 3) BRANCHES status #}
-                        {% if t.rating.branches.running %}
-                          <div class="YY-STATUS_GREEN w-full">Категории в обработке</div>
-                        {% else %}
-                          {% if t.rating.branches.last_done_hash %}
-                            {% if t.rating.branches.last_done_hash == t.rating_hashes.branches %}
-                              <div class="YY-STATUS_GREEN w-full">Категории обработаны</div>
-                              <a href="#" class="YY-BUTTON_MAIN" data-yy-modal="url=/panel/audience/clar/modal/?mode=branches&id={{ t.ui_id }}">
-                                  Посмотреть категории
-                              </a>
-                            {% else %}
-                              <div class="YY-STATUS_GREEN w-full">Категории не обработаны</div>
-                            {% endif %}
-                          {% else %}
-                            <div class="YY-STATUS_GREEN w-full">Категории не обработаны</div>
-                          {% endif %}
-                        {% endif %}
+                  </td>
 
-                        {# 2) GEO status #}
-                        {% if t.rating.geo.running %}
-                          <div class="YY-STATUS_GREEN w-full mb-2">Города в обработке</div>
-                        {% else %}
-                          {% if t.rating.geo.last_done_hash %}
-                            {% if t.rating.geo.last_done_hash == t.rating_hashes.geo %}
-                              <div class="YY-STATUS_GREEN w-full mb-2">Города обработаны</div>
-                              <a href="#" class="YY-BUTTON_MAIN" data-yy-modal="url=/panel/audience/clar/modal/?mode=cities&id={{ t.ui_id }}">
-                                  Посмотреть города
-                              </a>                              
-                            {% else %}
-                              <div class="YY-STATUS_GREEN w-full mb-2">Города не обработаны</div>
-                            {% endif %}
-                          {% else %}
-                            <div class="YY-STATUS_GREEN w-full mb-2">Города не обработаны</div>
-                          {% endif %}
-                        {% endif %}
-                      
-                    </td>
+                  <td class="YY-TB_TD">
+                    <a href="?state=edit&id={{ t.ui_id }}"
+                       class="YY-BUTTON_TAB_MAIN inline-block">
+                      {% trans "Управлять" %}
+                    </a>
+                  </td>
 
-                    <td class="YY-TB_TD">
-                      <a href="?state=edit&id={{ t.ui_id }}" class="YY-BUTTON_TAB_MAIN inline-block">
-                        {% trans "Управлять" %}
-                      </a>
-                 </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
 
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-
-          </div>
-        {% else %}
-          <div class="YY-CARD_WHITE mb-10">
-            {% trans "Здесь пока нет данных" %}
-          </div>
-        {% endif %}
+        </div>
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
+      {% endif %}
     </td>
   </tr>
 </table>
+
 {% endblock %}

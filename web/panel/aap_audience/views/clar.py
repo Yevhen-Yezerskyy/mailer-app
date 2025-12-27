@@ -1,13 +1,13 @@
-# FILE: web/panel/aap_audience/views/clar.py  (обновлено — 2025-12-26)
+# FILE: web/panel/aap_audience/views/clar.py  (обновлено — 2025-12-27)
 # CHANGE:
-# - Для списка tasks добавлены t.rating и t.rating_hashes (шаблон сам рисует статусы/цвета).
-# - rating branches/geo полностью независим от edit_task.run_processing
-# - __tasks_rating: только INSERT (append-only), done не трогаем
-# - хеш только через engine.common.utils.h64_text
+# - Убрано использование crawl_tasks_labeled (оно не подходит под i18n).
+# - Для списка задач и для правой панели edit используются crawl_tasks + joins (через clar_items.py).
+# - Добавлено сохранение rate для city/branch (всегда разрешено).
+# - В edit-режиме, если edit_task.run_processing=True: всегда показываем блоки Cities/Branches;
+#   если списки пустые — показываем "не обработаны".
 
 from __future__ import annotations
 
-from django.db import connection
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 
@@ -16,35 +16,12 @@ from mailer_web.access import encode_id, resolve_pk_or_redirect
 from panel.aap_audience.forms import AudienceClarBuyForm, AudienceClarSellForm
 from panel.aap_audience.models import AudienceTask
 
+from panel.aap_audience.views.clar_items import (
+    load_sorted_branches,
+    load_sorted_cities,
+    update_rate,
+)
 
-def _load_all_crawl_items_for_tasks(workspace_id, user_id, task_ids):
-    task_ids = [int(x) for x in task_ids if x]
-    if not task_ids:
-        return {}
-
-    out = {tid: {"city": [], "branch": []} for tid in task_ids}
-
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            SELECT task_id, type, value_id, value_text, rate
-            FROM crawl_tasks_labeled
-            WHERE workspace_id = %s
-              AND user_id      = %s
-              AND task_id = ANY(%s)
-            ORDER BY task_id ASC, type ASC, rate ASC, value_text ASC
-            """,
-            [str(workspace_id), int(user_id), task_ids],
-        )
-        rows = cur.fetchall()
-
-    for task_id, type_, value_id, value_text, rate in rows:
-        if task_id in out and type_ in ("city", "branch"):
-            out[task_id][type_].append(
-                {"value_id": value_id, "value_text": value_text, "rate": rate}
-            )
-
-    return out
 
 
 def _get_tasks(request):
@@ -62,18 +39,6 @@ def _with_ui_ids(tasks):
     for t in tasks:
         t.ui_id = encode_id(int(t.id))
     return tasks
-
-
-def _bind_clar_items(ws_id, user_id, tasks):
-    task_ids = [t.id for t in tasks]
-    all_items = (
-        _load_all_crawl_items_for_tasks(ws_id, user_id, task_ids) if task_ids else {}
-    )
-
-    for t in tasks:
-        bucket = all_items.get(t.id, {"city": [], "branch": []})
-        t.clar_city_items = bucket["city"]
-        t.clar_branch_items = bucket["branch"]
 
 
 def _get_edit_task_or_redirect(request):
@@ -109,6 +74,8 @@ def _tasks_rating_fetch(task_id: int):
       "geo":      {"running": bool, "last_done_hash": int|None},
     }
     """
+    from django.db import connection
+
     with connection.cursor() as cur:
         cur.execute(
             """
@@ -148,6 +115,8 @@ def _tasks_rating_fetch(task_id: int):
 
 
 def _tasks_rating_insert(task_id: int, type_: str, hash_task: int):
+    from django.db import connection
+
     with connection.cursor() as cur:
         cur.execute(
             """
@@ -163,7 +132,6 @@ def _bind_tasks_statuses(tasks):
     Для списка tasks:
     - t.rating: текущее состояние обработки (running/last_done_hash)
     - t.rating_hashes: текущие хеши (task+branches / task+geo)
-    Шаблон сам решает статусы/кнопки/цвета.
     """
     for t in tasks:
         t.rating = _tasks_rating_fetch(int(t.id))
@@ -173,9 +141,22 @@ def _bind_tasks_statuses(tasks):
         }
 
 
+def _bind_task_top_items(ws_id, user_id: int, tasks, ui_lang: str):
+    """
+    Для таблицы (ТОП-15):
+    - t.clar_city_items
+    - t.clar_branch_items
+    Берём первые 15 по rate.
+    """
+    for t in tasks:
+        t.clar_city_items = load_sorted_cities(ws_id, user_id, int(t.id))[:15]
+        t.clar_branch_items = load_sorted_branches(ws_id, user_id, int(t.id), ui_lang=ui_lang)[:15]
+
+
 def clar_view(request):
     ws_id = request.workspace_id
     user = request.user
+    ui_lang = getattr(request, "LANGUAGE_CODE", "") or "ru"
 
     edit_task, r = _get_edit_task_or_redirect(request)
     if r is not None:
@@ -186,13 +167,17 @@ def clar_view(request):
     rating = None
     rating_hashes = None
 
+    # правые списки для edit
+    edit_cities = []
+    edit_branches = []
+
     if edit_task:
         FormClass = (
             AudienceClarBuyForm if edit_task.type == "buy" else AudienceClarSellForm
         )
 
         if request.method == "POST":
-            action = request.POST.get("action")
+            action = (request.POST.get("action") or "").strip()
 
             if action == "cancel":
                 return redirect(request.path)
@@ -201,34 +186,42 @@ def clar_view(request):
                 AudienceTask.objects.filter(
                     id=edit_task.id, workspace_id=ws_id, user=user
                 ).update(run_processing=not edit_task.run_processing)
-                return redirect(
-                    f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}"
-                )
+                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
+
+            # rate update (ВСЕГДА разрешено)
+            if action in ("rate_city", "rate_branch"):
+                type_ = "city" if action == "rate_city" else "branch"
+                value_id = request.POST.get("value_id") or ""
+                rate_val = request.POST.get("rate") or ""
+                try:
+                    update_rate(
+                        ws_id=ws_id,
+                        user_id=int(user.id),
+                        task_id=int(edit_task.id),
+                        type_=type_,
+                        value_id=int(value_id),
+                        rate=int(rate_val),
+                    )
+                except Exception:
+                    pass
+                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
             # rating actions (append-only inserts)
-            hash_branches = h64_text(
-                (edit_task.task or "") + (edit_task.task_branches or "")
-            )
+            hash_branches = h64_text((edit_task.task or "") + (edit_task.task_branches or ""))
             hash_geo = h64_text((edit_task.task or "") + (edit_task.task_geo or ""))
 
             if action == "rating_start_all":
                 _tasks_rating_insert(int(edit_task.id), "branches", hash_branches)
                 _tasks_rating_insert(int(edit_task.id), "geo", hash_geo)
-                return redirect(
-                    f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}"
-                )
+                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
             if action == "rating_restart_branches":
                 _tasks_rating_insert(int(edit_task.id), "branches", hash_branches)
-                return redirect(
-                    f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}"
-                )
+                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
             if action == "rating_restart_geo":
                 _tasks_rating_insert(int(edit_task.id), "geo", hash_geo)
-                return redirect(
-                    f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}"
-                )
+                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
             if action == "save":
                 form = FormClass(request.POST)
@@ -237,45 +230,40 @@ def clar_view(request):
                     AudienceTask.objects.filter(
                         id=edit_task.id, workspace_id=ws_id, user=user
                     ).update(
-                        title=cd["title"].strip(),
-                        task=cd["task"].strip(),
-                        task_client=cd["task_client"].strip(),
-                        task_branches=cd["task_branches"].strip(),
-                        task_geo=cd["task_geo"].strip(),
+                        title=(cd["title"] or "").strip(),
+                        task=(cd["task"] or "").strip(),
+                        task_client=(cd["task_client"] or "").strip(),
+                        task_branches=(cd["task_branches"] or "").strip(),
+                        task_geo=(cd["task_geo"] or "").strip(),
                     )
-                    return redirect(
-                        f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}"
-                    )
-            else:
-                return redirect(
-                    f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}"
-                )
+                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
-        else:
-            form = FormClass(
-                initial={
-                    "title": edit_task.title or "",
-                    "task": edit_task.task or "",
-                    "task_client": edit_task.task_client or "",
-                    "task_branches": edit_task.task_branches or "",
-                    "task_geo": edit_task.task_geo or "",
-                }
-            )
+            return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
-        # rating data для шаблона — независимо от run_processing
+        form = FormClass(
+            initial={
+                "title": edit_task.title or "",
+                "task": edit_task.task or "",
+                "task_client": edit_task.task_client or "",
+                "task_branches": edit_task.task_branches or "",
+                "task_geo": edit_task.task_geo or "",
+            }
+        )
+
         rating = _tasks_rating_fetch(int(edit_task.id))
         rating_hashes = {
-            "branches": h64_text(
-                (edit_task.task or "") + (edit_task.task_branches or "")
-            ),
+            "branches": h64_text((edit_task.task or "") + (edit_task.task_branches or "")),
             "geo": h64_text((edit_task.task or "") + (edit_task.task_geo or "")),
         }
 
+        # списки справа (только если run_processing=True, но грузим всегда — чтобы шаблон решал)
+        edit_cities = load_sorted_cities(ws_id, user.id, int(edit_task.id))
+        edit_branches = load_sorted_branches(ws_id, user.id, int(edit_task.id), ui_lang=ui_lang)
+
     tasks = _with_ui_ids(_get_tasks(request))
     if ws_id and getattr(user, "is_authenticated", False) and tasks:
-        _bind_clar_items(ws_id, user.id, tasks)
         _bind_tasks_statuses(tasks)
-
+        _bind_task_top_items(ws_id, user.id, tasks, ui_lang=ui_lang)
 
     return render(
         request,
@@ -287,5 +275,8 @@ def clar_view(request):
             "edit_task": edit_task,
             "rating": rating,
             "rating_hashes": rating_hashes,
+            "ui_lang": ui_lang,
+            "edit_cities": edit_cities,
+            "edit_branches": edit_branches,
         },
     )

@@ -149,7 +149,7 @@ def task_prepare_geo() -> Dict[str, Any]:
                     user_id=str(user_id),
                     instructions=instructions,
                     input=payload,
-                    use_cache=True,
+                    use_cache=False,
                 )
                 .content
                 or ""
@@ -333,7 +333,7 @@ def task_prepare_branches() -> Dict[str, Any]:
                     user_id=str(user_id),
                     instructions=instructions,
                     input=payload,
-                    use_cache=True,
+                    use_cache=False,
                 )
                 .content
                 or ""
