@@ -1,16 +1,9 @@
-# FILE: engine/crawler/spiders/spider_gs_cb.py
-# (обновлено — 2025-12-27)
-# Смысл:
-# - Паук без очередей/тасков/пайплайна: вход plz + branch_slug + cb_crawler_id
-# - Всё найденное складывает в self.items (в память)
-# - В БД пишет ТОЛЬКО в конце одной транзакцией:
-#     - UPSERT raw_contacts_gb (все items)
-#     - UPDATE cb_crawler(collected=true, collected_num=..., updated_at=NOW())
-#     - COMMIT
-# - Если завершился НЕ успешно / abort — БД не трогаем
-# - DEBUG-флаг:
-#     - DEBUG=True: печатает по каждой компании + прогресс записи в БД
-#     - DEBUG=False: печатает 3 строки (куда пошёл / сколько нашёл / записал или нет)
+# FILE: engine/crawler/spiders/spider_gs_cb.py  (обновлено — 2025-12-27)
+# Смысл (правки):
+# - Если ЛЮБОЙ request (в т.ч. detail-карточка) упал в errback → abort + close_spider → БД НЕ трогаем.
+# - Если на list-странице есть карточки и среди их PLZ НЕТ запрошенного → это "completed пусто":
+#   сразу помечаем cb_crawler.collected=true, collected_num=0 отдельной короткой транзакцией и закрываем паука.
+# - Основной commit (raw_contacts_gb + cb_crawler.collected/collected_num) остаётся ТОЛЬКО при reason=="finished" и без abort.
 
 from __future__ import annotations
 
@@ -25,7 +18,6 @@ from engine.crawler.parsers.parser_gs_cb import parse_gs_cb_detail
 
 
 DEBUG = True  # <-- переключай на False
-
 
 PLZ_RE = re.compile(r"\b(\d{5})\b")
 
@@ -50,6 +42,9 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         self._abort = False
         self._abort_reason: str | None = None
 
+        # если хоть один HTTP-запрос упал — БД не трогаем вообще
+        self._any_request_failed = False
+
         # summary для DEBUG=False (ровно 3 строки)
         self._start_url: str | None = None
         self._db_written = False
@@ -69,7 +64,8 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         # ровно 3 строки
         print(f"GS_CB[{self.cb_crawler_id}] GO {self._start_url}")
         print(
-            f"GS_CB[{self.cb_crawler_id}] FOUND companies_ok={self._companies_ok} items={len(self.items)} abort={self._abort} reason={self._abort_reason or '-'}"
+            f"GS_CB[{self.cb_crawler_id}] FOUND companies_ok={self._companies_ok} items={len(self.items)} "
+            f"abort={self._abort} reason={self._abort_reason or '-'} any_fail={self._any_request_failed}"
         )
         if self._db_written:
             print(
@@ -98,10 +94,19 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         )
 
     def _errback(self, failure):
+        if self._abort:
+            return
+
+        self._any_request_failed = True
+        self._abort = True
+        self._abort_reason = "request_failed"
+
         req = getattr(failure, "request", None)
         url = req.url if req else "<?>"
         if DEBUG:
-            self._p(f"ERROR request_failed url={url} err={failure!r}")
+            self._p(f"ABORT {self._abort_reason} url={url} err={failure!r}")
+
+        self.crawler.engine.close_spider(self, reason=self._abort_reason)
 
     # ------------------------------------------------------------
 
@@ -114,6 +119,58 @@ class GelbeSeitenCBSpider(scrapy.Spider):
                 out.add(m.group(1))
         return out
 
+    def _mark_cb_crawler_collected_zero(self) -> bool:
+        """
+        Отдельная короткая транзакция:
+        used-case: list-page содержит карточки, но PLZ не совпадает (значит для этой связки реально пусто).
+        """
+        conn = get_connection()
+        try:
+            try:
+                conn.autocommit = False
+            except Exception:
+                pass
+
+            cur = conn.cursor()
+            cur.execute(
+                """
+                UPDATE cb_crawler
+                SET collected=true,
+                    collected_num=0,
+                    updated_at=NOW()
+                WHERE id=%s
+                """,
+                (self.cb_crawler_id,),
+            )
+            conn.commit()
+
+            try:
+                cur.close()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+            if DEBUG:
+                self._p("DB MARK collected=true collected_num=0 (plz_mismatch_list_page)")
+
+            return True
+
+        except Exception as e:
+            if DEBUG:
+                self._p(f"DB MARK ERROR -> ROLLBACK err={e!r}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+            return False
+
     def parse_list(self, response):
         if self._abort:
             return
@@ -121,13 +178,17 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         if DEBUG:
             self._p(f"LIST OK status={response.status} bytes={len(response.body)} url={response.url}")
 
-        # ранний guard: если карточки есть и PLZ среди них нет — abort
+        # ранний guard: если карточки есть и PLZ среди них нет — это “пусто”, помечаем collected и выходим
         list_plz_set = self._extract_list_plz_set(response)
         if list_plz_set and self.plz not in list_plz_set:
             self._abort = True
             self._abort_reason = "plz_mismatch_list_page"
             if DEBUG:
                 self._p(f"ABORT {self._abort_reason} req_plz={self.plz} list_plz={sorted(list_plz_set)}")
+
+            # ВАЖНО: это считаем "completed пусто" → ставим collected=true сразу
+            self._mark_cb_crawler_collected_zero()
+
             self.crawler.engine.close_spider(self, reason=self._abort_reason)
             return
 
@@ -235,7 +296,9 @@ class GelbeSeitenCBSpider(scrapy.Spider):
             self._buffer_item(company_name, e, cd_list)
 
         if DEBUG:
-            self._p(f"COMPANY OK name={company_name} emails={len(emails)} -> items+{len(emails)} total_items={len(self.items)}")
+            self._p(
+                f"COMPANY OK name={company_name} emails={len(emails)} -> items+{len(emails)} total_items={len(self.items)}"
+            )
 
     # ------------------------------------------------------------
 
@@ -325,6 +388,17 @@ class GelbeSeitenCBSpider(scrapy.Spider):
             return False, 0
 
     def closed(self, reason):
+        # если был хоть один request fail — гарантированно ничего не пишем (кроме спец-кейса plz_mismatch, который уже помечен отдельно)
+        if self._any_request_failed:
+            if DEBUG:
+                self._p(
+                    f"FINISH reason={reason} any_fail=true -> DB SKIP "
+                    f"companies_ok={self._companies_ok} items={len(self.items)}"
+                )
+            if not DEBUG:
+                self._p3()
+            return
+
         # COMMIT только при нормальном завершении и без abort
         if reason != "finished" or self._abort:
             if DEBUG:
