@@ -1,5 +1,8 @@
-# FILE: engine/common/cache/client.py  (новое — 2025-12-20)
+# FILE: engine/common/cache/client.py  (обновлено — 2025-12-27)
 # Смысл: клиент для dev IPC-кеша. Если демона нет/ошибка — считаем локально и продолжаем.
+# (новое — 2025-12-27)
+# - Добавлен IPC locker (lease): LOCK_TRY / LOCK_RENEW / LOCK_RELEASE / LOCK_STATUS
+# - Best-effort: если демона нет/ошибка — методы lock* возвращают None/False
 
 from __future__ import annotations
 
@@ -86,6 +89,8 @@ def _rpc(req: dict[str, Any]) -> Optional[dict[str, Any]]:
 
 
 class CacheClient:
+    # -------------------- cache --------------------
+
     def get(self, key: str, ttl_sec: int) -> Optional[bytes]:
         resp = _rpc({"op": "GET", "key": key, "ttl_sec": int(ttl_sec)})
         if not resp or not resp.get("ok"):
@@ -110,6 +115,33 @@ class CacheClient:
 
     def stats(self) -> Optional[dict[str, Any]]:
         resp = _rpc({"op": "STATS"})
+        return resp if resp and resp.get("ok") else None
+
+    # -------------------- locks (lease) --------------------
+
+    def lock_try(self, key: str, *, ttl_sec: float, owner: str) -> Optional[dict[str, Any]]:
+        """
+        Попытка взять lease-lock.
+        Возвращает ответ демона (dict) или None (если демона нет/ошибка).
+        Ожидаемые поля на успех:
+          - acquired: bool
+          - token: str (если acquired=True)
+          - owner: str
+          - expire_at: float (monotonic timestamp в секундах)
+        """
+        resp = _rpc({"op": "LOCK_TRY", "key": str(key), "ttl_sec": float(ttl_sec), "owner": str(owner)})
+        return resp if resp and resp.get("ok") else None
+
+    def lock_renew(self, key: str, *, ttl_sec: float, token: str) -> bool:
+        resp = _rpc({"op": "LOCK_RENEW", "key": str(key), "ttl_sec": float(ttl_sec), "token": str(token)})
+        return bool(resp and resp.get("ok") and resp.get("renewed") is True)
+
+    def lock_release(self, key: str, *, token: str) -> bool:
+        resp = _rpc({"op": "LOCK_RELEASE", "key": str(key), "token": str(token)})
+        return bool(resp and resp.get("ok") and resp.get("released") is True)
+
+    def lock_status(self, key: str) -> Optional[dict[str, Any]]:
+        resp = _rpc({"op": "LOCK_STATUS", "key": str(key)})
         return resp if resp and resp.get("ok") else None
 
 

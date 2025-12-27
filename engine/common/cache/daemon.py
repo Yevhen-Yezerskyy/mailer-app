@@ -1,6 +1,9 @@
-# FILE: engine/common/cache/daemon.py  (новое — 2025-12-20)
+# FILE: engine/common/cache/daemon.py  (обновлено — 2025-12-27)
 # Смысл: dev cache-daemon (RAM) по UNIX-socket рядом с модулем: TTL sliding, лимиты 128KB/obj и 50MB total,
 # GC до 60%, dump/restore рядом, watchdog 60s, alive-лог каждые 10s (evicted/expired/errors).
+# (новое — 2025-12-27)
+# - Добавлены lease-lock'и (координация воркеров): LOCK_TRY / LOCK_RENEW / LOCK_RELEASE / LOCK_STATUS
+# - Locks НЕ участвуют в dump/restore и НЕ учитываются в memory GC: это volatile coordination (TTL-only)
 
 from __future__ import annotations
 
@@ -38,6 +41,13 @@ class _Entry:
     last_access: float
 
 
+@dataclass
+class _Lease:
+    owner: str
+    token: str
+    expire_at: float
+
+
 class CacheDaemon:
     def __init__(self) -> None:
         self.dir = Path(__file__).resolve().parent
@@ -46,6 +56,9 @@ class CacheDaemon:
 
         self.data: dict[str, _Entry] = {}
         self.total_bytes = 0
+
+        # volatile locks (lease): key -> _Lease
+        self.locks: dict[str, _Lease] = {}
 
         self._stop = False
         self._last_heartbeat = time.monotonic()
@@ -76,16 +89,26 @@ class CacheDaemon:
         if e:
             self.total_bytes -= e.size
 
+    def _drop_lock(self, key: str) -> None:
+        self.locks.pop(key, None)
+
     def _expire_sweep(self) -> None:
         now = self._now()
+
+        # cache
         for k, e in list(self.data.items()):
             if now >= e.expire_at:
                 self._drop(k)
                 self._expired += 1
 
+        # locks (не считаем в expired-метрику кеша — это отдельная сущность)
+        for k, l in list(self.locks.items()):
+            if now >= l.expire_at:
+                self._drop_lock(k)
+
     def _gc(self) -> None:
         try:
-            # 1) TTL sweep
+            # 1) TTL sweep (cache + locks)
             self._expire_sweep()
 
             if self.total_bytes <= MAX_CACHE_BYTES:
@@ -116,6 +139,7 @@ class CacheDaemon:
         mb = self.total_bytes / 1024 / 1024
         limit = MAX_CACHE_BYTES / 1024 / 1024
         items = len(self.data)
+        locks = len(self.locks)
 
         ev, ex, er = self._evicted, self._expired, self._errors
         self._evicted = 0
@@ -123,7 +147,7 @@ class CacheDaemon:
         self._errors = 0
 
         self._log(
-            f"[cache][DEV] alive | items={items} | mem={mb:.2f}MB/{limit:.0f}MB | evicted={ev} expired={ex} errors={er}"
+            f"[cache][DEV] alive | items={items} locks={locks} | mem={mb:.2f}MB/{limit:.0f}MB | evicted={ev} expired={ex} errors={er}"
         )
 
     def _write_dump(self) -> None:
@@ -132,7 +156,7 @@ class CacheDaemon:
                 "v": 1,
                 "ts": time.time(),
                 "total_bytes": self.total_bytes,
-                # только bytes+мета
+                # только cache bytes+мета (locks не дампим)
                 "items": {
                     k: {
                         "payload": e.payload,
@@ -203,6 +227,9 @@ class CacheDaemon:
             self.data = data
             self.total_bytes = total
 
+            # locks никогда не восстанавливаем
+            self.locks = {}
+
             # если после восстановления уже выше лимита — сразу чистим
             if self.total_bytes > MAX_CACHE_BYTES:
                 self._gc()
@@ -247,24 +274,120 @@ class CacheDaemon:
         raw = self._safe_dump_pickle(obj)
         conn.sendall(struct.pack("!I", len(raw)) + raw)
 
+    def _new_token(self) -> str:
+        return os.urandom(16).hex()
+
     def _handle(self, req: Any) -> dict[str, Any]:
         try:
             if not isinstance(req, dict):
                 return {"ok": False, "err": "bad_req"}
 
             op = req.get("op")
+
             if op == "STATS":
+                # подчистим протухшее (locks тоже)
+                self._expire_sweep()
                 return {
                     "ok": True,
                     "items": len(self.data),
+                    "locks": len(self.locks),
                     "total_bytes": self.total_bytes,
                     "max_bytes": MAX_CACHE_BYTES,
                 }
 
+            # ops без key (кроме STATS) не поддерживаем
             key = req.get("key")
             if not isinstance(key, str) or not key:
                 return {"ok": False, "err": "bad_key"}
 
+            now = self._now()
+
+            # -------------------- LOCKS (lease) --------------------
+            if op in ("LOCK_TRY", "LOCK_RENEW", "LOCK_RELEASE", "LOCK_STATUS"):
+                # всегда подчищаем протухшее перед ответом
+                self._expire_sweep()
+
+                if op == "LOCK_STATUS":
+                    cur = self.locks.get(key)
+                    if not cur or now >= cur.expire_at:
+                        if cur:
+                            self._drop_lock(key)
+                        return {"ok": True, "held": False}
+                    return {"ok": True, "held": True, "owner": cur.owner, "token": cur.token, "expire_at": cur.expire_at}
+
+                if op == "LOCK_TRY":
+                    owner = req.get("owner")
+                    if not isinstance(owner, str) or not owner:
+                        return {"ok": False, "err": "bad_owner"}
+
+                    ttl_sec = req.get("ttl_sec")
+                    try:
+                        ttl = float(ttl_sec)
+                    except Exception:
+                        ttl = 0.0
+                    if ttl <= 0:
+                        return {"ok": False, "err": "bad_ttl"}
+
+                    cur = self.locks.get(key)
+                    if cur and now < cur.expire_at:
+                        return {
+                            "ok": True,
+                            "acquired": False,
+                            "owner": cur.owner,
+                            "token": cur.token,
+                            "expire_at": cur.expire_at,
+                        }
+
+                    token = self._new_token()
+                    expire_at = now + ttl
+                    self.locks[key] = _Lease(owner=owner, token=token, expire_at=expire_at)
+                    return {"ok": True, "acquired": True, "owner": owner, "token": token, "expire_at": expire_at}
+
+                if op == "LOCK_RENEW":
+                    token = req.get("token")
+                    if not isinstance(token, str) or not token:
+                        return {"ok": False, "err": "bad_token"}
+
+                    ttl_sec = req.get("ttl_sec")
+                    try:
+                        ttl = float(ttl_sec)
+                    except Exception:
+                        ttl = 0.0
+                    if ttl <= 0:
+                        return {"ok": False, "err": "bad_ttl"}
+
+                    cur = self.locks.get(key)
+                    if not cur or now >= cur.expire_at:
+                        if cur:
+                            self._drop_lock(key)
+                        return {"ok": True, "renewed": False, "reason": "not_held"}
+
+                    if cur.token != token:
+                        return {"ok": True, "renewed": False, "reason": "token_mismatch", "owner": cur.owner, "expire_at": cur.expire_at}
+
+                    cur.expire_at = now + ttl
+                    return {"ok": True, "renewed": True, "expire_at": cur.expire_at}
+
+                if op == "LOCK_RELEASE":
+                    token = req.get("token")
+                    if not isinstance(token, str) or not token:
+                        return {"ok": False, "err": "bad_token"}
+
+                    cur = self.locks.get(key)
+                    if not cur or now >= cur.expire_at:
+                        if cur:
+                            self._drop_lock(key)
+                        return {"ok": True, "released": False, "reason": "not_held"}
+
+                    if cur.token != token:
+                        return {"ok": True, "released": False, "reason": "token_mismatch", "owner": cur.owner, "expire_at": cur.expire_at}
+
+                    self._drop_lock(key)
+                    return {"ok": True, "released": True}
+
+                return {"ok": False, "err": "unknown_op"}
+
+            # -------------------- CACHE --------------------
             ttl_sec = req.get("ttl_sec", DEFAULT_TTL_SEC)
             try:
                 ttl_sec = int(ttl_sec)
@@ -272,8 +395,6 @@ class CacheDaemon:
                 ttl_sec = DEFAULT_TTL_SEC
             if ttl_sec <= 0:
                 ttl_sec = DEFAULT_TTL_SEC
-
-            now = self._now()
 
             if op == "GET":
                 e = self.data.get(key)
@@ -329,7 +450,7 @@ class CacheDaemon:
             "[cache][DEV] starting (DEV MODE) | "
             f"watchdog={WATCHDOG_STALL_SEC}s | alive_log={ALIVE_EVERY_SEC}s | "
             f"max_obj={MAX_VALUE_BYTES//1024}KB | max_mem={MAX_CACHE_BYTES//1024//1024}MB | "
-            f"gc_to={int(GC_TARGET_RATIO*100)}% | ttl_default=7d"
+            f"gc_to={int(GC_TARGET_RATIO*100)}% | ttl_default=7d | locks=lease"
         )
         self._log("[cache][DEV] NOTE: for production this must be replaced/disabled")
 
@@ -360,6 +481,9 @@ class CacheDaemon:
             while not self._stop:
                 self._beat()
                 self._alive_log()
+
+                # периодически подчистим протухшее (locks тоже)
+                self._expire_sweep()
 
                 try:
                     conn, _ = s.accept()

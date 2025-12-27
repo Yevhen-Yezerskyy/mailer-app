@@ -1,11 +1,35 @@
-# FILE: engine/crawler/fetch_gs_cb.py  (новое) 2025-12-14
-# Runner GelbeSeiten cb_crawler → raw_contacts_gb
+# FILE: engine/crawler/fetch_gs_cb.py
+# (обновлено — 2025-12-27)
+# Смысл:
+# - Выбираем ОДНУ cb_crawler where collected=false
+# - Передаём plz + branch_slug + cb_crawler_id в паука
+# - Никаких queue_sys, task_id, rate и т.п.
 
 from scrapy.crawler import CrawlerProcess
+
+from engine.common.db import fetch_one
 from engine.crawler.spiders.spider_gs_cb import GelbeSeitenCBSpider
 
 
 def main():
+    row = fetch_one(
+        """
+        SELECT id, plz, branch_slug
+        FROM cb_crawler
+        WHERE collected = false
+        ORDER BY id
+        LIMIT 1
+        """
+    )
+
+    if not row:
+        print("DEBUG: no uncollected cb_crawler rows")
+        return
+
+    cb_crawler_id, plz, branch_slug = row
+
+    print(f"DEBUG: picked cb_crawler_id={cb_crawler_id} plz={plz} branch={branch_slug}")
+
     process = CrawlerProcess(
         settings={
             "LOG_LEVEL": "ERROR",
@@ -29,7 +53,12 @@ def main():
         }
     )
 
-    process.crawl(GelbeSeitenCBSpider)
+    process.crawl(
+        GelbeSeitenCBSpider,
+        plz=plz,
+        branch_slug=branch_slug,
+        cb_crawler_id=cb_crawler_id,
+    )
     process.start()
 
 

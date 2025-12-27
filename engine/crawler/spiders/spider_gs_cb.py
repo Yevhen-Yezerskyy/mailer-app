@@ -1,19 +1,33 @@
-# FILE: engine/crawler/spiders/spider_gs_cb.py  (обновлено) 2025-12-16
-# Fix: spider использует parser_gs_cb.parse_gs_cb_detail только для карточек компаний;
-# - парсинг списка/пагинации остаётся в пауке
-# - yield-логика по email (0/1/2+) реализована в пауке (N yield’ов при 2+)
-# - company_data формат фиксированный (address, phone=list, email=string|list|null, fax/socials/parent)
-# - plz mismatch abort логика сохранена; collected_num увеличивается 1 раз на карточку (не на yield)
+# FILE: engine/crawler/spiders/spider_gs_cb.py
+# (обновлено — 2025-12-27)
+# Смысл:
+# - Паук без очередей/тасков/пайплайна: вход plz + branch_slug + cb_crawler_id
+# - Всё найденное складывает в self.items (в память)
+# - В БД пишет ТОЛЬКО в конце одной транзакцией:
+#     - UPSERT raw_contacts_gb (все items)
+#     - UPDATE cb_crawler(collected=true, collected_num=..., updated_at=NOW())
+#     - COMMIT
+# - Если завершился НЕ успешно / abort — БД не трогаем
+# - DEBUG-флаг:
+#     - DEBUG=True: печатает по каждой компании + прогресс записи в БД
+#     - DEBUG=False: печатает 3 строки (куда пошёл / сколько нашёл / записал или нет)
 
 from __future__ import annotations
 
+import json
 import re
 from urllib.parse import quote, urljoin
 
 import scrapy
 
-from engine.common.db import execute, fetch_one
+from engine.common.db import get_connection
 from engine.crawler.parsers.parser_gs_cb import parse_gs_cb_detail
+
+
+DEBUG = True  # <-- переключай на False
+
+
+PLZ_RE = re.compile(r"\b(\d{5})\b")
 
 
 class GelbeSeitenCBSpider(scrapy.Spider):
@@ -23,201 +37,311 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         "LOG_ENABLED": False,
     }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, plz: str, branch_slug: str, cb_crawler_id: int, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        self.task_id: int | None = None
-        self.queue_id: int | None = None
-        self.cb_crawler_id: int | None = None
-        self.collected_num: int = 0
+        self.plz = str(plz)
+        self.branch_slug = str(branch_slug)
+        self.cb_crawler_id = int(cb_crawler_id)
 
-        self._abort_plz_mismatch: bool = False
+        self.collected_num = 0  # карточек detail с совпавшим PLZ
+        self.items: list[dict] = []  # items для UPSERT в конце
+
+        self._abort = False
+        self._abort_reason: str | None = None
+
+        # summary для DEBUG=False (ровно 3 строки)
+        self._start_url: str | None = None
+        self._db_written = False
+        self._db_written_rows = 0
+
+        # доп. счётчики
+        self._companies_ok = 0
+        self._companies_skip = 0
+
+    # ------------------------------------------------------------
+
+    def _p(self, msg: str):
+        if DEBUG:
+            print(f"GS_CB[{self.cb_crawler_id}] {msg}")
+
+    def _p3(self):
+        # ровно 3 строки
+        print(f"GS_CB[{self.cb_crawler_id}] GO {self._start_url}")
+        print(
+            f"GS_CB[{self.cb_crawler_id}] FOUND companies_ok={self._companies_ok} items={len(self.items)} abort={self._abort} reason={self._abort_reason or '-'}"
+        )
+        if self._db_written:
+            print(
+                f"GS_CB[{self.cb_crawler_id}] DB COMMIT rows={self._db_written_rows} collected_num={self.collected_num}"
+            )
+        else:
+            print(
+                f"GS_CB[{self.cb_crawler_id}] DB SKIP (no commit) collected_num={self.collected_num}"
+            )
 
     # ------------------------------------------------------------
 
     def start_requests(self):
-        row = fetch_one("SELECT ___crawler_priority_pick_task_id();")
-        if not row or not row[0]:
-            print("DEBUG: no task_id from priority picker")
-            return
+        self._start_url = f"https://www.gelbeseiten.de/suche/{quote(self.branch_slug)}/{self.plz}"
 
-        self.task_id = row[0]
-        print(f"DEBUG: picked task_id = {self.task_id}")
+        if DEBUG:
+            self._p("START")
+            self._p(f"plz={self.plz} branch_slug={self.branch_slug}")
+            self._p(f"start_url={self._start_url}")
 
-        row = fetch_one(
-            """
-            UPDATE queue_sys q
-            SET status = 'processing',
-                time   = NOW()
-            FROM cb_crawler c
-            WHERE q.id = (
-                SELECT q2.id
-                FROM queue_sys q2
-                JOIN cb_crawler c2 ON c2.id = q2.cb_crawler_id
-                WHERE q2.status = 'pending'
-                  AND q2.task_id = %s
-                  AND c2.collected = false
-                ORDER BY q2.rate, q2.id
-                LIMIT 1
-                FOR UPDATE SKIP LOCKED
-            )
-              AND q.status = 'pending'
-              AND c.id = q.cb_crawler_id
-              AND c.collected = false
-            RETURNING
-                q.id,
-                q.cb_crawler_id,
-                c.plz,
-                c.city_name,
-                c.branch_slug
-            """,
-            (self.task_id,),
+        yield scrapy.Request(
+            self._start_url,
+            callback=self.parse_list,
+            errback=self._errback,
+            dont_filter=True,
         )
 
-        if not row:
-            print("DEBUG: no pending queue item for task_id")
-            return
-
-        self.queue_id, self.cb_crawler_id, plz, city, branch = row
-
-        branch_q = quote(branch)
-        start_url = f"https://www.gelbeseiten.de/suche/{branch_q}/{plz}"
-
-        print(f"DEBUG: queue_id = {self.queue_id}")
-        print(f"DEBUG: cb_crawler_id = {self.cb_crawler_id}")
-        print(f"DEBUG: plz = {plz}")
-        print(f"DEBUG: city = {city}")
-        print(f"DEBUG: branch_slug = {branch}")
-        print(f"DEBUG: start_url = {start_url}")
-
-        yield scrapy.Request(start_url, callback=self.parse_list, meta={"plz": plz})
+    def _errback(self, failure):
+        req = getattr(failure, "request", None)
+        url = req.url if req else "<?>"
+        if DEBUG:
+            self._p(f"ERROR request_failed url={url} err={failure!r}")
 
     # ------------------------------------------------------------
 
+    def _extract_list_plz_set(self, response) -> set[str]:
+        texts = response.css("span.mod-AdresseKompakt__adress__ort::text").getall()
+        out: set[str] = set()
+        for t in texts:
+            m = PLZ_RE.search(t or "")
+            if m:
+                out.add(m.group(1))
+        return out
+
     def parse_list(self, response):
-        if self._abort_plz_mismatch:
+        if self._abort:
             return
 
-        plz = response.meta["plz"]
+        if DEBUG:
+            self._p(f"LIST OK status={response.status} bytes={len(response.body)} url={response.url}")
+
+        # ранний guard: если карточки есть и PLZ среди них нет — abort
+        list_plz_set = self._extract_list_plz_set(response)
+        if list_plz_set and self.plz not in list_plz_set:
+            self._abort = True
+            self._abort_reason = "plz_mismatch_list_page"
+            if DEBUG:
+                self._p(f"ABORT {self._abort_reason} req_plz={self.plz} list_plz={sorted(list_plz_set)}")
+            self.crawler.engine.close_spider(self, reason=self._abort_reason)
+            return
 
         gsbiz_links = response.css('a[href*="/gsbiz/"]::attr(href)').getall()
         gsbiz_links = list(dict.fromkeys(gsbiz_links))
 
+        if DEBUG:
+            self._p(f"LIST gsbiz_links={len(gsbiz_links)}")
+
         for href in gsbiz_links:
-            if self._abort_plz_mismatch:
+            if self._abort:
                 return
+            url = urljoin(response.url, href)
+            if DEBUG:
+                self._p(f"GET {url}")
             yield scrapy.Request(
-                urljoin(response.url, href),
+                url,
                 callback=self.parse_detail,
-                meta={"plz": plz},
+                errback=self._errback,
+                dont_filter=True,
             )
 
         next_href = response.css('a.pagination__next::attr(href)').get()
-        if next_href and not self._abort_plz_mismatch:
+        if next_href and not self._abort:
+            next_url = urljoin(response.url, next_href)
+            if DEBUG:
+                self._p(f"LIST next -> {next_url}")
             yield scrapy.Request(
-                urljoin(response.url, next_href),
+                next_url,
                 callback=self.parse_list,
-                meta={"plz": plz},
+                errback=self._errback,
+                dont_filter=True,
             )
+        else:
+            if DEBUG:
+                self._p("LIST no next page")
 
     # ------------------------------------------------------------
 
-    def _expand_yields_by_email(self, parsed: dict):
-        """
-        Правило:
-        - 0 emails: 1 yield (email=None, company_data.email=None)
-        - 1 email : 1 yield (email=str, company_data.email=str)
-        - 2+      : N yield (email=str конкретный, company_data.email=[...])
-        """
-        emails: list[str] = parsed.get("emails") or []
-        company_name = parsed["company_name"]
-        base_cd: dict = parsed["company_data"]
-
-        # готовим базу company_data (не мутируем исходник)
-        if len(emails) == 0:
-            cd = dict(base_cd)
-            cd["email"] = None
-            yield {
-                "company_name": company_name,
-                "email": None,
+    def _buffer_item(self, company_name: str, email, company_data: dict):
+        self.items.append(
+            {
                 "cb_crawler_id": self.cb_crawler_id,
-                "company_data": cd,
-            }
-            return
-
-        if len(emails) == 1:
-            cd = dict(base_cd)
-            cd["email"] = emails[0]
-            yield {
                 "company_name": company_name,
-                "email": emails[0],
-                "cb_crawler_id": self.cb_crawler_id,
-                "company_data": cd,
+                "email": email,
+                "company_data": company_data,
             }
-            return
-
-        # 2+
-        cd_list = dict(base_cd)
-        cd_list["email"] = list(emails)
-        for e in emails:
-            yield {
-                "company_name": company_name,
-                "email": e,
-                "cb_crawler_id": self.cb_crawler_id,
-                "company_data": cd_list,
-            }
+        )
 
     def parse_detail(self, response):
-        if self._abort_plz_mismatch:
+        if self._abort:
             return
 
-        req_plz = response.meta["plz"]
+        if DEBUG:
+            self._p(f"DETAIL OK status={response.status} bytes={len(response.body)} url={response.url}")
 
         parsed = parse_gs_cb_detail(response)
         if not parsed:
+            self._companies_skip += 1
+            if DEBUG:
+                self._p("DETAIL skip parsed=None")
             return
 
-        parsed_plz = parsed.get("company_data", {}).get("plz")
+        company_name = parsed.get("company_name") or "<?>"
+        company_data = parsed.get("company_data") or {}
+        parsed_plz = company_data.get("plz")
 
-        # если плз не извлечён — не можем валидировать; пропускаем
         if not parsed_plz:
+            self._companies_skip += 1
+            if DEBUG:
+                self._p(f"DETAIL skip no_plz company={company_name}")
             return
 
-        if parsed_plz != req_plz:
-            if self.collected_num == 0:
-                self._abort_plz_mismatch = True
-                self.crawler.engine.close_spider(self, reason="plz_mismatch_first_detail")
+        if parsed_plz != self.plz:
+            self._companies_skip += 1
+            if DEBUG:
+                self._p(f"DETAIL skip plz_mismatch req={self.plz} got={parsed_plz} company={company_name}")
             return
 
-        # плз совпал: считаем 1 карточку (не yield)
+        # валидная карточка
         self.collected_num += 1
+        self._companies_ok += 1
 
-        # yield'им по email-правилу
-        for item in self._expand_yields_by_email(parsed):
-            yield item
+        emails = parsed.get("emails") or []
+
+        if not emails:
+            cd = dict(company_data)
+            cd["email"] = None
+            self._buffer_item(company_name, None, cd)
+            if DEBUG:
+                self._p(f"COMPANY OK name={company_name} emails=0 -> items+1 total_items={len(self.items)}")
+            return
+
+        if len(emails) == 1:
+            cd = dict(company_data)
+            cd["email"] = emails[0]
+            self._buffer_item(company_name, emails[0], cd)
+            if DEBUG:
+                self._p(f"COMPANY OK name={company_name} emails=1 -> items+1 total_items={len(self.items)}")
+            return
+
+        cd_list = dict(company_data)
+        cd_list["email"] = list(emails)
+        for e in emails:
+            self._buffer_item(company_name, e, cd_list)
+
+        if DEBUG:
+            self._p(f"COMPANY OK name={company_name} emails={len(emails)} -> items+{len(emails)} total_items={len(self.items)}")
 
     # ------------------------------------------------------------
 
+    def _db_flush_commit(self) -> tuple[bool, int]:
+        conn = get_connection()
+        written = 0
+
+        try:
+            try:
+                conn.autocommit = False
+            except Exception:
+                pass
+
+            cur = conn.cursor()
+
+            upsert_sql = """
+                INSERT INTO raw_contacts_gb
+                    (cb_crawler_id, company_name, email, company_data, created_at, updated_at)
+                VALUES
+                    (%s, %s, %s, %s::jsonb, now(), now())
+                ON CONFLICT (cb_crawler_id, company_name)
+                DO UPDATE SET
+                    email = EXCLUDED.email,
+                    company_data = EXCLUDED.company_data,
+                    updated_at = now()
+            """
+
+            total = len(self.items)
+            if DEBUG:
+                self._p(f"DB BEGIN total_items={total}")
+
+            for item in self.items:
+                cur.execute(
+                    upsert_sql,
+                    (
+                        item["cb_crawler_id"],
+                        item["company_name"],
+                        item.get("email"),
+                        json.dumps(item.get("company_data", {}), ensure_ascii=False),
+                    ),
+                )
+                written += 1
+
+            cur.execute(
+                """
+                UPDATE cb_crawler
+                SET collected=true,
+                    collected_num=%s,
+                    updated_at=NOW()
+                WHERE id=%s
+                """,
+                (self.collected_num, self.cb_crawler_id),
+            )
+
+            conn.commit()
+
+            self._db_written = True
+            self._db_written_rows = written
+
+            if DEBUG:
+                self._p(f"DB COMMIT OK rows={written} collected_num={self.collected_num}")
+
+            try:
+                cur.close()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+            return True, written
+
+        except Exception as e:
+            if DEBUG:
+                self._p(f"DB ERROR -> ROLLBACK err={e!r}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+            self._db_written = False
+            self._db_written_rows = 0
+            return False, 0
+
     def closed(self, reason):
-        if not self.queue_id or not self.cb_crawler_id:
+        # COMMIT только при нормальном завершении и без abort
+        if reason != "finished" or self._abort:
+            if DEBUG:
+                self._p(
+                    f"FINISH reason={reason} abort={self._abort} abort_reason={self._abort_reason} "
+                    f"companies_ok={self._companies_ok} items={len(self.items)} -> DB SKIP"
+                )
+            if not DEBUG:
+                self._p3()
             return
 
-        execute(
-            "UPDATE queue_sys SET status='collected', time=NOW() WHERE id=%s",
-            (self.queue_id,),
-        )
+        ok, written = self._db_flush_commit()
+        if DEBUG:
+            self._p(
+                f"FINISH reason={reason} companies_ok={self._companies_ok} items={len(self.items)} "
+                f"-> DB {'OK' if ok else 'FAIL'} rows={written}"
+            )
 
-        execute(
-            """
-            UPDATE cb_crawler
-            SET collected=true,
-                collected_num=%s,
-                updated_at=NOW()
-            WHERE id=%s
-            """,
-            (self.collected_num, self.cb_crawler_id),
-        )
-
-        print(
-            f"DEBUG: FINISH OK task_id={self.task_id} cb_crawler_id={self.cb_crawler_id} collected_num={self.collected_num} reason={reason}"
-        )
+        if not DEBUG:
+            self._p3()

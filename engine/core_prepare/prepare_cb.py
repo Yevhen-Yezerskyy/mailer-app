@@ -79,7 +79,7 @@ def _release(task_id: int, kind: str, entity_ids: List[int]) -> None:
 # ============================== CONSTANTS ==============================
 
 BATCH_SIZE = 50
-MODEL = "maxi"
+MODEL = "mini"
 SERVICE_TIER = "flex"
 _SELECT_LIMIT = BATCH_SIZE * 6
 
