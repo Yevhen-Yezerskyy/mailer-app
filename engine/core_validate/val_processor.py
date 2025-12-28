@@ -13,14 +13,14 @@ TASK_TIMEOUT_SEC = 900  # 15 минут
 def main() -> None:
     w = Worker(
         name="val_processor",
-        tick_sec=0.5,
+        tick_sec=2,
         max_parallel=1,
     )
 
     w.register(
         name="val_email",
         fn=val_email.run_batch,
-        every_sec=2,
+        every_sec=5,
         timeout_sec=TASK_TIMEOUT_SEC,
         singleton=True,
         heavy=False,
@@ -30,7 +30,7 @@ def main() -> None:
     w.register(
         name="val_prepare",
         fn=val_prepare.run_batch,
-        every_sec=3,
+        every_sec=10,
         timeout_sec=TASK_TIMEOUT_SEC,
         singleton=True,
         heavy=False,
