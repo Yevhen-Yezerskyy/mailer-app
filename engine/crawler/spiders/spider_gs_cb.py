@@ -79,7 +79,7 @@ class GelbeSeitenCBSpider(scrapy.Spider):
     # ------------------------------------------------------------
 
     def start_requests(self):
-        self._start_url = f"https://www.gelbeseiten.de/suche/{quote(self.branch_slug)}/{self.plz}"
+        self._start_url = f"https://www.gelbeseiten.de/suche/{term}/{plz}"
 
         if DEBUG:
             self._p("START")
