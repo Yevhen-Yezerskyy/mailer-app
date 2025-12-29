@@ -1,76 +1,147 @@
-# FILE: engine/core_validate/val_expand_processor.py  (обновлено — 2025-12-28)
+# FILE: engine/core_validate/val_expand_processor.py  (обновлено — 2025-12-29)
 # Смысл:
-# - Один процессор развёртывания rate_contacts (1 процесс, max_parallel=1)
-# - Каждую секунду выбирает случайный task: run_processing=true AND inserted_50k=false
-# - Внутри task:
-#   * окно 300×300 (cities × branches), сортировка по K=(rate_cb, city_id, branch_id)
-#   * CUT-OFF: берём последнюю пару из rate_contacts (по max rate_cb + city/branch) и СТАРТУЕМ С НЕЁ
-#     (потому что она может быть дыркой)
-#   * пара готова только если ВСЕ plz (cb_crawler) collected=true
-#   * если у пары есть collected=false → дырка → стоп
-#   * BULK INSERT: на одну пару (city,branch) — один INSERT..SELECT
-#   * лимит 50k: если rate_contacts(task_id) >= 50_000 → inserted_50k=true и стоп
-# - Печать ключевых шагов
+# - expand_rate_contacts: инкрементально добирает rate_contacts из raw_contacts_aggr по приоритетам (score-группам)
+# - check_inserted_50k: раз в 10 минут ставит inserted_50k=true
+# - reset_cache: раз в час сбрасывает кеш (через epoch)
+# - Батчирование pairs по 200, чтобы не раздувать SQL.
+# - Один проход по cb_crawler на батч: получаем collected_ids и факт наличия collected=false.
+# - В rate_contacts пишем ТОЛЬКО (task_id, contact_id, rate_cb). Никаких cb_crawler_id / hash_task / update.
 
 from __future__ import annotations
 
+import pickle
+import time
 from typing import Dict, List, Optional, Tuple
 
+from engine.common.cache.client import CLIENT as CACHE
+from engine.common.db import execute, fetch_all, fetch_one
 from engine.common.worker import Worker
-from engine.common.db import fetch_all, fetch_one, get_connection
 
-MAX_CONTACTS = 50_000
-WINDOW_LIMIT = 300
+TOP_LIMIT = 300
+SOFT_LIMIT_INSERTED = 1000
+BATCH_PAIRS = 200
+
+CACHE_TTL_SEC = 24 * 60 * 60  # сутки; сброс делает reset_cache_once()
+CACHE_EPOCH_KEY = "val_expand:epoch"
 
 
 def _p(msg: str) -> None:
     print(f"[val_expand] {msg}")
 
 
-def _count_task(task_id: int) -> int:
-    row = fetch_one("SELECT count(*) FROM rate_contacts WHERE task_id = %s", (task_id,))
-    return int(row[0]) if row else 0
-
-
-def _set_inserted_50k(task_id: int) -> None:
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("BEGIN")
-            cur.execute(
-                """
-                UPDATE aap_audience_audiencetask
-                SET inserted_50k = true
-                WHERE id = %s
-                """,
-                (task_id,),
-            )
-            cur.execute("COMMIT")
-
-
-def _get_cutoff_pair(task_id: int) -> Optional[Tuple[int, int, int]]:
-    """
-    Возвращает K=(rate_cb, city_id, branch_id) для последней уже развёрнутой записи.
-    Важно: стартуем С ЭТОЙ ЖЕ пары, т.к. она может быть дыркой.
-    """
-    row = fetch_one(
-        """
-        SELECT rc.rate_cb, c.city_id, c.branch_id
-        FROM rate_contacts rc
-        JOIN cb_crawler c ON c.id = rc.cb_crawler_id
-        WHERE rc.task_id = %s
-          AND rc.rate_cb IS NOT NULL
-        ORDER BY rc.rate_cb DESC, c.city_id DESC, c.branch_id DESC
-        LIMIT 1
-        """,
-        (task_id,),
-    )
-    if not row:
+def _cache_get_obj(key: str) -> Optional[object]:
+    payload = CACHE.get(key, ttl_sec=CACHE_TTL_SEC)
+    if payload is None:
         return None
-    return (int(row[0]), int(row[1]), int(row[2]))
+    try:
+        return pickle.loads(payload)
+    except Exception:
+        return None
+
+
+def _cache_set_obj(key: str, obj: object) -> bool:
+    try:
+        payload = pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+    except Exception:
+        return False
+    return CACHE.set(key, payload, ttl_sec=CACHE_TTL_SEC)
+
+
+def _get_epoch() -> int:
+    v = _cache_get_obj(CACHE_EPOCH_KEY)
+    if isinstance(v, int) and v > 0:
+        return v
+    epoch = int(time.time())
+    _cache_set_obj(CACHE_EPOCH_KEY, epoch)
+    return epoch
+
+
+def _key(epoch: int, suffix: str) -> str:
+    return f"val_expand:{epoch}:{suffix}"
+
+
+def _get_ref_counts(epoch: int) -> Tuple[int, int]:
+    # кешируем ТОЛЬКО эталонные counts (cities_sys, gb_branches)
+    k = _key(epoch, "ref_counts")
+    v = _cache_get_obj(k)
+    if isinstance(v, tuple) and len(v) == 2:
+        a, b = v
+        if isinstance(a, int) and isinstance(b, int):
+            return a, b
+
+    row1 = fetch_one("SELECT count(*) FROM cities_sys")
+    row2 = fetch_one("SELECT count(*) FROM gb_branches")
+    cities_ref = int(row1[0]) if row1 else 0
+    branches_ref = int(row2[0]) if row2 else 0
+    _cache_set_obj(k, (cities_ref, branches_ref))
+    return cities_ref, branches_ref
+
+
+def _build_score_groups(task_id: int) -> List[Tuple[int, List[Tuple[int, int]]]]:
+    cities = fetch_all(
+        """
+        SELECT value_id, rate
+        FROM crawl_tasks
+        WHERE task_id = %s AND type = 'city'
+        ORDER BY rate ASC, value_id ASC
+        LIMIT %s
+        """,
+        (task_id, TOP_LIMIT),
+    )
+    branches = fetch_all(
+        """
+        SELECT value_id, rate
+        FROM crawl_tasks
+        WHERE task_id = %s AND type = 'branch'
+        ORDER BY rate ASC, value_id ASC
+        LIMIT %s
+        """,
+        (task_id, TOP_LIMIT),
+    )
+
+    city_rate: Dict[int, int] = {int(cid): int(rate) for (cid, rate) in cities}
+    branch_rate: Dict[int, int] = {int(bid): int(rate) for (bid, rate) in branches}
+
+    groups: Dict[int, List[Tuple[int, int]]] = {}
+    for city_id, cr in city_rate.items():
+        for branch_id, br in branch_rate.items():
+            score = cr * br
+            groups.setdefault(score, []).append((city_id, branch_id))
+
+    out: List[Tuple[int, List[Tuple[int, int]]]] = []
+    for score in sorted(groups.keys()):
+        pairs = groups[score]
+        pairs.sort(key=lambda x: (x[0], x[1]))
+        out.append((score, pairs))
+    return out
+
+
+def _is_skippable(epoch: int, task_id: int, score: int) -> bool:
+    k = _key(epoch, f"skip:{task_id}:{score}")
+    v = _cache_get_obj(k)
+    return bool(v is True)
+
+
+def _set_skippable(epoch: int, task_id: int, score: int) -> None:
+    k = _key(epoch, f"skip:{task_id}:{score}")
+    _cache_set_obj(k, True)
+
+
+def _inc_full_hits(epoch: int, task_id: int, score: int) -> int:
+    k = _key(epoch, f"hits_full:{task_id}:{score}")
+    v = _cache_get_obj(k)
+    n = int(v) if isinstance(v, int) else 0
+    n += 1
+    _cache_set_obj(k, n)
+    return n
 
 
 def run_once() -> None:
-    # 1) случайный task
+    epoch = _get_epoch()
+
+    _p("tick mode=INCREMENTAL")
+
+    # 0) выбираем одну задачу случайно
     row = fetch_one(
         """
         SELECT id
@@ -83,179 +154,166 @@ def run_once() -> None:
     )
     if not row:
         return
-
     task_id = int(row[0])
     _p(f"picked task_id={task_id}")
 
-    # 2) быстрый стоп по флагу
-    row = fetch_one(
-        "SELECT inserted_50k FROM aap_audience_audiencetask WHERE id = %s",
+    # 1) валидация counts
+    cities_ref, branches_ref = _get_ref_counts(epoch)
+
+    row_c = fetch_one(
+        "SELECT count(*) FROM crawl_tasks WHERE task_id = %s AND type = 'city'",
         (task_id,),
     )
-    if row and bool(row[0]) is True:
-        _p(f"task_id={task_id} inserted_50k=true -> skip")
-        return
-
-    # 3) лимит
-    current_count = _count_task(task_id)
-    _p(f"task_id={task_id} current rate_contacts={current_count}")
-    if current_count >= MAX_CONTACTS:
-        _set_inserted_50k(task_id)
-        _p(f"task_id={task_id} already >= {MAX_CONTACTS} -> inserted_50k=true")
-        return
-
-    # 4) окно 300×300
-    cities = fetch_all(
-        """
-        SELECT value_id, rate
-        FROM crawl_tasks
-        WHERE task_id = %s AND type = 'city'
-        ORDER BY rate ASC, value_id ASC
-        LIMIT %s
-        """,
-        (task_id, WINDOW_LIMIT),
+    row_b = fetch_one(
+        "SELECT count(*) FROM crawl_tasks WHERE task_id = %s AND type = 'branch'",
+        (task_id,),
     )
-    if not cities:
-        _p(f"task_id={task_id} no cities -> stop")
-        return
+    cnt_city_task = int(row_c[0]) if row_c else 0
+    cnt_branch_task = int(row_b[0]) if row_b else 0
 
-    branches = fetch_all(
-        """
-        SELECT value_id, rate
-        FROM crawl_tasks
-        WHERE task_id = %s AND type = 'branch'
-        ORDER BY rate ASC, value_id ASC
-        LIMIT %s
-        """,
-        (task_id, WINDOW_LIMIT),
-    )
-    if not branches:
-        _p(f"task_id={task_id} no branches -> stop")
-        return
-
-    city_rate: Dict[int, int] = {int(cid): int(rate) for cid, rate in cities}
-    branch_rate: Dict[int, int] = {int(bid): int(rate) for bid, rate in branches}
-    _p(f"task_id={task_id} window cities={len(city_rate)} branches={len(branch_rate)}")
-
-    # 5) пары (city, branch) с ключом K=(rate_cb, city_id, branch_id)
-    pairs: List[Tuple[int, int, int]] = []
-    for city_id, cr in city_rate.items():
-        for branch_id, br in branch_rate.items():
-            pairs.append((cr * br, city_id, branch_id))
-    pairs.sort(key=lambda x: (x[0], x[1], x[2]))
-
-    cutoff = _get_cutoff_pair(task_id)
-    if cutoff:
-        _p(f"task_id={task_id} cutoff K=(rate_cb={cutoff[0]}, city_id={cutoff[1]}, branch_id={cutoff[2]})")
-    else:
-        _p(f"task_id={task_id} cutoff: none (start from beginning)")
-
-    # 6) идём по парам: пропускаем только то, что строго МЕНЬШЕ cutoff.
-    #    Ровно cutoff-пару проверяем (она может быть дыркой).
-    started = cutoff is None
-
-    for rate_cb, city_id, branch_id in pairs:
-        if not started:
-            if (rate_cb, city_id, branch_id) < cutoff:
-                continue
-            started = True  # дошли до cutoff-пары или дальше
-
-        if current_count >= MAX_CONTACTS:
-            _set_inserted_50k(task_id)
-            _p(f"task_id={task_id} reached {MAX_CONTACTS} -> inserted_50k=true and stop")
-            return
-
-        # дырка? (есть хоть один uncollected plz) -> стоп
-        row = fetch_one(
-            """
-            SELECT 1
-            FROM cb_crawler
-            WHERE city_id = %s
-              AND branch_id = %s
-              AND collected = false
-            LIMIT 1
-            """,
-            (city_id, branch_id),
-        )
-        if row:
-            _p(
-                f"task_id={task_id} HOLE at city_id={city_id} branch_id={branch_id} rate_cb={rate_cb} -> stop"
-            )
-            return
-
-        remaining = MAX_CONTACTS - current_count
-        if remaining <= 0:
-            _set_inserted_50k(task_id)
-            _p(f"task_id={task_id} remaining<=0 -> inserted_50k=true and stop")
-            return
-
+    if cnt_city_task != cities_ref or cnt_branch_task != branches_ref:
         _p(
-            f"task_id={task_id} expand pair city_id={city_id} branch_id={branch_id} rate_cb={rate_cb} remaining={remaining}"
+            f"task_id={task_id} invalid counts: "
+            f"task cities={cnt_city_task} ref={cities_ref}, "
+            f"task branches={cnt_branch_task} ref={branches_ref} -> skip"
         )
+        return
 
-        # BULK INSERT: на пару — один запрос
-        affected = 0
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("BEGIN")
-                try:
-                    cur.execute(
-                        """
-                        WITH cb AS (
-                            SELECT id
-                            FROM cb_crawler
-                            WHERE city_id = %s AND branch_id = %s
-                        ),
-                        cb_arr AS (
-                            SELECT array_agg(id) AS ids FROM cb
-                        ),
-                        picked AS (
-                            SELECT
-                                r.id AS contact_id,
-                                (
-                                    SELECT min(cb.id)
-                                    FROM cb
-                                    WHERE cb.id = ANY(r.cb_crawler_ids)
-                                ) AS cb_crawler_id
-                            FROM raw_contacts_aggr r, cb_arr a
-                            WHERE r.cb_crawler_ids && a.ids
-                            ORDER BY r.id ASC
-                            LIMIT %s
-                        )
-                        INSERT INTO rate_contacts
-                            (task_id, contact_id, cb_crawler_id, rate_cb)
-                        SELECT
-                            %s, p.contact_id, p.cb_crawler_id, %s
-                        FROM picked p
-                        WHERE p.cb_crawler_id IS NOT NULL
-                        ON CONFLICT (task_id, contact_id)
-                        DO UPDATE SET
-                            cb_crawler_id = EXCLUDED.cb_crawler_id,
-                            rate_cb = EXCLUDED.rate_cb,
-                            updated_at = now()
-                        """,
-                        (city_id, branch_id, remaining, task_id, rate_cb),
-                    )
-                    affected = int(cur.rowcount or 0)
-                    cur.execute("COMMIT")
-                except Exception:
-                    cur.execute("ROLLBACK")
-                    raise
+    # 2) score-группы
+    groups = _build_score_groups(task_id)
+    if not groups:
+        _p(f"task_id={task_id} no groups -> stop")
+        return
 
-        if affected <= 0:
-            _p(f"task_id={task_id} pair city_id={city_id} branch_id={branch_id} -> 0 rows affected")
-            # важно: даже если 0 строк, пара всё равно "готова" (все plz collected),
-            # значит можно идти дальше.
+    inserted_total = 0
+
+    # 3) итерации: много групп подряд
+    for score, pairs in groups:
+        if _is_skippable(epoch, task_id, score):
             continue
 
-        # пересчёт (rowcount может включать updates)
-        current_count = _count_task(task_id)
-        _p(f"task_id={task_id} pair done: affected={affected}, total_now={current_count}")
+        inserted_this_group = 0
+        fully_collected = True
 
-        if current_count >= MAX_CONTACTS:
-            _set_inserted_50k(task_id)
-            _p(f"task_id={task_id} reached {MAX_CONTACTS} -> inserted_50k=true and stop")
+        _p(f"task_id={task_id} score={score} pairs={len(pairs)}")
+
+        # батчи по 200 пар
+        i = 0
+        while i < len(pairs):
+            batch = pairs[i : i + BATCH_PAIRS]
+            i += BATCH_PAIRS
+
+            values_sql = ", ".join(["(%s,%s)"] * len(batch))
+            params: List[int] = []
+            for city_id, branch_id in batch:
+                params.append(int(city_id))
+                params.append(int(branch_id))
+
+            # один проход по cb_crawler на батч:
+            # - collected_ids: все plz -> id (только collected=true)
+            # - has_not_collected: exists(collected=false) внутри батча
+            row_cb = fetch_one(
+                f"""
+                WITH pairs(city_id, branch_id) AS (VALUES {values_sql})
+                SELECT
+                    array_agg(c.id) FILTER (WHERE c.collected = true)::bigint[] AS collected_ids,
+                    bool_or(c.collected = false) AS has_not_collected
+                FROM cb_crawler c
+                JOIN pairs p ON p.city_id = c.city_id AND p.branch_id = c.branch_id
+                """,
+                tuple(params),
+            )
+
+            collected_ids = None
+            has_not_collected = False
+            if row_cb:
+                collected_ids = row_cb[0]
+                has_not_collected = bool(row_cb[1])
+
+            if has_not_collected:
+                fully_collected = False
+
+            if not collected_ids:
+                continue
+
+            # insert-only в rate_contacts (без cb_crawler_id)
+            row_ins = fetch_one(
+                """
+                WITH cb_arr AS (
+                    SELECT %s::bigint[] AS ids
+                ),
+                ins AS (
+                    INSERT INTO rate_contacts (task_id, contact_id, rate_cb)
+                    SELECT %s, r.id, %s
+                    FROM raw_contacts_aggr r, cb_arr a
+                    WHERE r.cb_crawler_ids && a.ids
+                    ON CONFLICT (task_id, contact_id) DO NOTHING
+                    RETURNING 1
+                )
+                SELECT count(*) FROM ins
+                """,
+                (collected_ids, task_id, score),
+            )
+
+            inserted_batch = int(row_ins[0]) if row_ins else 0
+            inserted_this_group += inserted_batch
+
+        inserted_total += inserted_this_group
+
+        _p(
+            f"task_id={task_id} score={score} "
+            f"fully_collected={fully_collected} inserted={inserted_this_group} total={inserted_total}"
+        )
+
+        # fully-collected + 0 вставок => hit++ ; на 3 => skippable
+        if fully_collected and inserted_this_group == 0:
+            hits = _inc_full_hits(epoch, task_id, score)
+            _p(f"task_id={task_id} score={score} full+0 -> hits_full={hits}")
+            if hits >= 3:
+                _set_skippable(epoch, task_id, score)
+                _p(f"task_id={task_id} score={score} marked skippable")
+
+        # стоп по 0 вставок (именно вставок)
+        if inserted_this_group == 0:
             return
+
+        # мягкий лимит 1000: группу прошли целиком, дальше не идём
+        if inserted_total >= SOFT_LIMIT_INSERTED:
+            return
+
+
+def check_inserted_50k_once() -> None:
+    rows = fetch_all(
+        """
+        SELECT id
+        FROM aap_audience_audiencetask
+        WHERE run_processing = true
+          AND inserted_50k = false
+        """
+    )
+    if not rows:
+        return
+
+    for (task_id_raw,) in rows:
+        task_id = int(task_id_raw)
+        row = fetch_one("SELECT count(*) FROM rate_contacts WHERE task_id = %s", (task_id,))
+        cnt = int(row[0]) if row else 0
+        if cnt >= 50_000:
+            execute(
+                """
+                UPDATE aap_audience_audiencetask
+                SET inserted_50k = true
+                WHERE id = %s
+                """,
+                (task_id,),
+            )
+            _p(f"task_id={task_id} rate_contacts={cnt} -> inserted_50k=true")
+
+
+def reset_cache_once() -> None:
+    epoch = int(time.time())
+    _cache_set_obj(CACHE_EPOCH_KEY, epoch)
+    _p(f"cache reset: epoch={epoch}")
 
 
 def main() -> None:
@@ -273,6 +331,26 @@ def main() -> None:
         singleton=True,
         heavy=True,
         priority=5,
+    )
+
+    w.register(
+        name="check_inserted_50k",
+        fn=check_inserted_50k_once,
+        every_sec=600,  # 10 минут
+        timeout_sec=600,
+        singleton=True,
+        heavy=True,
+        priority=3,
+    )
+
+    w.register(
+        name="expand_rate_contacts_reset",
+        fn=reset_cache_once,
+        every_sec=3600,
+        timeout_sec=3600,
+        singleton=True,
+        heavy=True,
+        priority=1,
     )
 
     w.run_forever()

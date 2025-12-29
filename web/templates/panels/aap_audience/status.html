@@ -1,56 +1,109 @@
-{# FILE: web/templates/panels/aap_audience/status.html  (обновлено) 2025-12-15 #}
-{# Fix: в колонке "Подробнее" — кнопка со ссылкой на якорь по task.id #}
+<!-- FILE: web/templates/panels/aap_audience/status.html -->
+<!-- DATE: 2025-12-28 -->
+<!-- CHANGE:
+- Таблица 1:1 как внизу clar.html (классы/структура сохранены).
+- Показываются только задачи с run_processing=true (фильтр во view).
+- Колонка "Статус" пустая.
+- Колонка "Действия" полностью убрана.
+-->
 
 {% extends "panels/base.html" %}
-{% load audience_extras %}
-
-{% block title %}Подбор адресатов — Статус{% endblock %}
-
-{% block sidebar_menu %}
-  {% include "panels/aap_audience/menu_left.html" %}
-{% endblock %}
+{% load i18n %}
 
 {% block content %}
-  <div class="panel-card" style="margin-top: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
-    <h3 class="panel-card-title" style="margin-bottom: 12px;">Задачи</h3>
 
-    {% if tasks %}
-      <div class="panel-table-wrapper">
-        <table class="panel-table">
-          <thead>
-          <tr>
-            <th style="width: 10%;">Название</th>
-            <th style="width: 30%;">Task</th>
-            <th style="width: 8%;">Run</th>
-            <th style="width: 10%;">Города</th>
-            <th style="width: 10%;">Бранчи</th>
-            <th style="width: 14%;">Найдено компаний</th>
-            <th style="width: 18%;">Подробнее</th>
-          </tr>
-          </thead>
-          <tbody>
-          {% for t in tasks %}
-            {% with c=counts|get_item:t.id %}
-            <tr id="task-{{ t.id }}">
-              <td><strong>{{ t.title }}</strong></td>
-              <td>{{ t.task|linebreaksbr }}</td>
-              <td style="text-align: center;">{% if t.run_processing %}✅{% else %}—{% endif %}</td>
-              <td style="text-align: right;">{{ c.city|default:0 }}</td>
-              <td style="text-align: right;">{{ c.branch|default:0 }}</td>
-              <td style="text-align: right;">{{ companies|get_item:t.id|default:0 }}</td>
-              <td style="text-align: right;">
-                <a href="task-{{ t.id }}" class="panel-button-secondary" style="font-size: 12px; padding: 4px 8px;">
-                  Подробнее
-                </a>
-              </td>
-            </tr>
-            {% endwith %}
-          {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <div class="panel-subtitle" style="margin: 0;">Пока нет задач.</div>
-    {% endif %}
-  </div>
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      {% if tasks %}
+        <div class="YY-MAIN_BOTTOM_DIV">
+
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH w-[30%]">{% trans "Аудитория" %}</th>
+                <th class="YY-TH_TH w-[35%]">{% trans "Критерии" %}</th>
+                <th class="YY-TH_TH w-[35%]">{% trans "Статус" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in tasks %}
+                <tr class="YY-TB_TR align-top">
+                  <td class="YY-TB_TD">
+
+                    {% if t.type == "sell" %}
+                      <div class="YY-STATUS_GREEN mb-3">
+                        {% trans "Поиск клиентов" %}
+                      </div>
+                    {% else %}
+                      <div class="YY-STATUS_YELLOW mb-3">
+                        {% trans "Поиск поставщиков / подрядчиков" %}
+                      </div>
+                    {% endif %}
+
+                    <div class="mb-3 font-semibold">
+                      {{ t.title }}
+                    </div>
+                    <div>
+                      {{ t.task }}
+                    </div>
+
+                  </td>
+
+                  <td class="YY-TB_TD">
+                    <div data-tabs="crit-{{ t.id }}">
+                      <div class="flex gap-3 mb-3">
+                        <button type="button"
+                          data-tab="branches"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_GREEN">
+                          {% trans "Категории" %}
+                        </button>
+                        <button type="button"
+                          data-tab="geo"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_MAIN">
+                          {% trans "География" %}
+                        </button>
+                        <button type="button"
+                          data-tab="client"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_MAIN">
+                          {% trans "Клиент" %}
+                        </button>
+                      </div>
+
+                      <div data-panel="branches">
+                        {{ t.task_branches|linebreaksbr }}
+                      </div>
+                      <div data-panel="geo" class="hidden">
+                        {{ t.task_geo|linebreaksbr }}
+                      </div>
+                      <div data-panel="client" class="hidden">
+                        {{ t.task_client|linebreaksbr }}
+                      </div>
+                    </div>
+                  </td>
+
+                  <td class="YY-TB_TD">
+                  </td>
+
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+        </div>
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
+      {% endif %}
+    </td>
+  </tr>
+</table>
+
 {% endblock %}

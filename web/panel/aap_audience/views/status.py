@@ -1,10 +1,12 @@
-# FILE: web/panel/aap_audience/views/status.py  (обновлено — 2025-12-18)
-# CHANGE: исправлен импорт AudienceTask после переезда аппа под panel/,
-#         логика и SQL без изменений.
+# FILE: web/panel/aap_audience/views/status.py  (обновлено — 2025-12-28)
+# Смысл: статус-страница показывает ТОЛЬКО задачи с run_processing=true
+#        таблица/оформление — на стороне status.html (как низ clar.html), без SQL/статусов/действий.
 
-from django.db import connection
+from __future__ import annotations
+
 from django.shortcuts import render
 
+from mailer_web.access import encode_id
 from panel.aap_audience.models import AudienceTask
 
 
@@ -12,52 +14,21 @@ def status_view(request):
     ws_id = request.workspace_id
     user = request.user
 
-    tasks = list(AudienceTask.objects.filter(workspace_id=ws_id, user=user))
-    task_ids = [t.id for t in tasks]
+    if not ws_id or not getattr(user, "is_authenticated", False):
+        tasks = AudienceTask.objects.none()
+    else:
+        tasks = (
+            AudienceTask.objects.filter(workspace_id=ws_id, user=user, run_processing=True)
+            .order_by("-created_at")[:50]
+        )
 
-    counts = {}     # {task_id: {"city": int, "branch": int}}
-    companies = {}  # {task_id: int}
-
-    if task_ids:
-        with connection.cursor() as cur:
-            cur.execute(
-                """
-                SELECT task_id, type, COUNT(*)::int
-                FROM crawl_tasks
-                WHERE workspace_id = %s
-                  AND user_id = %s
-                  AND task_id = ANY(%s)
-                GROUP BY task_id, type
-                """,
-                [str(ws_id), int(user.id), task_ids],
-            )
-            for task_id, typ, cnt in cur.fetchall():
-                d = counts.setdefault(int(task_id), {"city": 0, "branch": 0})
-                if typ in ("city", "branch"):
-                    d[typ] = int(cnt)
-
-            cur.execute(
-                """
-                SELECT qs.task_id, COUNT(rc.id)::int
-                FROM queue_sys qs
-                JOIN raw_contacts_gb rc
-                  ON rc.cb_crawler_id = qs.cb_crawler_id
-                WHERE qs.status = 'collected'
-                  AND qs.task_id = ANY(%s)
-                GROUP BY qs.task_id
-                """,
-                [task_ids],
-            )
-            for task_id, cnt in cur.fetchall():
-                companies[int(task_id)] = int(cnt)
+    for t in tasks:
+        t.ui_id = encode_id(int(t.id))
 
     return render(
         request,
         "panels/aap_audience/status.html",
         {
-            "title": "Статус подбора",
             "tasks": tasks,
-            "counts": counts,
-            "companies": companies,
         },
     )

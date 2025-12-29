@@ -1,13 +1,13 @@
-# FILE: engine/crawler/fetch_gs_cb.py  (обновлено — 2025-12-28)
+# FILE: engine/crawler/fetch_gs_cb.py  (обновлено — 2025-12-29)
 # PATH: engine/crawler/fetch_gs_cb.py
 # Смысл:
-# - Исправлен критический баг окна: больше нет bulk-select + LIMIT по cb_crawler (ломало 300×300 и “дырки”).
-# - Окно = реальное декартово произведение top-N cities × top-N branches, обход по score.
-# - Для каждой пары (city_id, branch_id) — точечный SELECT LIMIT 1 (как договаривались).
-# - Доп. фиксы:
-#   * owner lock’а стал реально уникальным (иначе коллизии при параллели в одну секунду).
-#   * WINDOW_LIMIT обратно 300 (окно 300×300).
-#   * убраны потенциальные типовые глюки с ANY(empty_array) — делаем 2 варианта SELECT.
+# - Очередь cbq:list перестроена под ту же рейтинговую логику, что и val_expand_processor:
+#   * окно (TOP_LIMIT) и score-группы берём импортом из engine/core_validate/val_expand_processor.py
+#   * из каждой задачи используем ПЕРВУЮ (лучшую) score-группу; если из неё ничего не набрали — задача “не вышла”
+# - Random остаётся, но снижен до 10% и распределён по очереди (не хвостом).
+# - Фильтрация collected делается ТОЛЬКО на этапе построения очереди.
+# - Внешний обработчик: раз в 2 часа выставляет aap_audience_audiencetask.collected=true, если по задаче больше нечего собирать.
+# - Сброс очереди: cbq_reset_cache (как и раньше).
 
 from __future__ import annotations
 
@@ -17,14 +17,17 @@ import random
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Sequence, Set, Tuple
+from datetime import datetime, timezone
+from typing import List, Optional, Sequence, Tuple
 
 from scrapy.crawler import CrawlerProcess
 
 from engine.common.cache.client import CLIENT
 from engine.common.db import fetch_all, fetch_one
 from engine.crawler.spiders.spider_gs_cb import GelbeSeitenCBSpider
+
+# источник истины для окна и групп
+from engine.core_validate.val_expand_processor import TOP_LIMIT, _build_score_groups
 
 # -------------------------
 # cache queue config
@@ -33,26 +36,20 @@ QUEUE_LOCK_KEY = "cbq:lock"
 QUEUE_DATA_KEY = "cbq:list"
 
 LOCK_TTL_SEC = 60.0
-QUEUE_TTL_SEC = 60 * 60  # 1 hour (best-effort; внешним процессом можно нулить хоть каждые 10 минут)
+QUEUE_TTL_SEC = 60 * 60  # 1 hour (best-effort; reset'ом чистим чаще)
 
 REBUILD_SIZE = 500
-RANDOM_SHARE = 0.30
-RANDOM_SIZE = int(REBUILD_SIZE * RANDOM_SHARE)
-WINDOW_SIZE = REBUILD_SIZE - RANDOM_SIZE
+RANDOM_SHARE = 0.10  # 10%
+RANDOM_TARGET = int(REBUILD_SIZE * RANDOM_SHARE)
 
-# окно 300×300
-WINDOW_LIMIT = 400
-
-FRESH_HOURS = 2
-FRESH_QUOTA = 10
-STALE_QUOTA = 1
+BATCH_PAIRS = 200  # чтобы не раздувать VALUES
 
 LOCK_RETRY_SLEEP_SEC = 0.10
 LOCK_RENEW_EVERY_SEC = 7.0
 
 
 def cbq_reset_cache() -> None:
-    print("CACHE RESET!!!!!!!!!!!!!!!!!")
+    print("[cbq] RESET: cbq:list = []")
     payload = pickle.dumps([], protocol=pickle.HIGHEST_PROTOCOL)
     CLIENT.set(QUEUE_DATA_KEY, payload, ttl_sec=QUEUE_TTL_SEC)
 
@@ -98,10 +95,6 @@ def _cache_set_queue(items: Sequence[QueueItem]) -> None:
 
 
 def _lock_acquire(owner: str) -> Tuple[str, float]:
-    """
-    Возвращает (token, last_renew_monotonic).
-    Ретраит до успеха.
-    """
     while True:
         resp = CLIENT.lock_try(QUEUE_LOCK_KEY, ttl_sec=LOCK_TTL_SEC, owner=owner)
         if resp and resp.get("acquired") is True and isinstance(resp.get("token"), str):
@@ -151,39 +144,9 @@ def _run_spider(cb_crawler_id: int, plz: str, branch_slug: str) -> None:
 
 
 # -------------------------
-# дебаг-режим: как было
-# -------------------------
-def main():
-    row = fetch_one(
-        """
-        SELECT id, plz, branch_slug
-        FROM cb_crawler
-        WHERE collected = false
-        ORDER BY id
-        LIMIT 1
-        """
-    )
-
-    if not row:
-        print("DEBUG: no uncollected cb_crawler rows")
-        return
-
-    cb_crawler_id, plz, branch_slug = row
-
-    print(f"DEBUG: picked cb_crawler_id={cb_crawler_id} plz={plz} branch={branch_slug}")
-
-    _run_spider(cb_crawler_id=cb_crawler_id, plz=plz, branch_slug=branch_slug)
-
-
-# -------------------------
 # worker-режим: очередь в кеше + lock
 # -------------------------
 def worker_run_once() -> None:
-    """
-    Один проход процессора:
-    - под lock берём item из кеш-очереди (если пусто — rebuild на 500)
-    - запускаем паука
-    """
     owner = f"cb_processor:{os.getpid()}:{uuid.uuid4().hex[:10]}"
     token, last_renew = _lock_acquire(owner=owner)
     item: Optional[QueueItem] = None
@@ -203,26 +166,24 @@ def worker_run_once() -> None:
         _lock_release(token=token)
 
     if not item:
-        print("DEBUG: queue empty after rebuild; nothing to do")
+        print("[cbq] queue empty; nothing to do")
         return
 
-    print(
-        f"DEBUG: queue pop cb_crawler_id={item.cb_crawler_id} plz={item.plz} branch={item.branch_slug}"
-    )
+    print(f"[cbq] pop cb_crawler_id={item.cb_crawler_id} plz={item.plz} branch={item.branch_slug}")
     _run_spider(cb_crawler_id=item.cb_crawler_id, plz=item.plz, branch_slug=item.branch_slug)
 
 
 def _rebuild_queue_500(token: str, last_renew: float) -> Tuple[List[QueueItem], float]:
     """
-    Build new queue of size REBUILD_SIZE (500):
-    - WINDOW_SIZE (350) from task windows
-    - RANDOM_SIZE (150) random from cb_crawler collected=false
+    Build new queue of size REBUILD_SIZE:
+    - приоритетные: задачи run_processing=true AND collected=false, по updated_at desc
+      * из каждой задачи используем ПЕРВУЮ score-группу (лучшую)
+      * если из неё 0 — задача не дала элементов
+    - random 10% распределяем по очереди, не хвостом
+    - если приоритетных не хватило — остаток добиваем random
     """
-    out: List[QueueItem] = []
-    used: Set[int] = set()
-
-    # --- tasks (run_processing=true AND collected=false), freshest first ---
     last_renew = _lock_renew_if_needed(token, last_renew)
+
     tasks = fetch_all(
         """
         SELECT id, updated_at
@@ -233,214 +194,99 @@ def _rebuild_queue_500(token: str, last_renew: float) -> Tuple[List[QueueItem], 
         """
     )
 
-    fresh_cutoff = _now_utc() - timedelta(hours=FRESH_HOURS)
+    print(f"[cbq] rebuild size={REBUILD_SIZE} random=~{RANDOM_TARGET} window=TOP_LIMIT={TOP_LIMIT}")
+    print(f"[cbq] tasks candidates={len(tasks)}")
 
-    for task_id, updated_at in tasks:
-        if len(out) >= WINDOW_SIZE:
-            break
+    priority: List[QueueItem] = []
+    random_items: List[QueueItem] = []
 
-        is_fresh = bool(updated_at and updated_at >= fresh_cutoff)
-        quota = FRESH_QUOTA if is_fresh else STALE_QUOTA
+    # 1) набираем приоритетные (пока не соберём REBUILD_SIZE - RANDOM_TARGET)
+    need_priority = max(0, REBUILD_SIZE - RANDOM_TARGET)
 
-        need = min(quota, WINDOW_SIZE - len(out))
-        if need <= 0:
+    for task_id, _updated_at in tasks:
+        if len(priority) >= need_priority:
             break
 
         last_renew = _lock_renew_if_needed(token, last_renew)
-        picked, last_renew = _pick_from_task_window(
-            task_id=int(task_id),
-            need=need,
-            used=used,
-            token=token,
-            last_renew=last_renew,
-        )
-        for it in picked:
-            used.add(it.cb_crawler_id)
-            out.append(it)
+        picked = _pick_from_task_best_group(task_id=int(task_id), need=need_priority - len(priority))
+        if picked:
+            print(f"[cbq] task_id={int(task_id)} +{len(picked)} (best score-group)")
+            priority.extend(picked)
 
-    # --- random tail (30%) ---
-    last_renew = _lock_renew_if_needed(token, last_renew)
-    rnd, last_renew = _pick_random_cb(
-        need=REBUILD_SIZE - len(out),
-        used=used,
-        token=token,
-        last_renew=last_renew,
-    )
-    for it in rnd:
-        used.add(it.cb_crawler_id)
-        out.append(it)
-
-    # if still short (например задач нет) — добиваем рандомом
-    if len(out) < REBUILD_SIZE:
+    # 2) random 10% (или сколько получится), но если приоритетных меньше — random добивает остаток тоже
+    need_total = REBUILD_SIZE
+    need_random = max(RANDOM_TARGET, need_total - len(priority))
+    if need_random > 0:
         last_renew = _lock_renew_if_needed(token, last_renew)
-        more, last_renew = _pick_random_cb(
-            need=REBUILD_SIZE - len(out),
-            used=used,
-            token=token,
-            last_renew=last_renew,
-        )
-        for it in more:
-            used.add(it.cb_crawler_id)
-            out.append(it)
+        rnd = _pick_random_cb(need=need_random)
+        random_items.extend(rnd)
 
-    return out[:REBUILD_SIZE], last_renew
+    # 3) смешиваем random по очереди (в случайные позиции)
+    out = _merge_random(priority, random_items, target_size=REBUILD_SIZE)
+
+    print(f"[cbq] rebuild done: priority={len(priority)} random={len(random_items)} out={len(out)}")
+    return out, last_renew
 
 
-def _build_pairs_by_score(
-    city_rate: Dict[int, int],
-    branch_rate: Dict[int, int],
-) -> List[Tuple[int, int, int]]:
-    """
-    Пары (score, city_id, branch_id) отсортированы по score ASC, стабильно по id.
-    WINDOW_LIMIT=300 => 90k пар, ок для 1 ребилда / 10 минут.
-    """
-    pairs: List[Tuple[int, int, int]] = []
-    for city_id, cr in city_rate.items():
-        for branch_id, br in branch_rate.items():
-            pairs.append((int(cr) * int(br), int(city_id), int(branch_id)))
-    pairs.sort(key=lambda x: (x[0], x[1], x[2]))
-    return pairs
+def _pick_from_task_best_group(*, task_id: int, need: int) -> List[QueueItem]:
+    if need <= 0:
+        return []
 
+    groups = _build_score_groups(task_id)
+    if not groups:
+        return []
 
-def _pick_from_task_window(
-    *,
-    task_id: int,
-    need: int,
-    used: Set[int],
-    token: str,
-    last_renew: float,
-) -> Tuple[List[QueueItem], float]:
-    """
-    Окно = top-WINDOW_LIMIT cities × top-WINDOW_LIMIT branches.
-    ВАЖНО: больше нет bulk-select + LIMIT по cb_crawler.
-    Идём по парам в порядке score и точечно берём 1 cb_crawler на пару.
-    """
-    # cities
-    last_renew = _lock_renew_if_needed(token, last_renew)
-    cities = fetch_all(
-        """
-        SELECT value_id, rate
-        FROM crawl_tasks
-        WHERE task_id = %s AND type = 'city'
-        ORDER BY rate ASC, value_id ASC
-        LIMIT %s
-        """,
-        (task_id, WINDOW_LIMIT),
-    )
-    if not cities:
-        return [], last_renew
+    score, pairs = groups[0]  # ТОЛЬКО лучшая score-группа
+    if not pairs:
+        return []
 
-    # branches
-    last_renew = _lock_renew_if_needed(token, last_renew)
-    branches = fetch_all(
-        """
-        SELECT value_id, rate
-        FROM crawl_tasks
-        WHERE task_id = %s AND type = 'branch'
-        ORDER BY rate ASC, value_id ASC
-        LIMIT %s
-        """,
-        (task_id, WINDOW_LIMIT),
-    )
-    if not branches:
-        return [], last_renew
-
-    city_rate: Dict[int, int] = {int(cid): int(rate) for cid, rate in cities}
-    branch_rate: Dict[int, int] = {int(bid): int(rate) for bid, rate in branches}
-
-    pairs = _build_pairs_by_score(city_rate, branch_rate)
-
-    picked: List[QueueItem] = []
-    used_list: List[int] = list(used)  # <= 500, ок
-
-    renew_every = 250  # не дрочим renew на каждый селект
+    out: List[QueueItem] = []
     i = 0
 
-    for _, city_id, branch_id in pairs:
-        if len(picked) >= need:
-            break
+    while i < len(pairs) and len(out) < need:
+        batch = pairs[i : i + BATCH_PAIRS]
+        i += BATCH_PAIRS
 
-        i += 1
-        if (i % renew_every) == 0:
-            last_renew = _lock_renew_if_needed(token, last_renew)
+        values_sql = ", ".join(["(%s,%s)"] * len(batch))
+        params: List[int] = []
+        for city_id, branch_id in batch:
+            params.append(int(city_id))
+            params.append(int(branch_id))
 
-        if used_list:
-            row = fetch_one(
-                """
-                SELECT id, plz, branch_slug
-                FROM cb_crawler
-                WHERE collected = false
-                  AND city_id = %s
-                  AND branch_id = %s
-                  AND NOT (id = ANY(%s))
-                ORDER BY id ASC
-                LIMIT 1
-                """,
-                (city_id, branch_id, used_list),
-            )
-        else:
-            row = fetch_one(
-                """
-                SELECT id, plz, branch_slug
-                FROM cb_crawler
-                WHERE collected = false
-                  AND city_id = %s
-                  AND branch_id = %s
-                ORDER BY id ASC
-                LIMIT 1
-                """,
-                (city_id, branch_id),
-            )
-
-        if not row:
-            continue
-
-        cb_id, plz, branch_slug = row
-        cb_id_i = int(cb_id)
-        if cb_id_i in used:
-            # гонка/параллель/рандом — не страшно
-            continue
-
-        it = QueueItem(cb_id_i, str(plz), str(branch_slug))
-        picked.append(it)
-        used.add(cb_id_i)
-        used_list.append(cb_id_i)
-
-    # ВАЖНО: “таск выработан” только если ПРОШЛИ ВЕСЬ ОКНО-ПЕРЕБОР и реально ничего нет
-    if not picked:
-        last_renew = _lock_renew_if_needed(token, last_renew)
-        fetch_one(
-            """
-            UPDATE aap_audience_audiencetask
-            SET collected = true
-            WHERE id = %s
-            RETURNING id
+        rows = fetch_all(
+            f"""
+            WITH pairs(city_id, branch_id) AS (VALUES {values_sql})
+            SELECT c.id, c.plz, c.branch_slug
+            FROM cb_crawler c
+            JOIN pairs p ON p.city_id = c.city_id AND p.branch_id = c.branch_id
+            WHERE c.collected = false
+            ORDER BY c.id ASC
+            LIMIT %s
             """,
-            (task_id,),
+            tuple(params) + (need - len(out),),
         )
 
-    return picked, last_renew
+        for cb_id, plz, branch_slug in rows:
+            out.append(QueueItem(int(cb_id), str(plz), str(branch_slug)))
+            if len(out) >= need:
+                break
+
+    if out:
+        print(f"[cbq] task_id={task_id} best_score={score} picked={len(out)}")
+    return out
 
 
-def _pick_random_cb(
-    *,
-    need: int,
-    used: Set[int],
-    token: str,
-    last_renew: float,
-) -> Tuple[List[QueueItem], float]:
+def _pick_random_cb(*, need: int) -> List[QueueItem]:
     if need <= 0:
-        return [], last_renew
+        return []
 
-    last_renew = _lock_renew_if_needed(token, last_renew)
     row = fetch_one("SELECT max(id) FROM cb_crawler")
     max_id = int(row[0]) if row and row[0] is not None else 0
     if max_id <= 0:
-        return [], last_renew
+        return []
 
     start = random.randint(1, max_id)
 
-    last_renew = _lock_renew_if_needed(token, last_renew)
     rows = fetch_all(
         """
         SELECT id, plz, branch_slug
@@ -455,16 +301,11 @@ def _pick_random_cb(
 
     out: List[QueueItem] = []
     for cb_id, plz, branch_slug in rows:
-        cb_id_i = int(cb_id)
-        if cb_id_i in used:
-            continue
-        out.append(QueueItem(cb_id_i, str(plz), str(branch_slug)))
+        out.append(QueueItem(int(cb_id), str(plz), str(branch_slug)))
         if len(out) >= need:
-            return out, last_renew
+            return out
 
-    # wrap-around if not enough
     if len(out) < need:
-        last_renew = _lock_renew_if_needed(token, last_renew)
         rows2 = fetch_all(
             """
             SELECT id, plz, branch_slug
@@ -477,15 +318,163 @@ def _pick_random_cb(
             (start, (need - len(out)) * 3),
         )
         for cb_id, plz, branch_slug in rows2:
-            cb_id_i = int(cb_id)
-            if cb_id_i in used:
-                continue
-            out.append(QueueItem(cb_id_i, str(plz), str(branch_slug)))
+            out.append(QueueItem(int(cb_id), str(plz), str(branch_slug)))
             if len(out) >= need:
                 break
 
-    return out[:need], last_renew
+    return out[:need]
+
+
+def _merge_random(priority: List[QueueItem], rnd: List[QueueItem], target_size: int) -> List[QueueItem]:
+    # хотим распределить rnd по очереди, а не хвостом
+    pr = priority[:]
+    rr = rnd[:]
+    total = pr + rr
+    if len(total) <= target_size:
+        # если коротко — просто перемешиваем равномерно и возвращаем как есть
+        random.shuffle(total)
+        return total
+
+    # берём нужное количество rnd (если rnd больше)
+    need = max(0, target_size - len(pr))
+    rr = rr[:need]
+
+    base = pr[: max(0, target_size - len(rr))]
+    if not rr:
+        return base[:target_size]
+
+    slots = target_size
+    positions = sorted(random.sample(range(slots), k=len(rr)))
+
+    out: List[QueueItem] = []
+    bi = 0
+    ri = 0
+    for pos in range(slots):
+        if ri < len(rr) and positions[ri] == pos:
+            out.append(rr[ri])
+            ri += 1
+        else:
+            if bi < len(base):
+                out.append(base[bi])
+                bi += 1
+            else:
+                # если вдруг base короче — добиваем остатком rr
+                if ri < len(rr):
+                    out.append(rr[ri])
+                    ri += 1
+                else:
+                    break
+
+    return out[:target_size]
+
+
+# -------------------------
+# внешний обработчик: выставление aap_audience_audiencetask.collected=true
+# -------------------------
+def cb_mark_tasks_collected() -> None:
+    """
+    Раз в 2 часа:
+    - ищем задачи run_processing=true AND collected=false
+    - если по задаче больше нет ни одного cb_crawler.collected=false (по лучшей score-группе окна) — ставим collected=true
+    """
+    tasks = fetch_all(
+        """
+        SELECT id
+        FROM aap_audience_audiencetask
+        WHERE run_processing = true
+          AND collected = false
+        ORDER BY id ASC
+        """
+    )
+    if not tasks:
+        return
+
+    print(f"[cbq] mark_collected: tasks={len(tasks)}")
+
+    for (task_id_raw,) in tasks:
+        task_id = int(task_id_raw)
+
+        groups = _build_score_groups(task_id)
+        if not groups:
+            fetch_one(
+                """
+                UPDATE aap_audience_audiencetask
+                SET collected = true
+                WHERE id = %s
+                RETURNING id
+                """,
+                (task_id,),
+            )
+            print(f"[cbq] task_id={task_id} -> collected=true (no groups)")
+            continue
+
+        _score, pairs = groups[0]
+        if not pairs:
+            fetch_one(
+                """
+                UPDATE aap_audience_audiencetask
+                SET collected = true
+                WHERE id = %s
+                RETURNING id
+                """,
+                (task_id,),
+            )
+            print(f"[cbq] task_id={task_id} -> collected=true (empty best group)")
+            continue
+
+        has_any = False
+        i = 0
+        while i < len(pairs) and not has_any:
+            batch = pairs[i : i + BATCH_PAIRS]
+            i += BATCH_PAIRS
+
+            values_sql = ", ".join(["(%s,%s)"] * len(batch))
+            params: List[int] = []
+            for city_id, branch_id in batch:
+                params.append(int(city_id))
+                params.append(int(branch_id))
+
+            row = fetch_one(
+                f"""
+                WITH pairs(city_id, branch_id) AS (VALUES {values_sql})
+                SELECT 1
+                FROM cb_crawler c
+                JOIN pairs p ON p.city_id = c.city_id AND p.branch_id = c.branch_id
+                WHERE c.collected = false
+                LIMIT 1
+                """,
+                tuple(params),
+            )
+            if row:
+                has_any = True
+
+        if not has_any:
+            fetch_one(
+                """
+                UPDATE aap_audience_audiencetask
+                SET collected = true
+                WHERE id = %s
+                RETURNING id
+                """,
+                (task_id,),
+            )
+            print(f"[cbq] task_id={task_id} -> collected=true (no uncollected in best group)")
 
 
 if __name__ == "__main__":
-    main()
+    # debug: запуск одного uncollected
+    row = fetch_one(
+        """
+        SELECT id, plz, branch_slug
+        FROM cb_crawler
+        WHERE collected = false
+        ORDER BY id
+        LIMIT 1
+        """
+    )
+    if not row:
+        print("DEBUG: no uncollected cb_crawler rows")
+    else:
+        cb_crawler_id, plz, branch_slug = row
+        print(f"DEBUG: picked cb_crawler_id={cb_crawler_id} plz={plz} branch={branch_slug}")
+        _run_spider(cb_crawler_id=int(cb_crawler_id), plz=str(plz), branch_slug=str(branch_slug))
