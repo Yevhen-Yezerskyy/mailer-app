@@ -1,103 +1,238 @@
-# FILE: web/panel/aap_audience/views/status_task.py  (обновлено — 2025-12-18)
-# CHANGE: исправлен импорт AudienceTask после переезда аппа под panel/,
-#         логика/SQL/рендер без изменений.
+# FILE: web/panel/aap_audience/views/status_task.py  (обновлено — 2025-12-29)
+# Смысл:
+# - Страница статуса одной AudienceTask (по obfuscated id)
+# - Верх: счётчики из rate_contacts (total / rated)
+# - Низ: 2 вкладки с таблицами контактов (rated/all) + paging
+# - Правая верхняя карточка: запуск rating contacts через public.__tasks_rating (type='contacts')
+#   hash_task = h64_text(task + task_client) как в clar.py
 
-import json
+from __future__ import annotations
 
-from django.core.paginator import Paginator
+import math
+from typing import Any
+
 from django.db import connection
-from django.shortcuts import render, get_object_or_404
+from django.http import HttpResponseRedirect
+from django.shortcuts import redirect, render
 
+from engine.common.utils import h64_text
+from mailer_web.access import encode_id, resolve_pk_or_redirect
 from panel.aap_audience.models import AudienceTask
 
-
-def _to_dict(v):
-    if v is None:
-        return {}
-    if isinstance(v, dict):
-        return v
-    if isinstance(v, str):
-        try:
-            x = json.loads(v)
-            return x if isinstance(x, dict) else {}
-        except Exception:
-            return {}
-    return {}
+PAGE_SIZE = 50
 
 
-def status_task_view(request, task_id: int):
-    ws_id = request.workspace_id
-    user = request.user
+def _safe_int(v: Any, default: int = 1) -> int:
+    try:
+        x = int(str(v or "").strip())
+        return x if x > 0 else default
+    except Exception:
+        return default
 
-    task = get_object_or_404(
-        AudienceTask,
-        id=task_id,
-        workspace_id=ws_id,
-        user=user,
-    )
 
-    page = int(request.GET.get("page", 1))
-    per_page = 20
+def _qall(sql: str, params: list[Any]) -> list[dict]:
+    with connection.cursor() as cur:
+        cur.execute(sql, params)
+        cols = [c[0] for c in cur.description]
+        return [dict(zip(cols, r)) for r in cur.fetchall()]
 
+
+def _format_contact_rows(rows: list[dict]) -> list[dict]:
+    out = []
+    for r in rows:
+        branches = r.get("branches") or []
+        addr_list = r.get("address_list") or []
+        out.append(
+            {
+                "contact_id": int(r.get("contact_id") or 0),
+                "company_name": (r.get("company_name") or "").strip(),
+                "branches_str": ", ".join(str(x) for x in branches)
+                if isinstance(branches, (list, tuple))
+                else str(branches),
+                "address_first": (addr_list[0] if isinstance(addr_list, (list, tuple)) and addr_list else "") or "",
+                "rate_cl": r.get("rate_cl"),
+                "rate_cb_100": int(round((float(r.get("rate_cb") or 0) / 100.0)))
+                if r.get("rate_cb") is not None
+                else None,
+            }
+        )
+    return out
+
+
+def _fetch_contacts_stats(task_id: int) -> tuple[int, int]:
+    sql = """
+        SELECT
+            COUNT(*)::int AS total_cnt,
+            SUM(
+                CASE
+                    WHEN rate_cl IS NOT NULL AND hash_task IS NOT NULL THEN 1
+                    ELSE 0
+                END
+            )::int AS rated_cnt
+        FROM public.rate_contacts
+        WHERE task_id = %s
+    """
+    with connection.cursor() as cur:
+        cur.execute(sql, [int(task_id)])
+        row = cur.fetchone()
+        if not row:
+            return 0, 0
+        return int(row[0] or 0), int(row[1] or 0)
+
+
+def _fetch_contacts_rated(task_id: int, *, page: int) -> tuple[int, list[dict]]:
     with connection.cursor() as cur:
         cur.execute(
             """
-            SELECT COUNT(rc.id)
-            FROM queue_sys qs
-            JOIN raw_contacts_gb rc
-              ON rc.cb_crawler_id = qs.cb_crawler_id
-            WHERE qs.task_id = %s
-              AND qs.status = 'collected'
+            SELECT COUNT(*)::int
+            FROM public.rate_contacts rc
+            WHERE rc.task_id = %s
+              AND rc.rate_cl IS NOT NULL
+              AND rc.hash_task IS NOT NULL
             """,
-            [task_id],
+            [int(task_id)],
         )
-        total = cur.fetchone()[0] or 0
+        total = int((cur.fetchone() or [0])[0] or 0)
 
+    offset = (page - 1) * PAGE_SIZE
+    rows = _qall(
+        """
+        SELECT
+            rc.contact_id,
+            rca.company_name,
+            rca.branches,
+            rca.address_list,
+            rc.rate_cl,
+            rc.rate_cb
+        FROM public.rate_contacts rc
+        JOIN public.raw_contacts_aggr rca ON rca.id = rc.contact_id
+        WHERE rc.task_id = %s
+          AND rc.rate_cl IS NOT NULL
+          AND rc.hash_task IS NOT NULL
+        ORDER BY rc.rate_cl ASC, rc.contact_id ASC
+        LIMIT %s OFFSET %s
+        """,
+        [int(task_id), int(PAGE_SIZE), int(offset)],
+    )
+    return total, _format_contact_rows(rows)
+
+
+def _fetch_contacts_all(task_id: int, *, page: int) -> tuple[int, list[dict]]:
+    with connection.cursor() as cur:
         cur.execute(
             """
-            SELECT
-                rc.id,
-                rc.company_name,
-                rc.email,
-                cc.city_name,
-                cc.branch_slug,
-                rc.company_data
-            FROM queue_sys qs
-            JOIN cb_crawler cc
-              ON cc.id = qs.cb_crawler_id
-            JOIN raw_contacts_gb rc
-              ON rc.cb_crawler_id = cc.id
-            WHERE qs.task_id = %s
-              AND qs.status = 'collected'
-            ORDER BY rc.id
-            LIMIT %s OFFSET %s
+            SELECT COUNT(*)::int
+            FROM public.rate_contacts rc
+            WHERE rc.task_id = %s
             """,
-            [task_id, per_page, (page - 1) * per_page],
+            [int(task_id)],
+        )
+        total = int((cur.fetchone() or [0])[0] or 0)
+
+    offset = (page - 1) * PAGE_SIZE
+    rows = _qall(
+        """
+        SELECT
+            rc.contact_id,
+            rca.company_name,
+            rca.branches,
+            rca.address_list,
+            rc.rate_cl,
+            rc.rate_cb
+        FROM public.rate_contacts rc
+        JOIN public.raw_contacts_aggr rca ON rca.id = rc.contact_id
+        WHERE rc.task_id = %s
+        ORDER BY rc.rate_cb ASC NULLS LAST, rc.contact_id ASC
+        LIMIT %s OFFSET %s
+        """,
+        [int(task_id), int(PAGE_SIZE), int(offset)],
+    )
+    return total, _format_contact_rows(rows)
+
+
+def _contacts_rating_exists(task_id: int) -> bool:
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT 1
+            FROM public.__tasks_rating
+            WHERE task_id = %s
+              AND type = 'contacts'
+            LIMIT 1
+            """,
+            [int(task_id)],
+        )
+        return cur.fetchone() is not None
+
+
+def _contacts_rating_insert(task_id: int, hash_task: int) -> None:
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO public.__tasks_rating (task_id, type, hash_task, done, created_at, updated_at)
+            VALUES (%s, 'contacts', %s, false, now(), now())
+            """,
+            [int(task_id), int(hash_task)],
         )
 
-        rows = []
-        for r in cur.fetchall():
-            rows.append(
-                {
-                    "id": r[0],
-                    "company_name": r[1],
-                    "email": r[2],
-                    "city": r[3],
-                    "branch": r[4],
-                    "company_data": _to_dict(r[5]),
-                }
-            )
 
-    paginator = Paginator(range(total), per_page)
-    page_obj = paginator.get_page(page)
+def status_task_view(request):
+    res = resolve_pk_or_redirect(request, AudienceTask, param="id")
+    if isinstance(res, HttpResponseRedirect):
+        return res
+    pk = int(res)
+
+    ws_id = request.workspace_id
+    user = request.user
+    if not ws_id or not getattr(user, "is_authenticated", False):
+        return HttpResponseRedirect("../")
+
+    try:
+        t = AudienceTask.objects.get(id=pk, workspace_id=ws_id, user=user)
+    except Exception:
+        return HttpResponseRedirect("../")
+
+    t.ui_id = encode_id(int(t.id))
+
+    # --- start contacts rating ---
+    if request.method == "POST" and (request.POST.get("action") or "").strip() == "rating_start_contacts":
+        if not _contacts_rating_exists(int(t.id)):
+            hash_contacts = h64_text((t.task or "") + (t.task_client or ""))
+            _contacts_rating_insert(int(t.id), int(hash_contacts))
+        return redirect(f"{request.path}?id={t.ui_id}")
+    # --- /start contacts rating ---
+
+    contacts_total, contacts_rated = _fetch_contacts_stats(int(t.id))
+
+    tab = (request.GET.get("tab") or "rated").strip()
+    if tab not in ("rated", "all"):
+        tab = "rated"
+
+    rated_page = _safe_int(request.GET.get("p_rated"), 1)
+    all_page = _safe_int(request.GET.get("p_all"), 1)
+
+    rated_count, rated_rows = _fetch_contacts_rated(int(t.id), page=rated_page)
+    all_count, all_rows = _fetch_contacts_all(int(t.id), page=all_page)
+
+    contacts_rating_exists = _contacts_rating_exists(int(t.id))
 
     return render(
         request,
         "panels/aap_audience/status_task.html",
         {
-            "task": task,
-            "rows": rows,
-            "total": total,
-            "page_obj": page_obj,
+            "t": t,
+            "contacts_total": contacts_total,
+            "contacts_rated": contacts_rated,
+            "contacts_rating_exists": contacts_rating_exists,
+            "tab": tab,
+            "rated_rows": rated_rows,
+            "all_rows": all_rows,
+            "rated_count": rated_count,
+            "all_count": all_count,
+            "rated_page": rated_page,
+            "all_page": all_page,
+            "rated_pages": max(1, int(math.ceil(rated_count / float(PAGE_SIZE))) if rated_count else 1),
+            "all_pages": max(1, int(math.ceil(all_count / float(PAGE_SIZE))) if all_count else 1),
+            "page_size": PAGE_SIZE,
         },
     )

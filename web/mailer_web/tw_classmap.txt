@@ -4,7 +4,7 @@
 # Комментарии с #, пустые строки игнорируются.
 
 #FORMS
-YY-LABEL: ml-4 mb-2 block font-semibold
+YY-LABEL: ml-4 mb-1 flex font-semibold
 YY-CARD_IN_FORM: px-4 py-2 mb-2 rounded-md bg-[#f8fdff] border border-[#71d0f4] text-[#016b09]
 YY-CARD_IN_FORM_BLANK: px-4 py-2 mb-2 rounded-md bg-[#ffffff] border border-[#71d0f4]
 YY-CARD_IN_FORM_ERROR: px-4 py-2 mb-5 rounded-md bg-[#fff8f8] text-[#8e0000] border border-[#f3a7a7]

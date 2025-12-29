@@ -1,89 +1,237 @@
+<!-- FILE: web/templates/panels/aap_audience/status_task.html -->
+<!-- DATE: 2025-12-29 -->
+<!-- Смысл:
+- Стандартная разметка как в how.html
+- Верхняя таблица: две колонки (Колонка 1 / Колонка 2)
+- Нижняя таблица: заглушка "тут будет таблица"
+-->
+
 {% extends "panels/base.html" %}
-{# FILE: web/templates/panels/aap_audience/status_task.html  (обновлено) 2025-12-15 #}
-{# Fix: ширина 95% как в status.html; company_data печатаем красиво строками key — value. #}
-
-{% block title %}Задача {{ task.id }} — Статус{% endblock %}
-
-{% block sidebar_menu %}
-  {% include "panels/aap_audience/menu_left.html" %}
-{% endblock %}
+{% load i18n %}
 
 {% block content %}
-  <div class="panel-card" style="margin-top: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
-    <h2 class="panel-card-title" style="margin-bottom: 8px;">
-      {{ task.title }} <span style="opacity:.6;">(#{{ task.id }})</span>
-    </h2>
-    <div style="white-space: pre-line;">{{ task.task }}</div>
-  </div>
 
-  <div class="panel-card" style="margin-top: 24px; width: 95%; max-width: none; margin-left: auto; margin-right: auto;">
-    <h3 class="panel-card-title" style="margin-bottom: 12px;">
-      Найденные компании ({{ total }})
-    </h3>
+<!-- TOP TABLE -->
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+        {% if t.type == "sell" %}
+          <div class="YY-STATUS_GREEN mb-2">
+              {% trans "Поиск клиентов" %}
+          </div>
+        {% else %}
+          <div class="YY-STATUS_YELLOW mb-2">
+              {% trans "Поиск поставщиков / подрядчиков" %}
+        </div>
+        {% endif %}
 
-    {% if rows %}
-      <div class="panel-table-wrapper">
-        <table class="panel-table">
-          <thead>
-          <tr>
-            <th style="width: 6%;">ID</th>
-            <th style="width: 18%;">Компания</th>
-            <th style="width: 16%;">Email</th>
-            <th style="width: 12%;">Город</th>
-            <th style="width: 12%;">Бранч</th>
-            <th style="width: 36%;">Company data</th>
-          </tr>
-          </thead>
-          <tbody>
-          {% for r in rows %}
-            <tr>
-              <td>{{ r.id }}</td>
-              <td>{{ r.company_name }}</td>
-              <td>{{ r.email|default:"—" }}</td>
-              <td>{{ r.city }}</td>
-              <td>{{ r.branch }}</td>
-              <td>
-                {% if r.company_data %}
-                  <details>
-                    <summary style="cursor:pointer;">Показать</summary>
-                    <div style="margin-top: 8px;">
-                      {% for k, v in r.company_data.items %}
-                        <div style="display:flex; gap:12px; padding: 2px 0;">
-                          <div style="min-width: 140px; font-weight: 600; opacity: .85;">{{ k }}</div>
-                          <div style="white-space: pre-wrap;">{{ v }}</div>
-                        </div>
-                      {% empty %}
-                        <div style="opacity:.7;">(пусто)</div>
-                      {% endfor %}
-                    </div>
-                  </details>
-                {% else %}
-                  —
+         <div class="YY-LABEL mb-12">
+          {{ t.title }}
+         </div>
+
+        <div class="YY-STATUS_GREEN w-full mb-2">
+          {% trans "Контакты: присвоен рейтинг" %}: {{ contacts_rated }}
+        </div>
+
+        <div class="YY-STATUS_GRAY w-full mb-2">
+          {% trans "Всего собрано контактов" %}: {{ contacts_total }}
+        </div>
+
+        <div class="YY-STATUS_YELLOW w-full mb-12">
+          {% trans "Ограничение на рейтингование" %}: {{ t.subscribers_limit }}
+        </div>
+
+        <a href="../" class="YY-BUTTON_MAIN">
+          {% trans "Вернуться к аудиториям" %}
+        </a>
+
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+
+          {% if not contacts_rating_exists %}
+            <div class="YY-STATUS_YELLOW w-full mb-2">
+              {% trans "Рейтингование контактов не запущено" %}
+            </div>
+
+            <form method="post">
+              {% csrf_token %}
+              <button type="submit" name="action" value="rating_start_contacts" class="YY-BUTTON_MAIN w-full">
+                {% trans "Запустить рейтингование" %}
+              </button>
+            </form>
+          {% else %}
+            <div class="YY-STATUS_GREEN w-full mb-2">
+              {% trans "Рейтингование контактов запущено" %}
+            </div>
+          {% endif %}
+
+      </div>
+    </td>
+  </tr>
+</table>
+
+<!-- BOTTOM TABLE -->
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+
+      <div data-tabs="contacts">
+
+          <div class="flex gap-3 mb-3">
+            <button type="button"
+              data-tab="rated"
+              data-active-class="YY-BUTTON_GREEN"
+              data-idle-class="YY-BUTTON_MAIN"
+              class="{% if tab == 'rated' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}">
+              {% trans "Контакты: присвоен рейтинг" %}
+            </button>
+
+            <button type="button"
+              data-tab="all"
+              data-active-class="YY-BUTTON_GREEN"
+              data-idle-class="YY-BUTTON_MAIN"
+              class="{% if tab == 'all' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}">
+              {% trans "Контакты: все собранные" %}
+            </button>
+          </div>
+
+          <!-- RATED -->
+        <div class="YY-MAIN_BOTTOM_DIV">
+          <div data-panel="rated" class="{% if tab != 'rated' %}hidden{% endif %}">
+            {% if rated_rows %}
+              <table class="w-full text-left">
+                <thead>
+                  <tr class="YY-TH_TR">
+                    <th class="YY-TH_TH">{% trans "Компания" %}</th>
+                    <th class="YY-TH_TH">{% trans "Категории" %}</th>
+                    <th class="YY-TH_TH">{% trans "Адрес" %}</th>
+                    <th class="YY-TH_TH">{% trans "CB" %}</th>
+                    <th class="YY-TH_TH">{% trans "CL" %}</th>
+                    <th class="YY-TH_TH">{% trans "Смотреть" %}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for it in rated_rows %}
+                    <tr class="YY-TB_TR align-top">
+                      <td class="YY-TB_TD">{{ it.company_name }}</td>
+                      <td class="YY-TB_TD">{{ it.branches_str }}</td>
+                      <td class="YY-TB_TD">{{ it.address_first }}</td>
+                      <td class="YY-TB_TD">{{ it.rate_cb_100 }}</td>
+                      <td class="YY-TB_TD">{{ it.rate_cl }}</td>
+                      <td class="YY-TB_TD">
+                        <a href="#" class="YY-BUTTON_TAB_MAIN">{% trans "Смотреть" %}</a>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+
+              <div class="flex gap-3 mt-3 items-center">
+                {% if rated_page > 1 %}
+                  <a class="YY-BUTTON_MAIN"
+                    href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_page|add:"-1" }}&p_all={{ all_page }}">
+                    {% trans "Назад" %}
+                  </a>
                 {% endif %}
-              </td>
-            </tr>
-          {% endfor %}
-          </tbody>
-        </table>
-      </div>
 
-      <div style="margin-top: 16px; display: flex; align-items: center; justify-content: space-between;">
-        <div style="opacity:.8;">
-          Всего: {{ total }} • Страница {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+                <div class="YY-TEXT">
+                  {{ rated_page }} / {{ rated_pages }}
+                </div>
+
+                {% if rated_page < rated_pages %}
+                  <a class="YY-BUTTON_MAIN"
+                    href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_page|add:"1" }}&p_all={{ all_page }}">
+                    {% trans "Вперёд" %}
+                  </a>
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="YY-CARD_WHITE">
+                {% trans "Здесь пока нет данных" %}
+              </div>
+            {% endif %}
+          </div>
+
+          <!-- ALL -->
+          <div data-panel="all" class="{% if tab != 'all' %}hidden{% endif %}">
+            {% if all_rows %}
+              <table class="w-full text-left">
+                <thead>
+                  <tr class="YY-TH_TR">
+                    <th class="YY-TH_TH">{% trans "Компания" %}</th>
+                    <th class="YY-TH_TH">{% trans "Категории" %}</th>
+                    <th class="YY-TH_TH">{% trans "Адрес" %}</th>
+                    <th class="YY-TH_TH">{% trans "CB" %}</th>
+                    <th class="YY-TH_TH">{% trans "Смотреть" %}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for it in all_rows %}
+                    <tr class="YY-TB_TR align-top">
+                      <td class="YY-TB_TD">{{ it.company_name }}</td>
+                      <td class="YY-TB_TD">{{ it.branches_str }}</td>
+                      <td class="YY-TB_TD">{{ it.address_first }}</td>
+                      <td class="YY-TB_TD">{{ it.rate_cb_100 }}</td>
+                      <td class="YY-TB_TD">
+                        <a href="#" class="YY-BUTTON_TAB_MAIN">{% trans "Смотреть" %}</a>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+
+              <div class="flex gap-3 mt-3 items-center">
+                {% if all_page > 1 %}
+                  <a class="YY-BUTTON_MAIN"
+                    href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_page|add:"-1" }}">
+                    {% trans "Назад" %}
+                  </a>
+                {% endif %}
+
+                <div class="YY-TEXT">
+                  {{ all_page }} / {{ all_pages }}
+                </div>
+
+                {% if all_page < all_pages %}
+                  <a class="YY-BUTTON_MAIN"
+                    href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_page|add:"1" }}">
+                    {% trans "Вперёд" %}
+                  </a>
+                {% endif %}
+              </div>
+          </div>
+            {% else %}
+              <div class="YY-CARD_WHITE">
+                {% trans "Здесь пока нет данных" %}
+              </div>
+            {% endif %}
+          </div>
+        </div>
         </div>
 
-        <div style="display:flex; gap: 8px;">
-          {% if page_obj.has_previous %}
-            <a class="panel-button-secondary" href="?page={{ page_obj.previous_page_number }}" style="padding: 6px 10px;">← Назад</a>
-          {% endif %}
-          {% if page_obj.has_next %}
-            <a class="panel-button-secondary" href="?page={{ page_obj.next_page_number }}" style="padding: 6px 10px;">Вперёд →</a>
-          {% endif %}
-        </div>
-      </div>
 
-    {% else %}
-      <div class="panel-subtitle" style="margin: 0;">Компаний не найдено.</div>
-    {% endif %}
-  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+      </div>
+    </td>
+  </tr>
+</table>
+
 {% endblock %}

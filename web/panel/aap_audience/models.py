@@ -23,7 +23,7 @@ class AudienceTask(models.Model):
     )
 
     run_processing = models.BooleanField(default=False)
-    subscribers_limit = models.IntegerField(default=500)
+    subscribers_limit = models.IntegerField(default=1000)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
