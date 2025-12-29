@@ -1,11 +1,5 @@
 <!-- FILE: web/templates/panels/aap_audience/status.html -->
-<!-- DATE: 2025-12-28 -->
-<!-- CHANGE:
-- Таблица 1:1 как внизу clar.html (классы/структура сохранены).
-- Показываются только задачи с run_processing=true (фильтр во view).
-- Колонка "Статус" пустая.
-- Колонка "Действия" полностью убрана.
--->
+<!-- DATE: 2025-12-29 -->
 
 {% extends "panels/base.html" %}
 {% load i18n %}
@@ -21,9 +15,9 @@
           <table class="w-full text-left">
             <thead>
               <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[30%]">{% trans "Аудитория" %}</th>
-                <th class="YY-TH_TH w-[35%]">{% trans "Критерии" %}</th>
-                <th class="YY-TH_TH w-[35%]">{% trans "Статус" %}</th>
+                <th class="YY-TH_TH w-[50%]">{% trans "Аудитория" %}</th>
+                <th class="YY-TH_TH w-[50%]">{% trans "Критерии" %}</th>
+                <th class="YY-TH_TH">{% trans "Статус" %}</th>
               </tr>
             </thead>
             <tbody>
@@ -89,6 +83,20 @@
                   </td>
 
                   <td class="YY-TB_TD">
+
+                    <div class="YY-STATUS_GREEN w-full mb-2">
+                      {% trans "Контакты: присвоен рейтинг" %}: {{ t.contacts_rated }}
+                    </div>
+
+                    <div class="YY-STATUS_GRAY w-full mb-12">
+                      {% trans "Всего собрано контактов" %}: {{ t.contacts_total }}
+                    </div>
+
+                    <a href="task/?id={{ t.ui_id }}"
+                       class="YY-BUTTON_TAB_MAIN">
+                      {% trans "Смотреть / управлять" %}
+                    </a>
+
                   </td>
 
                 </tr>
