@@ -1,11 +1,13 @@
-# FILE: engine/core_validate/val_expand_processor.py  (обновлено — 2025-12-29)
-# Смысл:
-# - expand_rate_contacts: инкрементально добирает rate_contacts из raw_contacts_aggr по приоритетам (score-группам)
-# - check_inserted_50k: раз в 10 минут ставит inserted_50k=true
-# - reset_cache: раз в час сбрасывает кеш (через epoch)
-# - Батчирование pairs по 200, чтобы не раздувать SQL.
-# - Один проход по cb_crawler на батч: получаем collected_ids и факт наличия collected=false.
-# - В rate_contacts пишем ТОЛЬКО (task_id, contact_id, rate_cb). Никаких cb_crawler_id / hash_task / update.
+# FILE: engine/core_validate/val_expand_processor.py  (обновлено — 2025-12-30)
+# PATH: engine/core_validate/val_expand_processor.py
+# Смысл (минимальный рефактор только под collected/50k/выбор задач/глобальный обзорщик):
+# - Expander (run_once) больше НЕ смотрит на inserted_50k: берёт только run_processing=true AND collected=false.
+# - Лимит вынесен в MAX_RATE_CONTACTS_PER_TASK (= 50_000).
+# - Глобальный обзорщик (mark_collected_once) независимо от expander:
+#   * если rate_contacts >= LIMIT -> collected=true
+#   * иначе использует ту же cursor/epoch логику и ту же group-проверку fully_collected,
+#     и если дошёл до конца групп без stop-point -> collected=true
+# - Остальная логика (группы, вставки, курсор, reset_cache) не трогалась.
 
 from __future__ import annotations
 
@@ -18,10 +20,11 @@ from engine.common.db import execute, fetch_all, fetch_one
 from engine.common.worker import Worker
 
 TOP_LIMIT = 300
-SOFT_LIMIT_INSERTED = 1000
 BATCH_PAIRS = 200
 
-CACHE_TTL_SEC = 24 * 60 * 60  # сутки; сброс делает reset_cache_once()
+MAX_RATE_CONTACTS_PER_TASK = 50_000  # <-- меняй тут при необходимости
+
+CACHE_TTL_SEC = 24 * 60 * 60
 CACHE_EPOCH_KEY = "val_expand:epoch"
 
 
@@ -56,12 +59,28 @@ def _get_epoch() -> int:
     return epoch
 
 
+def _set_epoch(epoch: int) -> None:
+    _cache_set_obj(CACHE_EPOCH_KEY, epoch)
+
+
 def _key(epoch: int, suffix: str) -> str:
     return f"val_expand:{epoch}:{suffix}"
 
 
+def _cursor_key(epoch: int, task_id: int) -> str:
+    return _key(epoch, f"cursor:{task_id}")
+
+
+def _get_cursor_score(epoch: int, task_id: int) -> Optional[int]:
+    v = _cache_get_obj(_cursor_key(epoch, task_id))
+    return int(v) if isinstance(v, int) else None
+
+
+def _set_cursor_score(epoch: int, task_id: int, score: int) -> None:
+    _cache_set_obj(_cursor_key(epoch, task_id), int(score))
+
+
 def _get_ref_counts(epoch: int) -> Tuple[int, int]:
-    # кешируем ТОЛЬКО эталонные counts (cities_sys, gb_branches)
     k = _key(epoch, "ref_counts")
     v = _cache_get_obj(k)
     if isinstance(v, tuple) and len(v) == 2:
@@ -116,38 +135,26 @@ def _build_score_groups(task_id: int) -> List[Tuple[int, List[Tuple[int, int]]]]
     return out
 
 
-def _is_skippable(epoch: int, task_id: int, score: int) -> bool:
-    k = _key(epoch, f"skip:{task_id}:{score}")
-    v = _cache_get_obj(k)
-    return bool(v is True)
-
-
-def _set_skippable(epoch: int, task_id: int, score: int) -> None:
-    k = _key(epoch, f"skip:{task_id}:{score}")
-    _cache_set_obj(k, True)
-
-
-def _inc_full_hits(epoch: int, task_id: int, score: int) -> int:
-    k = _key(epoch, f"hits_full:{task_id}:{score}")
-    v = _cache_get_obj(k)
-    n = int(v) if isinstance(v, int) else 0
-    n += 1
-    _cache_set_obj(k, n)
-    return n
+def _start_index_by_score(groups: List[Tuple[int, List[Tuple[int, int]]]], score: Optional[int]) -> int:
+    if score is None:
+        return 0
+    for i, (s, _pairs) in enumerate(groups):
+        if s == score:
+            return i
+    return 0
 
 
 def run_once() -> None:
     epoch = _get_epoch()
+    _p(f"tick epoch={epoch}")
 
-    _p("tick mode=INCREMENTAL")
-
-    # 0) выбираем одну задачу случайно
+    # 0) выбираем одну задачу (ТОЛЬКО collected=false)
     row = fetch_one(
         """
         SELECT id
         FROM aap_audience_audiencetask
         WHERE run_processing = true
-          AND inserted_50k = false
+          AND collected = false
         ORDER BY random()
         LIMIT 1
         """
@@ -155,11 +162,9 @@ def run_once() -> None:
     if not row:
         return
     task_id = int(row[0])
-    _p(f"picked task_id={task_id}")
 
     # 1) валидация counts
     cities_ref, branches_ref = _get_ref_counts(epoch)
-
     row_c = fetch_one(
         "SELECT count(*) FROM crawl_tasks WHERE task_id = %s AND type = 'city'",
         (task_id,),
@@ -174,30 +179,30 @@ def run_once() -> None:
     if cnt_city_task != cities_ref or cnt_branch_task != branches_ref:
         _p(
             f"task_id={task_id} invalid counts: "
-            f"task cities={cnt_city_task} ref={cities_ref}, "
-            f"task branches={cnt_branch_task} ref={branches_ref} -> skip"
+            f"cities {cnt_city_task}/{cities_ref}, branches {cnt_branch_task}/{branches_ref} -> skip"
         )
         return
 
-    # 2) score-группы
     groups = _build_score_groups(task_id)
     if not groups:
         _p(f"task_id={task_id} no groups -> stop")
         return
 
-    inserted_total = 0
+    cursor_score = _get_cursor_score(epoch, task_id)
+    start_i = _start_index_by_score(groups, cursor_score)
+    if cursor_score is None:
+        _p(f"task_id={task_id} start=FIRST_GROUP groups={len(groups)}")
+    else:
+        _p(f"task_id={task_id} start=CURSOR score={cursor_score} idx={start_i}/{len(groups)}")
 
-    # 3) итерации: много групп подряд
-    for score, pairs in groups:
-        if _is_skippable(epoch, task_id, score):
-            continue
+    # 2) идём по группам начиная с курсора
+    for score, pairs in groups[start_i:]:
+        _p(f"task_id={task_id} score={score} pairs_count={len(pairs)}")
 
-        inserted_this_group = 0
-        fully_collected = True
+        collected_ids_all: List[int] = []
+        has_not_collected_any = False
+        total_rows_any = 0
 
-        _p(f"task_id={task_id} score={score} pairs={len(pairs)}")
-
-        # батчи по 200 пар
         i = 0
         while i < len(pairs):
             batch = pairs[i : i + BATCH_PAIRS]
@@ -209,13 +214,11 @@ def run_once() -> None:
                 params.append(int(city_id))
                 params.append(int(branch_id))
 
-            # один проход по cb_crawler на батч:
-            # - collected_ids: все plz -> id (только collected=true)
-            # - has_not_collected: exists(collected=false) внутри батча
             row_cb = fetch_one(
                 f"""
                 WITH pairs(city_id, branch_id) AS (VALUES {values_sql})
                 SELECT
+                    count(*)::int AS total_rows,
                     array_agg(c.id) FILTER (WHERE c.collected = true)::bigint[] AS collected_ids,
                     bool_or(c.collected = false) AS has_not_collected
                 FROM cb_crawler c
@@ -224,19 +227,23 @@ def run_once() -> None:
                 tuple(params),
             )
 
-            collected_ids = None
-            has_not_collected = False
-            if row_cb:
-                collected_ids = row_cb[0]
-                has_not_collected = bool(row_cb[1])
-
-            if has_not_collected:
-                fully_collected = False
-
-            if not collected_ids:
+            if not row_cb:
                 continue
 
-            # insert-only в rate_contacts (без cb_crawler_id)
+            total_rows = int(row_cb[0]) if row_cb[0] is not None else 0
+            total_rows_any += total_rows
+
+            collected_ids = row_cb[1]
+            has_not_collected = bool(row_cb[2]) if row_cb[2] is not None else False
+
+            if has_not_collected:
+                has_not_collected_any = True
+
+            if collected_ids:
+                collected_ids_all.extend([int(x) for x in collected_ids])
+
+        # 3) вставляем collected=true (всегда, даже если группа не fully)
+        if collected_ids_all:
             row_ins = fetch_one(
                 """
                 WITH cb_arr AS (
@@ -252,43 +259,47 @@ def run_once() -> None:
                 )
                 SELECT count(*) FROM ins
                 """,
-                (collected_ids, task_id, score),
+                (collected_ids_all, task_id, score),
             )
+            inserted = int(row_ins[0]) if row_ins else 0
+        else:
+            inserted = 0
 
-            inserted_batch = int(row_ins[0]) if row_ins else 0
-            inserted_this_group += inserted_batch
-
-        inserted_total += inserted_this_group
+        fully_collected = (not has_not_collected_any) and (total_rows_any > 0)
 
         _p(
             f"task_id={task_id} score={score} "
-            f"fully_collected={fully_collected} inserted={inserted_this_group} total={inserted_total}"
+            f"total_rows={total_rows_any} collected_ids={len(collected_ids_all)} "
+            f"inserted={inserted} fully_collected={fully_collected}"
         )
 
-        # fully-collected + 0 вставок => hit++ ; на 3 => skippable
-        if fully_collected and inserted_this_group == 0:
-            hits = _inc_full_hits(epoch, task_id, score)
-            _p(f"task_id={task_id} score={score} full+0 -> hits_full={hits}")
-            if hits >= 3:
-                _set_skippable(epoch, task_id, score)
-                _p(f"task_id={task_id} score={score} marked skippable")
-
-        # стоп по 0 вставок (именно вставок)
-        if inserted_this_group == 0:
+        # 4) управление ТОЛЬКО по collected (cursor)
+        if not fully_collected:
+            _set_cursor_score(epoch, task_id, score)
+            _p(f"task_id={task_id} STOP on score={score} (not fully collected) -> cursor saved")
             return
 
-        # мягкий лимит 1000: группу прошли целиком, дальше не идём
-        if inserted_total >= SOFT_LIMIT_INSERTED:
-            return
+        continue
+
+    _p(f"task_id={task_id} reached end of groups -> no stop point found")
 
 
-def check_inserted_50k_once() -> None:
+def mark_collected_once() -> None:
+    """
+    Глобальный обзорщик (независим от expander):
+    - collected=true если rate_contacts >= LIMIT
+    - collected=true если по cursor-логике дошли до конца групп и не нашли stop-point
+      (то есть "в последнем элементе не осталось никого, и все")
+    """
+    epoch = _get_epoch()
+
     rows = fetch_all(
         """
         SELECT id
         FROM aap_audience_audiencetask
         WHERE run_processing = true
-          AND inserted_50k = false
+          AND collected = false
+        ORDER BY id ASC
         """
     )
     if not rows:
@@ -296,24 +307,99 @@ def check_inserted_50k_once() -> None:
 
     for (task_id_raw,) in rows:
         task_id = int(task_id_raw)
-        row = fetch_one("SELECT count(*) FROM rate_contacts WHERE task_id = %s", (task_id,))
-        cnt = int(row[0]) if row else 0
-        if cnt >= 50_000:
+
+        row_cnt = fetch_one("SELECT count(*) FROM rate_contacts WHERE task_id = %s", (task_id,))
+        cnt = int(row_cnt[0]) if row_cnt else 0
+        if cnt >= MAX_RATE_CONTACTS_PER_TASK:
             execute(
                 """
                 UPDATE aap_audience_audiencetask
-                SET inserted_50k = true
+                SET collected = true
                 WHERE id = %s
                 """,
                 (task_id,),
             )
-            _p(f"task_id={task_id} rate_contacts={cnt} -> inserted_50k=true")
+            _p(f"task_id={task_id} rate_contacts={cnt} -> collected=true (limit)")
+            continue
+
+        groups = _build_score_groups(task_id)
+        if not groups:
+            # нет групп -> считаем done
+            execute(
+                """
+                UPDATE aap_audience_audiencetask
+                SET collected = true
+                WHERE id = %s
+                """,
+                (task_id,),
+            )
+            _p(f"task_id={task_id} no groups -> collected=true")
+            continue
+
+        cursor_score = _get_cursor_score(epoch, task_id)
+        start_i = _start_index_by_score(groups, cursor_score)
+
+        stop_found = False
+
+        for score, pairs in groups[start_i:]:
+            has_not_collected_any = False
+            total_rows_any = 0
+
+            i = 0
+            while i < len(pairs):
+                batch = pairs[i : i + BATCH_PAIRS]
+                i += BATCH_PAIRS
+
+                values_sql = ", ".join(["(%s,%s)"] * len(batch))
+                params: List[int] = []
+                for city_id, branch_id in batch:
+                    params.append(int(city_id))
+                    params.append(int(branch_id))
+
+                row_cb = fetch_one(
+                    f"""
+                    WITH pairs(city_id, branch_id) AS (VALUES {values_sql})
+                    SELECT
+                        count(*)::int AS total_rows,
+                        bool_or(c.collected = false) AS has_not_collected
+                    FROM cb_crawler c
+                    JOIN pairs p ON p.city_id = c.city_id AND p.branch_id = c.branch_id
+                    """,
+                    tuple(params),
+                )
+                if not row_cb:
+                    continue
+
+                total_rows = int(row_cb[0]) if row_cb[0] is not None else 0
+                total_rows_any += total_rows
+
+                has_not_collected = bool(row_cb[1]) if row_cb[1] is not None else False
+                if has_not_collected:
+                    has_not_collected_any = True
+
+            fully_collected = (not has_not_collected_any) and (total_rows_any > 0)
+            if not fully_collected:
+                _set_cursor_score(epoch, task_id, score)
+                stop_found = True
+                _p(f"task_id={task_id} not fully collected on score={score} -> cursor saved (no collected)")
+                break
+
+        if not stop_found:
+            execute(
+                """
+                UPDATE aap_audience_audiencetask
+                SET collected = true
+                WHERE id = %s
+                """,
+                (task_id,),
+            )
+            _p(f"task_id={task_id} end of groups -> collected=true (done)")
 
 
 def reset_cache_once() -> None:
     epoch = int(time.time())
-    _cache_set_obj(CACHE_EPOCH_KEY, epoch)
-    _p(f"cache reset: epoch={epoch}")
+    _set_epoch(epoch)
+    _p(f"cache reset: epoch={epoch} (next ticks will start from first group)")
 
 
 def main() -> None:
@@ -334,9 +420,9 @@ def main() -> None:
     )
 
     w.register(
-        name="check_inserted_50k",
-        fn=check_inserted_50k_once,
-        every_sec=600,  # 10 минут
+        name="mark_tasks_collected",
+        fn=mark_collected_once,
+        every_sec=600,
         timeout_sec=600,
         singleton=True,
         heavy=True,
