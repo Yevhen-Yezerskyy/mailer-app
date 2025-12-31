@@ -19,6 +19,15 @@
     <tr>
       <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
         <div class="YY-CARD_WHITE">
+            {% if edit_task.type == "sell" %}
+              <div class="YY-STATUS_GREEN mb-2">
+                  {% trans "Поиск клиентов" %}
+              </div>
+            {% else %}
+              <div class="YY-STATUS_YELLOW mb-2">
+                  {% trans "Поиск поставщиков / подрядчиков" %}
+            </div>
+            {% endif %}          
           <form method="post">
             {% csrf_token %}
 
@@ -325,9 +334,9 @@
           <table class="w-full text-left">
             <thead>
               <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[30%]">{% trans "Аудитория" %}</th>
-                <th class="YY-TH_TH w-[35%]">{% trans "Критерии" %}</th>
-                <th class="YY-TH_TH w-[35%]">{% trans "Статус" %}</th>
+                <th class="YY-TH_TH w-[50%]">{% trans "Аудитория" %}</th>
+                <th class="YY-TH_TH w-[50%]">{% trans "Критерии" %}</th>
+                <th class="YY-TH_TH">{% trans "Статус" %}</th>
                 <th class="YY-TH_TH">{% trans "Действия" %}</th>
               </tr>
             </thead>
@@ -397,50 +406,50 @@
 
                     {% if t.run_processing %}
                       <div class="YY-STATUS_GREEN w-full mb-2">
-                        {% trans "Обработка задачи включена" %}
+                        {% trans "Обработка включена" %}
                       </div>
                     {% else %}
                       <div class="YY-STATUS_GRAY w-full mb-2">
-                        {% trans "Обработка задачи отключена" %}
+                        {% trans "Обработка отключена" %}
                       </div>
                     {% endif %}
 
                     {% if t.rating.branches.running %}
                       <div class="YY-STATUS_YELLOW w-full mb-2">
-                        {% trans "Бизнес-категории в обработке" %}{% if t.rating.branches.progress is not None %} ({{ t.rating.branches.progress }}%){% endif %}
+                        {% trans "Категории: обработка" %}{% if t.rating.branches.progress is not None %} ({{ t.rating.branches.progress }}%){% endif %}
                       </div>
                     {% else %}
                       {% if t.rating.branches.last_done_hash %}
                         {% if t.rating.branches.last_done_hash == t.rating_hashes.branches %}
                           <div class="YY-STATUS_GREEN w-full mb-2">
-                            {% trans "Бизнес-категории обработаны" %}
+                            {% trans "Категории: обработаны" %}
                           </div>
                           <a href="#"
                              class="YY-BUTTON_MAIN w-full mb-5"
                              data-yy-modal="url=/panel/audience/clar/modal/?mode=branches&id={{ t.ui_id }}">
-                            {% trans "Посмотреть бизнес-категории" %}
+                            {% trans "Посмотреть категории" %}
                           </a>
                         {% else %}
                           <div class="YY-STATUS_GRAY w-full mb-2">
-                            {% trans "Бизнес-категории не обработаны" %}
+                            {% trans "Категории не обработаны" %}
                           </div>
                         {% endif %}
                       {% else %}
                         <div class="YY-STATUS_GRAY w-full mb-2">
-                          {% trans "Бизнес-категории не обработаны" %}
+                          {% trans "Категории не обработаны" %}
                         </div>
                       {% endif %}
                     {% endif %}
 
                     {% if t.rating.geo.running %}
                       <div class="YY-STATUS_YELLOW w-full mb-2">
-                        {% trans "Города в обработке" %}{% if t.rating.geo.progress is not None %} ({{ t.rating.geo.progress }}%){% endif %}
+                        {% trans "Города: обработка" %}{% if t.rating.geo.progress is not None %} ({{ t.rating.geo.progress }}%){% endif %}
                       </div>
                     {% else %}
                       {% if t.rating.geo.last_done_hash %}
                         {% if t.rating.geo.last_done_hash == t.rating_hashes.geo %}
                           <div class="YY-STATUS_GREEN w-full mb-2">
-                            {% trans "Города обработаны" %}
+                            {% trans "Города: обработаны" %}
                           </div>
                           <a href="#"
                              class="YY-BUTTON_MAIN w-full mb-5"
@@ -449,12 +458,12 @@
                           </a>
                         {% else %}
                           <div class="YY-STATUS_GRAY w-full mb-2">
-                            {% trans "Города не обработаны" %}
+                            {% trans "Города: не обработаны" %}
                           </div>
                         {% endif %}
                       {% else %}
                         <div class="YY-STATUS_GRAY w-full mb-2">
-                          {% trans "Города не обработаны" %}
+                          {% trans "Города: не обработаны" %}
                         </div>
                       {% endif %}
                     {% endif %}

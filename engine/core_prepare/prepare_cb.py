@@ -1,10 +1,5 @@
 # FILE: engine/core_prepare/prepare_cb.py  (обновлено — 2025-12-28)
-# Смысл (правки):
-# - Убраны захардкоженные "50" из имён/SQL: единый BATCH_SIZE, DONE_SCAN_LIMIT, TASKS_QUEUE_LIMIT.
-# - _pop_50 -> _pop_batch (и фактически использует BATCH_SIZE).
-# - В task_prepare_done(): LIMIT -> DONE_SCAN_LIMIT (и не смешиваем type IN без нужды).
-# - Фикс утечки entity-lock токенов: если reserved_ids пустой -> release tokens перед return.
-# - Мелкие фиксы читаемости/микрооптимизации (set(reserved_ids) один раз).
+
 
 from __future__ import annotations
 
@@ -22,7 +17,7 @@ from engine.common.utils import h64_text
 
 # ------------------------------
 BATCH_SIZE = 20
-MODEL = "mini"
+MODEL = "maxi"
 SERVICE_TIER = "flex"
 
 MAX_CANDIDATES = 2000           # если кандидатов больше — считаем аномалией и валимся
