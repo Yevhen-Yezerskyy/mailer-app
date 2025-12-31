@@ -1,18 +1,10 @@
-# FILE: engine/core_validate/val_expand_processor.py  (обновлено — 2025-12-30)
-# PATH: engine/core_validate/val_expand_processor.py
-# Смысл (минимальный рефактор только под collected/50k/выбор задач/глобальный обзорщик):
-# - Expander (run_once) больше НЕ смотрит на inserted_50k: берёт только run_processing=true AND collected=false.
-# - Лимит вынесен в MAX_RATE_CONTACTS_PER_TASK (= 50_000).
-# - Глобальный обзорщик (mark_collected_once) независимо от expander:
-#   * если rate_contacts >= LIMIT -> collected=true
-#   * иначе использует ту же cursor/epoch логику и ту же group-проверку fully_collected,
-#     и если дошёл до конца групп без stop-point -> collected=true
-# - Остальная логика (группы, вставки, курсор, reset_cache) не трогалась.
+# FILE: engine/core_validate/val_expand_processor.py
 
 from __future__ import annotations
 
 import pickle
 import time
+import heapq
 from typing import Dict, List, Optional, Tuple
 
 from engine.common.cache.client import CLIENT as CACHE
@@ -21,6 +13,8 @@ from engine.common.worker import Worker
 
 TOP_LIMIT = 300
 BATCH_PAIRS = 200
+
+WINDOW_LIMIT = 100_000
 
 MAX_RATE_CONTACTS_PER_TASK = 50_000  # <-- меняй тут при необходимости
 
@@ -103,9 +97,8 @@ def _build_score_groups(task_id: int) -> List[Tuple[int, List[Tuple[int, int]]]]
         FROM crawl_tasks
         WHERE task_id = %s AND type = 'city'
         ORDER BY rate ASC, value_id ASC
-        LIMIT %s
         """,
-        (task_id, TOP_LIMIT),
+        (task_id,),
     )
     branches = fetch_all(
         """
@@ -113,19 +106,26 @@ def _build_score_groups(task_id: int) -> List[Tuple[int, List[Tuple[int, int]]]]
         FROM crawl_tasks
         WHERE task_id = %s AND type = 'branch'
         ORDER BY rate ASC, value_id ASC
-        LIMIT %s
         """,
-        (task_id, TOP_LIMIT),
+        (task_id,),
     )
 
     city_rate: Dict[int, int] = {int(cid): int(rate) for (cid, rate) in cities}
     branch_rate: Dict[int, int] = {int(bid): int(rate) for (bid, rate) in branches}
 
+    # Топ WINDOW_LIMIT пар с минимальным score, без полной сортировки 1M элементов
+    top = heapq.nsmallest(
+        WINDOW_LIMIT,
+        (
+            (cr * br, city_id, branch_id)
+            for city_id, cr in city_rate.items()
+            for branch_id, br in branch_rate.items()
+        ),
+    )
+
     groups: Dict[int, List[Tuple[int, int]]] = {}
-    for city_id, cr in city_rate.items():
-        for branch_id, br in branch_rate.items():
-            score = cr * br
-            groups.setdefault(score, []).append((city_id, branch_id))
+    for score, city_id, branch_id in top:
+        groups.setdefault(int(score), []).append((int(city_id), int(branch_id)))
 
     out: List[Tuple[int, List[Tuple[int, int]]]] = []
     for score in sorted(groups.keys()):
@@ -133,7 +133,6 @@ def _build_score_groups(task_id: int) -> List[Tuple[int, List[Tuple[int, int]]]]
         pairs.sort(key=lambda x: (x[0], x[1]))
         out.append((score, pairs))
     return out
-
 
 def _start_index_by_score(groups: List[Tuple[int, List[Tuple[int, int]]]], score: Optional[int]) -> int:
     if score is None:
