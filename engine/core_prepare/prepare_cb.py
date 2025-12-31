@@ -1,5 +1,5 @@
-# FILE: engine/core_prepare/prepare_cb.py  (обновлено — 2025-12-28)
-
+# FILE: engine/core_prepare/prepare_cb.py  (обновлено — 2025-12-31)
+# Смысл: расширили данные города, которые кормятся в GPT (state/area/pop/urban/travel); остальная логика файла не тронута.
 
 from __future__ import annotations
 
@@ -457,9 +457,41 @@ def task_prepare_geo() -> Dict[str, Any]:
                 _p(kind, f"NOOP rating_id={rating_id} task_id={task_id} reason=locked_out")
                 return {"mode": "noop", "step": "locked_out"}
 
+            # === единственное изменение: расширили выборку и формат cities_sys -> candidates для GPT ===
             with get_connection() as conn, conn.cursor() as cur:
-                cur.execute("SELECT id, name FROM cities_sys WHERE id = ANY(%s)", (reserved_ids,))
-                candidates = [{"id": int(r[0]), "name": str(r[1])} for r in cur.fetchall()]
+                cur.execute(
+                    """
+                    SELECT
+                      id,
+                      state_name,
+                      name,
+                      area_km2,
+                      pop_total,
+                      urban_code,
+                      urban_name,
+                      travel_code,
+                      travel_name
+                    FROM cities_sys
+                    WHERE id = ANY(%s)
+                    """,
+                    (reserved_ids,),
+                )
+                candidates: List[Dict[str, Any]] = []
+                for r in cur.fetchall():
+                    candidates.append(
+                        {
+                            "id": int(r[0]),
+                            "state_name": str(r[1] or ""),
+                            "name": str(r[2] or ""),
+                            "area_km2": (float(r[3]) if r[3] is not None else None),
+                            "pop_total": (int(r[4]) if r[4] is not None else None),
+                            "urban_code": str(r[5] or ""),
+                            "urban_name": str(r[6] or ""),
+                            "travel_code": str(r[7] or ""),
+                            "travel_name": str(r[8] or ""),
+                        }
+                    )
+            # === /изменение ===
 
             payload = json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))
             out = (

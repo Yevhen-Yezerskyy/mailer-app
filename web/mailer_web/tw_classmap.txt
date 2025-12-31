@@ -27,8 +27,8 @@ YY-MAIN_BOTTOM_DIV: border rounded-md bg-[#ffffff] border border-[#71d0f4] overf
 YY-BUTTON_MAIN: px-5 py-1.5 flex items-center justify-center rounded-md bg-[#effbff] text-[#006991] font-semibold hover:bg-[#f8fdff] border border-[#71d0f4] uppercase text-sm
 YY-BUTTON_GREEN: px-5 py-1.5 flex items-center justify-center rounded-md bg-[#d6fdda] text-[#016b09] font-semibold hover:bg-[#f2fff3] border border-[#71d0f4] uppercase text-sm
 
-YY-BUTTON_TAB_MAIN: px-5 py-1.5 flex rounded-md bg-[#effbff] text-[#006991] font-semibold hover:bg-[#f8fdff] border border-[#71d0f4] uppercase text-sm min-w-[130px]
-YY-BUTTON_TAB_RED: px-5 py-1.5 flex rounded-md bg-[#fff8f8] text-[#8e0000] font-semibold hover:bg-[#fff2f2] border border-[#f3a7a7] uppercase text-sm min-w-[130px]
+YY-BUTTON_TAB_MAIN: px-5 py-1.5 flex rounded-md bg-[#effbff] text-[#006991] font-semibold hover:bg-[#f8fdff] border border-[#71d0f4] uppercase text-sm w-[100%]
+YY-BUTTON_TAB_RED: px-5 py-1.5 flex rounded-md bg-[#fff8f8] text-[#8e0000] font-semibold hover:bg-[#fff2f2] border border-[#f3a7a7] uppercase text-sm w-[100%]
 
 
 
@@ -48,6 +48,6 @@ YY-MAIN_BOTTOM_TD: pt-0 pb-10 px-8 align-top
 
 # MENU
 YY-MENU-CARD-BLUE: rounded-md bg-[#effbff] border border-[#71d0f4]
-YY-MENU-SUMMARY: flex items-center gap-3 pl-2 py-3 font-bold text-[#006991] hover:bg-[#f8fdff] hover:text-[#007c09] rounded-md cursor-pointer leading-none
-YY-MENU-DETAIL: flex rounded-md font-semibold text-[#006991] py-3 pl-10 hover:bg-[#f8fdff] hover:text-[#007c09]
+YY-MENU-SUMMARY: flex items-center gap-2 pl-2 py-3 font-bold text-[#006991] hover:bg-[#f8fdff] hover:text-[#007c09] rounded-md cursor-pointer leading-none
+YY-MENU-DETAIL: flex rounded-md font-semibold text-[#006991] py-2 pl-8 hover:bg-[#f8fdff] hover:text-[#007c09]
 YY-MENU-DETAIL-ACTIVE: bg-[#f8fdff] text-[#007c09]

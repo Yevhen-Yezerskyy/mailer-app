@@ -214,10 +214,9 @@
           <table class="w-full text-left">
             <thead>
               <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[40%]">{% trans "Задача" %}</th>
-                <th class="YY-TH_TH w-[40%]">{% trans "Критерии выбора" %}</th>
-                <th class="YY-TH_TH">{% trans "Статус" %}</th>
-                <th class="YY-TH_TH">{% trans "Действия" %}</th>
+                <th class="YY-TH_TH w-[50%]">{% trans "Задача" %}</th>
+                <th class="YY-TH_TH w-[50%]">{% trans "Критерии выбора" %}</th>
+                <th class="YY-TH_TH">{% trans "Действия / Статус" %}</th>
               </tr>
             </thead>
             <tbody>
@@ -250,7 +249,11 @@
                           data-active-class="YY-BUTTON_GREEN"
                           data-idle-class="YY-BUTTON_MAIN"
                           class="YY-BUTTON_GREEN">
-                          {% trans "Клиент" %}
+                            {% if t.type == "sell" %}
+                              {% trans "Клиент" %}
+                            {% else %}
+                              {% trans "Поставщик" %}
+                            {% endif %}
                         </button>
 
                         <button type="button"
@@ -283,25 +286,13 @@
                   </td>
 
                   <td class="YY-TB_TD">
-                    {% if t.run_processing %}
-                      <div class="YY-STATUS_GREEN">
-                        {% trans "В работе" %}
-                      </div>
-                    {% else %}
-                      <div class="YY-STATUS_YELLOW">
-                        {% trans "Не запущено" %}
-                      </div>
-                    {% endif %}
-                  </td>
-
-                  <td class="YY-TB_TD">
                     <a
                       href="?state=edit&type={{ t.type }}&id={{ t.ui_id }}"
-                      class="YY-BUTTON_TAB_MAIN mb-2 inline-block">
+                      class="YY-BUTTON_TAB_MAIN mb-2">
                       {% trans "Изменить" %}
                     </a>
                     {% if not t.run_processing %}
-                    <form method="post" class="inline-block"
+                    <form method="post"
                           onsubmit="return confirm('{% trans "Удалить задачу?" %}')">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="delete">
@@ -311,6 +302,17 @@
                       </button>
                     </form>
                     {% endif %}
+
+                    {% if t.run_processing %}
+                      <div class="YY-STATUS_GREEN mt-10">
+                        {% trans "Обработка включена" %}
+                      </div>
+                    {% else %}
+                      <div class="YY-STATUS_YELLOW mt-10">
+                        {% trans "Обработка отключена" %}
+                      </div>
+                    {% endif %}
+
                   </td>
                 </tr>
               {% endfor %}

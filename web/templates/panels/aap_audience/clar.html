@@ -1,10 +1,5 @@
 <!-- FILE: web/templates/panels/aap_audience/clar.html -->
 <!-- DATE: 2025-12-27 -->
-<!-- CHANGE:
-- Добавлен прогресс (%) везде, где статус "в обработке" для категорий и городов.
-- Прогресс берётся из t.rating.*.progress / rating.*.progress (может быть >100%).
-- Остальные правки из предыдущей версии сохранены (cities 1:1 как branches, единые классы, trans везде кроме OK).
--->
 
 {% extends "panels/base.html" %}
 {% load i18n %}
@@ -212,7 +207,7 @@
                   <input
                     name="rate"
                     type="text"
-                    class="YY-INPUT w-[50px] mt-5"
+                    class="YY-INPUT w-[60px] mt-5"
                     value=""
                   >
 
@@ -273,7 +268,7 @@
                   <input
                     name="rate"
                     type="text"
-                    class="YY-INPUT w-[50px] mt-5"
+                    class="YY-INPUT w-[60px] mt-5"
                     value=""
                   >
 
@@ -336,8 +331,7 @@
               <tr class="YY-TH_TR">
                 <th class="YY-TH_TH w-[50%]">{% trans "Аудитория" %}</th>
                 <th class="YY-TH_TH w-[50%]">{% trans "Критерии" %}</th>
-                <th class="YY-TH_TH">{% trans "Статус" %}</th>
-                <th class="YY-TH_TH">{% trans "Действия" %}</th>
+                <th class="YY-TH_TH">{% trans "Статус / Действия" %}</th>
               </tr>
             </thead>
             <tbody>
@@ -368,10 +362,21 @@
                     <div data-tabs="crit-{{ t.id }}">
                       <div class="flex gap-3 mb-3">
                         <button type="button"
-                          data-tab="branches"
+                          data-tab="client"
                           data-active-class="YY-BUTTON_GREEN"
                           data-idle-class="YY-BUTTON_MAIN"
                           class="YY-BUTTON_GREEN">
+                            {% if t.type == "sell" %}
+                              {% trans "Клиент" %}
+                            {% else %}
+                              {% trans "Поставщик" %}
+                            {% endif %}
+                        </button>                        
+                        <button type="button"
+                          data-tab="branches"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_MAIN">
                           {% trans "Категории" %}
                         </button>
                         <button type="button"
@@ -381,35 +386,31 @@
                           class="YY-BUTTON_MAIN">
                           {% trans "География" %}
                         </button>
-                        <button type="button"
-                          data-tab="client"
-                          data-active-class="YY-BUTTON_GREEN"
-                          data-idle-class="YY-BUTTON_MAIN"
-                          class="YY-BUTTON_MAIN">
-                          {% trans "Клиент" %}
-                        </button>
                       </div>
-
-                      <div data-panel="branches">
+                      <div data-panel="client">
+                        {{ t.task_client|linebreaksbr }}
+                      </div>
+                      <div data-panel="branches" class="hidden">
                         {{ t.task_branches|linebreaksbr }}
                       </div>
                       <div data-panel="geo" class="hidden">
                         {{ t.task_geo|linebreaksbr }}
                       </div>
-                      <div data-panel="client" class="hidden">
-                        {{ t.task_client|linebreaksbr }}
-                      </div>
                     </div>
                   </td>
 
                   <td class="YY-TB_TD">
+                    <a href="?state=edit&id={{ t.ui_id }}"
+                       class="YY-BUTTON_TAB_MAIN w-full mb-6">
+                      {% trans "Управлять" %}
+                    </a>
 
                     {% if t.run_processing %}
-                      <div class="YY-STATUS_GREEN w-full mb-2">
+                      <div class="YY-STATUS_GREEN w-full mb-6">
                         {% trans "Обработка включена" %}
                       </div>
                     {% else %}
-                      <div class="YY-STATUS_GRAY w-full mb-2">
+                      <div class="YY-STATUS_GRAY w-full mb-6">
                         {% trans "Обработка отключена" %}
                       </div>
                     {% endif %}
@@ -425,7 +426,7 @@
                             {% trans "Категории: обработаны" %}
                           </div>
                           <a href="#"
-                             class="YY-BUTTON_MAIN w-full mb-5"
+                             class="YY-BUTTON_TAB_MAIN w-full mb-6"
                              data-yy-modal="url=/panel/audience/clar/modal/?mode=branches&id={{ t.ui_id }}">
                             {% trans "Посмотреть категории" %}
                           </a>
@@ -452,7 +453,7 @@
                             {% trans "Города: обработаны" %}
                           </div>
                           <a href="#"
-                             class="YY-BUTTON_MAIN w-full mb-5"
+                             class="YY-BUTTON_TAB_MAIN w-full mb-6"
                              data-yy-modal="url=/panel/audience/clar/modal/?mode=cities&id={{ t.ui_id }}">
                             {% trans "Посмотреть города" %}
                           </a>
@@ -468,13 +469,6 @@
                       {% endif %}
                     {% endif %}
 
-                  </td>
-
-                  <td class="YY-TB_TD">
-                    <a href="?state=edit&id={{ t.ui_id }}"
-                       class="YY-BUTTON_TAB_MAIN inline-block">
-                      {% trans "Управлять" %}
-                    </a>
                   </td>
 
                 </tr>

@@ -30,7 +30,7 @@ PANEL_MENU = [
                 "active_prefixes": ["/panel/audience/how/"],
             },
             {
-                "title": _("Города и бизнес-категории"),
+                "title": _("Города и категории"),
                 "page_title": _("Города и бизнес-категории"),
                 "url_name": "audience:clar",
                 "active_prefixes": ["/panel/audience/clar/"],
