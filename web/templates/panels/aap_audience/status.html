@@ -43,17 +43,29 @@
                     </div>
 
                   </td>
-
                   <td class="YY-TB_TD">
-                    <div data-tabs="crit-{{ t.id }}">
+                    <div data-tabs="choice-{{ t.id }}">
                       <div class="flex gap-3 mb-3">
+                        <button type="button"
+                          data-tab="client"
+                          data-active-class="YY-BUTTON_GREEN"
+                          data-idle-class="YY-BUTTON_MAIN"
+                          class="YY-BUTTON_GREEN">
+                            {% if t.type == "sell" %}
+                              {% trans "Клиент" %}
+                            {% else %}
+                              {% trans "Поставщик" %}
+                            {% endif %}
+                        </button>
+
                         <button type="button"
                           data-tab="branches"
                           data-active-class="YY-BUTTON_GREEN"
                           data-idle-class="YY-BUTTON_MAIN"
-                          class="YY-BUTTON_GREEN">
+                          class="YY-BUTTON_MAIN">
                           {% trans "Категории" %}
                         </button>
+
                         <button type="button"
                           data-tab="geo"
                           data-active-class="YY-BUTTON_GREEN"
@@ -61,27 +73,20 @@
                           class="YY-BUTTON_MAIN">
                           {% trans "География" %}
                         </button>
-                        <button type="button"
-                          data-tab="client"
-                          data-active-class="YY-BUTTON_GREEN"
-                          data-idle-class="YY-BUTTON_MAIN"
-                          class="YY-BUTTON_MAIN">
-                          {% trans "Клиент" %}
-                        </button>
                       </div>
 
-                      <div data-panel="branches">
+                      <div data-panel="client">
+                        {{ t.task_client|linebreaksbr }}
+                      </div>
+                      <div data-panel="branches" class="hidden">
                         {{ t.task_branches|linebreaksbr }}
                       </div>
                       <div data-panel="geo" class="hidden">
                         {{ t.task_geo|linebreaksbr }}
                       </div>
-                      <div data-panel="client" class="hidden">
-                        {{ t.task_client|linebreaksbr }}
-                      </div>
                     </div>
                   </td>
-
+                  
                   <td class="YY-TB_TD">
 
                     <div class="YY-STATUS_GREEN w-full mb-2">

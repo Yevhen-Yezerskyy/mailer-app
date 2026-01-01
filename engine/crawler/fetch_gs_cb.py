@@ -45,9 +45,7 @@ QUEUE_TTL_SEC = 60 * 60                   # 1 hour (best-effort)
 EPOCH_TTL_SEC = 60 * 60 * 24              # 24h (epoch живёт долго, но обновляем reset'ом)
 
 REBUILD_SIZE = 500
-RANDOM_SHARE = 0.10
-RANDOM_TARGET = int(REBUILD_SIZE * RANDOM_SHARE)  # 50
-MAIN_TARGET = REBUILD_SIZE - RANDOM_TARGET        # 450
+RATE_CONTACTS_PRIORITY_OFFSET = 50
 
 # технический лимит для VALUES, чтобы не взрывать SQL строкой на десятки тысяч пар
 PAIRS_SQL_CHUNK = 2000
@@ -214,17 +212,17 @@ def cbq_reset_cache() -> None:
 # -------------------------
 # rate_contacts <1000 priority
 # -------------------------
-def _task_has_1001_row(task_id: int) -> bool:
+def _task_has_priority_row(task_id: int) -> bool:
     row = fetch_one(
         """
         SELECT 1
         FROM rate_contacts
         WHERE task_id = %s
         ORDER BY contact_id ASC
-        OFFSET 50
+        OFFSET %s
         LIMIT 1
         """,
-        (task_id,),
+        (task_id, RATE_CONTACTS_PRIORITY_OFFSET),
     )
     return bool(row)
 
@@ -468,15 +466,15 @@ def _rebuild_queue_500(token: str, last_renew: float) -> Tuple[List[QueueItem], 
     underdone_ids: List[int] = []
     for task_id in active_task_ids:
         last_renew = _lock_renew_if_needed(token, last_renew)
-        if not _task_has_1001_row(task_id):
+        if not _task_has_priority_row(task_id):
             underdone_ids.append(task_id)
 
     # 4) mode
     if underdone_ids:
-        mode = "A_UNDERDONE_LT_1000"
+        mode = f"A_UNDERDONE_LT_{RATE_CONTACTS_PRIORITY_OFFSET+1}"
         target_ids = underdone_ids
     else:
-        mode = "B_FAIR_ALL_GE_1000"
+        mode = f"B_FAIR_ALL_GE_{RATE_CONTACTS_PRIORITY_OFFSET+1}"
         target_ids = active_task_ids
 
     print(f"[cbq] rebuild: mode={mode} target_tasks={len(target_ids)}")
@@ -534,12 +532,6 @@ def worker_run_once() -> None:
     print(f"[cbq] pop cb_crawler_id={item.cb_crawler_id} plz={item.plz} branch={item.branch_slug}")
     _run_spider(cb_crawler_id=item.cb_crawler_id, plz=item.plz, branch_slug=item.branch_slug)
 
-
-# -------------------------
-# external: mark collected (as before)
-# -------------------------
-def cb_mark_tasks_collected() -> None:
-    pass
 
 
 if __name__ == "__main__":

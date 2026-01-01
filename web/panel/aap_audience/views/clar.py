@@ -29,8 +29,9 @@ def _get_tasks(request):
     if not ws_id or not getattr(user, "is_authenticated", False):
         return AudienceTask.objects.none()
     return (
-        AudienceTask.objects.filter(workspace_id=ws_id, user=user)
-        .order_by("-created_at")[:50]
+        AudienceTask.objects
+        .filter(workspace_id=ws_id, user=user, archived=False)
+        .order_by("-created_at")
     )
 
 

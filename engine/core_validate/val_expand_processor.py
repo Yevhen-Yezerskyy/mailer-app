@@ -264,7 +264,7 @@ def run_once() -> None:
         else:
             inserted = 0
 
-        fully_collected = (not has_not_collected_any) and (total_rows_any > 0)
+        fully_collected = (not has_not_collected_any)
 
         _p(
             f"task_id={task_id} score={score} "
@@ -376,7 +376,7 @@ def mark_collected_once() -> None:
                 if has_not_collected:
                     has_not_collected_any = True
 
-            fully_collected = (not has_not_collected_any) and (total_rows_any > 0)
+            fully_collected = (not has_not_collected_any)
             if not fully_collected:
                 _set_cursor_score(epoch, task_id, score)
                 stop_found = True

@@ -103,7 +103,11 @@ def _get_tasks(request):
     user = request.user
     if not ws_id or not getattr(user, "is_authenticated", False):
         return AudienceTask.objects.none()
-    return AudienceTask.objects.filter(workspace_id=ws_id, user=user).order_by("-created_at")[:50]
+    return (
+        AudienceTask.objects
+        .filter(workspace_id=ws_id, user=user, archived=False)
+        .order_by("-created_at")
+    )
 
 
 def _with_ui_ids(tasks):
@@ -417,7 +421,7 @@ def how_view(request):
     if state not in ("how", "add", "edit"):
         return _canonical_redirect(request)
 
-    # --- DELETE guard (для how/edit одинаково) ---
+    # --- DELETE guard (soft archive) ---
     if request.method == "POST" and request.POST.get("action") == "delete":
         post_id = (request.POST.get("id") or "").strip()
         if post_id and not request.GET.get("id"):
@@ -433,7 +437,14 @@ def how_view(request):
         ws_id = request.workspace_id
         user = request.user
         if ws_id and getattr(user, "is_authenticated", False):
-            AudienceTask.objects.filter(id=pk, workspace_id=ws_id, user=user).delete()
+            AudienceTask.objects.filter(
+                id=pk,
+                workspace_id=ws_id,
+                user=user,
+            ).update(
+                archived=True,
+                run_processing=False,
+            )
 
         return redirect(request.get_full_path())
     # --- /DELETE guard ---

@@ -5,7 +5,7 @@
 # - cb_mark_tasks_collected: раз в 2 часа выставляет aap_audience_audiencetask.collected=true
 
 from engine.common.worker import Worker
-from engine.crawler.fetch_gs_cb import cb_mark_tasks_collected, cbq_reset_cache, worker_run_once
+from engine.crawler.fetch_gs_cb import cbq_reset_cache, worker_run_once
 
 TASK_TIMEOUT_SEC = 900  # 15 минут
 
@@ -35,16 +35,6 @@ def main() -> None:
         singleton=True,
         heavy=False,
         priority=90,
-    )
-
-    w.register(
-        name="cb_mark_tasks_collected",
-        fn=cb_mark_tasks_collected,
-        every_sec=7200,  # 2 часа
-        timeout_sec=600,
-        singleton=True,
-        heavy=False,
-        priority=80,
     )
 
     w.run_forever()

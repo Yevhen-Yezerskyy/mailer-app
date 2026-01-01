@@ -1,6 +1,5 @@
 # FILE: web/panel/aap_audience/models.py
-# DATE: 2025-12-21
-# ADD: поле type (buy/sell) для AudienceTask
+# DATE: 2026-01-01
 
 from django.conf import settings
 from django.db import models
@@ -21,6 +20,8 @@ class AudienceTask(models.Model):
         choices=[("buy", "buy"), ("sell", "sell")],
         default="sell",
     )
+
+    archived = models.BooleanField(default=False)  # NEW
 
     run_processing = models.BooleanField(default=False)
     subscribers_limit = models.IntegerField(default=1000)
