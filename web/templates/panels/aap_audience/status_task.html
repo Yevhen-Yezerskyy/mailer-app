@@ -59,7 +59,7 @@
 
             <form method="post">
               {% csrf_token %}
-              <button type="submit" name="action" value="rating_start_contacts" class="YY-BUTTON_MAIN">
+              <button type="submit" name="action" value="rating_start_contacts" class="YY-BUTTON_MAIN w-full">
                 {% trans "Начать рейтингование" %}
               </button>
             </form>
@@ -77,7 +77,7 @@
                   {% trans "Провести повторное рейтингование" %}
                 </button>
               </form>
-            {% else %}
+                {% else %}
               <div class="YY-STATUS_GREEN w-full mb-2">
                 {% trans "Рейтингование завершено" %}
               </div>
@@ -223,7 +223,7 @@
                       <td class="YY-TB_TD">{{ it.address_first }}</td>
                       <td class="YY-TB_TD">{{ it.rate_cb_100 }}</td>
                       <td class="YY-TB_TD">
-                        <td class="YY-TB_TD">
+                      <td class="YY-TB_TD">
                           <a href="#"
                             class="YY-BUTTON_TAB_MAIN"
                             data-yy-modal="url=/panel/audience/status/task/modal/?id={{ it.ui_id }}">

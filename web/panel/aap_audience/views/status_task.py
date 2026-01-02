@@ -1,9 +1,10 @@
 # FILE: web/panel/aap_audience/views/status_task.py
 # DATE: 2026-01-02
 # CHANGE:
-# - rows для нижних таблиц: добавлен ui_id = encode_id(rate_contacts.id)
-# - SELECT: добавлен rc.id AS rate_contact_id
-# - остальное не трогал
+# - восстановлена логика правой верхней карточки: rating_any_exists / rating_active_exists / criteria_changed
+# - добавлены buckets 1-30/31-70/71-100 + проценты
+# - сохранена модалка: ui_id = encode_id(rate_contacts.id) в нижних таблицах
+# - остальное (таблицы rated/all + paging) без лишних изменений
 
 from __future__ import annotations
 
@@ -36,6 +37,12 @@ def _qall(sql: str, params: list[Any]) -> list[dict]:
         return [dict(zip(cols, r)) for r in cur.fetchall()]
 
 
+def _pct(part: int, total: int) -> int:
+    if not total:
+        return 0
+    return int(round((int(part) * 100.0) / float(int(total))))
+
+
 def _format_contact_rows(rows: list[dict]) -> list[dict]:
     out = []
     for r in rows:
@@ -43,7 +50,7 @@ def _format_contact_rows(rows: list[dict]) -> list[dict]:
         addr_list = r.get("address_list") or []
         out.append(
             {
-                "ui_id": encode_id(int(r.get("rate_contact_id") or 0)),  # NEW: для модалки
+                "ui_id": encode_id(int(r.get("rate_contact_id") or 0)),  # для модалки (rate_contacts.id)
                 "contact_id": int(r.get("contact_id") or 0),
                 "company_name": (r.get("company_name") or "").strip(),
                 "branches_str": ", ".join(str(x) for x in branches)
@@ -59,13 +66,17 @@ def _format_contact_rows(rows: list[dict]) -> list[dict]:
     return out
 
 
-def _fetch_contacts_stats(task_id: int) -> tuple[int, int]:
+def _fetch_contacts_total_and_rated(task_id: int) -> tuple[int, int]:
+    # rated = rate_cl NOT NULL + валидный hash_task
     sql = """
         SELECT
             COUNT(*)::int AS total_cnt,
             SUM(
                 CASE
-                    WHEN rate_cl IS NOT NULL AND hash_task IS NOT NULL THEN 1
+                    WHEN rate_cl IS NOT NULL
+                     AND hash_task IS NOT NULL
+                     AND hash_task NOT IN (-1,0,1)
+                    THEN 1
                     ELSE 0
                 END
             )::int AS rated_cnt
@@ -80,6 +91,24 @@ def _fetch_contacts_stats(task_id: int) -> tuple[int, int]:
         return int(row[0] or 0), int(row[1] or 0)
 
 
+def _fetch_rated_buckets(task_id: int) -> tuple[int, int, int]:
+    sql = """
+        SELECT
+            SUM(CASE WHEN rate_cl BETWEEN 1 AND 30 THEN 1 ELSE 0 END)::int AS c1,
+            SUM(CASE WHEN rate_cl BETWEEN 31 AND 70 THEN 1 ELSE 0 END)::int AS c2,
+            SUM(CASE WHEN rate_cl BETWEEN 71 AND 100 THEN 1 ELSE 0 END)::int AS c3
+        FROM public.rate_contacts
+        WHERE task_id = %s
+          AND rate_cl IS NOT NULL
+          AND hash_task IS NOT NULL
+          AND hash_task NOT IN (-1,0,1)
+    """
+    with connection.cursor() as cur:
+        cur.execute(sql, [int(task_id)])
+        row = cur.fetchone() or (0, 0, 0)
+        return int(row[0] or 0), int(row[1] or 0), int(row[2] or 0)
+
+
 def _fetch_contacts_rated(task_id: int, *, page: int) -> tuple[int, list[dict]]:
     with connection.cursor() as cur:
         cur.execute(
@@ -89,6 +118,7 @@ def _fetch_contacts_rated(task_id: int, *, page: int) -> tuple[int, list[dict]]:
             WHERE rc.task_id = %s
               AND rc.rate_cl IS NOT NULL
               AND rc.hash_task IS NOT NULL
+              AND rc.hash_task NOT IN (-1,0,1)
             """,
             [int(task_id)],
         )
@@ -98,7 +128,7 @@ def _fetch_contacts_rated(task_id: int, *, page: int) -> tuple[int, list[dict]]:
     rows = _qall(
         """
         SELECT
-            rc.id AS rate_contact_id,  -- NEW
+            rc.id AS rate_contact_id,
             rc.contact_id,
             rca.company_name,
             rca.branches,
@@ -110,6 +140,7 @@ def _fetch_contacts_rated(task_id: int, *, page: int) -> tuple[int, list[dict]]:
         WHERE rc.task_id = %s
           AND rc.rate_cl IS NOT NULL
           AND rc.hash_task IS NOT NULL
+          AND rc.hash_task NOT IN (-1,0,1)
         ORDER BY rc.rate_cl ASC, rc.contact_id ASC
         LIMIT %s OFFSET %s
         """,
@@ -134,7 +165,7 @@ def _fetch_contacts_all(task_id: int, *, page: int) -> tuple[int, list[dict]]:
     rows = _qall(
         """
         SELECT
-            rc.id AS rate_contact_id,  -- NEW
+            rc.id AS rate_contact_id,
             rc.contact_id,
             rca.company_name,
             rca.branches,
@@ -152,20 +183,63 @@ def _fetch_contacts_all(task_id: int, *, page: int) -> tuple[int, list[dict]]:
     return total, _format_contact_rows(rows)
 
 
-def _contacts_rating_exists(task_id: int) -> bool:
+def _rating_any_exists(task_id: int) -> bool:
     with connection.cursor() as cur:
         cur.execute(
             """
             SELECT 1
             FROM public.__tasks_rating
             WHERE task_id = %s
-              AND type = 'contacts'
+              AND type IN ('contacts','contacts_update')
+            LIMIT 1
+            """,
+            [int(task_id)],
+        )
+        return cur.fetchone() is not None
+
+
+def _rating_active_exists(task_id: int) -> bool:
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT 1
+            FROM public.__tasks_rating
+            WHERE task_id = %s
+              AND type IN ('contacts','contacts_update')
               AND done = false
             LIMIT 1
             """,
             [int(task_id)],
         )
         return cur.fetchone() is not None
+
+
+def _criteria_changed(task_id: int, current_hash: int) -> bool:
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT 1
+            FROM public.rate_contacts
+            WHERE task_id = %s
+              AND hash_task IS NOT NULL
+              AND hash_task NOT IN (-1,0,1)
+              AND hash_task IS DISTINCT FROM %s
+            LIMIT 1
+            """,
+            [int(task_id), int(current_hash)],
+        )
+        return cur.fetchone() is not None
+
+
+def _rating_insert(task_id: int, type_: str, hash_task: int) -> None:
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO public.__tasks_rating (task_id, type, hash_task, done, created_at, updated_at)
+            VALUES (%s, %s, %s, false, now(), now())
+            """,
+            [int(task_id), str(type_), int(hash_task)],
+        )
 
 
 def status_task_view(request):
@@ -179,27 +253,44 @@ def status_task_view(request):
     if not ws_id or not getattr(user, "is_authenticated", False):
         return HttpResponseRedirect("../")
 
-    try:
-        t = AudienceTask.objects.get(id=pk, workspace_id=ws_id, user=user)
-    except Exception:
+    task = AudienceTask.objects.filter(id=pk, workspace_id=ws_id, user=user).first()
+    if task is None:
         return HttpResponseRedirect("../")
 
-    t.ui_id = encode_id(int(t.id))
+    task.ui_id = encode_id(int(task.id))
+    current_hash = int(h64_text((task.task or "") + (task.task_client or "")))
 
-    if request.method == "POST" and request.POST.get("action") == "start_contacts":
-        if not _contacts_rating_exists(int(t.id)):
-            hash_task = int(h64_text((t.task or "") + (t.task_client or "")))
-            with connection.cursor() as cur:
-                cur.execute(
-                    """
-                    INSERT INTO public.__tasks_rating (task_id, type, hash_task, done, created_at, updated_at)
-                    VALUES (%s, 'contacts', %s, false, now(), now())
-                    """,
-                    [int(t.id), int(hash_task)],
+    # actions (правая верхняя карточка)
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "rating_start_contacts":
+            if (not _rating_any_exists(int(task.id))) and (not _rating_active_exists(int(task.id))):
+                _rating_insert(int(task.id), "contacts", current_hash)
+            return redirect(f"{request.path}?id={task.ui_id}")
+
+        if action == "rating_next_1000":
+            if _rating_any_exists(int(task.id)) and (not _rating_active_exists(int(task.id))):
+                AudienceTask.objects.filter(id=task.id, workspace_id=ws_id, user=user).update(
+                    subscribers_limit=int(task.subscribers_limit or 0) + 1000
                 )
-        return redirect(f"{request.path}?id={t.ui_id}")
+                _rating_insert(int(task.id), "contacts", current_hash)
+            return redirect(f"{request.path}?id={task.ui_id}")
 
-    contacts_total, contacts_rated = _fetch_contacts_stats(int(t.id))
+        if action == "rating_start_contacts_update":
+            if not _rating_active_exists(int(task.id)):
+                _rating_insert(int(task.id), "contacts_update", current_hash)
+            return redirect(f"{request.path}?id={task.ui_id}")
+
+    contacts_total, contacts_rated = _fetch_contacts_total_and_rated(int(task.id))
+
+    rated_1_30_cnt = rated_31_70_cnt = rated_71_100_cnt = 0
+    rated_1_30_pct = rated_31_70_pct = rated_71_100_pct = 0
+    if contacts_rated > 0:
+        rated_1_30_cnt, rated_31_70_cnt, rated_71_100_cnt = _fetch_rated_buckets(int(task.id))
+        rated_1_30_pct = _pct(rated_1_30_cnt, contacts_rated)
+        rated_31_70_pct = _pct(rated_31_70_cnt, contacts_rated)
+        rated_71_100_pct = _pct(rated_71_100_cnt, contacts_rated)
 
     tab = (request.GET.get("tab") or "rated").strip()
     if tab not in ("rated", "all"):
@@ -208,19 +299,31 @@ def status_task_view(request):
     rated_page = _safe_int(request.GET.get("p_rated"), 1)
     all_page = _safe_int(request.GET.get("p_all"), 1)
 
-    rated_count, rated_rows = _fetch_contacts_rated(int(t.id), page=rated_page)
-    all_count, all_rows = _fetch_contacts_all(int(t.id), page=all_page)
+    rated_count, rated_rows = _fetch_contacts_rated(int(task.id), page=rated_page)
+    all_count, all_rows = _fetch_contacts_all(int(task.id), page=all_page)
 
-    contacts_rating_exists = _contacts_rating_exists(int(t.id))
+    rating_any_exists = _rating_any_exists(int(task.id))
+    rating_active_exists = _rating_active_exists(int(task.id))
+    criteria_changed = False
+    if (not rating_active_exists) and rating_any_exists:
+        criteria_changed = _criteria_changed(int(task.id), current_hash)
 
     return render(
         request,
         "panels/aap_audience/status_task.html",
         {
-            "t": t,
+            "t": task,
             "contacts_total": contacts_total,
             "contacts_rated": contacts_rated,
-            "contacts_rating_exists": contacts_rating_exists,
+            "rated_1_30_cnt": rated_1_30_cnt,
+            "rated_31_70_cnt": rated_31_70_cnt,
+            "rated_71_100_cnt": rated_71_100_cnt,
+            "rated_1_30_pct": rated_1_30_pct,
+            "rated_31_70_pct": rated_31_70_pct,
+            "rated_71_100_pct": rated_71_100_pct,
+            "rating_any_exists": rating_any_exists,
+            "rating_active_exists": rating_active_exists,
+            "criteria_changed": criteria_changed,
             "tab": tab,
             "rated_rows": rated_rows,
             "all_rows": all_rows,
