@@ -1,8 +1,8 @@
-<!-- FILE: web/templates/panels/aap_audience/status.html -->
-<!-- DATE: 2025-12-29 -->
-
 {% extends "panels/base.html" %}
 {% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/status.html -->
+<!-- DATE: 2026-01-01 -->
+<!-- CHANGE: колонка "Статус" — активный rating + синий rated + buckets + criteria_changed -->
 
 {% block content %}
 
@@ -86,16 +86,42 @@
                       </div>
                     </div>
                   </td>
-                  
+
                   <td class="YY-TB_TD">
 
-                    <div class="YY-STATUS_GREEN w-full mb-2">
+                    {% if t.rating_active %}
+                      <div class="YY-STATUS_YELLOW w-full mb-6">
+                        {% trans "Рейтингование запущено" %}
+                      </div>
+                    {% endif %}
+
+                    <div class="YY-STATUS_BLUE w-full mb-1">
                       {% trans "Контакты: присвоен рейтинг" %}: {{ t.contacts_rated }}
                     </div>
 
-                    <div class="YY-STATUS_GRAY w-full mb-12">
+                    {% if t.contacts_rated > 0 %}
+                      <div class="YY-STATUS_GREEN mb-1">
+                        - {% trans "Рейтинг 1-30" %}: {{ t.rated_1_30_cnt }} ({{ t.rated_1_30_pct }}%)
+                      </div>
+
+                      <div class="YY-STATUS_YELLOW mb-1">
+                        - {% trans "Рейтинг 31-70" %}: {{ t.rated_31_70_cnt }} ({{ t.rated_31_70_pct }}%)
+                      </div>
+
+                      <div class="YY-STATUS_GRAY mb-1">
+                        - {% trans "Рейтинг 71-100" %}: {{ t.rated_71_100_cnt }} ({{ t.rated_71_100_pct }}%)
+                      </div>
+                    {% endif %}
+
+                    <div class="YY-STATUS_GRAY mb-6 mt-6">
                       {% trans "Всего собрано контактов" %}: {{ t.contacts_total }}
                     </div>
+
+                    {% if t.criteria_changed %}
+                      <div class="YY-STATUS_YELLOW mb-6">
+                        {% trans "Критерии оценки изменены" %}
+                      </div>
+                    {% endif %}
 
                     <a href="task/?id={{ t.ui_id }}"
                        class="YY-BUTTON_TAB_MAIN">

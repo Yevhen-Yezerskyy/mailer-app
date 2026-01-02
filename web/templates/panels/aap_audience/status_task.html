@@ -1,10 +1,6 @@
 <!-- FILE: web/templates/panels/aap_audience/status_task.html -->
-<!-- DATE: 2025-12-29 -->
-<!-- Смысл:
-- Стандартная разметка как в how.html
-- Верхняя таблица: две колонки (Колонка 1 / Колонка 2)
-- Нижняя таблица: заглушка "тут будет таблица"
--->
+<!-- DATE: 2026-01-01 -->
+<!-- CHANGE: правый верхний блок — новая логика статусов/кнопок rating contacts -->
 
 {% extends "panels/base.html" %}
 {% load i18n %}
@@ -17,29 +13,27 @@
     <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
       <div class="YY-CARD_WHITE">
         {% if t.type == "sell" %}
-          <div class="YY-STATUS_GREEN mb-2">
-              {% trans "Поиск клиентов" %}
+          <div class="YY-STATUS_GREEN mb-8">
+              {% trans "Поиск клиентов" %}:<br>
+              {{ t.title }}
           </div>
         {% else %}
-          <div class="YY-STATUS_YELLOW mb-2">
-              {% trans "Поиск поставщиков / подрядчиков" %}
+          <div class="YY-STATUS_YELLOW mb-8">
+              {% trans "Поиск поставщиков / подрядчиков" %}:<br>
+              {{ t.title }}    
         </div>
         {% endif %}
 
-         <div class="YY-LABEL mb-12">
-          {{ t.title }}
-         </div>
-
-        <div class="YY-STATUS_GREEN w-full mb-2">
+        <div class="YY-STATUS_BLUE mb-2">
           {% trans "Контакты: присвоен рейтинг" %}: {{ contacts_rated }}
         </div>
 
-        <div class="YY-STATUS_GRAY w-full mb-2">
+        <div class="YY-STATUS_GRAY mb-2">
           {% trans "Всего собрано контактов" %}: {{ contacts_total }}
         </div>
 
-        <div class="YY-STATUS_YELLOW w-full mb-12">
-          {% trans "Ограничение на рейтингование" %}: {{ t.subscribers_limit }}
+        <div class="YY-STATUS_YELLOW mb-8">
+          {% trans "Контактов к рейтингованию" %}: {{ t.subscribers_limit }}
         </div>
 
         <a href="../" class="YY-BUTTON_MAIN">
@@ -52,22 +46,70 @@
     <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
       <div class="YY-CARD_WHITE">
 
-          {% if not contacts_rating_exists %}
-            <div class="YY-STATUS_YELLOW w-full mb-2">
-              {% trans "Рейтингование контактов не запущено" %}
+          {% if rating_active_exists %}
+            <div class="YY-STATUS_YELLOW mb-8">
+              {% trans "Рейтингование контактов запущено" %}
+            </div>
+          {% else %}
+
+          {% if not rating_any_exists %}
+            <div class="YY-STATUS_GRAY mb-2">
+              {% trans "Рейтингование не начато" %}
             </div>
 
             <form method="post">
               {% csrf_token %}
-              <button type="submit" name="action" value="rating_start_contacts" class="YY-BUTTON_MAIN w-full">
-                {% trans "Запустить рейтингование" %}
+              <button type="submit" name="action" value="rating_start_contacts" class="YY-BUTTON_MAIN">
+                {% trans "Начать рейтингование" %}
               </button>
             </form>
+
           {% else %}
-            <div class="YY-STATUS_GREEN w-full mb-2">
-              {% trans "Рейтингование контактов запущено" %}
-            </div>
+
+            {% if criteria_changed %}
+              <div class="YY-STATUS_YELLOW mb-2">
+                {% trans "Критерии оценки изменены" %}
+              </div>
+
+              <form method="post">
+                {% csrf_token %}
+                <button type="submit" name="action" value="rating_start_contacts_update" class="YY-BUTTON_MAIN w-full">
+                  {% trans "Провести повторное рейтингование" %}
+                </button>
+              </form>
+            {% else %}
+              <div class="YY-STATUS_GREEN w-full mb-2">
+                {% trans "Рейтингование завершено" %}
+              </div>
+
+              <form method="post">
+                {% csrf_token %}
+                <button type="submit" name="action" value="rating_next_1000" class="YY-BUTTON_MAIN w-full">
+                  {% trans "Рейтинговать следуюющую 1 000" %}
+                </button>
+              </form>
+            {% endif %}
+
           {% endif %}
+        {% endif %}
+
+          <div class="YY-STATUS_BLUE w-full mb-1 mt-8">
+            {% trans "Контакты: присвоен рейтинг" %}: {{ contacts_rated }}
+          </div>
+
+          {% if contacts_rated|default:0|add:0 > 0 %}
+            <div class="YY-STATUS_GREEN w-full mb-1">
+              - {% trans "Рейтинг 1-30" %}: {{ rated_1_30_cnt }} ({{ rated_1_30_pct }}%)
+            </div>
+
+            <div class="YY-STATUS_YELLOW w-full mb-1">
+              - {% trans "Рейтинг 31-70" %}: {{ rated_31_70_cnt }} ({{ rated_31_70_pct }}%)
+            </div>
+
+            <div class="YY-STATUS_GRAY w-full mb-1">
+              - {% trans "Рейтинг 71-100" %}: {{ rated_71_100_cnt }} ({{ rated_71_100_pct }}%)
+            </div>
+          {% endif %}        
 
       </div>
     </td>
@@ -123,7 +165,11 @@
                       <td class="YY-TB_TD">{{ it.rate_cb_100 }}</td>
                       <td class="YY-TB_TD">{{ it.rate_cl }}</td>
                       <td class="YY-TB_TD">
-                        <a href="#" class="YY-BUTTON_TAB_MAIN">{% trans "Смотреть" %}</a>
+                        <a href="#"
+                          class="YY-BUTTON_TAB_MAIN"
+                          data-yy-modal="url=/panel/audience/status/task/modal/?id={{ it.ui_id }}">
+                          {% trans "Смотреть" %}
+                        </a>                        
                       </td>
                     </tr>
                   {% endfor %}
@@ -177,7 +223,12 @@
                       <td class="YY-TB_TD">{{ it.address_first }}</td>
                       <td class="YY-TB_TD">{{ it.rate_cb_100 }}</td>
                       <td class="YY-TB_TD">
-                        <a href="#" class="YY-BUTTON_TAB_MAIN">{% trans "Смотреть" %}</a>
+                        <td class="YY-TB_TD">
+                          <a href="#"
+                            class="YY-BUTTON_TAB_MAIN"
+                            data-yy-modal="url=/panel/audience/status/task/modal/?id={{ it.ui_id }}">
+                            {% trans "Смотреть" %}
+                          </a>
                       </td>
                     </tr>
                   {% endfor %}
@@ -212,22 +263,6 @@
           </div>
         </div>
         </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
       </div>
     </td>

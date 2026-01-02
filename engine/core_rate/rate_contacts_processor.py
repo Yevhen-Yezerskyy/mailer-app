@@ -1,9 +1,5 @@
 # FILE: engine/core_rate/rate_contacts_processor.py  (новое — 2025-12-29)
-# Смысл:
-# - Worker-процессор для rate_contacts:
-#   - rate_contacts_once: часто, по 1 батчу
-#   - rate_contacts_done_scan: раз в 2 минуты закрывает done
-#   - rate_contacts_reset_cache: раз в 10 минут очищает tasks-queue (entities по TTL)
+
 
 from engine.common.worker import Worker
 from engine.core_rate.rate_contacts import (

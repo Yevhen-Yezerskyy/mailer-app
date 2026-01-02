@@ -1,10 +1,9 @@
-# FILE: web/panel/aap_audience/views/status_task.py  (обновлено — 2025-12-29)
-# Смысл:
-# - Страница статуса одной AudienceTask (по obfuscated id)
-# - Верх: счётчики из rate_contacts (total / rated)
-# - Низ: 2 вкладки с таблицами контактов (rated/all) + paging
-# - Правая верхняя карточка: запуск rating contacts через public.__tasks_rating (type='contacts')
-#   hash_task = h64_text(task + task_client) как в clar.py
+# FILE: web/panel/aap_audience/views/status_task.py
+# DATE: 2026-01-02
+# CHANGE:
+# - rows для нижних таблиц: добавлен ui_id = encode_id(rate_contacts.id)
+# - SELECT: добавлен rc.id AS rate_contact_id
+# - остальное не трогал
 
 from __future__ import annotations
 
@@ -44,6 +43,7 @@ def _format_contact_rows(rows: list[dict]) -> list[dict]:
         addr_list = r.get("address_list") or []
         out.append(
             {
+                "ui_id": encode_id(int(r.get("rate_contact_id") or 0)),  # NEW: для модалки
                 "contact_id": int(r.get("contact_id") or 0),
                 "company_name": (r.get("company_name") or "").strip(),
                 "branches_str": ", ".join(str(x) for x in branches)
@@ -98,6 +98,7 @@ def _fetch_contacts_rated(task_id: int, *, page: int) -> tuple[int, list[dict]]:
     rows = _qall(
         """
         SELECT
+            rc.id AS rate_contact_id,  -- NEW
             rc.contact_id,
             rca.company_name,
             rca.branches,
@@ -133,6 +134,7 @@ def _fetch_contacts_all(task_id: int, *, page: int) -> tuple[int, list[dict]]:
     rows = _qall(
         """
         SELECT
+            rc.id AS rate_contact_id,  -- NEW
             rc.contact_id,
             rca.company_name,
             rca.branches,
@@ -158,22 +160,12 @@ def _contacts_rating_exists(task_id: int) -> bool:
             FROM public.__tasks_rating
             WHERE task_id = %s
               AND type = 'contacts'
+              AND done = false
             LIMIT 1
             """,
             [int(task_id)],
         )
         return cur.fetchone() is not None
-
-
-def _contacts_rating_insert(task_id: int, hash_task: int) -> None:
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            INSERT INTO public.__tasks_rating (task_id, type, hash_task, done, created_at, updated_at)
-            VALUES (%s, 'contacts', %s, false, now(), now())
-            """,
-            [int(task_id), int(hash_task)],
-        )
 
 
 def status_task_view(request):
@@ -194,13 +186,18 @@ def status_task_view(request):
 
     t.ui_id = encode_id(int(t.id))
 
-    # --- start contacts rating ---
-    if request.method == "POST" and (request.POST.get("action") or "").strip() == "rating_start_contacts":
+    if request.method == "POST" and request.POST.get("action") == "start_contacts":
         if not _contacts_rating_exists(int(t.id)):
-            hash_contacts = h64_text((t.task or "") + (t.task_client or ""))
-            _contacts_rating_insert(int(t.id), int(hash_contacts))
+            hash_task = int(h64_text((t.task or "") + (t.task_client or "")))
+            with connection.cursor() as cur:
+                cur.execute(
+                    """
+                    INSERT INTO public.__tasks_rating (task_id, type, hash_task, done, created_at, updated_at)
+                    VALUES (%s, 'contacts', %s, false, now(), now())
+                    """,
+                    [int(t.id), int(hash_task)],
+                )
         return redirect(f"{request.path}?id={t.ui_id}")
-    # --- /start contacts rating ---
 
     contacts_total, contacts_rated = _fetch_contacts_stats(int(t.id))
 

@@ -1,0 +1,30 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/modal_status_task.html -->
+<!-- DATE: 2026-01-02 -->
+<!-- NEW: модалка company_data по rate_contacts.id -->
+
+<div class="YY-CARD_WHITE">
+
+  {% if status == "done" %}
+    <div class="YY-LABEL mb-3">
+      {{ company_name|default:"" }}
+    </div>
+
+    <div class="flex gap-3 mb-4">
+      <div class="YY-STATUS_GREEN">
+        {% trans "CL" %}: {{ rate_cl|default:"-" }}
+      </div>
+      <div class="YY-STATUS_GRAY">
+        {% trans "CB" %}: {{ rate_cb|default:"-" }}
+      </div>
+    </div>
+
+    <pre class="w-full text-xs bg-white border border-[#71d0f4] rounded-lg p-3 overflow-auto"
+         style="max-height: 70vh; white-space: pre-wrap; word-break: break-word;">{{ company_json }}</pre>
+  {% else %}
+    <div class="YY-STATUS_GRAY w-full">
+      {% trans "Здесь пока нет данных" %}
+    </div>
+  {% endif %}
+
+</div>

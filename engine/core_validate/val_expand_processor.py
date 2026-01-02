@@ -1,4 +1,6 @@
-# FILE: engine/core_validate/val_expand_processor.py
+# FILE: engine/core_validate/val_expand_processor.py  (обновлено — 2026-01-02)
+# Смысл: (1) _build_score_groups без полного перебора (точный top WINDOW_LIMIT по (score, city_id, branch_id));
+#        (2) убраны тяжёлые агрегаты в cb_crawler (array_agg/bool_or/count) — вместо них быстрый LIMIT 1 по collected=false + SELECT id по collected=true.
 
 from __future__ import annotations
 
@@ -110,29 +112,71 @@ def _build_score_groups(task_id: int) -> List[Tuple[int, List[Tuple[int, int]]]]
         (task_id,),
     )
 
-    city_rate: Dict[int, int] = {int(cid): int(rate) for (cid, rate) in cities}
-    branch_rate: Dict[int, int] = {int(bid): int(rate) for (bid, rate) in branches}
+    if not cities or not branches:
+        return []
 
-    # Топ WINDOW_LIMIT пар с минимальным score, без полной сортировки 1M элементов
-    top = heapq.nsmallest(
-        WINDOW_LIMIT,
-        (
-            (cr * br, city_id, branch_id)
-            for city_id, cr in city_rate.items()
-            for branch_id, br in branch_rate.items()
-        ),
-    )
+    # Отсортированные списки (как и раньше через ORDER BY).
+    C: List[Tuple[int, int]] = [(int(rate), int(cid)) for (cid, rate) in cities]  # (cr, city_id)
+    B: List[Tuple[int, int]] = [(int(rate), int(bid)) for (bid, rate) in branches]  # (br, branch_id)
+
+    # Чтобы heap был меньше, внешнюю ось берём по меньшему списку.
+    # ВАЖНО: heap-ключ всегда (score, city_id, branch_id) => идентично heapq.nsmallest по tuples.
+    outer_is_branch = len(B) <= len(C)
+    outer = B if outer_is_branch else C
+    inner = C if outer_is_branch else B
+
+    max_pairs = len(outer) * len(inner)
+    k_limit = WINDOW_LIMIT if WINDOW_LIMIT < max_pairs else max_pairs
+
+    # heap item: (score, city_id, branch_id, i, j)
+    h: List[Tuple[int, int, int, int, int]] = []
+
+    # Инициализация: для каждого outer берём j=0.
+    for i, (orate, oid) in enumerate(outer):
+        irate0, iid0 = inner[0]
+
+        if outer_is_branch:
+            city_id = int(iid0)
+            branch_id = int(oid)
+            score = int(orate) * int(irate0)
+        else:
+            city_id = int(oid)
+            branch_id = int(iid0)
+            score = int(orate) * int(irate0)
+
+        heapq.heappush(h, (score, city_id, branch_id, i, 0))
 
     groups: Dict[int, List[Tuple[int, int]]] = {}
-    for score, city_id, branch_id in top:
+    for _ in range(k_limit):
+        if not h:
+            break
+
+        score, city_id, branch_id, i, j = heapq.heappop(h)
         groups.setdefault(int(score), []).append((int(city_id), int(branch_id)))
+
+        j2 = j + 1
+        if j2 < len(inner):
+            orate, oid = outer[i]
+            irate2, iid2 = inner[j2]
+
+            if outer_is_branch:
+                city_id2 = int(iid2)
+                branch_id2 = int(oid)
+                score2 = int(orate) * int(irate2)
+            else:
+                city_id2 = int(oid)
+                branch_id2 = int(iid2)
+                score2 = int(orate) * int(irate2)
+
+            heapq.heappush(h, (score2, city_id2, branch_id2, i, j2))
 
     out: List[Tuple[int, List[Tuple[int, int]]]] = []
     for score in sorted(groups.keys()):
         pairs = groups[score]
         pairs.sort(key=lambda x: (x[0], x[1]))
-        out.append((score, pairs))
+        out.append((int(score), pairs))
     return out
+
 
 def _start_index_by_score(groups: List[Tuple[int, List[Tuple[int, int]]]], score: Optional[int]) -> int:
     if score is None:
@@ -213,33 +257,37 @@ def run_once() -> None:
                 params.append(int(city_id))
                 params.append(int(branch_id))
 
-            row_cb = fetch_one(
+            # 2.1) stop-detection: проверяем collected=false (только чтобы понять fully_collected)
+            # ВАЖНО: НЕ прерываем сбор collected ids — иначе rate_contacts перестанет наполняться.
+            if not has_not_collected_any:
+                row_unc = fetch_one(
+                    f"""
+                    WITH pairs(city_id, branch_id) AS (VALUES {values_sql})
+                    SELECT 1
+                    FROM cb_crawler c
+                    JOIN pairs p ON p.city_id = c.city_id AND p.branch_id = c.branch_id
+                    WHERE c.collected = false
+                    LIMIT 1
+                    """,
+                    tuple(params),
+                )
+                if row_unc:
+                    has_not_collected_any = True
+
+            # 2.2) collected ids (без array_agg — просто строки)
+            rows_ids = fetch_all(
                 f"""
                 WITH pairs(city_id, branch_id) AS (VALUES {values_sql})
-                SELECT
-                    count(*)::int AS total_rows,
-                    array_agg(c.id) FILTER (WHERE c.collected = true)::bigint[] AS collected_ids,
-                    bool_or(c.collected = false) AS has_not_collected
+                SELECT c.id
                 FROM cb_crawler c
                 JOIN pairs p ON p.city_id = c.city_id AND p.branch_id = c.branch_id
+                WHERE c.collected = true
                 """,
                 tuple(params),
             )
-
-            if not row_cb:
-                continue
-
-            total_rows = int(row_cb[0]) if row_cb[0] is not None else 0
-            total_rows_any += total_rows
-
-            collected_ids = row_cb[1]
-            has_not_collected = bool(row_cb[2]) if row_cb[2] is not None else False
-
-            if has_not_collected:
-                has_not_collected_any = True
-
-            if collected_ids:
-                collected_ids_all.extend([int(x) for x in collected_ids])
+            if rows_ids:
+                collected_ids_all.extend([int(r[0]) for r in rows_ids])
+                total_rows_any += len(rows_ids)  # для лога (без тяжёлого count(*))
 
         # 3) вставляем collected=true (всегда, даже если группа не fully)
         if collected_ids_all:
@@ -277,8 +325,6 @@ def run_once() -> None:
             _set_cursor_score(epoch, task_id, score)
             _p(f"task_id={task_id} STOP on score={score} (not fully collected) -> cursor saved")
             return
-
-        continue
 
     _p(f"task_id={task_id} reached end of groups -> no stop point found")
 
@@ -355,26 +401,20 @@ def mark_collected_once() -> None:
                     params.append(int(city_id))
                     params.append(int(branch_id))
 
-                row_cb = fetch_one(
+                row_unc = fetch_one(
                     f"""
                     WITH pairs(city_id, branch_id) AS (VALUES {values_sql})
-                    SELECT
-                        count(*)::int AS total_rows,
-                        bool_or(c.collected = false) AS has_not_collected
+                    SELECT 1
                     FROM cb_crawler c
                     JOIN pairs p ON p.city_id = c.city_id AND p.branch_id = c.branch_id
+                    WHERE c.collected = false
+                    LIMIT 1
                     """,
                     tuple(params),
                 )
-                if not row_cb:
-                    continue
-
-                total_rows = int(row_cb[0]) if row_cb[0] is not None else 0
-                total_rows_any += total_rows
-
-                has_not_collected = bool(row_cb[1]) if row_cb[1] is not None else False
-                if has_not_collected:
+                if row_unc:
                     has_not_collected_any = True
+                    break  # дальше батчи этой score-группы уже не важны
 
             fully_collected = (not has_not_collected_any)
             if not fully_collected:

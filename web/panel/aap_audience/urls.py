@@ -1,5 +1,5 @@
-# FILE: web/panel/aap_audience/urls.py  (обновлено — 2025-12-29)
-# Смысл: добавлен URL для страницы статуса одной задачи (status_task)
+# FILE: web/panel/aap_audience/urls.py
+# DATE: 2026-01-02
 
 from django.urls import path
 from django.shortcuts import redirect
@@ -8,7 +8,8 @@ from .views.how import how_view
 from .views.clar import clar_view
 from .views.modal_clar import modal_clar_view
 from .views.status import status_view
-from .views.status_task import status_task_view  # новое
+from .views.status_task import status_task_view
+from .views.modal_status_task import modal_status_task_view  # NEW
 
 app_name = "audience"
 
@@ -20,5 +21,6 @@ urlpatterns = [
     path("clar/modal/", modal_clar_view, name="clar_modal"),
 
     path("status/", status_view, name="status"),
-    path("status/task/", status_task_view, name="status_task"),  # новое
+    path("status/task/", status_task_view, name="status_task"),
+    path("status/task/modal/", modal_status_task_view, name="status_task_modal"),  # NEW
 ]
