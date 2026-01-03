@@ -1,14 +1,16 @@
-# FILE: engine/common/cache/daemon.py  (обновлено — 2025-12-27)
-# Смысл: dev cache-daemon (RAM) по UNIX-socket рядом с модулем: TTL sliding, лимиты 128KB/obj и 50MB total,
-# GC до 60%, dump/restore рядом, watchdog 60s, alive-лог каждые 10s (evicted/expired/errors).
-# (новое — 2025-12-27)
-# - Добавлены lease-lock'и (координация воркеров): LOCK_TRY / LOCK_RENEW / LOCK_RELEASE / LOCK_STATUS
-# - Locks НЕ участвуют в dump/restore и НЕ учитываются в memory GC: это volatile coordination (TTL-only)
+# FILE: engine/common/cache/daemon.py  (обновлено — 2026-01-02)
+# Смысл: DEV cache-daemon (RAM) по UNIX-socket рядом с модулем.
+# (новое — 2026-01-02) исправление производительности:
+# - Убран O(N) sweep на каждом тике: expire делается через lazy-heap (O(log N) на op, O(k log N) на просрочку)
+# - Event-driven loop на selectors: в простое CPU ~0
+# - watchdog сохранён, но таймаут ожидания ограничен (чтобы heartbeat был жив)
 
 from __future__ import annotations
 
+import heapq
 import os
 import pickle
+import selectors
 import signal
 import socket
 import struct
@@ -16,7 +18,7 @@ import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 
 
 # фиксированные лимиты (задача)
@@ -31,6 +33,9 @@ MAX_REQUEST_BYTES = 256 * 1024
 # dev поведение
 WATCHDOG_STALL_SEC = 60
 ALIVE_EVERY_SEC = 10
+
+# чтобы watchdog не срабатывал в idle — ограничиваем max timeout selector
+MAX_IDLE_WAIT_SEC = 2.0
 
 
 @dataclass
@@ -60,6 +65,10 @@ class CacheDaemon:
         # volatile locks (lease): key -> _Lease
         self.locks: dict[str, _Lease] = {}
 
+        # heaps: (expire_at, kind, key, version)
+        # kind: 0=cache, 1=lock
+        self._exp_heap: list[Tuple[float, int, str, float]] = []
+
         self._stop = False
         self._last_heartbeat = time.monotonic()
         self._last_alive = 0.0
@@ -76,13 +85,18 @@ class CacheDaemon:
         self._last_heartbeat = self._now()
 
     def _log(self, msg: str) -> None:
-        print(msg, flush=True)
+        # без flush=True: иначе лишний sync-IO
+        print(msg)
 
     def _safe_load_pickle(self, raw: bytes) -> Any:
         return pickle.loads(raw)
 
     def _safe_dump_pickle(self, obj: Any) -> bytes:
         return pickle.dumps(obj, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def _push_expire(self, *, kind: int, key: str, expire_at: float) -> None:
+        # version = expire_at: lazy-invalidations (сверяем с текущим expire_at записи)
+        heapq.heappush(self._exp_heap, (float(expire_at), int(kind), str(key), float(expire_at)))
 
     def _drop(self, key: str) -> None:
         e = self.data.pop(key, None)
@@ -92,37 +106,66 @@ class CacheDaemon:
     def _drop_lock(self, key: str) -> None:
         self.locks.pop(key, None)
 
-    def _expire_sweep(self) -> None:
+    def _expire_pop(self) -> None:
+        """Проверяет heap и выкидывает всё протухшее (lazy)."""
         now = self._now()
+        h = self._exp_heap
 
-        # cache
-        for k, e in list(self.data.items()):
-            if now >= e.expire_at:
-                self._drop(k)
-                self._expired += 1
+        while h:
+            exp_at, kind, key, ver = h[0]
+            if exp_at > now:
+                break
+            heapq.heappop(h)
 
-        # locks (не считаем в expired-метрику кеша — это отдельная сущность)
-        for k, l in list(self.locks.items()):
-            if now >= l.expire_at:
-                self._drop_lock(k)
+            if kind == 0:
+                cur = self.data.get(key)
+                if not cur:
+                    continue
+                # stale heap-item?
+                if float(cur.expire_at) != float(ver):
+                    continue
+                if now >= cur.expire_at:
+                    self._drop(key)
+                    self._expired += 1
+            else:
+                cur = self.locks.get(key)
+                if not cur:
+                    continue
+                if float(cur.expire_at) != float(ver):
+                    continue
+                if now >= cur.expire_at:
+                    self._drop_lock(key)
+
+    def _next_deadline(self) -> Optional[float]:
+        """Следующее событие: ближайший expire, либо alive-log."""
+        now = self._now()
+        nxt: Optional[float] = None
+
+        if self._exp_heap:
+            nxt = float(self._exp_heap[0][0])
+
+        alive_at = (self._last_alive + ALIVE_EVERY_SEC) if self._last_alive else (now + ALIVE_EVERY_SEC)
+        if nxt is None:
+            return alive_at
+        return min(nxt, alive_at)
 
     def _gc(self) -> None:
         try:
-            # 1) TTL sweep (cache + locks)
-            self._expire_sweep()
+            # сперва выкинем протухшее по heap
+            self._expire_pop()
 
             if self.total_bytes <= MAX_CACHE_BYTES:
                 return
 
             target = int(MAX_CACHE_BYTES * GC_TARGET_RATIO)
 
-            # 2) eviction по размеру (крупные сначала), а при равных — по expire_at (раньше умрет), затем по last_access (старее)
+            # eviction по размеру (крупные сначала), а при равных — по expire_at (раньше умрет), затем по last_access (старее)
             items = sorted(
                 self.data.items(),
                 key=lambda kv: (-kv[1].size, kv[1].expire_at, kv[1].last_access),
             )
 
-            for k, e in items:
+            for k, _e in items:
                 if self.total_bytes <= target:
                     break
                 self._drop(k)
@@ -216,11 +259,11 @@ class CacheDaemon:
                 if not isinstance(last_access, (int, float)):
                     continue
 
-                # не поднимаем протухшее
                 if now >= float(expire_at):
                     continue
 
-                data[k] = _Entry(payload=payload, size=size, expire_at=float(expire_at), last_access=float(last_access))
+                e = _Entry(payload=payload, size=size, expire_at=float(expire_at), last_access=float(last_access))
+                data[k] = e
                 total += size
                 restored += 1
 
@@ -230,7 +273,11 @@ class CacheDaemon:
             # locks никогда не восстанавливаем
             self.locks = {}
 
-            # если после восстановления уже выше лимита — сразу чистим
+            # rebuild heap
+            self._exp_heap = []
+            for k, e in self.data.items():
+                self._push_expire(kind=0, key=k, expire_at=e.expire_at)
+
             if self.total_bytes > MAX_CACHE_BYTES:
                 self._gc()
 
@@ -238,7 +285,6 @@ class CacheDaemon:
         except Exception:
             self._errors += 1
         finally:
-            # по ТЗ: чистим dump даже если не прочитали
             try:
                 self.dump_path.unlink(missing_ok=True)
             except Exception:
@@ -249,7 +295,6 @@ class CacheDaemon:
             time.sleep(2)
             now = self._now()
             if (now - self._last_heartbeat) > WATCHDOG_STALL_SEC:
-                # dev: лучше умереть, чем уложить тазик
                 self._log(f"[cache][DEV] WATCHDOG: stalled > {WATCHDOG_STALL_SEC}s, exiting")
                 os._exit(2)
 
@@ -285,8 +330,7 @@ class CacheDaemon:
             op = req.get("op")
 
             if op == "STATS":
-                # подчистим протухшее (locks тоже)
-                self._expire_sweep()
+                self._expire_pop()
                 return {
                     "ok": True,
                     "items": len(self.data),
@@ -295,17 +339,23 @@ class CacheDaemon:
                     "max_bytes": MAX_CACHE_BYTES,
                 }
 
-            # ops без key (кроме STATS) не поддерживаем
             key = req.get("key")
             if not isinstance(key, str) or not key:
                 return {"ok": False, "err": "bad_key"}
+
+            ttl_sec = req.get("ttl_sec", DEFAULT_TTL_SEC)
+            try:
+                ttl = float(ttl_sec)
+            except Exception:
+                ttl = 0.0
+            if ttl <= 0:
+                return {"ok": False, "err": "bad_ttl"}
 
             now = self._now()
 
             # -------------------- LOCKS (lease) --------------------
             if op in ("LOCK_TRY", "LOCK_RENEW", "LOCK_RELEASE", "LOCK_STATUS"):
-                # всегда подчищаем протухшее перед ответом
-                self._expire_sweep()
+                self._expire_pop()
 
                 if op == "LOCK_STATUS":
                     cur = self.locks.get(key)
@@ -320,41 +370,20 @@ class CacheDaemon:
                     if not isinstance(owner, str) or not owner:
                         return {"ok": False, "err": "bad_owner"}
 
-                    ttl_sec = req.get("ttl_sec")
-                    try:
-                        ttl = float(ttl_sec)
-                    except Exception:
-                        ttl = 0.0
-                    if ttl <= 0:
-                        return {"ok": False, "err": "bad_ttl"}
-
                     cur = self.locks.get(key)
                     if cur and now < cur.expire_at:
-                        return {
-                            "ok": True,
-                            "acquired": False,
-                            "owner": cur.owner,
-                            "token": cur.token,
-                            "expire_at": cur.expire_at,
-                        }
+                        return {"ok": True, "acquired": False, "owner": cur.owner, "token": cur.token, "expire_at": cur.expire_at}
 
                     token = self._new_token()
                     expire_at = now + ttl
                     self.locks[key] = _Lease(owner=owner, token=token, expire_at=expire_at)
+                    self._push_expire(kind=1, key=key, expire_at=expire_at)
                     return {"ok": True, "acquired": True, "owner": owner, "token": token, "expire_at": expire_at}
 
                 if op == "LOCK_RENEW":
                     token = req.get("token")
                     if not isinstance(token, str) or not token:
                         return {"ok": False, "err": "bad_token"}
-
-                    ttl_sec = req.get("ttl_sec")
-                    try:
-                        ttl = float(ttl_sec)
-                    except Exception:
-                        ttl = 0.0
-                    if ttl <= 0:
-                        return {"ok": False, "err": "bad_ttl"}
 
                     cur = self.locks.get(key)
                     if not cur or now >= cur.expire_at:
@@ -366,6 +395,7 @@ class CacheDaemon:
                         return {"ok": True, "renewed": False, "reason": "token_mismatch", "owner": cur.owner, "expire_at": cur.expire_at}
 
                     cur.expire_at = now + ttl
+                    self._push_expire(kind=1, key=key, expire_at=cur.expire_at)
                     return {"ok": True, "renewed": True, "expire_at": cur.expire_at}
 
                 if op == "LOCK_RELEASE":
@@ -388,13 +418,7 @@ class CacheDaemon:
                 return {"ok": False, "err": "unknown_op"}
 
             # -------------------- CACHE --------------------
-            ttl_sec = req.get("ttl_sec", DEFAULT_TTL_SEC)
-            try:
-                ttl_sec = int(ttl_sec)
-            except Exception:
-                ttl_sec = DEFAULT_TTL_SEC
-            if ttl_sec <= 0:
-                ttl_sec = DEFAULT_TTL_SEC
+            self._expire_pop()
 
             if op == "GET":
                 e = self.data.get(key)
@@ -408,7 +432,8 @@ class CacheDaemon:
 
                 # sliding TTL
                 e.last_access = now
-                e.expire_at = now + ttl_sec
+                e.expire_at = now + ttl
+                self._push_expire(kind=0, key=key, expire_at=e.expire_at)
                 return {"ok": True, "hit": True, "payload": e.payload}
 
             if op == "SET":
@@ -421,7 +446,7 @@ class CacheDaemon:
                 if size <= 0 or size > MAX_VALUE_BYTES:
                     return {"ok": True, "stored": False, "reason": "too_big"}
 
-                expire_at = now + ttl_sec
+                expire_at = now + ttl
 
                 old = self.data.get(key)
                 if old:
@@ -429,6 +454,7 @@ class CacheDaemon:
 
                 self.data[key] = _Entry(payload=payload, size=size, expire_at=expire_at, last_access=now)
                 self.total_bytes += size
+                self._push_expire(kind=0, key=key, expire_at=expire_at)
 
                 if self.total_bytes > MAX_CACHE_BYTES:
                     self._gc()
@@ -441,11 +467,10 @@ class CacheDaemon:
             return {"ok": False, "err": "server_error"}
 
     def _on_signal(self, signum: int, _frame: Any) -> None:
-        self._log(f"[cache][DEV] signal={signum}, shutting down (dump...)")
+        self._log(f"[cache][DEV] signal={signum}, shutting down (dump.)")
         self._stop = True
 
     def serve_forever(self) -> None:
-        # banner
         self._log(
             "[cache][DEV] starting (DEV MODE) | "
             f"watchdog={WATCHDOG_STALL_SEC}s | alive_log={ALIVE_EVERY_SEC}s | "
@@ -454,62 +479,77 @@ class CacheDaemon:
         )
         self._log("[cache][DEV] NOTE: for production this must be replaced/disabled")
 
-        # signals
         signal.signal(signal.SIGINT, self._on_signal)
         signal.signal(signal.SIGTERM, self._on_signal)
 
-        # restore (и всегда удаляем dump)
         self._try_restore_dump()
 
-        # remove old socket
         try:
             if self.sock_path.exists():
                 self.sock_path.unlink()
         except Exception:
             pass
 
-        # watchdog thread
         t = threading.Thread(target=self._watchdog_loop, daemon=True)
         t.start()
+
+        sel = selectors.DefaultSelector()
 
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
             s.bind(str(self.sock_path))
             os.chmod(str(self.sock_path), 0o666)
             s.listen(128)
-            s.settimeout(1.0)
+            s.setblocking(False)
 
-            while not self._stop:
-                self._beat()
-                self._alive_log()
+            sel.register(s, selectors.EVENT_READ)
 
-                # периодически подчистим протухшее (locks тоже)
-                self._expire_sweep()
+            try:
+                while not self._stop:
+                    self._beat()
 
+                    # housekeeping by deadlines (expire heap + alive)
+                    self._expire_pop()
+                    self._alive_log()
+
+                    deadline = self._next_deadline()
+                    now = self._now()
+                    if deadline is None:
+                        timeout = MAX_IDLE_WAIT_SEC
+                    else:
+                        timeout = max(0.0, min(float(deadline - now), MAX_IDLE_WAIT_SEC))
+
+                    events = sel.select(timeout)
+                    for key, _mask in events:
+                        if key.fileobj is s:
+                            try:
+                                conn, _addr = s.accept()
+                            except Exception:
+                                self._errors += 1
+                                continue
+
+                            with conn:
+                                try:
+                                    conn.settimeout(1.0)
+                                    req = self._recv_msg(conn)
+                                    resp = self._handle(req)
+                                    self._send_msg(conn, resp)
+                                except Exception as e:
+                                    self._errors += 1
+                                    try:
+                                        self._log(f"[cache][DEV] error: {type(e).__name__}: {e}")
+                                    except Exception:
+                                        pass
+                                    try:
+                                        self._send_msg(conn, {"ok": False, "err": "io_error"})
+                                    except Exception:
+                                        pass
+            finally:
                 try:
-                    conn, _ = s.accept()
-                except socket.timeout:
-                    continue
+                    sel.unregister(s)
                 except Exception:
-                    self._errors += 1
-                    continue
+                    pass
+                sel.close()
 
-                with conn:
-                    try:
-                        req = self._recv_msg(conn)
-                        resp = self._handle(req)
-                        self._send_msg(conn, resp)
-                    except Exception as e:
-                        self._errors += 1
-                        try:
-                            self._log(f"[cache][DEV] error: {type(e).__name__}: {e}")
-                        except Exception:
-                            pass
-                        try:
-                            self._send_msg(conn, {"ok": False, "err": "io_error"})
-                        except Exception:
-                            pass
-
-        # graceful shutdown
         try:
             self._write_dump()
         finally:

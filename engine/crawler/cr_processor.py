@@ -1,8 +1,8 @@
-# FILE: engine/crawler/cr_processor.py  (обновлено — 2025-12-29)
+# FILE: engine/crawler/cr_processor.py  (обновлено — 2026-01-03)
+# PATH: engine/crawler/cr_processor.py
 # Смысл:
-# - gs_cb_spider: как было (каждый тик берёт 1 item из очереди и запускает паука)
+# - gs_cb_spider: каждый тик берёт 1 item из очереди и запускает паука
 # - cbq_reset_cache: каждые 10 минут обнуляет кеш-очередь (cbq:list)
-# - cb_mark_tasks_collected: раз в 2 часа выставляет aap_audience_audiencetask.collected=true
 
 from engine.common.worker import Worker
 from engine.crawler.fetch_gs_cb import cbq_reset_cache, worker_run_once

@@ -1,15 +1,17 @@
-# FILE: engine/crawler/spiders/spider_gs_cb.py  (обновлено — 2025-12-30)
+# FILE: engine/crawler/spiders/spider_gs_cb.py  (обновлено — 2026-01-03)
 # PATH: engine/crawler/spiders/spider_gs_cb.py
 # Смысл:
-# - gs_cb: без _Abort; БД пишем ТОЛЬКО в closed().
+# - БД пишем ТОЛЬКО в closed().
+# - Перед стартом: если cb_crawler.collected=true => close_spider("ALREADY COLLECTED") и НЕ лезем в БД в closed().
 # - Любой request-fail => close_spider("REQUEST FAILED <url>").
 # - parse_list: FAILED TO PARSE / FAILED TO LOCATE GSBIS / PLZ MISMATCH; далее yield gsbiz + paging.
 # - parse_detail: если парсер не понял страницу => close_spider("FAILED TO PARSE <current_url>").
 # - closed():
+#   0) ALREADY COLLECTED => SKIP DB (ничего не пишем)
 #   1) REQUEST FAILED / FAILED TO PARSE / FAILED TO LOCATE GSBIS => cb_crawler.collected=true, collected_num=0, reason=<reason>
-#   2) PLZ MISMATCH => cb_crawler.collected=true, collected_num=0, reason=NULL
+#   2) PLZ MISMATCH => cb_crawler.collected=true, collected_num=0, reason="PLZ MISMATCH"
 #   3) иначе: пишем raw_contacts_gb + cb_crawler.collected=true, collected_num=<n>, reason=NULL
-# - Дебаг: только в closed(), по веткам (без json-dump всей пачки).
+# - Дебаг: печать в closed() по веткам (без json-dump всей пачки).
 
 from __future__ import annotations
 
@@ -21,8 +23,8 @@ from urllib.parse import urljoin
 
 import scrapy
 
-from engine.common.db import get_connection
 from engine.common.cache.client import CLIENT
+from engine.common.db import fetch_one, get_connection
 from engine.crawler.parsers.parser_gs_cb import parse_gs_cb_detail
 
 PLZ_RE = re.compile(r"\b(\d{5})\b")
@@ -43,6 +45,7 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         self.plz = str(plz or "").strip()
         self.branch_slug = str(branch_slug or "").strip()
         self.cb_crawler_id = int(cb_crawler_id)
+
         # side-channel: task_id приходит не аргументом, а из кеша
         self.task_id = 0
         payload = CLIENT.get(f"cbq:cb2task:{self.cb_crawler_id}", ttl_sec=3600)
@@ -66,12 +69,18 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         self.items: List[Dict[str, Any]] = []
 
         # DB debug
-        self._db_action: str = "skip"  # skip|mark_fail|mark_mismatch|commit
+        self._db_action: str = "skip"  # skip|skip_already|mark_fail|mark_mismatch|commit
         self._db_rows: int = 0
 
     # -------------------- requests --------------------
 
     def start_requests(self):
+        # pre-check: если уже собран — не делаем сетевых запросов
+        row = fetch_one("SELECT collected FROM cb_crawler WHERE id=%s", (self.cb_crawler_id,))
+        if row and row[0] is True:
+            self.crawler.engine.close_spider(self, reason="ALREADY COLLECTED")
+            return
+
         # CONTRACT: no quote() here
         self._start_url = f"https://www.gelbeseiten.de/suche/{self.branch_slug}/{self.plz}"
         yield scrapy.Request(
@@ -178,6 +187,7 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         if not parsed:
             self.crawler.engine.close_spider(self, reason=f"FAILED TO PARSE {response.url}")
             return
+
         print(f"PARSING GBIS {response.url}")
         self._detail_parsed += 1
         self.items.append(
@@ -298,6 +308,12 @@ class GelbeSeitenCBSpider(scrapy.Spider):
             f"detail_seen={self._detail_seen} detail_parsed={self._detail_parsed} items={len(self.items)}"
         )
 
+        # 0) ALREADY COLLECTED => SKIP DB полностью (ничего не затирать!)
+        if r == "ALREADY COLLECTED":
+            self._db_action = "skip_already"
+            print(f"GS_CB[{self.cb_crawler_id}] DB SKIP_ALREADY (no writes)")
+            return
+
         # 1) FAIL reasons => collected=true, collected_num=0, reason=<reason>
         if self._reason_is_fail(r):
             conn = get_connection()
@@ -320,7 +336,7 @@ class GelbeSeitenCBSpider(scrapy.Spider):
             print(f"GS_CB[{self.cb_crawler_id}] DB MARK_FAIL collected=true collected_num=0 reason='{r}'")
             return
 
-        # 2) PLZ MISMATCH => collected=true, collected_num=0, reason=NULL
+        # 2) PLZ MISMATCH => collected=true, collected_num=0, reason="PLZ MISMATCH"
         if r == "PLZ MISMATCH":
             conn = get_connection()
             with conn.cursor() as cur:
@@ -329,17 +345,17 @@ class GelbeSeitenCBSpider(scrapy.Spider):
                     UPDATE cb_crawler
                     SET collected=true,
                         collected_num=0,
-                        reason=NULL,
+                        reason=%s,
                         updated_at=NOW()
                     WHERE id=%s
                     """,
-                    (self.cb_crawler_id,),
+                    ("PLZ MISMATCH", self.cb_crawler_id),
                 )
             conn.commit()
             conn.close()
 
             self._db_action = "mark_mismatch"
-            print(f"GS_CB[{self.cb_crawler_id}] DB MARK_MISMATCH collected=true collected_num=0 reason=NULL")
+            print(f"GS_CB[{self.cb_crawler_id}] DB MARK_MISMATCH collected=true collected_num=0 reason='PLZ MISMATCH'")
             return
 
         # 3) Success path => write items + mark collected

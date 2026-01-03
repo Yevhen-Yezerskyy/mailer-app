@@ -1,8 +1,7 @@
-# FILE: engine/common/cache/client.py  (обновлено — 2025-12-27)
+# FILE: engine/common/cache/client.py  (обновлено — 2026-01-02)
 # Смысл: клиент для dev IPC-кеша. Если демона нет/ошибка — считаем локально и продолжаем.
-# (новое — 2025-12-27)
-# - Добавлен IPC locker (lease): LOCK_TRY / LOCK_RENEW / LOCK_RELEASE / LOCK_STATUS
-# - Best-effort: если демона нет/ошибка — методы lock* возвращают None/False
+# (новое — 2026-01-02) исправление производительности:
+# - Анти-шторм: если сокет/демон недоступен, временно "глушим" RPC на короткий backoff, чтобы не долбить CPU/FS
 
 from __future__ import annotations
 
@@ -25,6 +24,10 @@ MAX_VALUE_BYTES = 128 * 1024
 MAX_QUERY_BYTES = 32 * 1024
 MAX_REQUEST_BYTES = 256 * 1024
 RPC_TIMEOUT_SEC = 0.25
+
+# анти-шторм по недоступности демона
+_RPC_FAIL_BACKOFF_SEC = 0.5
+_RPC_DOWN_UNTIL = 0.0
 
 
 def _module_dir() -> Path:
@@ -67,6 +70,12 @@ def _recv_exact(conn: socket.socket, n: int) -> bytes:
 
 
 def _rpc(req: dict[str, Any]) -> Optional[dict[str, Any]]:
+    global _RPC_DOWN_UNTIL
+
+    now = time.monotonic()
+    if now < _RPC_DOWN_UNTIL:
+        return None
+
     try:
         data = _safe_pickle(req)
         if len(data) > MAX_REQUEST_BYTES:
@@ -85,6 +94,7 @@ def _rpc(req: dict[str, Any]) -> Optional[dict[str, Any]]:
             obj = pickle.loads(payload)
             return obj if isinstance(obj, dict) else None
     except Exception:
+        _RPC_DOWN_UNTIL = time.monotonic() + _RPC_FAIL_BACKOFF_SEC
         return None
 
 
@@ -101,10 +111,8 @@ class CacheClient:
         payload = resp.get("payload")
         if not isinstance(payload, (bytes, bytearray)):
             return None
-
         if len(payload) > MAX_VALUE_BYTES:
             return None
-
         return bytes(payload)
 
     def set(self, key: str, payload: bytes, ttl_sec: int) -> bool:
@@ -120,15 +128,6 @@ class CacheClient:
     # -------------------- locks (lease) --------------------
 
     def lock_try(self, key: str, *, ttl_sec: float, owner: str) -> Optional[dict[str, Any]]:
-        """
-        Попытка взять lease-lock.
-        Возвращает ответ демона (dict) или None (если демона нет/ошибка).
-        Ожидаемые поля на успех:
-          - acquired: bool
-          - token: str (если acquired=True)
-          - owner: str
-          - expire_at: float (monotonic timestamp в секундах)
-        """
         resp = _rpc({"op": "LOCK_TRY", "key": str(key), "ttl_sec": float(ttl_sec), "owner": str(owner)})
         return resp if resp and resp.get("ok") else None
 
@@ -156,14 +155,6 @@ def memo(
     version: str = DEFAULT_VERSION,
     update: bool = False,
 ) -> Any:
-    """
-    Dev memo-cache через локальный daemon (UNIX-socket).
-    - Всегда требуется query и fn(query)
-    - ttl по умолчанию неделя; на hit TTL продлевается (sliding)
-    - version обязателен (дефолт dev), участвует в ключе
-    - update=True: пересчитать и перезаписать не глядя
-    - Если демона нет/ошибка: просто считаем локально и возвращаем
-    """
     ttl_sec = int(ttl) if ttl is not None else DEFAULT_TTL_SEC
 
     try:
@@ -177,16 +168,14 @@ def memo(
             try:
                 return pickle.loads(payload)
             except Exception:
-                # битый payload в кеше — просто пересчитаем
                 pass
 
     value = fn(query)
 
     try:
-        out = _safe_pickle(value)
+        out = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
     except Exception:
         return value
 
-    # best-effort set; если не положили — не страшно
     CLIENT.set(key, out, ttl_sec=ttl_sec)
     return value
