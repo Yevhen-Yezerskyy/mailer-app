@@ -20,7 +20,7 @@
         {% else %}
           <div class="YY-STATUS_YELLOW mb-8">
               {% trans "Поиск поставщиков / подрядчиков" %}:<br>
-              {{ t.title }}    
+              {{ t.title }}
         </div>
         {% endif %}
 
@@ -109,7 +109,7 @@
             <div class="YY-STATUS_GRAY w-full mb-1">
               - {% trans "Рейтинг 71-100" %}: {{ rated_71_100_cnt }} ({{ rated_71_100_pct }}%)
             </div>
-          {% endif %}        
+          {% endif %}
 
       </div>
     </td>
@@ -123,148 +123,261 @@
 
       <div data-tabs="contacts">
 
-          <div class="flex gap-3 mb-3">
-            <button type="button"
-              data-tab="rated"
-              data-active-class="YY-BUTTON_GREEN"
-              data-idle-class="YY-BUTTON_MAIN"
-              class="{% if tab == 'rated' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}">
-              {% trans "Контакты: присвоен рейтинг" %}
-            </button>
+        <!-- TABS -->
+        <div class="flex gap-3 mb-4">
+          <button type="button"
+            data-tab="rated"
+            data-active-class="YY-BUTTON_GREEN"
+            data-idle-class="YY-BUTTON_MAIN"
+            class="{% if tab == 'rated' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}">
+            {% trans "Контакты: присвоен рейтинг" %}
+          </button>
 
-            <button type="button"
-              data-tab="all"
-              data-active-class="YY-BUTTON_GREEN"
-              data-idle-class="YY-BUTTON_MAIN"
-              class="{% if tab == 'all' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}">
-              {% trans "Контакты: все собранные" %}
-            </button>
-          </div>
-
-          <!-- RATED -->
-        <div class="YY-MAIN_BOTTOM_DIV">
-          <div data-panel="rated" class="{% if tab != 'rated' %}hidden{% endif %}">
-            {% if rated_rows %}
-              <table class="w-full text-left">
-                <thead>
-                  <tr class="YY-TH_TR">
-                    <th class="YY-TH_TH">{% trans "Компания" %}</th>
-                    <th class="YY-TH_TH">{% trans "Категории" %}</th>
-                    <th class="YY-TH_TH">{% trans "Адрес" %}</th>
-                    <th class="YY-TH_TH">{% trans "CB" %}</th>
-                    <th class="YY-TH_TH">{% trans "CL" %}</th>
-                    <th class="YY-TH_TH">{% trans "Смотреть" %}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for it in rated_rows %}
-                    <tr class="YY-TB_TR align-top">
-                      <td class="YY-TB_TD">{{ it.company_name }}</td>
-                      <td class="YY-TB_TD">{{ it.branches_str }}</td>
-                      <td class="YY-TB_TD">{{ it.address_first }}</td>
-                      <td class="YY-TB_TD">{{ it.rate_cb_100 }}</td>
-                      <td class="YY-TB_TD">{{ it.rate_cl }}</td>
-                      <td class="YY-TB_TD">
-                        <a href="#"
-                          class="YY-BUTTON_TAB_MAIN"
-                          data-yy-modal="url=/panel/audience/status/task/modal/?id={{ it.ui_id }}">
-                          {% trans "Смотреть" %}
-                        </a>                        
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-
-              <div class="flex gap-3 mt-3 items-center">
-                {% if rated_page > 1 %}
-                  <a class="YY-BUTTON_MAIN"
-                    href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_page|add:"-1" }}&p_all={{ all_page }}">
-                    {% trans "Назад" %}
-                  </a>
-                {% endif %}
-
-                <div class="YY-TEXT">
-                  {{ rated_page }} / {{ rated_pages }}
-                </div>
-
-                {% if rated_page < rated_pages %}
-                  <a class="YY-BUTTON_MAIN"
-                    href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_page|add:"1" }}&p_all={{ all_page }}">
-                    {% trans "Вперёд" %}
-                  </a>
-                {% endif %}
-              </div>
-            {% else %}
-              <div class="YY-CARD_WHITE">
-                {% trans "Здесь пока нет данных" %}
-              </div>
-            {% endif %}
-          </div>
-
-          <!-- ALL -->
-          <div data-panel="all" class="{% if tab != 'all' %}hidden{% endif %}">
-            {% if all_rows %}
-              <table class="w-full text-left">
-                <thead>
-                  <tr class="YY-TH_TR">
-                    <th class="YY-TH_TH">{% trans "Компания" %}</th>
-                    <th class="YY-TH_TH">{% trans "Категории" %}</th>
-                    <th class="YY-TH_TH">{% trans "Адрес" %}</th>
-                    <th class="YY-TH_TH">{% trans "CB" %}</th>
-                    <th class="YY-TH_TH">{% trans "Смотреть" %}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for it in all_rows %}
-                    <tr class="YY-TB_TR align-top">
-                      <td class="YY-TB_TD">{{ it.company_name }}</td>
-                      <td class="YY-TB_TD">{{ it.branches_str }}</td>
-                      <td class="YY-TB_TD">{{ it.address_first }}</td>
-                      <td class="YY-TB_TD">{{ it.rate_cb_100 }}</td>
-                      <td class="YY-TB_TD">
-                      <td class="YY-TB_TD">
-                          <a href="#"
-                            class="YY-BUTTON_TAB_MAIN"
-                            data-yy-modal="url=/panel/audience/status/task/modal/?id={{ it.ui_id }}">
-                            {% trans "Смотреть" %}
-                          </a>
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-
-              <div class="flex gap-3 mt-3 items-center">
-                {% if all_page > 1 %}
-                  <a class="YY-BUTTON_MAIN"
-                    href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_page|add:"-1" }}">
-                    {% trans "Назад" %}
-                  </a>
-                {% endif %}
-
-                <div class="YY-TEXT">
-                  {{ all_page }} / {{ all_pages }}
-                </div>
-
-                {% if all_page < all_pages %}
-                  <a class="YY-BUTTON_MAIN"
-                    href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_page|add:"1" }}">
-                    {% trans "Вперёд" %}
-                  </a>
-                {% endif %}
-              </div>
-          </div>
-            {% else %}
-              <div class="YY-CARD_WHITE">
-                {% trans "Здесь пока нет данных" %}
-              </div>
-            {% endif %}
-          </div>
+          <button type="button"
+            data-tab="all"
+            data-active-class="YY-BUTTON_GREEN"
+            data-idle-class="YY-BUTTON_MAIN"
+            class="{% if tab == 'all' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}">
+            {% trans "Контакты: все собранные" %}
+          </button>
         </div>
+
+        <!-- ================= RATED ================= -->
+
+        <div data-panel="rated" class="{% if tab != 'rated' %}hidden{% endif %}">
+
+          <!-- PAGINATION TOP -->
+          <div class="YY-CARD_WHITE flex items-center mb-4">
+            {% if rated_page > 1 %}
+              <a class="YY-BUTTON_MAIN mr-3"
+                href="?id={{ request.GET.id }}&tab=rated&p_rated=1&p_all={{ all_page }}">
+                << <<
+              </a>
+            {% endif %}
+
+            {% if rated_page > 1 %}
+              <a class="YY-BUTTON_MAIN mr-6"
+                href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_page|add:'-1' }}&p_all={{ all_page }}">
+                <<
+              </a>
+            {% endif %}
+
+            <div class="YY-TEXT-BOLD !mb-0">
+              {% trans "Страницы" %}: {{ rated_page }} / {{ rated_pages }}
+            </div>
+
+            {% if rated_page < rated_pages %}
+              <a class="YY-BUTTON_MAIN ml-6"
+                href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_page|add:'1' }}&p_all={{ all_page }}">
+                >>
+              </a>
+            {% endif %}
+
+            {% if rated_page < rated_pages %}
+              <a class="YY-BUTTON_MAIN ml-3"
+                href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_pages }}&p_all={{ all_page }}">
+                >> >>
+              </a>
+            {% endif %}
+          </div>
+
+          {% if rated_rows %}
+          <div class="YY-MAIN_BOTTOM_DIV">
+            <table class="w-full text-left">
+              <thead>
+                <tr class="YY-TH_TR">
+                  <th class="YY-TH_TH w-[30%]">{% trans "Компания" %}</th>
+                  <th class="YY-TH_TH w-[30%]">{% trans "Категории" %}</th>
+                  <th class="YY-TH_TH w-[30%]">{% trans "Город" %}</th>
+                  <th class="YY-TH_TH">{% trans "Поиск" %}</th>
+                  <th class="YY-TH_TH">{% trans "Клиент" %}</th>
+                  <th class="YY-TH_TH">&nbsp;</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for it in rated_rows %}
+                  <tr class="YY-TB_TR align-top">
+                    <td class="YY-TB_TD">
+                      <span class="YY-TEXT-BOLD">{{ it.company_name }}</span>
+                      {{ it.address_first }}
+                    </td>
+                    <td class="YY-TB_TD">{{ it.branches_str|safe }}</td>
+                    <td class="YY-TB_TD">{{ it.city_str }}</td>
+                    <td class="YY-TB_TD text-center">{{ it.rate_cb_100 }}</td>
+                    <td class="YY-TB_TD text-center {{ it.rate_cl_bg }}">{{ it.rate_cl }}</td>
+                    <td class="YY-TB_TD">
+                      <a href="#"
+                        class="YY-BUTTON_TAB_MAIN"
+                        data-yy-modal="url=/panel/audience/status/task/modal/?id={{ it.ui_id }}">
+                        {% trans "Больше" %}
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+            <div class="YY-CARD_WHITE">
+              {% trans "Здесь пока нет данных" %}
+            </div>
+          {% endif %}
+
+          <!-- PAGINATION BOTTOM -->
+          <div class="YY-CARD_WHITE flex items-center mt-6">
+            {% if rated_page > 1 %}
+              <a class="YY-BUTTON_MAIN mr-3"
+                href="?id={{ request.GET.id }}&tab=rated&p_rated=1&p_all={{ all_page }}">
+                << <<
+              </a>
+            {% endif %}
+
+            {% if rated_page > 1 %}
+              <a class="YY-BUTTON_MAIN mr-6"
+                href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_page|add:'-1' }}&p_all={{ all_page }}">
+                <<
+              </a>
+            {% endif %}
+
+            <div class="YY-TEXT-BOLD !mb-0">
+              {% trans "Страницы" %}: {{ rated_page }} / {{ rated_pages }}
+            </div>
+
+            {% if rated_page < rated_pages %}
+              <a class="YY-BUTTON_MAIN ml-6"
+                href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_page|add:'1' }}&p_all={{ all_page }}">
+                >>
+              </a>
+            {% endif %}
+
+            {% if rated_page < rated_pages %}
+              <a class="YY-BUTTON_MAIN ml-3"
+                href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_pages }}&p_all={{ all_page }}">
+                >> >>
+              </a>
+            {% endif %}
+          </div>
+
+        </div>
+
+        <!-- ================= ALL ================= -->
+
+        <div data-panel="all" class="{% if tab != 'all' %}hidden{% endif %}">
+
+          <!-- PAGINATION TOP -->
+          <div class="YY-CARD_WHITE flex items-center mb-4">
+            {% if all_page > 1 %}
+              <a class="YY-BUTTON_MAIN mr-3"
+                href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all=1">
+                << <<
+              </a>
+            {% endif %}
+
+            {% if all_page > 1 %}
+              <a class="YY-BUTTON_MAIN mr-6"
+                href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_page|add:'-1' }}">
+                <<
+              </a>
+            {% endif %}
+
+            <div class="YY-TEXT-BOLD !mb-0">
+              {% trans "Страницы" %}: {{ all_page }} / {{ all_pages }}
+            </div>
+
+            {% if all_page < all_pages %}
+              <a class="YY-BUTTON_MAIN ml-6"
+                href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_page|add:'1' }}">
+                >>
+              </a>
+            {% endif %}
+
+            {% if all_page < all_pages %}
+              <a class="YY-BUTTON_MAIN ml-3"
+                href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_pages }}">
+                >> >>
+              </a>
+            {% endif %}
+          </div>
+
+          {% if all_rows %}
+          <div class="YY-MAIN_BOTTOM_DIV">
+            <table class="w-full text-left">
+              <thead>
+                <tr class="YY-TH_TR">
+                  <th class="YY-TH_TH w-[30%]">{% trans "Компания" %}</th>
+                  <th class="YY-TH_TH w-[30%]">{% trans "Категории" %}</th>
+                  <th class="YY-TH_TH w-[30%]">{% trans "Город" %}</th>
+                  <th class="YY-TH_TH">{% trans "Поиск" %}</th>
+                  <th class="YY-TH_TH">&nbsp;</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for it in all_rows %}
+                  <tr class="YY-TB_TR align-top">
+                    <td class="YY-TB_TD">
+                      <span class="YY-TEXT-BOLD">{{ it.company_name }}</span>
+                      {{ it.address_first }}
+                    </td>
+                    <td class="YY-TB_TD">{{ it.branches_str|safe }}</td>
+                    <td class="YY-TB_TD">{{ it.city_str }}</td>
+                    <td class="YY-TB_TD text-center">{{ it.rate_cb_100 }}</td>
+                    <td class="YY-TB_TD">
+                      <a href="#"
+                        class="YY-BUTTON_TAB_MAIN"
+                        data-yy-modal="url=/panel/audience/status/task/modal/?id={{ it.ui_id }}">
+                        {% trans "Больше" %}
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+            <div class="YY-CARD_WHITE">
+              {% trans "Здесь пока нет данных" %}
+            </div>
+          {% endif %}
+
+          <!-- PAGINATION BOTTOM -->
+          <div class="YY-CARD_WHITE flex items-center mt-6">
+            {% if all_page > 1 %}
+              <a class="YY-BUTTON_MAIN mr-3"
+                href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all=1">
+                << <<
+              </a>
+            {% endif %}
+
+            {% if all_page > 1 %}
+              <a class="YY-BUTTON_MAIN mr-6"
+                href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_page|add:'-1' }}">
+                <<
+              </a>
+            {% endif %}
+
+            <div class="YY-TEXT-BOLD !mb-0">
+              {% trans "Страницы" %}: {{ all_page }} / {{ all_pages }}
+            </div>
+
+            {% if all_page < all_pages %}
+              <a class="YY-BUTTON_MAIN ml-6"
+                href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_page|add:'1' }}">
+                >>
+              </a>
+            {% endif %}
+
+            {% if all_page < all_pages %}
+              <a class="YY-BUTTON_MAIN ml-3"
+                href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_pages }}">
+                >> >>
+              </a>
+            {% endif %}
+          </div>
+
         </div>
 
       </div>
+
     </td>
   </tr>
 </table>

@@ -1,30 +1,124 @@
 {% load i18n %}
 <!-- FILE: web/templates/panels/aap_audience/modal_status_task.html -->
-<!-- DATE: 2026-01-02 -->
-<!-- NEW: модалка company_data по rate_contacts.id -->
+<!-- DATE: 2026-01-04 -->
+<!-- CHANGE:
+  - рендер под modal_status_task.py: norm(address/phone/email/website/source_urls/socials/description) + chosen_city_str/chosen_branch_str + all_branches
+  - город+земля: "City - State"
+  - нижний адрес: address_line + <br> + chosen_city_str (BR в HTML)
+  - телефоны: BR в HTML (phones_list)
+-->
 
-<div class="YY-CARD_WHITE">
+<div class="YY-CARD_WHITE overflow-hidden" style="max-height: 80vh;">
+
+  <button type="button" class="YY-BUTTON_MAIN" data-yy-modal-close
+        style="position:absolute; top:10px; right:10px;">
+    ✕
+  </button>
+
+  <div class="overflow-auto mt-10 mb-8 max-h-[calc(80vh-2.5rem)]">
 
   {% if status == "done" %}
-    <div class="YY-LABEL mb-3">
-      {{ company_name|default:"" }}
+    <span class="YY-TEXT-BOLD !mb-0">{{ company_name|default:"" }}</span>
+
+    {% if address_line %}
+      <div class="YY-TEXT mb-6">
+        {{ address_line }}
+      </div>
+    {% endif %}
+
+    <div class="YY-STATUS_YELLOW mb-2 !text-[#006991] {{ rate_cl_bg }}">
+        {% trans "Рейтинг компании" %}:
+        {% if rate_cl is None %}
+          {% trans "Рейтинг не присвоен" %}
+        {% else %}
+          {{ rate_cl }}
+        {% endif %}
     </div>
 
-    <div class="flex gap-3 mb-4">
-      <div class="YY-STATUS_GREEN">
-        {% trans "CL" %}: {{ rate_cl|default:"-" }}
-      </div>
-      <div class="YY-STATUS_GRAY">
-        {% trans "CB" %}: {{ rate_cb|default:"-" }}
-      </div>
+    <div class="YY-STATUS_BLUE !mb-6">
+        <span class="YY-TEXT">{% trans "Рейтинг поиска" %}: {{ rate_cb_norm|default:"-" }}</span>
+        <span class="YY-TEXT">
+        {% if chosen_city_str %}
+          {% trans "Город" %}: {{ chosen_city_str }}<br>
+        {% endif %}
+        {% if chosen_branch_str %}
+          {% trans "Категория" %}: {{ chosen_branch_str }}
+        {% endif %}
+        </span>
     </div>
 
-    <pre class="w-full text-xs bg-white border border-[#71d0f4] rounded-lg p-3 overflow-auto"
-         style="max-height: 70vh; white-space: pre-wrap; word-break: break-word;">{{ company_json }}</pre>
+    <div class="YY-TEXT-BOLD !mb-2">{% trans "Категории / отрасли:" %}</div>
+    {% if all_branches %}
+      <span class="YY-TEXT !ml-6 !mb-6">
+        {% for b in all_branches %}
+          {{ b }}<br>
+        {% endfor %}
+      </span>
+    {% endif %}
+
+    {% if address_line or chosen_city_str %}
+      <div class="YY-TEXT-BOLD !mb-2">{% trans "Адрес:" %}</div>
+      <span class="YY-TEXT !ml-6 !mb-6">
+        {% if address_line %}
+          {{ address_line }}{% if chosen_city_str %}<br>{% endif %}
+        {% endif %}
+        {% if chosen_city_str %}
+          {{ chosen_city_str }}
+        {% endif %}
+      </span>
+    {% endif %}
+
+    {% if phones_list %}
+      <div class="YY-TEXT-BOLD !mb-2">{% trans "Телефон:" %}</div>
+      <span class="YY-TEXT !ml-6 !mb-6">
+        {% for p in phones_list %}
+          {{ p }}{% if not forloop.last %}<br>{% endif %}
+        {% endfor %}
+      </span>
+    {% endif %}
+
+    {% if email %}
+      <div class="YY-TEXT-BOLD !mb-2">{% trans "Email:" %}</div>
+      <a class="YY-LINK !ml-6 !mb-6" href="mailto:{{ email }}" target="_blank" rel="noopener noreferrer">{{ email }}</a>
+    {% endif %}
+
+    {% if website %}
+      <div class="YY-TEXT-BOLD !mb-2">{% trans "Web-site:" %}</div>
+      <a class="YY-LINK !ml-6 !mb-6" href="{{ website }}" target="_blank" rel="noopener noreferrer">
+        {{ website }}
+      </a>
+    {% endif %}
+
+    {% if sources %}
+      <div class="YY-TEXT-BOLD !mb-2">{% trans "Источники:" %}</div>
+      <span class="YY-TEXT !ml-6 !mb-6">
+        {% for u in sources %}
+          <a class="YY-LINK" href="{{ u }}" target="_blank" rel="noopener noreferrer">{{ u }}</a>{% if not forloop.last %}<br>{% endif %}
+        {% endfor %}
+      </span>
+    {% endif %}
+
+    {% if socials %}
+      <div class="YY-TEXT-BOLD !mb-2">{% trans "Соцсети:" %}</div>
+      <span class="YY-TEXT !ml-6 !mb-6">
+        {% for u in socials %}
+          <a class="YY-LINK" href="{{ u }}" target="_blank" rel="noopener noreferrer">{{ u }}</a>{% if not forloop.last %}<br>{% endif %}
+        {% endfor %}
+      </span>
+    {% endif %}
+
+    {% if description %}
+      <div class="YY-TEXT-BOLD !mb-2">{% trans "Описание:" %}</div>
+      <span class="YY-TEXT !ml-6 !mb-6">
+        {{ description }}
+      </span>
+    {% endif %}
+
   {% else %}
     <div class="YY-STATUS_GRAY w-full">
       {% trans "Здесь пока нет данных" %}
     </div>
   {% endif %}
 
+  </div>
 </div>

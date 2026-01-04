@@ -36,6 +36,7 @@ YY-BUTTON_TAB_RED: px-5 py-1.5 flex rounded-md bg-[#fff8f8] text-[#8e0000] font-
 #TEXTS
 YY-TEXT: block mb-3
 YY-TEXT_OL: block list-decimal pl-5 space-y-4 leading-relaxed
+YY-TEXT-BOLD: block mb-3 font-semibold
 
 #MAIN GRID
 YY-CARD_WHITE: px-5 py-5 rounded-md bg-[#FFFFFF] border border-[#71d0f4] text-[#006991]
@@ -52,3 +53,6 @@ YY-MENU-CARD-BLUE: rounded-md bg-[#effbff] border border-[#71d0f4]
 YY-MENU-SUMMARY: flex items-center gap-2 pl-2 py-3 font-bold text-[#006991] hover:bg-[#f8fdff] hover:text-[#007c09] rounded-md cursor-pointer leading-none
 YY-MENU-DETAIL: flex rounded-md font-semibold text-[#006991] py-2 pl-8 hover:bg-[#f8fdff] hover:text-[#007c09]
 YY-MENU-DETAIL-ACTIVE: bg-[#f8fdff] text-[#007c09]
+
+#LINKS
+YY-LINK: flex text-[#006991] hover:text-[#016b09] underline

@@ -74,3 +74,44 @@ select[aria-invalid="true"] {
   pointer-events: auto;   /* ← КЛЮЧЕВОЕ */
   position: relative;     /* для кнопки закрыть внутри */
 }
+
+.bg-10{
+  background: #e0fbdd !important;
+}
+
+.bg-20{
+  background: #eaffe8 !important;
+}
+
+.bg-30{
+  background: #f5fff4 !important;
+}
+
+.bg-40{
+  background: #fffdf2 !important;
+}
+
+.bg-50{
+  background: #fef9e5 !important;
+}
+
+.bg-60{
+  background: #fef6d5 !important;
+}
+
+.bg-70{
+  background: #fff3c0 !important;
+}
+
+.bg-80{
+  background: #ffebe0 !important;
+}
+
+.bg-90{
+  background: #ffddca !important;
+}
+
+.bg-100{
+  background: #ffd0b6 !important;
+}
+

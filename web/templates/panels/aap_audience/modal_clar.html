@@ -4,10 +4,10 @@
     ✕
   </button>
 
-  <div class="YY-TEXT font-semibold mb-2">{{ task.title }}</div>
-  <div class="YY-TEXT mb-4">{{ title }}</div>
+  <div class="YY-TEXT-BOLD">{{ task.title }}</div>
+  <div class="YY-TEXT-BOLD">{{ title }}:</div>
 
-  <div style="max-height: 70vh; overflow-y: auto; border-top: 1px solid #71d0f4; padding-top: 10px;">
+  <div style="max-height: 70vh; overflow-y: auto; border-top: 1px solid #71d0f4;border-bottom: 1px solid #71d0f4; padding: 5px 15px 5px 0;">
     {% if status == "running" %}
       <div class="YY-TEXT">В обработке</div>
     {% elif status == "empty" %}
@@ -16,7 +16,7 @@
       {% for item in items %}
         <div class="flex justify-between py-1">
           <span>{{ item.value_text }}</span>
-          <span class="text-slate-500">{{ item.rate }}</span>
+          <span>{{ item.rate }}</span>
         </div>
       {% endfor %}
     {% endif %}
