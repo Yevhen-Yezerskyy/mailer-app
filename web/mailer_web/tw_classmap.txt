@@ -37,6 +37,7 @@ YY-BUTTON_TAB_RED: px-5 py-1.5 flex rounded-md bg-[#fff8f8] text-[#8e0000] font-
 YY-TEXT: block mb-3
 YY-TEXT_OL: block list-decimal pl-5 space-y-4 leading-relaxed
 YY-TEXT-BOLD: block mb-3 font-semibold
+YY-BLOCK: flex
 
 #MAIN GRID
 YY-CARD_WHITE: px-5 py-5 rounded-md bg-[#FFFFFF] border border-[#71d0f4] text-[#006991]
