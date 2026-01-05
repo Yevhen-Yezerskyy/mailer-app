@@ -1,9 +1,10 @@
-# FILE: engine/common/cache/daemon.py  (обновлено — 2026-01-02)
-# Смысл: DEV cache-daemon (RAM) по UNIX-socket рядом с модулем.
-# (новое — 2026-01-02) исправление производительности:
-# - Убран O(N) sweep на каждом тике: expire делается через lazy-heap (O(log N) на op, O(k log N) на просрочку)
-# - Event-driven loop на selectors: в простое CPU ~0
-# - watchdog сохранён, но таймаут ожидания ограничен (чтобы heartbeat был жив)
+# FILE: engine/common/cache/daemon.py
+# DATE: 2026-01-05
+# CHANGE: демон не засираем BrokenPipe и быстрее дренируем accept:
+# - accept() в цикле (дренируем очередь) за один select
+# - BrokenPipe/ConnectionError/socket.timeout при recv/send НЕ считаем "ошибкой" (клиент мог тайм-аутнуться)
+# - conn timeout чуть увеличен (под RPC_TIMEOUT_SEC клиента)
+# - остальная логика/протокол без изменений
 
 from __future__ import annotations
 
@@ -36,6 +37,9 @@ ALIVE_EVERY_SEC = 10
 
 # чтобы watchdog не срабатывал в idle — ограничиваем max timeout selector
 MAX_IDLE_WAIT_SEC = 2.0
+
+# таймаут на обработку одного соединения (должен быть >= client RPC_TIMEOUT_SEC)
+CONN_TIMEOUT_SEC = 2.0
 
 
 @dataclass
@@ -85,7 +89,6 @@ class CacheDaemon:
         self._last_heartbeat = self._now()
 
     def _log(self, msg: str) -> None:
-        # без flush=True: иначе лишний sync-IO
         print(msg)
 
     def _safe_load_pickle(self, raw: bytes) -> Any:
@@ -470,6 +473,27 @@ class CacheDaemon:
         self._log(f"[cache][DEV] signal={signum}, shutting down (dump.)")
         self._stop = True
 
+    def _handle_one_conn(self, conn: socket.socket) -> None:
+        with conn:
+            try:
+                conn.settimeout(CONN_TIMEOUT_SEC)
+                req = self._recv_msg(conn)
+                resp = self._handle(req)
+                self._send_msg(conn, resp)
+            except (BrokenPipeError, ConnectionError, socket.timeout):
+                # клиент мог закрыть/тайм-аутнуться -> это НОРМА, не считаем ошибкой и не логируем
+                return
+            except Exception as e:
+                self._errors += 1
+                try:
+                    self._log(f"[cache][DEV] error: {type(e).__name__}: {e}")
+                except Exception:
+                    pass
+                try:
+                    self._send_msg(conn, {"ok": False, "err": "io_error"})
+                except Exception:
+                    pass
+
     def serve_forever(self) -> None:
         self._log(
             "[cache][DEV] starting (DEV MODE) | "
@@ -520,29 +544,21 @@ class CacheDaemon:
 
                     events = sel.select(timeout)
                     for key, _mask in events:
-                        if key.fileobj is s:
+                        if key.fileobj is not s:
+                            continue
+
+                        # дренируем очередь accept за один select
+                        while True:
                             try:
                                 conn, _addr = s.accept()
+                            except BlockingIOError:
+                                break
                             except Exception:
                                 self._errors += 1
-                                continue
+                                break
 
-                            with conn:
-                                try:
-                                    conn.settimeout(1.0)
-                                    req = self._recv_msg(conn)
-                                    resp = self._handle(req)
-                                    self._send_msg(conn, resp)
-                                except Exception as e:
-                                    self._errors += 1
-                                    try:
-                                        self._log(f"[cache][DEV] error: {type(e).__name__}: {e}")
-                                    except Exception:
-                                        pass
-                                    try:
-                                        self._send_msg(conn, {"ok": False, "err": "io_error"})
-                                    except Exception:
-                                        pass
+                            self._handle_one_conn(conn)
+
             finally:
                 try:
                     sel.unregister(s)

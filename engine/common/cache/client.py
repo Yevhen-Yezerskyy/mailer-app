@@ -1,10 +1,14 @@
-# FILE: engine/common/cache/client.py  (обновлено — 2026-01-02)
-# Смысл: клиент для dev IPC-кеша. Если демона нет/ошибка — считаем локально и продолжаем.
-# (новое — 2026-01-02) исправление производительности:
-# - Анти-шторм: если сокет/демон недоступен, временно "глушим" RPC на короткий backoff, чтобы не долбить CPU/FS
+# FILE: engine/common/cache/client.py
+# DATE: 2026-01-05
+# CHANGE: не ломаем кеш сами себе:
+# - RPC_TIMEOUT_SEC увеличен
+# - backoff "daemon down" ставим только при реальной недоступности сокета/соединения
+# - socket.timeout НЕ выключает кеш на 0.5s (микро-backoff, чтобы не молотить)
+# - прочие ошибки -> мягкий backoff (не "убивать" кеш надолго)
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import pickle
 import socket
@@ -23,10 +27,14 @@ MAX_VALUE_BYTES = 128 * 1024
 # лимиты входа (защита от "случайно закешировал весь мир")
 MAX_QUERY_BYTES = 32 * 1024
 MAX_REQUEST_BYTES = 256 * 1024
-RPC_TIMEOUT_SEC = 0.25
+
+# было 0.25 и клиент сам "убивал" кеш на пиках
+RPC_TIMEOUT_SEC = 1.0
 
 # анти-шторм по недоступности демона
 _RPC_FAIL_BACKOFF_SEC = 0.5
+_RPC_TIMEOUT_BACKOFF_SEC = 0.05
+_RPC_SOFT_BACKOFF_SEC = 0.05
 _RPC_DOWN_UNTIL = 0.0
 
 
@@ -69,6 +77,17 @@ def _recv_exact(conn: socket.socket, n: int) -> bytes:
     return buf
 
 
+def _is_daemon_down_oserror(e: OSError) -> bool:
+    # нет сокета / нельзя подключиться
+    return e.errno in (
+        errno.ENOENT,       # no such file (socket missing)
+        errno.ECONNREFUSED, # refused
+        errno.ECONNRESET,   # reset by peer
+        errno.ENOTCONN,     # not connected
+        errno.EPIPE,        # broken pipe
+    )
+
+
 def _rpc(req: dict[str, Any]) -> Optional[dict[str, Any]]:
     global _RPC_DOWN_UNTIL
 
@@ -88,13 +107,33 @@ def _rpc(req: dict[str, Any]) -> Optional[dict[str, Any]]:
 
             hdr = _recv_exact(s, 4)
             (ln,) = struct.unpack("!I", hdr)
-            if ln > MAX_REQUEST_BYTES:
+            if ln <= 0 or ln > MAX_REQUEST_BYTES:
                 return None
+
             payload = _recv_exact(s, ln)
             obj = pickle.loads(payload)
             return obj if isinstance(obj, dict) else None
-    except Exception:
+
+    except socket.timeout:
+        # демон жив, но не успел ответить -> НЕ выключаем кеш на 0.5s
+        _RPC_DOWN_UNTIL = time.monotonic() + _RPC_TIMEOUT_BACKOFF_SEC
+        return None
+
+    except FileNotFoundError:
         _RPC_DOWN_UNTIL = time.monotonic() + _RPC_FAIL_BACKOFF_SEC
+        return None
+
+    except (BrokenPipeError, ConnectionError):
+        _RPC_DOWN_UNTIL = time.monotonic() + _RPC_FAIL_BACKOFF_SEC
+        return None
+
+    except OSError as e:
+        _RPC_DOWN_UNTIL = time.monotonic() + (_RPC_FAIL_BACKOFF_SEC if _is_daemon_down_oserror(e) else _RPC_SOFT_BACKOFF_SEC)
+        return None
+
+    except Exception:
+        # неизвестное -> мягко, но не "убить" кеш надолго
+        _RPC_DOWN_UNTIL = time.monotonic() + _RPC_SOFT_BACKOFF_SEC
         return None
 
 

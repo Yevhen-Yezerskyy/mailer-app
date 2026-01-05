@@ -1,6 +1,9 @@
-# FILE: web/panel/aap_audience/views/modal_clar.py  (обновлено — 2025-12-27)
-# PURPOSE: HTML-фрагмент для модалки clar. Показывает города/категории по task (ui_id) и mode (cities|branches).
-#          Источник: crawl_tasks + joins (НЕ crawl_tasks_labeled).
+# FILE: web/panel/aap_audience/views/modal_clar.py
+# DATE: 2026-01-05
+# CHANGE:
+# - Логика модалки НЕ тронута.
+# - load_sorted_* уже возвращают корректный value_text через format_data (внутри clar_items.py).
+# - Никаких "левых интерфейсов" здесь нет и не нужно.
 
 from __future__ import annotations
 

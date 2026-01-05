@@ -1,10 +1,9 @@
-# FILE: web/panel/aap_audience/views/clar.py  (обновлено — 2025-12-27)
-# (новое — 2025-12-27)
-# - Для статусов "в обработке" добавлен прогресс (%):
-#   branches: count(crawl_tasks where task_id + type='branch' + hash_task) / 790 * 100
-#   geo(cities): count(crawl_tasks where task_id + type='city' + hash_task) / 1326 * 100
-# - Процент НЕ ограничивается сверху (если 1000% — значит баг виден всем).
-# - Прогресс считается по hash_task из последней running-записи (__tasks_rating done=false).
+# FILE: web/panel/aap_audience/views/clar.py
+# DATE: 2026-01-05
+# CHANGE:
+# - Ничего не "ломаем": файл остаётся как был (2025-12-27), со всеми статусами/прогрессом/топ-15 и т.д.
+# - Единственное изменение: update_rate теперь вызывается в нормальной сигнатуре (позиционные аргументы),
+#   потому что clar_items.py больше не поддерживает kwargs-обвязку.
 
 from __future__ import annotations
 
@@ -29,9 +28,7 @@ def _get_tasks(request):
     if not ws_id or not getattr(user, "is_authenticated", False):
         return AudienceTask.objects.none()
     return (
-        AudienceTask.objects
-        .filter(workspace_id=ws_id, user=user, archived=False)
-        .order_by("-created_at")
+        AudienceTask.objects.filter(workspace_id=ws_id, user=user, archived=False).order_by("-created_at")
     )
 
 
@@ -94,12 +91,7 @@ def _tasks_rating_fetch(task_id: int):
 
     out = {
         "has_any": False,
-        "branches": {
-            "running": False,
-            "last_done_hash": None,
-            "progress": None,
-            "running_hash": None,
-        },
+        "branches": {"running": False, "last_done_hash": None, "progress": None, "running_hash": None},
         "geo": {"running": False, "last_done_hash": None, "progress": None, "running_hash": None},
     }
     if not rows:
@@ -227,9 +219,9 @@ def clar_view(request):
                 return redirect(request.path)
 
             if action == "toggle_processing":
-                AudienceTask.objects.filter(
-                    id=edit_task.id, workspace_id=ws_id, user=user
-                ).update(run_processing=not edit_task.run_processing)
+                AudienceTask.objects.filter(id=edit_task.id, workspace_id=ws_id, user=user).update(
+                    run_processing=not edit_task.run_processing
+                )
                 return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
 
             if action in ("rate_city", "rate_branch"):
@@ -242,12 +234,12 @@ def clar_view(request):
 
                 try:
                     update_rate(
-                        ws_id=ws_id,
-                        user_id=int(user.id),
-                        task_id=int(edit_task.id),
-                        type_=type_,
-                        value_id=int(value_id),
-                        rate=int(rate_val),
+                        ws_id,
+                        int(user.id),
+                        int(edit_task.id),
+                        type_,
+                        int(value_id),
+                        int(rate_val),
                     )
                 except Exception:
                     pass
@@ -274,9 +266,7 @@ def clar_view(request):
                 form = FormClass(request.POST)
                 if form.is_valid():
                     cd = form.cleaned_data
-                    AudienceTask.objects.filter(
-                        id=edit_task.id, workspace_id=ws_id, user=user
-                    ).update(
+                    AudienceTask.objects.filter(id=edit_task.id, workspace_id=ws_id, user=user).update(
                         title=(cd["title"] or "").strip(),
                         task=(cd["task"] or "").strip(),
                         task_client=(cd["task_client"] or "").strip(),
