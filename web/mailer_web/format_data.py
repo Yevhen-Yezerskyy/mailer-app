@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from django.db import connection
 from django.utils.html import escape
 
-from engine.common.cache.client import memo
+from engine.common.cache.client import memo, memo_many_iter
 import json
 import re
 
@@ -789,3 +789,41 @@ def build_contact_packet(rate_contact_id: int, ui_lang: str) -> Dict[str, Any]:
     ratings = get_ratings(int(rate_contact_id), ui_lang)
     contact = get_contact(get_aggr_id_by_rate_contact(int(rate_contact_id)), ui_lang)
     return {"contact": contact, "ratings": ratings}
+
+
+
+def iter_city_land(city_ids: List[int]):
+    """
+    Yield (city_id, city_land) без гарантии порядка.
+    Использовать ТОЛЬКО для batch/таблиц.
+    """
+
+    def _load(cid: int) -> str:
+        return get_city_land(cid)
+
+    for cid, val in memo_many_iter(
+        city_ids,
+        _load,
+        ttl=TTL_WEEK,
+        version=MEMO_VERSION,
+        chunk=200,
+    ):
+        yield cid, val
+
+
+def iter_branch_str(branch_ids: List[int], ui_lang: str):
+    """
+    Yield (branch_id, branch_str) без гарантии порядка.
+    """
+
+    def _load(bid: int) -> str:
+        return get_branch_str(bid, ui_lang)
+
+    for bid, val in memo_many_iter(
+        branch_ids,
+        _load,
+        ttl=TTL_WEEK,
+        version=MEMO_VERSION,
+        chunk=200,
+    ):
+        yield bid, val

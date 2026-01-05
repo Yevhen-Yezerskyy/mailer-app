@@ -1,5 +1,6 @@
-# FILE: docker-compose.yml  (обновлено — 2025-12-21)
-# PURPOSE: ЧИСТЫЙ DEV на Django runserver — без gunicorn, без кешей, без боли
+# FILE: docker-compose.yml  (обновлено — 2026-01-05)
+# PURPOSE: DEV compose + Redis через UNIX-socket ВНУТРИ проекта (./run/redis/redis.sock),
+#          чтобы и контейнеры, и хост видели один и тот же файл сокета по одному пути в проекте.
 
 services:
   # ------------ POSTGRES ------------
@@ -15,6 +16,19 @@ services:
       - mailer-db-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    networks:
+      - webnet
+
+  # ------------ REDIS (UNIX SOCKET IN PROJECT) ------------
+  mailer-redis:
+    image: redis:7-alpine
+    container_name: mailer-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - /app/run/redis/redis.conf
+    volumes:
+      - ./:/app
     networks:
       - webnet
 

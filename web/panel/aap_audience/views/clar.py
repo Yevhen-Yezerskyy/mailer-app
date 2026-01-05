@@ -293,13 +293,16 @@ def clar_view(request):
             "geo": h64_text((edit_task.task or "") + (edit_task.task_geo or "")),
         }
 
-        edit_cities = load_sorted_cities(ws_id, user.id, int(edit_task.id))
-        edit_branches = load_sorted_branches(ws_id, user.id, int(edit_task.id), ui_lang=ui_lang)
+        # ✅ грузим списки городов/категорий только если реально будут показаны (run_processing=True)
+        if edit_task.run_processing:
+            edit_cities = load_sorted_cities(ws_id, user.id, int(edit_task.id))
+            edit_branches = load_sorted_branches(ws_id, user.id, int(edit_task.id), ui_lang=ui_lang)
 
     tasks = _with_ui_ids(_get_tasks(request))
     if ws_id and getattr(user, "is_authenticated", False) and tasks:
         _bind_tasks_statuses(tasks)
-        _bind_task_top_items(ws_id, user.id, tasks, ui_lang=ui_lang)
+        # ✅ ВАЖНО: НЕ грузим top-15 (имена городов/категорий) в общем списке задач.
+        # _bind_task_top_items(ws_id, user.id, tasks, ui_lang=ui_lang)
 
     return render(
         request,
