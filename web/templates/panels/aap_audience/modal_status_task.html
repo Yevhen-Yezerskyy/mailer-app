@@ -25,7 +25,7 @@
 
     <div class="YY-STATUS_BLUE mb-4">
       {% trans "Рейтинг поиска" %}: {{ ratings.rate_cb_100|default:"-" }}
-      <span class="flex font-normal">{% trans "Город" %}: {{ ratings.chosen_cb.city_str }}</span>
+      <span class="flex font-normal">{% trans "Город" %}: {{ ratings.chosen_cb.city_land }}</span>
       <span class="flex font-normal">{% trans "Категория" %}: {{ ratings.chosen_cb.branch_str }}</span>
     </div>
 

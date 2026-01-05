@@ -186,9 +186,9 @@
             <table class="w-full text-left">
               <thead>
                 <tr class="YY-TH_TR">
-                  <th class="YY-TH_TH w-[30%]">{% trans "Компания" %}</th>
-                  <th class="YY-TH_TH w-[30%]">{% trans "Категории" %}</th>
-                  <th class="YY-TH_TH w-[30%]">{% trans "Город" %}</th>
+                  <th class="YY-TH_TH w-[40%]">{% trans "Компания" %}</th>
+                  <th class="YY-TH_TH w-[40%]">{% trans "Категории" %}</th>
+                  <th class="YY-TH_TH w-[20%]">{% trans "Город" %}</th>
                   <th class="YY-TH_TH">{% trans "Поиск" %}</th>
                   <th class="YY-TH_TH">{% trans "Клиент" %}</th>
                   <th class="YY-TH_TH">&nbsp;</th>
@@ -202,7 +202,7 @@
                       {{ it.contact.address }}
                     </td>
                     <td class="YY-TB_TD">{{ it.contact.branches_html|safe }}</td>
-                    <td class="YY-TB_TD">{{ it.ratings.chosen_cb.city_str }}</td>
+                    <td class="YY-TB_TD">{{ it.ratings.chosen_cb.city_land }}</td>
                     <td class="YY-TB_TD text-center">{{ it.ratings.rate_cb_100 }}</td>
                     <td class="YY-TB_TD text-center {{ it.ratings.rate_cl_bg }}">{{ it.ratings.rate_cl }}</td>
                     <td class="YY-TB_TD">
@@ -304,9 +304,9 @@
             <table class="w-full text-left">
               <thead>
                 <tr class="YY-TH_TR">
-                  <th class="YY-TH_TH w-[30%]">{% trans "Компания" %}</th>
-                  <th class="YY-TH_TH w-[30%]">{% trans "Категории" %}</th>
-                  <th class="YY-TH_TH w-[30%]">{% trans "Город" %}</th>
+                  <th class="YY-TH_TH w-[40%]">{% trans "Компания" %}</th>
+                  <th class="YY-TH_TH w-[40%]">{% trans "Категории" %}</th>
+                  <th class="YY-TH_TH w-[20%]">{% trans "Город" %}</th>
                   <th class="YY-TH_TH">{% trans "Поиск" %}</th>
                   <th class="YY-TH_TH">&nbsp;</th>
                 </tr>
@@ -319,7 +319,7 @@
                       {{ it.contact.address }}
                     </td>
                     <td class="YY-TB_TD">{{ it.contact.branches_html|safe }}</td>
-                    <td class="YY-TB_TD">{{ it.ratings.chosen_cb.city_str }}</td>
+                    <td class="YY-TB_TD">{{ it.ratings.chosen_cb.city_land }}</td>
                     <td class="YY-TB_TD text-center">{{ it.ratings.rate_cb_100 }}</td>
                     <td class="YY-TB_TD">
                       <a href="#"

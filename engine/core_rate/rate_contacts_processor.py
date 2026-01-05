@@ -15,7 +15,7 @@ def main() -> None:
     w = Worker(
         name="core_rate_contacts_processor",
         tick_sec=2,
-        max_parallel=10,
+        max_parallel=5,
     )
 
     w.register(
@@ -31,7 +31,7 @@ def main() -> None:
     w.register(
         name="rate_contacts_done_scan",
         fn=task_rate_contacts_done_scan,
-        every_sec=10,
+        every_sec=20,
         timeout_sec=60,
         singleton=True,
         heavy=False,
