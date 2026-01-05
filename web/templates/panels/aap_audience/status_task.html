@@ -1,11 +1,11 @@
-<!-- FILE: web/templates/panels/aap_audience/status_task.html -->
-<!-- DATE: 2026-01-01 -->
-<!-- CHANGE: правый верхний блок — новая логика статусов/кнопок rating contacts -->
-
 {% extends "panels/base.html" %}
 {% load i18n %}
 
 {% block content %}
+<!-- FILE: web/templates/panels/aap_audience/status_task.html -->
+<!-- DATE: 2026-01-05 -->
+<!-- CHANGE: нижние таблицы читают данные из format_data.build_contact_packet(): it.contact.* и it.ratings.* (город = ratings.chosen_cb.city_str). -->
+
 
 <!-- TOP TABLE -->
 <table class="YY-MAIN_TABLE">
@@ -198,13 +198,13 @@
                 {% for it in rated_rows %}
                   <tr class="YY-TB_TR align-top">
                     <td class="YY-TB_TD">
-                      <span class="YY-TEXT-BOLD">{{ it.company_name }}</span>
-                      {{ it.address_first }}
+                      <span class="YY-TEXT-BOLD">{{ it.contact.company_name }}</span>
+                      {{ it.contact.address }}
                     </td>
-                    <td class="YY-TB_TD">{{ it.branches_str|safe }}</td>
-                    <td class="YY-TB_TD">{{ it.city_str }}</td>
-                    <td class="YY-TB_TD text-center">{{ it.rate_cb_100 }}</td>
-                    <td class="YY-TB_TD text-center {{ it.rate_cl_bg }}">{{ it.rate_cl }}</td>
+                    <td class="YY-TB_TD">{{ it.contact.branches_html|safe }}</td>
+                    <td class="YY-TB_TD">{{ it.ratings.chosen_cb.city_str }}</td>
+                    <td class="YY-TB_TD text-center">{{ it.ratings.rate_cb_100 }}</td>
+                    <td class="YY-TB_TD text-center {{ it.ratings.rate_cl_bg }}">{{ it.ratings.rate_cl }}</td>
                     <td class="YY-TB_TD">
                       <a href="#"
                         class="YY-BUTTON_TAB_MAIN"
@@ -315,12 +315,12 @@
                 {% for it in all_rows %}
                   <tr class="YY-TB_TR align-top">
                     <td class="YY-TB_TD">
-                      <span class="YY-TEXT-BOLD">{{ it.company_name }}</span>
-                      {{ it.address_first }}
+                      <span class="YY-TEXT-BOLD">{{ it.contact.company_name }}</span>
+                      {{ it.contact.address }}
                     </td>
-                    <td class="YY-TB_TD">{{ it.branches_str|safe }}</td>
-                    <td class="YY-TB_TD">{{ it.city_str }}</td>
-                    <td class="YY-TB_TD text-center">{{ it.rate_cb_100 }}</td>
+                    <td class="YY-TB_TD">{{ it.contact.branches_html|safe }}</td>
+                    <td class="YY-TB_TD">{{ it.ratings.chosen_cb.city_str }}</td>
+                    <td class="YY-TB_TD text-center">{{ it.ratings.rate_cb_100 }}</td>
                     <td class="YY-TB_TD">
                       <a href="#"
                         class="YY-BUTTON_TAB_MAIN"

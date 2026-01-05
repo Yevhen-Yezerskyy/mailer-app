@@ -1,13 +1,19 @@
 # FILE: web/mailer_web/format_data.py
-# DATE: 2026-01-04
-# (новое) 2026-01-04
+# DATE: 2026-01-05
+# (новое) 2026-01-05
 # PURPOSE:
-#   format_data v7:
+#   format_data v8:
 #   - UI зовёт ТОЛЬКО публичные функции (get_contact / get_ratings / build_contact_packet).
 #   - *_raw спрятаны внутри.
-#   - CONTACT (печать): только raw_contacts_aggr.{id,email,company_data(norm)} + город по norm.plz.
+#   - CONTACT (печать): raw_contacts_aggr.{id,email,company_data(norm)} + город по norm.plz (через cb_crawler.plz → city_id → cities_sys).
 #     Если company_data не dict ИЛИ norm отсутствует/пустой -> raise (катастрофа).
-#   - RATINGS: контракт неизменен, можно звать отдельно по rate_contacts.id.
+#   - RATINGS: контракт рейтингов сохранён, но city-поля приведены к новому контракту:
+#       city      = cities_sys.name (просто город)
+#       city_norm = normalize_city(city)
+#       city_land = city_norm + " - " + state_name
+#     То же самое в ratings.chosen_cb (вместо city_str).
+#   - _choose_cb_id memoized на TTL_HOUR (как ratings_raw) — второй проход быстрый.
+#   - Убрана мёртвая ветка (дублирующий return) в get_contact_raw.
 
 from __future__ import annotations
 
@@ -23,7 +29,7 @@ import re
 
 TTL_WEEK = 7 * 24 * 60 * 60
 TTL_HOUR = 60 * 60
-MEMO_VERSION = "format_data:v7"
+MEMO_VERSION = "format_data:v8"
 
 
 # ============================================================
@@ -35,13 +41,17 @@ def _is_de_lang(ui_lang: str) -> bool:
     return (s == "de") or s.startswith("de-")
 
 
-def _strip_city_suffix(name: str) -> str:
+def normalize_city(name: str) -> str:
+    """
+    Нормализация города (пока примитивная).
+    Сейчас: отрезаем ', Stadt'. Потом можно расширять.
+    """
+    name = (name or "").strip()
     return name[:-7].rstrip() if name.endswith(", Stadt") else name
 
 
 def _html_block(text: str) -> str:
     return f'<span class="YY-BLOCK">{escape(text)}</span>' if text else ""
-
 
 
 def _html_link(url: str) -> str:
@@ -50,7 +60,7 @@ def _html_link(url: str) -> str:
 
     text = url
     if len(text) > 80:
-        text = text[:70] + "..."
+        text = text[:70] + "."
 
     return (
         f'<a class="YY-LINK" href="{escape(url)}" '
@@ -101,16 +111,26 @@ def _norm_list_str(n: Dict[str, Any], key: str) -> List[str]:
 
 
 def _norm_email_candidates(n: Dict[str, Any]) -> List[str]:
-    v = n.get("email")
-    if isinstance(v, str) and v.strip():
-        return [v.strip()]
-    if not isinstance(v, list):
-        return []
+    # из norm может прилетать email или emails
     out: List[str] = []
-    for x in v:
-        if isinstance(x, str) and x.strip():
-            out.append(x.strip())
-    return out
+    for k in ("email", "emails"):
+        vv = n.get(k)
+        if isinstance(vv, str) and vv.strip():
+            out.append(vv.strip())
+        elif isinstance(vv, list):
+            for x in vv:
+                if isinstance(x, str) and x.strip():
+                    out.append(x.strip())
+    # дедуп (case-insensitive)
+    seen: set[str] = set()
+    res: List[str] = []
+    for e in out:
+        k = e.lower()
+        if k in seen:
+            continue
+        seen.add(k)
+        res.append(e)
+    return res
 
 
 def _emails_add(*, aggr_email: str, norm_emails: List[str]) -> List[str]:
@@ -206,18 +226,18 @@ def get_city_name(city_id: int) -> str:
 
 
 def get_city_norm(city_id: int) -> str:
-    return _strip_city_suffix(get_city_name(city_id))
+    return normalize_city(get_city_name(city_id))
 
 
 def get_city_land(city_id: int) -> str:
     row = get_city_row(city_id)
     if not row:
         return ""
-    name = _strip_city_suffix(row["name"])
+    city = normalize_city(row["name"])
     state = row["state"]
-    if name and state:
-        return f"{name} - {state}"
-    return name or state or ""
+    if city and state:
+        return f"{city} - {state}"
+    return city or state or ""
 
 
 def get_city_id_by_plz(plz: str) -> Optional[int]:
@@ -245,12 +265,18 @@ def get_city_id_by_plz(plz: str) -> Optional[int]:
 def get_city_payload_by_plz(plz: str) -> Dict[str, Any]:
     city_id = get_city_id_by_plz(plz)
     if not city_id:
-        return {"city_id": None, "city": "", "city_land": ""}
+        return {"city_id": None, "city": "", "city_norm": "", "city_land": ""}
+
+    cid = int(city_id)
+    city = get_city_name(cid)
+    city_norm = normalize_city(city)
+    city_land = get_city_land(cid)
 
     return {
-        "city_id": int(city_id),
-        "city": get_city_norm(int(city_id)),
-        "city_land": get_city_land(int(city_id)),
+        "city_id": cid,
+        "city": city,
+        "city_norm": city_norm,
+        "city_land": city_land,
     }
 
 
@@ -303,7 +329,7 @@ def format_branches_html(branch_ids: List[int], ui_lang: str) -> str:
 
 def normalize_phones_for_print(phones: List[str]) -> List[str]:
     """
-    1) Убираем все пробелы/whitespace.
+    1) Убираем все пробелы/whitespace и дефисы.
     2) Дедуп по “хвосту”: сравниваем номера БЕЗ префикса +49/0049/49 и БЕЗ первого нуля (если он первый).
        При точном совпадении хвоста выбрасываем вариант "с нулём" (если есть вариант без нуля).
     3) Возвращаем список (в исходном порядке, но может произойти замена "0..." на "..." если позже встретили лучше).
@@ -319,7 +345,6 @@ def normalize_phones_for_print(phones: List[str]) -> List[str]:
         if s.startswith("0049"):
             return s[4:]
         if s.startswith("49"):
-            # не “умничаем”, просто поддержим частый случай
             return s[2:]
         return s
 
@@ -348,7 +373,6 @@ def normalize_phones_for_print(phones: List[str]) -> List[str]:
             out.append(s)
             continue
 
-        # уже есть такой хвост: если новый БЕЗ нуля, а старый С нулём — заменяем
         if (has0.get(key) is True) and (with0 is False):
             out[pos[key]] = s
             has0[key] = False
@@ -390,7 +414,6 @@ def get_contact_raw(aggr_id: int) -> Optional[Dict[str, Any]]:
     company_data в cursor может прилетать как dict ИЛИ как JSON-строка/bytes — парсим.
     Если norm отсутствует/пустой — raise (катастрофа).
     """
-    import json  # локально, чтобы не спорить с импортами в файле
 
     def _parse_company_data(v: Any) -> Dict[str, Any]:
         if isinstance(v, dict):
@@ -399,7 +422,9 @@ def get_contact_raw(aggr_id: int) -> Optional[Dict[str, Any]]:
             try:
                 v = bytes(v).decode("utf-8", errors="strict")
             except Exception as e:
-                raise ValueError(f"CONTACT_COMPANY_DATA_DECODE_FAIL aggr_id={aggr_id} type={type(v).__name__}") from e
+                raise ValueError(
+                    f"CONTACT_COMPANY_DATA_DECODE_FAIL aggr_id={aggr_id} type={type(v).__name__}"
+                ) from e
         if isinstance(v, str):
             s = v.strip()
             if not s:
@@ -408,9 +433,13 @@ def get_contact_raw(aggr_id: int) -> Optional[Dict[str, Any]]:
                 obj = json.loads(s)
             except Exception as e:
                 sample = s[:200].replace("\n", "\\n")
-                raise ValueError(f"CONTACT_COMPANY_DATA_JSON_LOAD_FAIL aggr_id={aggr_id} sample='{sample}'") from e
+                raise ValueError(
+                    f"CONTACT_COMPANY_DATA_JSON_LOAD_FAIL aggr_id={aggr_id} sample='{sample}'"
+                ) from e
             if not isinstance(obj, dict):
-                raise ValueError(f"CONTACT_COMPANY_DATA_JSON_NOT_OBJECT aggr_id={aggr_id} got={type(obj).__name__}")
+                raise ValueError(
+                    f"CONTACT_COMPANY_DATA_JSON_NOT_OBJECT aggr_id={aggr_id} got={type(obj).__name__}"
+                )
             return obj
         raise ValueError(f"CONTACT_COMPANY_DATA_BAD_TYPE aggr_id={aggr_id} type={type(v).__name__}")
 
@@ -441,67 +470,39 @@ def get_contact_raw(aggr_id: int) -> Optional[Dict[str, Any]]:
 
     return memo(("contact_raw", int(aggr_id)), _load, ttl=TTL_WEEK, version=MEMO_VERSION)
 
-    def _load(_: Tuple[str, int]):
-        with connection.cursor() as cur:
-            cur.execute(
-                """
-                SELECT id, email, company_data
-                FROM public.raw_contacts_aggr
-                WHERE id = %s
-                LIMIT 1
-                """,
-                [int(aggr_id)],
-            )
-            row = cur.fetchone()
-            if not row:
-                return None
 
-            cd = _parse_company_data(row[2])
-
-            # validate norm (катастрофа если нет/пустой)
-            _ = _must_norm(cd)
-
-            return {
-                "aggr_id": int(row[0]),
-                "email": (row[1] or "").strip(),
-                "company_data": cd,
-            }
-
-    return memo(("contact_raw", int(aggr_id)), _load, ttl=TTL_WEEK, version=MEMO_VERSION)
-
+# ============================================================
+# CONTACT (BUILD)
+# ============================================================
 
 def build_contact(raw: Dict[str, Any], ui_lang: str) -> Dict[str, Any]:
-    """
-    CONTACT (печать):
-      - email = aggr.email (истина)
-      - emails_add = norm.email minus aggr.email
-      - tags = norm.branches (display-теги из карточки)
-      - branches_ids = aggr.branches (каноника) -> branches + branches_html через gb_branches/i18n
-      - город: по norm.plz -> cb_crawler -> cities_sys
-      - если norm отсутствует/пустой — raise (катастрофа)
-    """
-    aggr_id = int(raw.get("aggr_id") or 0)
+    aggr_id = int(raw["aggr_id"])
     aggr_email = (raw.get("email") or "").strip()
 
     company_data = _must_company_data(raw.get("company_data"))
     n = _must_norm(company_data)
 
     company_name = _norm_str(n, "company_name")
-    description = _norm_str(n, "description")
+    description = _norm_str(n, "details")
+
+    # address / plz
     address = _norm_str(n, "address")
     plz = _norm_str(n, "plz")
-    website = _norm_str(n, "website")
 
-    phones = _norm_list_str(n, "phone")
-    socials = _norm_list_str(n, "socials")
-
-    source_urls = _norm_list_str(n, "source_urls")
-    source_urls_html = "".join(_html_link(u) for u in source_urls if u)
-
-    emails_add = _emails_add(aggr_email=aggr_email, norm_emails=_norm_email_candidates(n))
+    # emails
+    norm_emails = _norm_email_candidates(n)
+    emails_add = _emails_add(aggr_email=aggr_email, norm_emails=norm_emails)
     emails_add_html = "".join(_html_mailto(e) for e in emails_add if e)
 
-    # tags (display) = то, что раньше ошибочно называли branches в norm
+    # phones
+    phones = _norm_list_str(n, "phone")
+
+    # website + socials + sources
+    website = _norm_str(n, "website")
+    socials = _norm_list_str(n, "socials")
+    source_urls = _norm_list_str(n, "source_urls")
+
+    # tags (старое: norm.branches)
     tags = _norm_list_str(n, "branches")
     tags_html = "".join(_html_block(t) for t in tags if t)
 
@@ -512,6 +513,7 @@ def build_contact(raw: Dict[str, Any], ui_lang: str) -> Dict[str, Any]:
     branches = [s for s in branches if s]
     branches_html = "".join(_html_block(s) for s in branches)
 
+    # city payload (new contract)
     city_payload = get_city_payload_by_plz(plz)
 
     return {
@@ -532,6 +534,7 @@ def build_contact(raw: Dict[str, Any], ui_lang: str) -> Dict[str, Any]:
 
         "city_id": city_payload["city_id"],
         "city": city_payload["city"],
+        "city_norm": city_payload["city_norm"],
         "city_land": city_payload["city_land"],
 
         "phone": phones,
@@ -551,11 +554,10 @@ def build_contact(raw: Dict[str, Any], ui_lang: str) -> Dict[str, Any]:
         "tags_html": tags_html,
 
         "source_urls": source_urls,
-        "source_urls_html": source_urls_html,
+        "source_urls_html": "".join(_html_link(u) for u in source_urls if u),
 
         "norm": n,
     }
-    
 
 
 # ============================================================
@@ -646,59 +648,72 @@ def _choose_cb_id(task_id: int, rate_cb: Any, cb_ids: List[int]) -> Optional[int
     if not cb_ids:
         return None
 
-    with connection.cursor() as cur:
-        cur.execute(
-            """
-            WITH cb AS (
-              SELECT id::bigint AS cb_id, city_id::int, branch_id::int
-              FROM public.cb_crawler
-              WHERE id = ANY(%s)
-            ),
-            city_r AS (
-              SELECT value_id::int AS city_id, MIN(rate)::int AS rate_city
-              FROM public.crawl_tasks
-              WHERE task_id = %s AND type = 'city'
-              GROUP BY value_id
-            ),
-            branch_r AS (
-              SELECT value_id::int AS branch_id, MIN(rate)::int AS rate_branch
-              FROM public.crawl_tasks
-              WHERE task_id = %s AND type = 'branch'
-              GROUP BY value_id
-            )
-            SELECT
-              cb.cb_id,
-              (cr.rate_city * br.rate_branch) AS product
-            FROM cb
-            LEFT JOIN city_r cr ON cr.city_id = cb.city_id
-            LEFT JOIN branch_r br ON br.branch_id = cb.branch_id
-            """,
-            [cb_ids, int(task_id), int(task_id)],
-        )
-        rows = cur.fetchall()
-
     target: Optional[int] = None
     try:
         target = int(rate_cb) if rate_cb is not None else None
     except Exception:
         target = None
 
-    if target is not None:
+    import hashlib
+
+    h = hashlib.sha1()
+    h.update(str(int(task_id)).encode("utf-8"))
+    h.update(b"|")
+    h.update(str(int(target)).encode("utf-8") if target is not None else b"none")
+    h.update(b"|")
+    h.update(",".join(str(int(x)) for x in cb_ids).encode("utf-8"))
+    digest = h.hexdigest()[:16]
+
+    def _load(_: Tuple[str, int, str]):
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                WITH cb AS (
+                  SELECT id::bigint AS cb_id, city_id::int, branch_id::int
+                  FROM public.cb_crawler
+                  WHERE id = ANY(%s)
+                ),
+                city_r AS (
+                  SELECT value_id::int AS city_id, MIN(rate)::int AS rate_city
+                  FROM public.crawl_tasks
+                  WHERE task_id = %s AND type = 'city'
+                  GROUP BY value_id
+                ),
+                branch_r AS (
+                  SELECT value_id::int AS branch_id, MIN(rate)::int AS rate_branch
+                  FROM public.crawl_tasks
+                  WHERE task_id = %s AND type = 'branch'
+                  GROUP BY value_id
+                )
+                SELECT
+                  cb.cb_id,
+                  (cr.rate_city * br.rate_branch) AS product
+                FROM cb
+                LEFT JOIN city_r cr ON cr.city_id = cb.city_id
+                LEFT JOIN branch_r br ON br.branch_id = cb.branch_id
+                """,
+                [cb_ids, int(task_id), int(task_id)],
+            )
+            rows = cur.fetchall()
+
+        if target is not None:
+            for cb_id, product in rows:
+                if product is not None and int(product) == target:
+                    return int(cb_id)
+
+        best_cb: Optional[int] = None
+        best_prod: Optional[int] = None
         for cb_id, product in rows:
-            if product is not None and int(product) == target:
-                return int(cb_id)
+            if product is None:
+                continue
+            p = int(product)
+            if best_prod is None or p < best_prod:
+                best_prod = p
+                best_cb = int(cb_id)
 
-    best_cb: Optional[int] = None
-    best_prod: Optional[int] = None
-    for cb_id, product in rows:
-        if product is None:
-            continue
-        p = int(product)
-        if best_prod is None or p < best_prod:
-            best_prod = p
-            best_cb = int(cb_id)
+        return best_cb if best_cb is not None else int(cb_ids[0])
 
-    return best_cb if best_cb is not None else int(cb_ids[0])
+    return memo(("choose_cb_id", int(task_id), digest), _load, ttl=TTL_HOUR, version=MEMO_VERSION)
 
 
 def build_ratings(r: Dict[str, Any], cb_ids: List[int], ui_lang: str) -> Dict[str, Any]:
@@ -712,7 +727,10 @@ def build_ratings(r: Dict[str, Any], cb_ids: List[int], ui_lang: str) -> Dict[st
 
     city_id: Optional[int] = None
     branch_id: Optional[int] = None
-    city_str = ""
+
+    city = ""
+    city_norm = ""
+    city_land = ""
     branch_str = ""
 
     if chosen_cb_id:
@@ -721,11 +739,10 @@ def build_ratings(r: Dict[str, Any], cb_ids: List[int], ui_lang: str) -> Dict[st
             city_id = cb["city_id"]
             branch_id = cb["branch_id"]
 
-            cr = get_city_row(city_id)
-            if cr:
-                nm = cr["name"]
-                st = cr["state"]
-                city_str = f"{nm} - {st}" if (nm and st) else (nm or st or "")
+            if city_id is not None:
+                city = get_city_name(int(city_id))
+                city_norm = normalize_city(city)
+                city_land = get_city_land(int(city_id))
 
             branch_str = get_branch_str(branch_id, ui_lang) if branch_id is not None else ""
 
@@ -741,8 +758,10 @@ def build_ratings(r: Dict[str, Any], cb_ids: List[int], ui_lang: str) -> Dict[st
         "chosen_cb": {
             "cb_id": int(chosen_cb_id) if chosen_cb_id else None,
             "city_id": city_id,
+            "city": city,
+            "city_norm": city_norm,
+            "city_land": city_land,
             "branch_id": branch_id,
-            "city_str": city_str,
             "branch_str": branch_str,
         },
     }

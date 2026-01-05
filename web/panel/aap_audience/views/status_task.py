@@ -1,7 +1,7 @@
-# FILE: web/panel/aap_audience/views/status_task.py  (обновлено — 2026-01-03)
-# PURPOSE: Страница статуса AudienceTask: контакты (rated/all) + правая верхняя карточка.
-#          Обновление: 1) cb rate (Поиск) перенормализован в 1..100 без нулей (ceil(product/100));
-#          2) для rated добавлено rate_cl_bg = bg-10..bg-100 по десяткам.
+# FILE: web/panel/aap_audience/views/status_task.py
+# DATE: 2026-01-05
+# CHANGE: нижние таблицы (rated/all) теперь собираются ТОЛЬКО через format_data.build_contact_packet(rate_contacts.id);
+#         никаких JOIN в raw_contacts_aggr/форматирования в status_task.py; добавлен ui_id для модалки.
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from django.shortcuts import redirect, render
 
 from engine.common.utils import h64_text
 from mailer_web.access import encode_id, resolve_pk_or_redirect
+from mailer_web.format_data import build_contact_packet
 from panel.aap_audience.models import AudienceTask
 
 PAGE_SIZE = 50
@@ -27,187 +28,10 @@ def _safe_int(v: Any, default: int = 1) -> int:
         return default
 
 
-def _qall(sql: str, params: list[Any]) -> list[dict]:
-    with connection.cursor() as cur:
-        cur.execute(sql, params)
-        cols = [c[0] for c in cur.description]
-        return [dict(zip(cols, r)) for r in cur.fetchall()]
-
-
 def _pct(part: int, total: int) -> int:
     if not total:
         return 0
     return int(round((int(part) * 100.0) / float(int(total))))
-
-
-def _is_de_lang(ui_lang: str) -> bool:
-    s = (ui_lang or "").strip().lower()
-    return (s == "de") or s.startswith("de-")
-
-
-def _cb_to_1_100(rate_cb: Any) -> int | None:
-    if rate_cb is None:
-        return None
-    try:
-        v = int(float(rate_cb))
-    except Exception:
-        return None
-    if v <= 0:
-        return 1
-    # rate_cb = city_rate(1..100) * branch_rate(1..100) => 1..10000
-    # хотим 1..100 без нулей
-    x = (v + 99) // 100  # ceil(v/100)
-    if x < 1:
-        return 1
-    if x > 100:
-        return 100
-    return int(x)
-
-
-def _rate_cl_bg(rate_cl: Any) -> str:
-    try:
-        v = int(rate_cl)
-    except Exception:
-        return ""
-    if v <= 0:
-        return "bg-10"
-    if v > 100:
-        return "bg-100"
-    bucket = ((v - 1) // 10 + 1) * 10  # 1-10=>10, 11-20=>20, ...
-    if bucket < 10:
-        bucket = 10
-    if bucket > 100:
-        bucket = 100
-    return f"bg-{bucket}"
-
-
-def _branches_map_for_rows(rows: list[dict], *, ui_lang: str) -> dict[int, str]:
-    ids: set[int] = set()
-    for r in rows:
-        br = r.get("branches") or []
-        if isinstance(br, (list, tuple)):
-            for x in br:
-                try:
-                    ids.add(int(x))
-                except Exception:
-                    pass
-
-    if not ids:
-        return {}
-
-    ids_list = sorted(ids)
-    want_de_only = _is_de_lang(ui_lang)
-    lang = (ui_lang or "ru").strip().lower()
-
-    sql = """
-        SELECT
-            b.id::int AS id,
-            b.name::text AS de_name,
-            i.name_trans::text AS tr_name
-        FROM public.gb_branches b
-        LEFT JOIN public.gb_branch_i18n i
-               ON i.branch_id = b.id
-              AND i.lang = %s
-        WHERE b.id = ANY(%s)
-    """
-
-    with connection.cursor() as cur:
-        cur.execute(sql, [lang, ids_list])
-        out: dict[int, str] = {}
-        for bid, de_name, tr_name in cur.fetchall():
-            de_name = (de_name or "").strip()
-            tr_name = (tr_name or "").strip()
-            if want_de_only:
-                out[int(bid)] = de_name
-            else:
-                out[int(bid)] = f"{de_name} - {tr_name}" if tr_name else de_name
-        return out
-
-
-def _cities_map_for_rows(rows: list[dict]) -> dict[int, str]:
-    """
-    Map: cb_crawler.id -> "city, state"
-    Берём только первый cb_crawler_id для каждого контакта.
-    """
-    ids: set[int] = set()
-    for r in rows:
-        arr = r.get("cb_crawler_ids") or []
-        if isinstance(arr, (list, tuple)) and arr:
-            try:
-                ids.add(int(arr[0]))
-            except Exception:
-                pass
-
-    if not ids:
-        return {}
-
-    ids_list = sorted(ids)
-
-    sql = """
-        SELECT
-            c.id,
-            cs.name,
-            cs.state_name
-        FROM public.cb_crawler c
-        JOIN public.cities_sys cs ON cs.id = c.city_id
-        WHERE c.id = ANY(%s)
-    """
-    with connection.cursor() as cur:
-        cur.execute(sql, [ids_list])
-        out: dict[int, str] = {}
-        for cid, name, state in cur.fetchall():
-            name = (name or "").strip()
-            state = (state or "").strip()
-            out[int(cid)] = f"{name}, {state}".strip(", ")
-        return out
-
-
-def _format_contact_rows(rows: list[dict], *, ui_lang: str) -> list[dict]:
-    br_map = _branches_map_for_rows(rows, ui_lang=ui_lang)
-    city_map = _cities_map_for_rows(rows)
-
-    out = []
-    for r in rows:
-        branches = r.get("branches") or []
-        addr_list = r.get("address_list") or []
-        cb_ids = r.get("cb_crawler_ids") or []
-
-        if isinstance(branches, (list, tuple)):
-            br_parts = []
-            for x in branches:
-                try:
-                    bid = int(x)
-                    br_parts.append(br_map.get(bid, str(bid)))
-                except Exception:
-                    br_parts.append(str(x))
-            branches_str = '<span class="YY-TEXT">' + '</span><span class="YY-TEXT">'.join(br_parts) + "</span>"
-        else:
-            branches_str = str(branches)
-
-        city_str = ""
-        if isinstance(cb_ids, (list, tuple)) and cb_ids:
-            try:
-                city_str = city_map.get(int(cb_ids[0]), "")
-            except Exception:
-                city_str = ""
-
-        rate_cb_100 = _cb_to_1_100(r.get("rate_cb"))
-        rate_cl = r.get("rate_cl")
-
-        out.append(
-            {
-                "ui_id": encode_id(int(r.get("rate_contact_id") or 0)),  # для модалки (rate_contacts.id)
-                "contact_id": int(r.get("contact_id") or 0),
-                "company_name": (r.get("company_name") or "").strip(),
-                "branches_str": branches_str,
-                "city_str": city_str,
-                "address_first": (addr_list[0] if isinstance(addr_list, (list, tuple)) and addr_list else "") or "",
-                "rate_cl": rate_cl,
-                "rate_cl_bg": _rate_cl_bg(rate_cl),
-                "rate_cb_100": rate_cb_100,
-            }
-        )
-    return out
 
 
 def _fetch_contacts_total_and_rated(task_id: int) -> tuple[int, int]:
@@ -252,6 +76,16 @@ def _fetch_rated_buckets(task_id: int) -> tuple[int, int, int]:
         return int(row[0] or 0), int(row[1] or 0), int(row[2] or 0)
 
 
+def _packets_for_ids(rate_contact_ids: list[int], *, ui_lang: str) -> list[dict]:
+    out: list[dict] = []
+    for rc_id in rate_contact_ids:
+        p = build_contact_packet(int(rc_id), ui_lang)
+        # ui_id — UI/URL логика вьюхи (не format_data)
+        p["ui_id"] = encode_id(int(rc_id))
+        out.append(p)
+    return out
+
+
 def _fetch_contacts_rated(task_id: int, *, page: int, ui_lang: str) -> tuple[int, list[dict]]:
     with connection.cursor() as cur:
         cur.execute(
@@ -268,29 +102,23 @@ def _fetch_contacts_rated(task_id: int, *, page: int, ui_lang: str) -> tuple[int
         total = int((cur.fetchone() or [0])[0] or 0)
 
     offset = (page - 1) * PAGE_SIZE
-    rows = _qall(
-        """
-        SELECT
-            rc.id AS rate_contact_id,
-            rc.contact_id,
-            rca.company_name,
-            rca.branches,
-            rca.cb_crawler_ids,
-            rca.address_list,
-            rc.rate_cl,
-            rc.rate_cb
-        FROM public.rate_contacts rc
-        JOIN public.raw_contacts_aggr rca ON rca.id = rc.contact_id
-        WHERE rc.task_id = %s
-          AND rc.rate_cl IS NOT NULL
-          AND rc.hash_task IS NOT NULL
-          AND rc.hash_task NOT IN (-1,0,1)
-        ORDER BY rc.rate_cl ASC, rc.contact_id ASC
-        LIMIT %s OFFSET %s
-        """,
-        [int(task_id), int(PAGE_SIZE), int(offset)],
-    )
-    return total, _format_contact_rows(rows, ui_lang=ui_lang)
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT rc.id::bigint
+            FROM public.rate_contacts rc
+            WHERE rc.task_id = %s
+              AND rc.rate_cl IS NOT NULL
+              AND rc.hash_task IS NOT NULL
+              AND rc.hash_task NOT IN (-1,0,1)
+            ORDER BY rc.rate_cl ASC, rc.contact_id ASC
+            LIMIT %s OFFSET %s
+            """,
+            [int(task_id), int(PAGE_SIZE), int(offset)],
+        )
+        ids = [int(r[0]) for r in cur.fetchall()]
+
+    return total, _packets_for_ids(ids, ui_lang=ui_lang)
 
 
 def _fetch_contacts_all(task_id: int, *, page: int, ui_lang: str) -> tuple[int, list[dict]]:
@@ -306,26 +134,20 @@ def _fetch_contacts_all(task_id: int, *, page: int, ui_lang: str) -> tuple[int, 
         total = int((cur.fetchone() or [0])[0] or 0)
 
     offset = (page - 1) * PAGE_SIZE
-    rows = _qall(
-        """
-        SELECT
-            rc.id AS rate_contact_id,
-            rc.contact_id,
-            rca.company_name,
-            rca.branches,
-            rca.cb_crawler_ids,
-            rca.address_list,
-            rc.rate_cl,
-            rc.rate_cb
-        FROM public.rate_contacts rc
-        JOIN public.raw_contacts_aggr rca ON rca.id = rc.contact_id
-        WHERE rc.task_id = %s
-        ORDER BY rc.rate_cb ASC NULLS LAST, rc.contact_id ASC
-        LIMIT %s OFFSET %s
-        """,
-        [int(task_id), int(PAGE_SIZE), int(offset)],
-    )
-    return total, _format_contact_rows(rows, ui_lang=ui_lang)
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT rc.id::bigint
+            FROM public.rate_contacts rc
+            WHERE rc.task_id = %s
+            ORDER BY rc.rate_cb ASC NULLS LAST, rc.contact_id ASC
+            LIMIT %s OFFSET %s
+            """,
+            [int(task_id), int(PAGE_SIZE), int(offset)],
+        )
+        ids = [int(r[0]) for r in cur.fetchall()]
+
+    return total, _packets_for_ids(ids, ui_lang=ui_lang)
 
 
 def _rating_any_exists(task_id: int) -> bool:
