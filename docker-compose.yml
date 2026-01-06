@@ -1,8 +1,8 @@
 # FILE: docker-compose.yml  (обновлено — 2026-01-06)
-# PURPOSE: Фиксируем tmpfs volume как EXTERNAL (имя строго mailer-redis-prod-run),
-#          чтобы redis.sock был одинаково виден во всех prod контейнерах.
+# PURPOSE: Ограничить CPU для dev Django (0.5) и для prod воркеров (0.20 каждый); prod web без лимита.
 
 services:
+  # -------- DEV --------
   mailer-db:
     image: postgres:16
     container_name: mailer-db
@@ -13,6 +13,10 @@ services:
       POSTGRES_PASSWORD: secret
     volumes:
       - mailer-db-data:/var/lib/postgresql/data
+    command: >
+      postgres -c shared_preload_libraries=pg_stat_statements
+           -c pg_stat_statements.track=all
+           -c pg_stat_statements.max=10000
     ports:
       - "5433:5432"
     networks: [webnet]
@@ -29,7 +33,7 @@ services:
   mailer-web:
     build:
       context: .
-      dockerfile: Dockerfile_Django
+      dockerfile: .DockerFiles/Dockerfile_Django
     container_name: mailer-web
     working_dir: /app/web
     restart: unless-stopped
@@ -48,6 +52,7 @@ services:
       - ./:/app
     ports:
       - "8000:8000"
+    cpus: "0.5"
     command: >
       /app/.venv/bin/python manage.py runserver 0.0.0.0:8000
     networks: [webnet]
@@ -65,7 +70,10 @@ services:
     networks: [webnet]
 
   mailer-web-prod:
-    image: python:3.12-slim
+    build:
+      context: .
+      dockerfile: .DockerFiles/Dockerfile_prod_web
+    image: mailer-web-prod:latest
     container_name: mailer-web-prod
     working_dir: /app/web
     restart: unless-stopped
@@ -83,20 +91,21 @@ services:
       - mailer-app-prod:/app
       - mailer-static:/app/web/staticfiles
       - mailer-redis-prod-run:/app/run/redis
+    ports:
+      - "8001:8000"
     command: >
       /bin/sh -lc "
-        apt-get update &&
-        apt-get install -y --no-install-recommends gettext &&
-        rm -rf /var/lib/apt/lists/* &&
-        python -m pip install --no-cache-dir -U pip &&
-        pip install --no-cache-dir -r /app/requirements/web.lock.txt &&
         python manage.py collectstatic --noinput &&
         gunicorn mailer_web.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120
       "
     networks: [webnet]
 
+  # Все воркеры на одном образе; каждому cap 0.20 CPU
   mailer-engine-cb-prod:
-    image: python:3.12-slim
+    build:
+      context: .
+      dockerfile: .DockerFiles/Dockerfile_prod_engine
+    image: mailer-engine-prod:latest
     container_name: mailer-engine-cb-prod
     working_dir: /app
     restart: unless-stopped
@@ -112,20 +121,17 @@ services:
     volumes:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
+    cpus: "0.15"
     command: >
-      /bin/sh -lc "
-        python -m pip install --no-cache-dir -U pip &&
-        pip install --no-cache-dir -r /app/requirements/engine.lock.txt &&
-        python -m engine.core_prepare.prepare_cb_processor
-      "
+      /bin/sh -lc "python -m engine.core_prepare.prepare_cb_processor"
     networks: [webnet]
 
   mailer-engine-val-prod:
-    image: python:3.12-slim
+    image: mailer-engine-prod:latest
     container_name: mailer-engine-val-prod
     working_dir: /app
     restart: unless-stopped
-    depends_on: [mailer-db, mailer-redis-prod]
+    depends_on: [mailer-db, mailer-redis-prod, mailer-engine-cb-prod]
     environment:
       PYTHONPATH: /app
       DB_HOST: mailer-db
@@ -137,20 +143,17 @@ services:
     volumes:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
+    cpus: "0.15"
     command: >
-      /bin/sh -lc "
-        python -m pip install --no-cache-dir -U pip &&
-        pip install --no-cache-dir -r /app/requirements/engine.lock.txt &&
-        python -m engine.core_validate.val_processor
-      "
+      /bin/sh -lc "python -m engine.core_validate.val_processor"
     networks: [webnet]
 
   mailer-engine-exp-prod:
-    image: python:3.12-slim
+    image: mailer-engine-prod:latest
     container_name: mailer-engine-exp-prod
     working_dir: /app
     restart: unless-stopped
-    depends_on: [mailer-db, mailer-redis-prod]
+    depends_on: [mailer-db, mailer-redis-prod, mailer-engine-cb-prod]
     environment:
       PYTHONPATH: /app
       DB_HOST: mailer-db
@@ -162,20 +165,17 @@ services:
     volumes:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
+    cpus: "0.15"
     command: >
-      /bin/sh -lc "
-        python -m pip install --no-cache-dir -U pip &&
-        pip install --no-cache-dir -r /app/requirements/engine.lock.txt &&
-        python -m engine.core_validate.val_expand_processor
-      "
+      /bin/sh -lc "python -m engine.core_validate.val_expand_processor"
     networks: [webnet]
 
   mailer-engine-rate-prod:
-    image: python:3.12-slim
+    image: mailer-engine-prod:latest
     container_name: mailer-engine-rate-prod
     working_dir: /app
     restart: unless-stopped
-    depends_on: [mailer-db, mailer-redis-prod]
+    depends_on: [mailer-db, mailer-redis-prod, mailer-engine-cb-prod]
     environment:
       PYTHONPATH: /app
       DB_HOST: mailer-db
@@ -187,20 +187,17 @@ services:
     volumes:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
+    cpus: "0.15"
     command: >
-      /bin/sh -lc "
-        python -m pip install --no-cache-dir -U pip &&
-        pip install --no-cache-dir -r /app/requirements/engine.lock.txt &&
-        python -m engine.core_rate.rate_contacts_processor
-      "
+      /bin/sh -lc "python -m engine.core_rate.rate_contacts_processor"
     networks: [webnet]
 
   mailer-engine-cr-prod:
-    image: python:3.12-slim
+    image: mailer-engine-prod:latest
     container_name: mailer-engine-cr-prod
     working_dir: /app
     restart: unless-stopped
-    depends_on: [mailer-db, mailer-redis-prod]
+    depends_on: [mailer-db, mailer-redis-prod, mailer-engine-cb-prod]
     environment:
       PYTHONPATH: /app
       DB_HOST: mailer-db
@@ -212,12 +209,35 @@ services:
     volumes:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
+    cpus: "0.10"
     command: >
-      /bin/sh -lc "
-        python -m pip install --no-cache-dir -U pip &&
-        pip install --no-cache-dir -r /app/requirements/engine.lock.txt &&
-        python -m engine.crawler.cr_processor
-      "
+      /bin/sh -lc "python -m engine.crawler.cr_processor"
+    networks: [webnet]
+
+  # -------- OPS / TOOLBOX --------
+  mailer-ops-prod:
+    build:
+      context: .
+      dockerfile: .DockerFiles/Dockerfile_ops
+    image: mailer-ops-prod:latest
+    container_name: mailer-ops-prod
+    working_dir: /app
+    restart: unless-stopped
+    environment:
+      PYTHONPATH: /app
+      DB_HOST: mailer-db
+      DB_PORT: "5432"
+      DB_NAME: mailersys
+      DB_USER: mailersys_user
+      DB_PASSWORD: secret
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - mailer-app-prod:/app
+      - mailer-static:/app/web/staticfiles
+      - mailer-redis-prod-run:/app/run/redis
+      - /home/eee/.ssh:/root/.ssh:ro
+    command: >
+      /bin/sh -lc "sleep infinity"
     networks: [webnet]
 
 volumes:
@@ -229,7 +249,6 @@ volumes:
   mailer-static:
     external: true
 
-  # ВАЖНО: фиксированное имя, один том на все compose-проекты
   mailer-redis-prod-run:
     external: true
     name: mailer-redis-prod-run

@@ -1,0 +1,23 @@
+# FILE: .DockerFiles/Dockerfile_ops  (новое — 2026-01-06)
+# PURPOSE: Always-on lightweight toolbox for prod volume: git + basic utils; no app deps.
+
+FROM debian:bookworm-slim
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      git \
+      ca-certificates \
+      curl \
+      wget \
+      nano \
+      vim-tiny \
+      less \
+      procps \
+      iproute2 \
+      openssh-client \
+      tzdata \
+      postgresql-client \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+ENV LANG=C.UTF-8

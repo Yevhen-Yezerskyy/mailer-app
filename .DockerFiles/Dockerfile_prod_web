@@ -1,0 +1,18 @@
+# FILE: .DockerFiles/Dockerfile_prod_web  (новое — 2026-01-06)
+# PURPOSE: Prod Django+Gunicorn image: system deps + python deps from requirements/web.lock.txt; no pip/apt at runtime.
+
+FROM python:3.12-slim
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gettext \
+ && rm -rf /var/lib/apt/lists/*
+
+# Только lock-файл для кеша зависимостей
+COPY requirements/web.lock.txt /tmp/requirements/web.lock.txt
+
+RUN python -m pip install --no-cache-dir -U pip \
+ && pip install --no-cache-dir -r /tmp/requirements/web.lock.txt \
+ && rm -rf /tmp/requirements
+
+WORKDIR /app/web
+ENV PYTHONUNBUFFERED=1
