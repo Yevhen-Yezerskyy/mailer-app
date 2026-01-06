@@ -13,7 +13,7 @@ def main() -> None:
     w = Worker(
         name="prepare_cb_processor",
         tick_sec=3,
-        max_parallel=6,
+        max_parallel=4,
     )
 
     w.register(
