@@ -1,5 +1,6 @@
 # FILE: docker-compose.yml  (обновлено — 2026-01-06)
-# PURPOSE: Привести env DB_* и DEBUG к тому же формату, что использует Django settings + engine/common/db.py.
+# PURPOSE: Фиксируем tmpfs volume как EXTERNAL (имя строго mailer-redis-prod-run),
+#          чтобы redis.sock был одинаково виден во всех prod контейнерах.
 
 services:
   mailer-db:
@@ -14,20 +15,16 @@ services:
       - mailer-db-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
-    networks:
-      - webnet
+    networks: [webnet]
 
   mailer-redis:
     image: redis:7-alpine
     container_name: mailer-redis
     restart: unless-stopped
-    command:
-      - redis-server
-      - /app/config/redis/redis-dev.conf
+    command: ["redis-server", "/app/config/redis/redis-dev.conf"]
     volumes:
       - ./:/app
-    networks:
-      - webnet
+    networks: [webnet]
 
   mailer-web:
     build:
@@ -37,37 +34,205 @@ services:
     working_dir: /app/web
     restart: unless-stopped
     user: "1001:1001"
-    depends_on:
-      - mailer-db
-
+    depends_on: [mailer-db, mailer-redis]
     environment:
-      # DB (container-mode)
+      PYTHONPATH: /app
+      DEBUG: "1"
       DB_HOST: mailer-db
       DB_PORT: "5432"
       DB_NAME: mailersys
       DB_USER: mailersys_user
       DB_PASSWORD: secret
-
-      # Django
-      DEBUG: "1"
-      PYTHONPATH: /app
-
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-
     volumes:
       - ./:/app
-
     ports:
       - "8000:8000"
-
     command: >
       /app/.venv/bin/python manage.py runserver 0.0.0.0:8000
+    networks: [webnet]
 
-    networks:
-      - webnet
+  # -------- PROD --------
+  mailer-redis-prod:
+    image: redis:7-alpine
+    container_name: mailer-redis-prod
+    restart: unless-stopped
+    command: >
+      /bin/sh -lc "mkdir -p /app/run/redis && chmod 777 /app/run/redis && exec redis-server /app/config/redis/redis-prod.conf"
+    volumes:
+      - mailer-app-prod:/app
+      - mailer-redis-prod-run:/app/run/redis
+    networks: [webnet]
+
+  mailer-web-prod:
+    image: python:3.12-slim
+    container_name: mailer-web-prod
+    working_dir: /app/web
+    restart: unless-stopped
+    depends_on: [mailer-db, mailer-redis-prod]
+    environment:
+      PYTHONPATH: /app
+      DEBUG: "0"
+      DB_HOST: mailer-db
+      DB_PORT: "5432"
+      DB_NAME: mailersys
+      DB_USER: mailersys_user
+      DB_PASSWORD: secret
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - mailer-app-prod:/app
+      - mailer-static:/app/web/staticfiles
+      - mailer-redis-prod-run:/app/run/redis
+    command: >
+      /bin/sh -lc "
+        apt-get update &&
+        apt-get install -y --no-install-recommends gettext &&
+        rm -rf /var/lib/apt/lists/* &&
+        python -m pip install --no-cache-dir -U pip &&
+        pip install --no-cache-dir -r /app/requirements/web.lock.txt &&
+        python manage.py collectstatic --noinput &&
+        gunicorn mailer_web.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120
+      "
+    networks: [webnet]
+
+  mailer-engine-cb-prod:
+    image: python:3.12-slim
+    container_name: mailer-engine-cb-prod
+    working_dir: /app
+    restart: unless-stopped
+    depends_on: [mailer-db, mailer-redis-prod]
+    environment:
+      PYTHONPATH: /app
+      DB_HOST: mailer-db
+      DB_PORT: "5432"
+      DB_NAME: mailersys
+      DB_USER: mailersys_user
+      DB_PASSWORD: secret
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - mailer-app-prod:/app
+      - mailer-redis-prod-run:/app/run/redis
+    command: >
+      /bin/sh -lc "
+        python -m pip install --no-cache-dir -U pip &&
+        pip install --no-cache-dir -r /app/requirements/engine.lock.txt &&
+        python -m engine.core_prepare.prepare_cb_processor
+      "
+    networks: [webnet]
+
+  mailer-engine-val-prod:
+    image: python:3.12-slim
+    container_name: mailer-engine-val-prod
+    working_dir: /app
+    restart: unless-stopped
+    depends_on: [mailer-db, mailer-redis-prod]
+    environment:
+      PYTHONPATH: /app
+      DB_HOST: mailer-db
+      DB_PORT: "5432"
+      DB_NAME: mailersys
+      DB_USER: mailersys_user
+      DB_PASSWORD: secret
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - mailer-app-prod:/app
+      - mailer-redis-prod-run:/app/run/redis
+    command: >
+      /bin/sh -lc "
+        python -m pip install --no-cache-dir -U pip &&
+        pip install --no-cache-dir -r /app/requirements/engine.lock.txt &&
+        python -m engine.core_validate.val_processor
+      "
+    networks: [webnet]
+
+  mailer-engine-exp-prod:
+    image: python:3.12-slim
+    container_name: mailer-engine-exp-prod
+    working_dir: /app
+    restart: unless-stopped
+    depends_on: [mailer-db, mailer-redis-prod]
+    environment:
+      PYTHONPATH: /app
+      DB_HOST: mailer-db
+      DB_PORT: "5432"
+      DB_NAME: mailersys
+      DB_USER: mailersys_user
+      DB_PASSWORD: secret
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - mailer-app-prod:/app
+      - mailer-redis-prod-run:/app/run/redis
+    command: >
+      /bin/sh -lc "
+        python -m pip install --no-cache-dir -U pip &&
+        pip install --no-cache-dir -r /app/requirements/engine.lock.txt &&
+        python -m engine.core_validate.val_expand_processor
+      "
+    networks: [webnet]
+
+  mailer-engine-rate-prod:
+    image: python:3.12-slim
+    container_name: mailer-engine-rate-prod
+    working_dir: /app
+    restart: unless-stopped
+    depends_on: [mailer-db, mailer-redis-prod]
+    environment:
+      PYTHONPATH: /app
+      DB_HOST: mailer-db
+      DB_PORT: "5432"
+      DB_NAME: mailersys
+      DB_USER: mailersys_user
+      DB_PASSWORD: secret
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - mailer-app-prod:/app
+      - mailer-redis-prod-run:/app/run/redis
+    command: >
+      /bin/sh -lc "
+        python -m pip install --no-cache-dir -U pip &&
+        pip install --no-cache-dir -r /app/requirements/engine.lock.txt &&
+        python -m engine.core_rate.rate_contacts_processor
+      "
+    networks: [webnet]
+
+  mailer-engine-cr-prod:
+    image: python:3.12-slim
+    container_name: mailer-engine-cr-prod
+    working_dir: /app
+    restart: unless-stopped
+    depends_on: [mailer-db, mailer-redis-prod]
+    environment:
+      PYTHONPATH: /app
+      DB_HOST: mailer-db
+      DB_PORT: "5432"
+      DB_NAME: mailersys
+      DB_USER: mailersys_user
+      DB_PASSWORD: secret
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - mailer-app-prod:/app
+      - mailer-redis-prod-run:/app/run/redis
+    command: >
+      /bin/sh -lc "
+        python -m pip install --no-cache-dir -U pip &&
+        pip install --no-cache-dir -r /app/requirements/engine.lock.txt &&
+        python -m engine.crawler.cr_processor
+      "
+    networks: [webnet]
 
 volumes:
   mailer-db-data:
+
+  mailer-app-prod:
+    external: true
+
+  mailer-static:
+    external: true
+
+  # ВАЖНО: фиксированное имя, один том на все compose-проекты
+  mailer-redis-prod-run:
+    external: true
+    name: mailer-redis-prod-run
 
 networks:
   webnet:
