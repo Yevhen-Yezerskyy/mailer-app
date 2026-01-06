@@ -25,6 +25,8 @@ DEBUG = True
 ALLOWED_HOSTS = [
     "serenity-mail.com",
     "serenity-mail.de",
+    "dev.serenity-mail.com",
+    "dev.serenity-mail.de",
     "localhost",
     "127.0.0.1",
 ]
@@ -32,6 +34,9 @@ ALLOWED_HOSTS = [
 CSRF_TRUSTED_ORIGINS = [
     "https://serenity-mail.com",
     "https://serenity-mail.de",
+    "https://dev.serenity-mail.com",
+    "https://dev.serenity-mail.de",
+
 ]
 
 # если Django стоит за nginx с HTTPS:

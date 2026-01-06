@@ -1,6 +1,6 @@
-# FILE: docker-compose.yml  (обновлено — 2026-01-05)
+# FILE: docker-compose.yml  (обновлено — 2026-01-06)
 # PURPOSE: DEV compose + Redis через UNIX-socket ВНУТРИ проекта (./run/redis/redis.sock),
-#          чтобы и контейнеры, и хост видели один и тот же файл сокета по одному пути в проекте.
+#          конфиг вынесен в config/redis/ (run/redis остаётся runtime-каталогом).
 
 services:
   # ------------ POSTGRES ------------
@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
     command:
       - redis-server
-      - /app/run/redis/redis.conf
+      - /app/config/redis/redis-dev.conf
     volumes:
       - ./:/app
     networks:
@@ -59,7 +59,6 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
 
     volumes:
-      # весь проект — live
       - ./:/app
 
     ports:
