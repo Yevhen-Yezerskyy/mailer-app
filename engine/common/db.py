@@ -1,26 +1,31 @@
-# FILE: engine/common/db.py  (новое) 2025-12-12
+# FILE: engine/common/db.py  (обновлено — 2026-01-06)
+# PURPOSE: Универсальный PostgreSQL-коннектор.
+#          По умолчанию ведёт себя КАК СЕЙЧАС (localhost:5433 для хоста),
+#          но в Docker полностью управляется через env (mailer-db:5432).
 
 from __future__ import annotations
 
+import os
 import psycopg
 
 
 # -------------------------
-# ЖЁСТКИЕ НАСТРОЙКИ ДЛЯ ЛОКАЛКИ
+# НАСТРОЙКИ (BACKWARD-COMPATIBLE)
 # -------------------------
-DB_HOST = "localhost"     # всегда ходим с хоста
-DB_PORT = 5433            # проброшенный порт контейнера
-DB_NAME = "mailersys"
-DB_USER = "mailersys_user"
-DB_PASSWORD = "secret"
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = int(os.getenv("DB_PORT", "5433"))
+DB_NAME = os.getenv("DB_NAME", "mailersys")
+DB_USER = os.getenv("DB_USER", "mailersys_user")
+DB_PASSWORD = os.getenv("DB_PASSWORD", "secret")
 
 
 def get_connection(autocommit: bool = False) -> psycopg.Connection:
     """
-    Соединение с PostgreSQL внутри Docker:
-      localhost:5433 → mailer-db:5432
+    PostgreSQL connection.
+    - Host mode (default): localhost:5433
+    - Docker mode: DB_HOST=mailer-db, DB_PORT=5432
     """
-    conn = psycopg.connect(
+    return psycopg.connect(
         host=DB_HOST,
         port=DB_PORT,
         dbname=DB_NAME,
@@ -28,7 +33,6 @@ def get_connection(autocommit: bool = False) -> psycopg.Connection:
         password=DB_PASSWORD,
         autocommit=autocommit,
     )
-    return conn
 
 
 def fetch_all(sql: str, params=None):

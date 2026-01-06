@@ -1,6 +1,6 @@
-# FILE: web/mailer_web/settings.py
-# DATE: 2025-12-17
-# CHANGE: enable i18n + languages (ru/de/uk), LocaleMiddleware, GeoIP2 path (Country DB in logs/GeoLite2-Country)
+# FILE: web/mailer_web/settings.py  (обновлено — 2026-01-06)
+# PURPOSE: Единый формат DB env (DB_HOST/DB_PORT/...) + DEBUG из env.
+#          Дефолты совпадают с engine: localhost:5433 (хост), в Docker переопределяется на mailer-db:5432.
 
 """
 Django settings for mailer_web project.
@@ -20,7 +20,8 @@ SECRET_KEY = os.environ.get(
     "django-insecure-3m*cqi8#r2wwaw=n_*mj2@7u+%(wys52q*n$!lr8f3r9jg#ksg",
 )
 
-DEBUG = True
+# DEBUG from env (default = True for backward compat)
+DEBUG = os.environ.get("DEBUG", "1") not in ("0", "false", "False", "no", "NO")
 
 ALLOWED_HOSTS = [
     "serenity-mail.com",
@@ -36,12 +37,10 @@ CSRF_TRUSTED_ORIGINS = [
     "https://serenity-mail.de",
     "https://dev.serenity-mail.com",
     "https://dev.serenity-mail.de",
-
 ]
 
 # если Django стоит за nginx с HTTPS:
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-
 
 # --- APPLICATIONS ---
 
@@ -52,49 +51,36 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     "mailer_web",
     "public",
     "panel",
-
     # panel sub-apps (ОБЯЗАТЕЛЬНО)
     "panel.aap_audience",
     "panel.aap_settings",
 ]
-
 
 # --- MIDDLEWARE ---
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
-
     # Django i18n — сначала
     "django.middleware.locale.LocaleMiddleware",
-
     # ТВОЯ логика выбора языка (cookie / geo / url)
     "mailer_web.middleware_public_lang.PublicLangMiddleware",
-
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-
     "mailer_web.middleware.WorkspaceMiddleware",
-
     # tailwind class-map (работает только если request._tw_classmap_enabled=True)
     "mailer_web.tw_classmap_middleware.TailwindClassMapMiddleware",
-
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
 ROOT_URLCONF = "mailer_web.urls"
 
-
 # --- TEMPLATES ---
-
-# FILE: web/mailer_web/settings.py  (обновлено — 2025-12-18)
-# Смысл: полный корректный TEMPLATES с panel context processor
 
 TEMPLATES = [
     {
@@ -114,12 +100,9 @@ TEMPLATES = [
     },
 ]
 
-
-
 WSGI_APPLICATION = "mailer_web.wsgi.application"
 
-
-# --- DATABASE (Postgres в Docker) ---
+# --- DATABASE (Unified DB_* env) ---
 
 DATABASES = {
     "default": {
@@ -127,11 +110,11 @@ DATABASES = {
         "NAME": os.environ.get("DB_NAME", "mailersys"),
         "USER": os.environ.get("DB_USER", "mailersys_user"),
         "PASSWORD": os.environ.get("DB_PASSWORD", "secret"),
-        "HOST": os.environ.get("DB_HOST", "mailer-db"),
-        "PORT": os.environ.get("DB_PORT", "5432"),
+        # defaults = host-mode (same as engine/common/db.py)
+        "HOST": os.environ.get("DB_HOST", "localhost"),
+        "PORT": os.environ.get("DB_PORT", "5433"),
     }
 }
-
 
 # --- PASSWORD VALIDATION ---
 
@@ -142,10 +125,8 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-
 # --- I18N / TIMEZONE ---
 
-# Язык исходников/текстов (пишешь по-русски), но логика редиректов будет отдельно (middleware).
 LANGUAGE_CODE = "ru"
 
 LANGUAGES = [
@@ -164,12 +145,9 @@ LOCALE_PATHS = [
     BASE_DIR / "locale",
 ]
 
-
 # --- GEOIP (Country only) ---
 
-# logs/GeoLite2-Country/GeoLite2-Country.mmdb
 GEOIP_PATH = BASE_DIR / "logs" / "GeoLite2-Country"
-
 
 # --- STATIC FILES ---
 
@@ -179,13 +157,11 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
-
 # --- AUTH / LOGIN REDIRECTS ---
 
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "landing"
-
 
 # --- MISC ---
 

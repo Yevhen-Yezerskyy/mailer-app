@@ -1,9 +1,7 @@
 # FILE: docker-compose.yml  (обновлено — 2026-01-06)
-# PURPOSE: DEV compose + Redis через UNIX-socket ВНУТРИ проекта (./run/redis/redis.sock),
-#          конфиг вынесен в config/redis/ (run/redis остаётся runtime-каталогом).
+# PURPOSE: Привести env DB_* и DEBUG к тому же формату, что использует Django settings + engine/common/db.py.
 
 services:
-  # ------------ POSTGRES ------------
   mailer-db:
     image: postgres:16
     container_name: mailer-db
@@ -19,7 +17,6 @@ services:
     networks:
       - webnet
 
-  # ------------ REDIS (UNIX SOCKET IN PROJECT) ------------
   mailer-redis:
     image: redis:7-alpine
     container_name: mailer-redis
@@ -32,7 +29,6 @@ services:
     networks:
       - webnet
 
-  # ------------ DJANGO (DEV, RUNSERVER) ------------
   mailer-web:
     build:
       context: .
@@ -45,14 +41,14 @@ services:
       - mailer-db
 
     environment:
-      # DB
+      # DB (container-mode)
       DB_HOST: mailer-db
-      DB_PORT: 5432
+      DB_PORT: "5432"
       DB_NAME: mailersys
       DB_USER: mailersys_user
       DB_PASSWORD: secret
 
-      # DEV
+      # Django
       DEBUG: "1"
       PYTHONPATH: /app
 
