@@ -1,12 +1,6 @@
-# FILE: engine/common/gpt.py  (обновлено — 2025-12-24)
-# Смысл: единая точка общения с OpenAI (Responses API) + dev IPC-cache через common/cache (daemon).
-# Правки:
-# - service_tier НЕ хранится в объекте: только аргумент ask() (default=flex).
-# - Разрешены tier'ы: flex|standard|priority.
-# - Guard: если вызвали из engine и tier=standard ИЛИ priority → raise (до запроса).
-# - override НЕ ограничиваем (bypass guard'ов; логируем как platform-call).
-# - Логи пишутся ТОЛЬКО на моменте реального ответа платформы; cache-hit не логируется.
-# - Один общий лог-файл logs/gpt.requests.log, без ротации/разбиения.
+# FILE: engine/common/gpt.py  (обновлено — 2026-01-06)
+# PURPOSE: Единая точка общения с OpenAI (Responses API) + IPC-cache через common/cache (daemon).
+#          Изменение: добавлен режим debug-логирования (debug=True — полный лог как раньше; debug=False — только billing header).
 
 from __future__ import annotations
 
@@ -155,6 +149,7 @@ def _log_platform_call(
     raw: Any,
     status: str,
     error_message: Optional[str] = None,
+    debug: bool = True,
 ) -> None:
     head = (
         f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] "
@@ -164,7 +159,17 @@ def _log_platform_call(
         f"total={getattr(usage, 'total_tokens', None)})"
     )
 
-    lines: List[str] = [head]
+    # debug=False: billing лог — только факт запроса/ответа + error (если есть)
+    if not debug:
+        lines: List[str] = [head]
+        if error_message:
+            lines.append(f"ERROR: {error_message}")
+        lines.append("-" * 120)
+        _write_log_block(*lines)
+        return
+
+    # debug=True: как раньше — полный лог
+    lines = [head]
     if error_message:
         lines.append(f"ERROR: {error_message}")
 
@@ -228,9 +233,10 @@ def _build_payload(
 
 
 class GPTClient:
-    def __init__(self) -> None:
+    def __init__(self, debug: bool = True) -> None:
         # Объект без состояния tier. Ключ проверим по месту вызова.
         _require_api_key()
+        self.debug = bool(debug)
 
     def ask(
         self,
@@ -261,8 +267,10 @@ class GPTClient:
             if not isinstance(override, dict):
                 raise GptValidationError("override must be a dict.")
             try:
+                t0 = time.monotonic()
                 client = _get_openai_client()
                 resp = client.responses.create(**override)
+                elapsed_ms = int((time.monotonic() - t0) * 1000)
 
                 raw = resp.model_dump()
                 content = str(getattr(resp, "output_text", "") or "")
@@ -283,7 +291,8 @@ class GPTClient:
                     usage=usage,
                     output_text=content,
                     raw=raw,
-                    status="ok",
+                    status=f"ok ({elapsed_ms} ms)",
+                    debug=self.debug,
                 )
                 return GptResponse(content=content, raw=raw, usage=usage)
             except Exception as exc:
@@ -304,6 +313,7 @@ class GPTClient:
                     raw={},
                     status="error",
                     error_message=str(exc),
+                    debug=self.debug,
                 )
                 raise
 
@@ -342,7 +352,6 @@ class GPTClient:
             api_tier = "default" if effective_tier == "standard" else effective_tier
             payload["service_tier"] = api_tier
 
-            
             try:
                 t0 = time.monotonic()
                 client = _get_openai_client()
@@ -367,6 +376,7 @@ class GPTClient:
                     output_text=out_text,
                     raw=raw,
                     status=f"ok ({elapsed_ms} ms)",
+                    debug=self.debug,
                 )
                 return out_text
             except Exception as exc:
@@ -382,6 +392,7 @@ class GPTClient:
                     raw={},
                     status="error",
                     error_message=str(exc),
+                    debug=self.debug,
                 )
                 raise
 
