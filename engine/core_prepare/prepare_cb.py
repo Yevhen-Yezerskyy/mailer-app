@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 from engine.common.cache.client import CLIENT
 from engine.common.db import get_connection
 from engine.common.gpt import GPTClient
-from engine.common.prompts.process import get_prompt, translate_text
+from engine.common.prompts.process import get_prompt, translate_text, denormalize_branches_prompt
 from engine.common.utils import h64_text
 
 # ------------------------------
@@ -600,9 +600,9 @@ def task_prepare_branches() -> Dict[str, Any]:
 
         instructions = (
             base_instructions
-            + "\n\nTASK (DE):\n" + (translate_text(main_task, "de") or "")
-            + "\n\nBRANCHES TASK (DE):\n" + (translate_text(branches_task, "de") or "")
+            + denormalize_branches_prompt( (translate_text(main_task, "de") or "") + (translate_text(branches_task, "de") or ""))
         )
+
 
         reserved_ids, lock_tokens = _reserve_entities(kind, task_id, ids, BATCH_SIZE)
         try:

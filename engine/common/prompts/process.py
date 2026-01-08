@@ -163,3 +163,39 @@ def get_branch_name(branch_id: int, lang: str) -> str:
         return (memo(("gb_branch_name", int(branch_id), lang), _memo_calc_branch_name, version="gb_branch_name_v1") or "").strip()
     except Exception:
         return ""
+
+
+
+def denormalize_branches_prompt(text: str) -> str:
+
+    if not text:
+        return ""
+
+    try:
+        src_path = BASE_DIR / "source_branches.txt"
+        if not src_path.exists():
+            return text
+
+        branches_raw = src_path.read_text(encoding="utf-8").strip()
+        if not branches_raw:
+            return text
+
+        system_instructions = get_prompt("denormalize_branches").strip()
+        if not system_instructions:
+            return text
+        
+        system_instructions = system_instructions + "\n\n EXCEPTIONS: \n" + branches_raw
+
+        resp = GPTClient().ask(
+            model="mini",
+            service_tier="flex",
+            user_id="SYSTEM",
+            instructions=system_instructions,
+            input=text,
+            use_cache=True,
+        )
+
+        return (resp.content or "").strip() or text
+
+    except Exception:
+        return text
