@@ -169,20 +169,22 @@ def _rate_cl_bg(rate_cl: Any) -> str:
 
 
 def _rate_cb_1_100(rate_cb: Any) -> Optional[int]:
-    if rate_cb is None:
-        return None
-    try:
-        v = int(rate_cb)
-    except Exception:
-        return None
-    if v <= 0:
-        return 1
-    x = (v + 99) // 100  # ceil(v/100)
-    if x < 1:
-        return 1
-    if x > 100:
-        return 100
-    return int(x)
+    return rate_cb
+   
+#    if rate_cb is None:
+#        return None
+#    try:
+#        v = int(rate_cb)
+#    except Exception:
+#        return None
+#    if v <= 0:
+#        return 1
+#    x = (v + 99) // 100  # ceil(v/100)
+#    if x < 1:
+#        return 1
+#    if x > 100:
+#        return 100
+#    return int(x)
 
 
 def _safe_int_list(v: Any) -> List[int]:

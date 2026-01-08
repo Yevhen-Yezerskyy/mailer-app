@@ -212,7 +212,7 @@ def _select_candidates_geo(task_id: int, target_hash: int) -> Tuple[str, List[Di
                 FROM crawl_tasks ct
                 WHERE ct.task_id=%s AND ct.type='city' AND ct.value_id=c.id
             )
-            ORDER BY c.id
+            ORDER BY random()
             LIMIT %s
             """,
             (task_id, MAX_CANDIDATES + 1),
