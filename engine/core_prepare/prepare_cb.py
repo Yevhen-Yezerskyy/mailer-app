@@ -257,7 +257,7 @@ def _select_candidates_branches(task_id: int, target_hash: int) -> Tuple[str, Li
                 FROM crawl_tasks ct
                 WHERE ct.task_id=%s AND ct.type='branch' AND ct.value_id=b.id
             )
-            ORDER BY b.id
+            ORDER BY random()
             LIMIT %s
             """,
             (task_id, MAX_CANDIDATES + 1),
