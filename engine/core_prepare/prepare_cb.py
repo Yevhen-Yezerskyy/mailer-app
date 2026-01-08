@@ -15,6 +15,7 @@ from engine.common.gpt import GPTClient
 from engine.common.prompts.process import get_prompt, translate_text, denormalize_branches_prompt
 from engine.common.utils import h64_text
 
+
 # ------------------------------
 BATCH_SIZE = 20
 MODEL = "maxi"
@@ -600,7 +601,7 @@ def task_prepare_branches() -> Dict[str, Any]:
 
         instructions = (
             base_instructions
-            + denormalize_branches_prompt( (translate_text(main_task, "de") or "") + (translate_text(branches_task, "de") or ""))
+            + (translate_text(main_task, "de") or "") + (translate_text(branches_task, "de") or "")
         )
 
 
