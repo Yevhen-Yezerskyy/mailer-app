@@ -1,12 +1,8 @@
-# FILE: engine/core_validate/val_expand_processor.py  (обновлено — 2026-01-03)
-# Смысл:
-# - Единый выбор task_id (LIGHT/FULL) через pick_task_id() + кеш эталонных counts и кеш ok/skip по task_id в рамках epoch.
-# - LIGHT не зовёт _build_score_groups(), если есть cursor + pairs_cache; _build_score_groups() вызывается только когда надо перейти.
-# - LIGHT может за тик перескочить до MAX_GROUP_ADVANCES_PER_TICK полностью-collected пустых групп.
-# - Закрыты логические дыры (5) и (6) строго и детерминированно:
-#   (5) pairs: делаем столько окон, сколько нужно: pairs[0:W], pairs[W:2W], ... (без head/mid/tail).
-#   (6) cb_ids: внутри каждого окна pairs делаем столько окон cb_ids, сколько нужно: OFFSET k*CB_IDS_LIMIT, LIMIT CB_IDS_LIMIT.
-# - WINDOW_LIMIT=100_000 и _build_score_groups(task_id) сохранены нетронутыми.
+# FILE: engine/core_validate/val_expand_processor.py  (обновлено — 2026-01-09)
+# PURPOSE:
+# - Per-task cache versioning (без частого epoch reset): cursor/pairs ключи включают task_ver.
+# - При изменении crawl_tasks (ct_max > rc_max): DELETE rate_contacts по task_id + bump task_ver (инвалидация кеша только для task).
+# - mark_collected_once: быстрый проход по всем активным tasks; heavy-проверка “окно кончилось” — редко (стохастически 1/20).
 
 from __future__ import annotations
 
@@ -24,26 +20,19 @@ from engine.common.worker import Worker
 # Settings
 # -------------------------
 BATCH_PAIRS = 200
-
-# bounded вставка контактов за одну итерацию (на группу за тик)
 CONTACTS_INSERT_LIMIT = 200
-
-# окна по cb_crawler.id
 CB_IDS_LIMIT = 500
 
 WINDOW_LIMIT = 100_000  # <-- НЕ ТРОГАТЬ, кравлер на этом живёт
-TOP_LIMIT = WINDOW_LIMIT # <-- какой-то джипити решил, что надо переименовать переменную, хоть сам и написал, что не трогать. И вот приходится дописывать ))
+TOP_LIMIT = WINDOW_LIMIT  # <-- legacy alias, не трогать
 
 MAX_RATE_CONTACTS_PER_TASK = 50_000
-
-# LIGHT: максимум сколько полностью-collected групп можно перескочить за один тик
 MAX_GROUP_ADVANCES_PER_TICK = 50
-
-# окно pairs (сколько пар кладём в VALUES одним запросом)
 PAIRS_WINDOW_SIZE = 4 * BATCH_PAIRS  # 800
 
 CACHE_TTL_SEC = 24 * 60 * 60
 CACHE_EPOCH_KEY = "val_expand:epoch"
+CACHE_TASK_VER_PREFIX = "val_expand:task_ver:"  # + task_id
 
 
 def _p(msg: str) -> None:
@@ -81,12 +70,35 @@ def _set_epoch(epoch: int) -> None:
     _cache_set_obj(CACHE_EPOCH_KEY, epoch)
 
 
-def _key(epoch: int, suffix: str) -> str:
-    return f"val_expand:{epoch}:{suffix}"
+def _task_ver_key(task_id: int) -> str:
+    return f"{CACHE_TASK_VER_PREFIX}{int(task_id)}"
+
+
+def _get_task_ver(task_id: int) -> int:
+    v = _cache_get_obj(_task_ver_key(task_id))
+    if isinstance(v, int) and v >= 0:
+        return int(v)
+    _cache_set_obj(_task_ver_key(task_id), 0)
+    return 0
+
+
+def _bump_task_ver(task_id: int) -> int:
+    v = _get_task_ver(task_id) + 1
+    _cache_set_obj(_task_ver_key(task_id), int(v))
+    return int(v)
+
+
+def _key(epoch: int, task_id: Optional[int], suffix: str) -> str:
+    # epoch оставляем (у тебя уже есть reset раз в час),
+    # но для task-scoped кеша добавляем версию task_ver, чтобы точечно инвалидировать ветку.
+    if task_id is None:
+        return f"val_expand:{epoch}:{suffix}"
+    ver = _get_task_ver(int(task_id))
+    return f"val_expand:{epoch}:t{int(task_id)}:v{int(ver)}:{suffix}"
 
 
 def _cursor_key(epoch: int, task_id: int) -> str:
-    return _key(epoch, f"cursor:{task_id}")
+    return _key(epoch, task_id, "cursor")
 
 
 def _get_cursor_score(epoch: int, task_id: int) -> Optional[int]:
@@ -99,7 +111,7 @@ def _set_cursor_score(epoch: int, task_id: int, score: int) -> None:
 
 
 def _pairs_key(epoch: int, task_id: int, score: int) -> str:
-    return _key(epoch, f"pairs:{task_id}:{score}")
+    return _key(epoch, task_id, f"pairs:{int(score)}")
 
 
 def _get_pairs_cached(epoch: int, task_id: int, score: int) -> Optional[List[Tuple[int, int]]]:
@@ -117,7 +129,7 @@ def _set_pairs_cached(epoch: int, task_id: int, score: int, pairs: List[Tuple[in
 
 
 def _get_ref_counts(epoch: int) -> Tuple[int, int]:
-    k = _key(epoch, "ref_counts")
+    k = _key(epoch, None, "ref_counts")
     v = _cache_get_obj(k)
     if isinstance(v, tuple) and len(v) == 2:
         a, b = v
@@ -133,7 +145,8 @@ def _get_ref_counts(epoch: int) -> Tuple[int, int]:
 
 
 def _task_ok_key(epoch: int, task_id: int) -> str:
-    return _key(epoch, f"task_ok:{task_id}")
+    # task_ok зависит от counts, а не от рейтингов — тоже можно версионировать, но не нужно.
+    return _key(epoch, None, f"task_ok:{int(task_id)}")
 
 
 def _is_task_counts_ok(epoch: int, task_id: int) -> bool:
@@ -320,7 +333,6 @@ def _iter_pairs_windows(pairs: List[Tuple[int, int]]):
     n = len(pairs)
     if n <= 0:
         return
-    # строгое покрытие всего списка окон по PAIRS_WINDOW_SIZE
     for off in range(0, n, PAIRS_WINDOW_SIZE):
         yield pairs[off : off + PAIRS_WINDOW_SIZE]
 
@@ -419,12 +431,6 @@ def _count_cb_collected_for_pairs_window(*, pairs_window: List[Tuple[int, int]])
 
 
 def _insert_missing_for_group(*, task_id: int, score: int, pairs: List[Tuple[int, int]]) -> int:
-    """
-    Строгое покрытие (без эвристики):
-    - делаем столько окон pairs, сколько нужно (0..len step PAIRS_WINDOW_SIZE)
-    - внутри каждого окна pairs делаем столько окон cb_ids, сколько нужно (0..count step CB_IDS_LIMIT)
-    В рамках одного тика. Останавливаемся только если исчерпали CONTACTS_INSERT_LIMIT.
-    """
     total_inserted = 0
     remaining = CONTACTS_INSERT_LIMIT
 
@@ -436,25 +442,21 @@ def _insert_missing_for_group(*, task_id: int, score: int, pairs: List[Tuple[int
         if total_cb <= 0:
             continue
 
-        # сколько cb-окон нужно
         cb_passes = int(math.ceil(total_cb / float(CB_IDS_LIMIT)))
         for k in range(cb_passes):
             if remaining <= 0:
                 break
-            cb_offset = k * CB_IDS_LIMIT
 
             ins = _insert_missing_for_pairs_window_with_cb_offset(
                 task_id=task_id,
                 score=score,
                 pairs_window=pw,
-                cb_offset=cb_offset,
+                cb_offset=k * CB_IDS_LIMIT,
                 cb_limit=CB_IDS_LIMIT,
                 contacts_limit=remaining,
             )
             total_inserted += ins
             remaining -= ins
-
-            # если из этого cb-окна не вставили ничего — это ок, идём дальше (покрываем весь объём)
 
     return total_inserted
 
@@ -470,7 +472,6 @@ def light_run_once() -> None:
 
     cursor_score = _get_cursor_score(epoch, task_id)
 
-    # быстрый путь: cursor + pairs_cache => вообще без _build_score_groups()
     if cursor_score is not None:
         pairs = _get_pairs_cached(epoch, task_id, int(cursor_score))
         if pairs is not None:
@@ -485,7 +486,6 @@ def light_run_once() -> None:
             if has_uncollected or inserted > 0:
                 return
 
-            # fully-collected и inserted=0 -> прыгаем дальше (до 50 групп за тик)
             groups = _build_score_groups(task_id)
             if not groups:
                 return
@@ -522,7 +522,6 @@ def light_run_once() -> None:
 
             return
 
-    # нет курсора / нет pairs_cache: нужен groups
     groups = _build_score_groups(task_id)
     if not groups:
         _p(f"LIGHT task_id={task_id} no groups -> stop")
@@ -593,7 +592,7 @@ def full_reconcile_once() -> None:
 
 
 # -------------------------
-# mark_collected_once (DONE, без добора)
+# mark_collected_once (fast sweep + rare heavy)
 # -------------------------
 def mark_collected_once() -> None:
     rows = fetch_all(
@@ -608,12 +607,25 @@ def mark_collected_once() -> None:
     if not rows:
         return
 
+    epoch = _get_epoch()
+    heavy_candidates: List[int] = []
+
     for (task_id_raw,) in rows:
         task_id = int(task_id_raw)
 
-        row_cnt = fetch_one("SELECT count(*) FROM rate_contacts WHERE task_id = %s", (task_id,))
-        cnt = int(row_cnt[0]) if row_cnt else 0
-        if cnt >= MAX_RATE_CONTACTS_PER_TASK:
+        # лимит достигнут? (без count(*))
+        row_lim = fetch_one(
+            """
+            SELECT 1
+            FROM rate_contacts
+            WHERE task_id = %s
+            ORDER BY id ASC
+            OFFSET %s
+            LIMIT 1
+            """,
+            (task_id, int(MAX_RATE_CONTACTS_PER_TASK - 1)),
+        )
+        if row_lim:
             execute(
                 """
                 UPDATE aap_audience_audiencetask
@@ -622,42 +634,68 @@ def mark_collected_once() -> None:
                 """,
                 (task_id,),
             )
-            _p(f"MARK task_id={task_id} rate_contacts={cnt} -> collected=true (limit)")
+            _p(f"MARK task_id={task_id} -> collected=true (limit={MAX_RATE_CONTACTS_PER_TASK})")
             continue
 
-        groups = _build_score_groups(task_id)
-        if not groups:
-            execute(
-                """
-                UPDATE aap_audience_audiencetask
-                SET collected = true
-                WHERE id = %s
-                """,
-                (task_id,),
-            )
-            _p(f"MARK task_id={task_id} no groups -> collected=true")
+        row_ct = fetch_one("SELECT max(updated_at) FROM crawl_tasks WHERE task_id = %s", (task_id,))
+        ct_max = row_ct[0] if row_ct else None
+
+        row_rc = fetch_one("SELECT max(updated_at) FROM rate_contacts WHERE task_id = %s", (task_id,))
+        rc_max = row_rc[0] if row_rc else None
+
+        # crawl_tasks изменился после наполнения rate_contacts -> снести и инвалидировать cache ветку task_ver
+        if rc_max is not None and ct_max is not None and ct_max > rc_max:
+            execute("DELETE FROM rate_contacts WHERE task_id = %s", (task_id,))
+            _bump_task_ver(task_id)  # cursor+pairs станут недостижимыми (без epoch reset)
+            _p(f"MARK task_id={task_id} crawl_tasks changed -> DELETE rate_contacts + bump task_ver")
             continue
 
-        any_uncollected = False
-        for _score, pairs in groups:
-            if _has_uncollected_in_group(pairs=pairs):
-                any_uncollected = True
-                break
+        # кандидат на heavy: поток давно не двигался
+        if rc_max is not None:
+            row_old = fetch_one("SELECT 1 WHERE %s < (now() - interval '24 hours')", (rc_max,))
+            if row_old:
+                heavy_candidates.append(task_id)
 
-        if not any_uncollected:
-            execute(
-                """
-                UPDATE aap_audience_audiencetask
-                SET collected = true
-                WHERE id = %s
-                """,
-                (task_id,),
-            )
-            _p(f"MARK task_id={task_id} all pairs collected=true -> collected=true (done)")
+    # heavy стохастически: 1/20 прогонов (≈ раз в 20 минут при запуске раз в минуту)
+    if not heavy_candidates:
+        return
+
+    if (int(time.time()) % 20) != 0:
+        return
+
+    task_id = int(heavy_candidates[int(time.time()) % len(heavy_candidates)])
+
+    groups = _build_score_groups(task_id)
+    if not groups:
+        execute(
+            """
+            UPDATE aap_audience_audiencetask
+            SET collected = true
+            WHERE id = %s
+            """,
+            (task_id,),
+        )
+        _p(f"MARK-HEAVY task_id={task_id} no groups -> collected=true")
+        return
+
+    for _score, pairs in groups:
+        if _has_uncollected_in_group(pairs=pairs):
+            _p(f"MARK-HEAVY task_id={task_id} has uncollected -> keep open")
+            return
+
+    execute(
+        """
+        UPDATE aap_audience_audiencetask
+        SET collected = true
+        WHERE id = %s
+        """,
+        (task_id,),
+    )
+    _p(f"MARK-HEAVY task_id={task_id} all pairs collected=true -> collected=true (done)")
 
 
 # -------------------------
-# LIGHT cache reset (раз в час)
+# LIGHT cache reset (раз в час) — оставляем как было
 # -------------------------
 def reset_cache_once() -> None:
     epoch = int(time.time())
@@ -685,7 +723,7 @@ def main() -> None:
     w.register(
         name="full_reconcile_rate_contacts",
         fn=full_reconcile_once,
-        every_sec=60,  # 1 минута
+        every_sec=180,
         timeout_sec=900,
         singleton=True,
         heavy=True,
@@ -695,17 +733,17 @@ def main() -> None:
     w.register(
         name="mark_tasks_collected",
         fn=mark_collected_once,
-        every_sec=7200,  # 2 часа
+        every_sec=120,  
         timeout_sec=900,
         singleton=True,
-        heavy=True,
+        heavy=False,
         priority=2,
     )
 
     w.register(
         name="light_cache_reset",
         fn=reset_cache_once,
-        every_sec=3600,  # 1 час
+        every_sec=3600,
         timeout_sec=60,
         singleton=True,
         heavy=False,
