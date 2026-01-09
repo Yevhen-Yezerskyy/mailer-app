@@ -17,7 +17,7 @@ from engine.common.utils import h64_text
 
 
 # ------------------------------
-BATCH_SIZE = 20
+BATCH_SIZE = 25
 MODEL = "maxi"
 SERVICE_TIER = "flex"
 
