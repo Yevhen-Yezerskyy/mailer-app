@@ -287,6 +287,7 @@ def get_city_payload_by_plz(plz: str) -> Dict[str, Any]:
 # ============================================================
 
 def get_branch_row(branch_id: int, ui_lang: str) -> Optional[Dict[str, str]]:
+
     lang = (ui_lang or "ru").strip().lower()
 
     def _load(_: Tuple[str, int, str]):
@@ -814,15 +815,14 @@ def iter_city_land(city_ids: List[int]):
 
 
 def iter_branch_str(branch_ids: List[int], ui_lang: str):
-    """
-    Yield (branch_id, branch_str) без гарантии порядка.
-    """
+    def _load(key):
+        bid, lang = key
+        return get_branch_str(bid, lang)
 
-    def _load(bid: int) -> str:
-        return get_branch_str(bid, ui_lang)
+    keys = [(bid, ui_lang) for bid in branch_ids]
 
-    for bid, val in memo_many_iter(
-        branch_ids,
+    for (bid, _), val in memo_many_iter(
+        keys,
         _load,
         ttl=TTL_WEEK,
         version=MEMO_VERSION,

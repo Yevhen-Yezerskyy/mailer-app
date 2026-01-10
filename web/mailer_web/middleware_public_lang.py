@@ -1,7 +1,8 @@
-# FILE: web/mailer_web/middleware_public_lang.py  (обновлено — 2025-12-19)
+# FILE: web/mailer_web/middleware_public_lang.py  (обновлено — 2026-01-10)
 # PURPOSE:
-# - Public: язык через /{lang}/... + cookie+geo редиректы (как было)
-# - Panel (/panel/...): НИКАКИХ редиректов; просто activate(lang) по cookie/geo, чтобы _() работал в меню
+# - Public: язык через /{lang}/... + cookie+geo редиректы (как было), но синхронизируем serenity_lang и django_language.
+# - Panel (/panel/...): НИКАКИХ редиректов; activate(lang) по cookie. Приоритет: django_language (setlang) -> serenity_lang -> geo.
+#   Если пользователь переключил язык через setlang (django_language), синхронизируем serenity_lang = django_language, чтобы всё было едино.
 
 from __future__ import annotations
 
@@ -47,6 +48,14 @@ def _cfg() -> _Cfg:
     )
 
 
+def _django_lang_cookie_name() -> str:
+    return getattr(settings, "LANGUAGE_COOKIE_NAME", "django_language")
+
+
+def _is_valid_lang(cfg: _Cfg, lang: str | None) -> bool:
+    return bool(lang) and (lang in cfg.public_langs)
+
+
 def _get_client_ip(request: HttpRequest) -> str | None:
     xff = request.META.get("HTTP_X_FORWARDED_FOR")
     if xff:
@@ -75,6 +84,19 @@ def _country_to_lang(country: str | None, default_lang: str) -> str:
     return default_lang
 
 
+def _pick_geo_lang(cfg: _Cfg, request: HttpRequest) -> str:
+    ip = _get_client_ip(request)
+    reader = _get_reader(cfg.geo_db_path)
+    country = None
+    if reader and ip:
+        try:
+            country = reader.country(ip).country.iso_code
+        except Exception:
+            country = None
+    lang = _country_to_lang(country, cfg.default_lang)
+    return lang if _is_valid_lang(cfg, lang) else cfg.default_lang
+
+
 def _split_lang_prefix(path: str, public_langs: tuple[str, ...]) -> tuple[str | None, str]:
     parts = path.split("/", 2)  # ["", "de", "rest..."]
     if len(parts) >= 2:
@@ -94,16 +116,28 @@ def _activate(request: HttpRequest, lang: str) -> None:
     request.LANGUAGE_CODE = lang
 
 
-def _pick_geo_lang(cfg: _Cfg, request: HttpRequest) -> str:
-    ip = _get_client_ip(request)
-    reader = _get_reader(cfg.geo_db_path)
-    country = None
-    if reader and ip:
-        try:
-            country = reader.country(ip).country.iso_code
-        except Exception:
-            country = None
-    return _country_to_lang(country, cfg.default_lang)
+def _set_lang_cookie(resp: HttpResponse, name: str, value: str, max_age: int) -> None:
+    resp.set_cookie(name, value, max_age=max_age, samesite="Lax")
+
+
+def _sync_cookies(
+    resp: HttpResponse,
+    cfg: _Cfg,
+    *,
+    lang: str,
+    serenity_lang: str | None,
+    django_lang: str | None,
+    set_django: bool,
+    set_serenity: bool,
+) -> None:
+    if not _is_valid_lang(cfg, lang):
+        return
+
+    if set_serenity and (lang != (serenity_lang or "")):
+        _set_lang_cookie(resp, cfg.cookie_name, lang, cfg.cookie_max_age)
+
+    if set_django and (lang != (django_lang or "")):
+        _set_lang_cookie(resp, _django_lang_cookie_name(), lang, cfg.cookie_max_age)
 
 
 class PublicLangMiddleware:
@@ -114,22 +148,44 @@ class PublicLangMiddleware:
         cfg = _cfg()
         path = request.path or "/"
 
-        cookie_lang = request.COOKIES.get(cfg.cookie_name)
+        serenity_lang = request.COOKIES.get(cfg.cookie_name)
+        django_lang = request.COOKIES.get(_django_lang_cookie_name())
 
         # --- PANEL: без редиректов, только activate ---
         if path.startswith("/panel/") or path == "/panel":
-            django_cookie_name = getattr(settings, "LANGUAGE_COOKIE_NAME", "django_language")
-            django_lang = request.COOKIES.get(django_cookie_name)
-
             try:
-                lang = (django_lang or cookie_lang or _pick_geo_lang(cfg, request))
-                _activate(request, lang)
+                # приоритет: django_language (setlang) -> serenity_lang -> geo
+                lang = django_lang or serenity_lang or _pick_geo_lang(cfg, request)
+                if not _is_valid_lang(cfg, lang):
+                    lang = cfg.default_lang
 
+                _activate(request, lang)
                 resp = self.get_response(request)
 
-                # синхронизируем serenity_lang, чтобы public/panel не жили разными языками
-                if (lang != cookie_lang) and (lang in cfg.public_langs):
-                    resp.set_cookie(cfg.cookie_name, lang, max_age=cfg.cookie_max_age, samesite="Lax")
+                # Ключевое: если пользователь переключил через setlang (django_lang),
+                # то дожимаем serenity_lang = django_lang.
+                if _is_valid_lang(cfg, django_lang):
+                    _sync_cookies(
+                        resp,
+                        cfg,
+                        lang=str(django_lang),
+                        serenity_lang=serenity_lang,
+                        django_lang=django_lang,
+                        set_django=False,   # setlang уже поставил
+                        set_serenity=True,  # синхронизируем serenity
+                    )
+                else:
+                    # если setlang не использовался, держим django в синке с serenity/geo,
+                    # чтобы дальше в панели LocaleMiddleware не жил своей жизнью
+                    _sync_cookies(
+                        resp,
+                        cfg,
+                        lang=lang,
+                        serenity_lang=serenity_lang,
+                        django_lang=django_lang,
+                        set_django=True,
+                        set_serenity=True,
+                    )
 
                 return resp
             finally:
@@ -142,35 +198,42 @@ class PublicLangMiddleware:
 
         url_lang, url_rest = _split_lang_prefix(path, cfg.public_langs)
 
-        # CASE A: cookie отсутствует -> игнорируем URL, редирект по geo
-        if not cookie_lang:
+        # CASE A: serenity_lang отсутствует/битый -> редирект по geo (как было), и ставим обе куки
+        if not _is_valid_lang(cfg, serenity_lang):
             lang = _pick_geo_lang(cfg, request)
-            _activate(request, lang)
-
             target = f"/{lang}{url_rest if url_lang else path}"
             resp = _redirect(target)
-            resp.set_cookie(cfg.cookie_name, lang, max_age=cfg.cookie_max_age, samesite="Lax")
-
-            translation.deactivate()
+            _sync_cookies(
+                resp,
+                cfg,
+                lang=lang,
+                serenity_lang=serenity_lang,
+                django_lang=django_lang,
+                set_django=True,
+                set_serenity=True,
+            )
             return resp
 
-        # CASE B: cookie есть
-        # B1) пользователь пришел на /xx/... => это смена языка: обновить cookie и пропустить дальше
+        # CASE B: serenity_lang есть
+        # B1) пришли на /xx/... => это смена языка: обновить куки и пропустить дальше
         if url_lang:
             _activate(request, url_lang)
             try:
                 resp = self.get_response(request)
-                if url_lang != cookie_lang:
-                    resp.set_cookie(cfg.cookie_name, url_lang, max_age=cfg.cookie_max_age, samesite="Lax")
+                _sync_cookies(
+                    resp,
+                    cfg,
+                    lang=url_lang,
+                    serenity_lang=serenity_lang,
+                    django_lang=django_lang,
+                    set_django=True,
+                    set_serenity=True,
+                )
                 return resp
             finally:
                 translation.deactivate()
 
-        # B2) URL без префикса => редирект на cookie-язык
-        _activate(request, cookie_lang)
-
-        target = f"/{cookie_lang}{path}"
+        # B2) URL без префикса => редирект на serenity_lang
+        target = f"/{serenity_lang}{path}"
         resp = _redirect(target)
-
-        translation.deactivate()
         return resp

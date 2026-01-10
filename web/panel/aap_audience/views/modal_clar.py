@@ -15,6 +15,8 @@ from panel.aap_audience.models import AudienceTask
 
 from .clar_items import load_sorted_branches, load_sorted_cities
 
+from django.utils.translation import gettext as _
+
 
 def _is_running(task_id: int, rating_type: str) -> bool:
     """
@@ -65,11 +67,11 @@ def modal_clar_view(request):
     if mode == "cities":
         items = load_sorted_cities(ws_id, user.id, task.id)
         running = _is_running(task.id, "geo")
-        title = "Города"
+        title = _("Города")
     else:
         items = load_sorted_branches(ws_id, user.id, task.id, ui_lang=ui_lang)
         running = _is_running(task.id, "branches")
-        title = "Категории"
+        title = _("Категории")
 
     if items:
         status = "done"
