@@ -620,7 +620,7 @@ def task_prepare_branches() -> Dict[str, Any]:
             out = (
                 GPTClient()
                 .ask(
-                    model=MODEL,
+                    model="gpt-5.2",
                     service_tier=SERVICE_TIER,
                     user_id=str(user_id),
                     instructions=instructions,

@@ -1,40 +1,58 @@
-Понятия:
+Definitions:
+OFFER — a product or service that the PAYEE offers for sale to the PAYER in exchange for money.
+PAYEE — the party that sells the OFFER and receives money from the PAYER.
+PAYER — the party that pays money to the PAYEE in order to obtain the OFFER.
+PAYMENT_EVENT — a real-world event in which a company from a GB_CATEGORY pays money to the PAYEE for the OFFER.
+GB_CATEGORY — a search category in the directory https://www.gelbeseiten.de/, where companies are listed by category and location (Branchen/{category}/{Ort}, Suche/{category}/{Ort}).
 
-Продукт — продукт или услуга, которая предлагается Продавцом к продаже Покупателю за деньги.
+Input data
+- a description of the OFFER and the PAYEE
+- a list of GB_CATEGORY entries to be evaluated (each entry contains only id and name), provided as a subset of all GB_CATEGORY entries at https://www.gelbeseiten.de/
 
-Продавец — сторона Сделки, которая продаёт Продукт Покупателям.
+Task
+- For each GB_CATEGORY, evaluate the typical (base-rate) probability of a PAYMENT_EVENT in real-world transactions.
+- The evaluation must be performed as if the category were ranked among ALL GB_CATEGORY entries available on https://www.gelbeseiten.de/, not normalized to the provided list.
 
-Покупатель — сторона Сделки, которая покупает Продукт у Продавца, для себя или дла последующей перепродажи.
+Rating scale (1–100):
+- 1–10 — Very high probability
+Buyer-Side is CLEAR; Competition = false; Role Overlap = false; regular (e.g., recurring purchases in normal operations) PAYMENT_EVENTs are expected.
+- 11–20 — High probability
+Buyer-Side is PROBABLE, but Competition = false and Role Overlap = false; PAYMENT_EVENTs are plausible and realistic in ordinary business practice.
+- 21–60 — Medium probability
+Buyer-Side is unclear or mixed; Competition = false; possible or weak Role Overlap; PAYMENT_EVENTs are occasional or project-based.
+- 61–80 — Low probability
+Role Overlap = true and Buyer-Side is NOT CLEAR, or strong role uncertainty; PAYMENT_EVENTs are unlikely.
+- 81–100 — No meaningful probability
+Competition = true (including easy substitutability); same-side market; PAYMENT_EVENTs are structurally implausible.
 
-Сделка — Покупатель из Категории покупает Продукт и платит деньги Продавцу, а Продавец продаёт Продукт и получает деньги от Покупателя.
+Rules:
 
-Категория — это поисковая рубрика каталога https://www.gelbeseiten.de/, списки компаний доступны по "PLZ/Ort", 
-в URL-шаблонах вида https://www.gelbeseiten.de/Branchen/{category}/{Ort} и https://www.gelbeseiten.de/Suche/{category}/{Ort}.
-Название Категории обозначает, что компании предлагают рынку, их профиль продаж. Категория не определяет спрос на Продукт и не задаёт роль компаний как Покупателей.
+1. Competition (hard negative cap)
+Competition (hard negative cap): Similarity between the OFFER and a GB_CATEGORY increases the likelihood of competition. Determine Competition based ONLY on business context.
 
+2. Role Overlap
+Role Overlap (hard negative cap): Similarity increases the likelihood that they operate on the same side of the market. Parallel, adjacent, or substitutable activities indicate a probability of Role Overlap. Determine Role Overlap based ONLY on business context. 
 
-Входные данные:
-- описание Продукта и Продавца (ниже)
-- подсказка для оценки Категорий
-- список Категорий для оценки
+3. Buyer-Side
+Buyer-Side is CLEAR or PROBABLE only when the GB_CATEGORY’s primary role is to buy, own, or operate relative to the OFFER, and it makes real-world purchases of the OFFER. Determine Buyer-Side based ONLY on business context.
 
-Задача:
-- Для каждой Категории из списка оценить вероятность Сделок относительно всех Категорий.
+4. Similarity must be evaluated through Competition, Role Overlap, and Buyer-Side first; only after these checks may any remaining positive or negative impact be applied.
 
-Рейтинг:
-- rate — целое число от 1 до 100
-- меньший rate означает более высокую вероятность Сделок
-- больший rate означает более низкую вероятность Сделок
-- намеренно используй весь диапазон рейтинга 1–100
-- оценка производится относительно всех Категорий https://www.gelbeseiten.de/ (≈780 Категорий), а не ограниченного переданного списка
-- Если Категория описывает конкурентов Продавца, такие компании по умолчанию не являются Покупателями Продукта; для этой Категории запрещён rate < 50
+5. Similarity at the level of functions or business roles must be checked under Role Overlap.
 
-Инструкции:
-- используй ТОЛЬКО id и name из переданного списка Категорий
+6. If the PAYEE can be easily substituted by the GB_CATEGORY, check Competition and Role Overlap.
 
-Формат ответа (СТРОГО, только JSON, без текста):
+Use web search to clarify:
+- the details of the OFFER and PAYEE,
+- list of GB_CATEGORY enties available on https://www.gelbeseiten.de/
+- business-context and  real-world transactions
+
+Output format (STRICT)
+Output JSON only, with no explanations, no comments, and no extra text.
+
+For each category, output exactly:
 
 [
-  {"id": 123, "name": "Example_name_a", "rate": 7},
-  {"id": 456, "name": "Example_name_b", "rate": 12}
+{"id": 123, "name": "Example_name_a", "rate": 12},
+{"id": 456, "name": "Example_name_b", "rate": 87}
 ]
