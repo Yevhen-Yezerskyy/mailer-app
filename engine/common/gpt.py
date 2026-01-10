@@ -149,7 +149,7 @@ def _log_platform_call(
     raw: Any,
     status: str,
     error_message: Optional[str] = None,
-    debug: bool = True,
+    debug: bool = False,
 ) -> None:
     head = (
         f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] "
@@ -233,7 +233,7 @@ def _build_payload(
 
 
 class GPTClient:
-    def __init__(self, debug: bool = True) -> None:
+    def __init__(self, debug: bool = False) -> None:
         # Объект без состояния tier. Ключ проверим по месту вызова.
         _require_api_key()
         self.debug = bool(debug)
