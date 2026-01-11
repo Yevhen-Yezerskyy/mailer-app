@@ -1,26 +1,26 @@
-# FILE: engine/core_rate/rate_contacts.py  (обновлено — 2025-12-30)
-# Смысл:
-# - Рейтингование контактов (raw_contacts_aggr) для AudienceTask по двум типам __tasks_rating:
-#   - contacts: добираем контакты без rate_cl или без валидного hash_task
-#   - contacts_update: переоценка только тех, у кого rate_cl есть и hash_task валиден, но != target_hash
-# - Очереди/локи — как в prepare_cb (lock только на POP/FILL кеш-очередей; GPT/DB без лока).
-# - GPT батч: фиксированный BATCH_SIZE (как в prepare_cb), модель/тир — тоже как в prepare_cb.
-# - Done:
-#   - contacts: done когда rated_cnt >= subscribers_limit + BATCH_SIZE
-#   - contacts_update: done когда больше нет stale по критериям contacts_update
-# - Guard (NEW):
-#   - contacts: перед "DO take" вероятностно ограничиваем параллельные батчи около лимита,
-#     чтобы перелёт был ~1–2 батча, а не N батчей.
+# FILE: engine/core_rate/rate_contacts.py
+# DATE: 2026-01-11
+# CHANGE:
+# - Добавлены локальные lookup-хелперы с memo-кешированием (engine-only, без Django):
+#   - branch_name_de(branch_id) + branch_name_de_many(branch_ids) через memo_many_iter
+#   - city_land_by_plz(plz) (cb_crawler.plz -> cities_sys(name,state_name) + normalize ", Stadt")
+# - _fetch_contacts_payload теперь формирует псевдо-норм для GPT (формат не меняем: {"id","norm"}):
+#   - norm["email"] = raw_contacts_aggr.email (если есть)
+#   - norm["tags"] = строка через запятую из исходного company_data.norm.branches (потом branches удаляем)
+#   - norm["gs_categories"] = строка через запятую из DE-названий gb_branches по raw_contacts_aggr.branches
+#   - norm["city_land"] = по первому PLZ из raw_contacts_aggr.plz_list
+# - Очереди/локи/DB/GPT-логика не тронуты, чтобы ничего не поломать.
 
 from __future__ import annotations
 
 import json
 import pickle
 import random
+import re
 import time
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from engine.common.cache.client import CLIENT
+from engine.common.cache.client import CLIENT, memo, memo_many_iter
 from engine.common.db import get_connection
 from engine.common.gpt import GPTClient
 from engine.common.prompts.process import get_prompt, translate_text
@@ -42,6 +42,9 @@ LOCK_RETRY_SLEEP_SEC = 0.10
 DO_PROB = 0.70  # если entity-очередь не пустая: 70% берём батч, 30% rotate на следующий rating
 MAX_FILL = 1000
 # ------------------------------
+
+LOOKUP_TTL_SEC = 7 * 24 * 60 * 60
+LOOKUP_MEMO_VERSION = "rate_contacts:lookups:v1"
 
 
 def _ts() -> str:
@@ -356,7 +359,10 @@ def _pop_batch() -> Dict[str, Any]:
                     take = eq[:BATCH_SIZE]
                     rest = eq[BATCH_SIZE:]
                     _cache_set_list(ek, rest)
-                    _p(f"HEAD rating_id={rating_id} task_id={task_id} type={rtype} eq={len(eq)} -> DO take={len(take)} rest={len(rest)}")
+                    _p(
+                        f"HEAD rating_id={rating_id} task_id={task_id} type={rtype} eq={len(eq)} "
+                        f"-> DO take={len(take)} rest={len(rest)}"
+                    )
                     return {
                         "mode": "work",
                         "rating_id": rating_id,
@@ -477,6 +483,107 @@ def _build_instructions(task_mode: str, task: str, task_client: str) -> Optional
     ).strip()
 
 
+# ============================================================
+# LOOKUPS (engine-only, memo cached)
+# ============================================================
+
+def _normalize_city(name: str) -> str:
+    name = (name or "").strip()
+    return name[:-7].rstrip() if name.endswith(", Stadt") else name
+
+
+def _first_plz(plz_list: Any) -> str:
+    if isinstance(plz_list, str):
+        return plz_list.strip()
+    if not isinstance(plz_list, list):
+        return ""
+    for x in plz_list:
+        if isinstance(x, str) and x.strip():
+            return x.strip()
+    return ""
+
+
+def _tags_str_from_norm_branches(v: Any) -> str:
+    # norm.branches -> "a, b, c"
+    if isinstance(v, str):
+        return v.strip()
+    if isinstance(v, list):
+        parts: List[str] = []
+        for x in v:
+            if isinstance(x, str) and x.strip():
+                parts.append(x.strip())
+        return ", ".join(parts)
+    return ""
+
+
+def _city_land_by_plz(plz: str) -> str:
+    plz_s = (plz or "").strip()
+    if not plz_s:
+        return ""
+
+    def _load(_: Tuple[str, str]) -> str:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT cs.name, cs.state_name
+                FROM public.cb_crawler c
+                JOIN public.cities_sys cs ON cs.id = c.city_id
+                WHERE c.plz = %s
+                LIMIT 1
+                """,
+                (plz_s,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return ""
+            city = _normalize_city((row[0] or "").strip())
+            state = (row[1] or "").strip()
+            if city and state:
+                return f"{city} - {state}"
+            return city or state or ""
+
+    return memo(("city_land_by_plz", plz_s), _load, ttl=LOOKUP_TTL_SEC, version=LOOKUP_MEMO_VERSION) or ""
+
+
+def _branch_name_de(branch_id: int) -> str:
+    bid = int(branch_id)
+
+    def _load(_: Tuple[str, int]) -> str:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT name
+                FROM public.gb_branches
+                WHERE id = %s
+                LIMIT 1
+                """,
+                (bid,),
+            )
+            row = cur.fetchone()
+            return (row[0] or "").strip() if row else ""
+
+    return memo(("gb_branch_de", bid), _load, ttl=LOOKUP_TTL_SEC, version=LOOKUP_MEMO_VERSION) or ""
+
+
+def _branch_name_de_many(branch_ids: List[int]) -> Dict[int, str]:
+    ids = [int(x) for x in (branch_ids or []) if isinstance(x, int) or str(x).isdigit()]
+    if not ids:
+        return {}
+
+    out: Dict[int, str] = {}
+
+    def _load(bid: int) -> str:
+        return _branch_name_de(int(bid))
+
+    for bid, val in memo_many_iter(ids, _load, ttl=LOOKUP_TTL_SEC, version=LOOKUP_MEMO_VERSION, chunk=200):
+        try:
+            out[int(bid)] = (val or "").strip()
+        except Exception:
+            continue
+
+    return out
+
+
 def _fetch_contacts_payload(ids: List[int]) -> List[Dict[str, Any]]:
     if not ids:
         return []
@@ -484,7 +591,7 @@ def _fetch_contacts_payload(ids: List[int]) -> List[Dict[str, Any]]:
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            SELECT id, company_data
+            SELECT id, email, company_data, branches, plz_list
             FROM public.raw_contacts_aggr
             WHERE id = ANY(%s)
             """,
@@ -492,16 +599,67 @@ def _fetch_contacts_payload(ids: List[int]) -> List[Dict[str, Any]]:
         )
         rows = cur.fetchall() or []
 
+    # branch_id -> de-name (батч)
+    all_branch_ids: List[int] = []
+    for _cid, _email, _cd, branches, _plz_list in rows:
+        if isinstance(branches, list):
+            for x in branches:
+                try:
+                    all_branch_ids.append(int(x))
+                except Exception:
+                    pass
+    branch_map = _branch_name_de_many(all_branch_ids)
+
     by_id: Dict[int, Dict[str, Any]] = {}
-    for cid, company_data in rows:
+
+    for cid, aggr_email, company_data, branches, plz_list in rows:
         cid_i = int(cid)
+
         cd = company_data or {}
         if not isinstance(cd, dict):
             cd = {}
-        norm = cd.get("norm") or {}
-        if not isinstance(norm, dict):
-            norm = {}
-        by_id[cid_i] = {"id": cid_i, "norm": _clean_norm(norm)}
+
+        norm_src = cd.get("norm") or {}
+        if not isinstance(norm_src, dict):
+            norm_src = {}
+
+        tags_str = _tags_str_from_norm_branches(norm_src.get("branches"))
+
+        norm2 = _clean_norm(norm_src)
+
+        # norm.branches -> norm.tags (строкой), branches удаляем
+        norm2.pop("branches", None)
+        if tags_str:
+            norm2["tags"] = tags_str
+
+        # email из raw_contacts_aggr (внутри norm)
+        email_s = (aggr_email or "").strip()
+        if email_s:
+            norm2["email"] = email_s
+
+        # city_land по первому plz из raw_contacts_aggr.plz_list
+        plz = _first_plz(plz_list)
+        if plz:
+            cl = _city_land_by_plz(plz)
+            if cl:
+                norm2["city_land"] = cl
+
+        # gs_categories: DE-имена gb_branches по raw_contacts_aggr.branches
+        gs_parts: List[str] = []
+        if isinstance(branches, list):
+            for x in branches:
+                try:
+                    bid = int(x)
+                except Exception:
+                    continue
+                s = (branch_map.get(bid) or "").strip()
+                if s:
+                    gs_parts.append(s)
+        if gs_parts:
+            # чтобы GPT было удобно: строка через запятую
+            norm2["gs_categories"] = ", ".join(gs_parts)
+
+        by_id[cid_i] = {"id": cid_i, "norm": norm2}
 
     # сохранить порядок ids (чтобы "allowed" совпадало и для дебага было понятно)
     out: List[Dict[str, Any]] = []
@@ -584,7 +742,6 @@ def task_rate_contacts_once() -> Dict[str, Any]:
         return {"mode": "closed", "reason": "bad_target_hash"}
 
     if st.get("mode") == "need_fill":
-        # ВАЖНО: fill делаем здесь (как шаг 1), и только под коротким lock.
         owner = f"prep:contacts:fillgate:{int(time.time())}"
         token = _lock_acquire(owner=owner)
         try:
@@ -595,14 +752,13 @@ def task_rate_contacts_once() -> Dict[str, Any]:
                 _p(f"FILL_SKIP rating_id={rating_id} task_id={task_id} type={rtype} reason=already_filled eq={len(eq)}")
                 return {"mode": "noop", "step": "already_filled"}
 
-            # close-by-state (done) решаем тут же, чтобы не плодить лишние candidates
             t = _load_audience_task(task_id)
             if not t:
                 _p(f"CLOSE rating_id={rating_id} task_id={task_id} type={rtype} reason=task_missing")
                 _close_rating_done(rating_id)
                 return {"mode": "closed", "reason": "task_missing"}
 
-            user_id, task_mode, main_task, task_client, subs_limit = t
+            _user_id, _task_mode, _main_task, _task_client, subs_limit = t
 
             if rtype == "contacts":
                 rc = _rated_cnt(task_id)
@@ -646,7 +802,7 @@ def task_rate_contacts_once() -> Dict[str, Any]:
         _close_rating_done(rating_id)
         return {"mode": "closed", "reason": "task_missing"}
 
-    user_id, task_mode, main_task, task_client, subs_limit = t
+    user_id, task_mode, main_task, task_client, _subs_limit = t
 
     instructions = _build_instructions(task_mode, main_task, task_client)
     if not instructions:
@@ -732,7 +888,7 @@ def task_rate_contacts_done_scan() -> Dict[str, Any]:
             closed += 1
             continue
 
-        user_id, task_mode, main_task, task_client, subs_limit = t
+        _user_id, _task_mode, _main_task, _task_client, subs_limit = t
 
         if rtype_s == "contacts":
             rc = _rated_cnt(task_id_i)
@@ -765,7 +921,6 @@ def task_rate_contacts_reset_cache() -> Dict[str, Any]:
 
 
 def main() -> None:
-    # удобный прямой запуск: один тик + done_scan
     task_rate_contacts_once()
     task_rate_contacts_done_scan()
 
