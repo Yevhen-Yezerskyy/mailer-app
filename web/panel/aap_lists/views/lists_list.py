@@ -386,6 +386,17 @@ def lists_list_view(request):
                 rate_max = 100
             _bulk_add_by_rate(int(task.id), int(ml.id), ws_id, rate_max=rate_max)
             return _redir_same()
+        
+        if action == "clear_list":
+            with connection.cursor() as cur:
+                cur.execute(
+                    """
+                    DELETE FROM public.lists_contacts
+                    WHERE list_id = %s
+                    """,
+                    [int(ml.id)],
+                )
+            return _redir_same()
 
         cid_s = (request.POST.get("contact_id") or "").strip()
         contact_id = None
