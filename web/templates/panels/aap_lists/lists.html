@@ -94,43 +94,50 @@
       {% if lists %}
         <div class="YY-MAIN_BOTTOM_DIV">
 
-            <table class="w-full text-left">
-              <thead>
-                <tr class="YY-TH_TR">
-                  <th class="YY-TH_TH w-[50%]">{% trans "Список" %}</th>
-                  <th class="YY-TH_TH w-[50%]">{% trans "Аудитория" %}</th>
-                  <th class="YY-TH_TH">&nbsp;</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for it in lists %}
-                  <tr class="YY-TB_TR align-top">
-                    <td class="YY-TB_TD">
-                      <span class="YY-TEXT-BOLD">{{ it.title }}</span>
-                    </td>
+<table class="w-full text-left">
+  <thead>
+    <tr class="YY-TH_TR">
+      <th class="YY-TH_TH w-[50%]">{% trans "Список" %}</th>
+      <th class="YY-TH_TH w-[50%]">{% trans "Аудитория" %}</th>
+      <th class="YY-TH_TH">&nbsp;</th>
+      <th class="YY-TH_TH">&nbsp;</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for it in lists %}
+      <tr class="YY-TB_TR align-top">
+        <td class="YY-TB_TD">
+          <span class="YY-TEXT-BOLD">{{ it.title }}</span>
+        </td>
 
-                    <td class="YY-TB_TD">
-                        {{ it.one_task.title }}
-                    </td>
+        <td class="YY-TB_TD">
+          {{ it.one_task.title }}
+        </td>
 
-                    <td class="YY-TB_TD">
-                      <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
-                        {% trans "Изменить" %}
-                      </a>
+        <td class="YY-TB_TD">
+          <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
+            {% trans "Изменить" %}
+          </a>
 
-                      <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="id" value="{{ it.ui_id }}">
-                        <button type="submit" class="YY-BUTTON_TAB_RED">
-                          {% trans "Удалить" %}
-                        </button>
-                      </form>
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+          <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="id" value="{{ it.ui_id }}">
+            <button type="submit" class="YY-BUTTON_TAB_RED">
+              {% trans "Удалить" %}
+            </button>
+          </form>
+        </td>
+        <td class="YY-TB_TD">
+          <a href="list/?id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">
+            {% trans "Управлять" %}
+          </a>
+        </td>
+
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
 
 
         </div>

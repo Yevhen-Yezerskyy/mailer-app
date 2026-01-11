@@ -1,0 +1,267 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_lists/lists_list.html -->
+<!-- DATE: 2026-01-11 -->
+<!-- PURPOSE: Управление списком рассылки: режимы list/audience, поиск, bulk-add по рейтингу, таблица + модалка. -->
+
+
+{% block content %}
+
+<!-- TOP TABLE -->
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+
+        <div class="YY-STATUS_GREEN mb-6">
+          {% trans "Список рассылки" %}: {{ ml.title }} <br>
+          {% trans "Аудитория" %}: {{ task.title }}
+        </div>
+
+        <div class="YY-STATUS_GRAY mb-6">
+          {% trans "Включено в список" %}: {{ list_active_cnt }}
+        </div>
+
+        <div class="YY-STATUS_YELLOW mb-6">
+          <form method="post" class="flex gap-3 items-center">
+          {% csrf_token %}
+          {% trans "Добавить контакты с рейтингом от 1 до:" %}        
+          <input type="number" name="rate_max" value="{{ default_rate_max }}" min="1" max="100" class="YY-INPUT" style="width:70px !Important; margin-top:20px !Important;">
+                           
+          <button type="submit" name="action" value="bulk_add_by_rate" class="YY-BUTTON_MAIN">
+            {% trans "Добавить" %}
+          </button>
+          </form>
+        </div>
+        
+        <div class="mb-10">
+          <a href="../" class="YY-BUTTON_MAIN">{% trans "Вернуться к спискам" %}</a>
+        </div>
+
+        <div class="flex gap-3">
+          <a class="{% if mode == 'list' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}"
+             href="?id={{ request.GET.id }}&mode=list">
+            {% trans "Контакты - Список рассылки" %}
+          </a>
+          <a class="{% if mode == 'audience' %}YY-BUTTON_GREEN{% else %}YY-BUTTON_MAIN{% endif %}"
+             href="?id={{ request.GET.id }}&mode=audience">
+            {% trans "Контакты - Аудитория" %}
+          </a>
+        </div>
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+        <form method="get">
+          <input type="hidden" name="id" value="{{ request.GET.id }}">
+          <input type="hidden" name="mode" value="{{ mode }}">
+
+          <div class="grid grid-cols-2 gap-4 mb-6">
+
+            <div class="flex gap-3">
+              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">Email:</label>
+              <input class="YY-INPUT flex-1" name="q_email" value="{{ q_email }}">
+            </div>
+
+            <div class="flex gap-3">
+              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "Компания" %}:</label>
+              <input class="YY-INPUT flex-1" name="q_company" value="{{ q_company }}">
+            </div>
+
+            <div class="flex gap-3">
+              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "Категория" %}:</label>
+              <input class="YY-INPUT flex-1" name="q_branch" value="{{ q_branch }}">
+            </div>
+
+            <div class="flex gap-3">
+              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "Адрес, город" %}:</label>
+              <input class="YY-INPUT flex-1" name="q_addr" value="{{ q_addr }}">
+            </div>
+
+            <div class="flex gap-3">
+              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">PLZ:</label>
+              <input class="YY-INPUT flex-1" name="q_plz" value="{{ q_plz }}">
+            </div>
+            
+            <div class="flex gap-3">
+              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "В списке" %}:</label>
+              <input type="checkbox" name="in_list" value="1" {% if in_list_only %}checked{% endif %}>
+            </div>
+            
+          </div>
+
+          <div class="flex gap-3 mt-4">
+            <button type="submit" class="YY-BUTTON_MAIN">
+              {% trans "Искать" %}
+            </button>
+
+            <button type="submit"
+                    name="action"
+                    value="clear_search"
+                    formmethod="post"
+                    class="YY-BUTTON_MAIN">
+              {% trans "Очистить поиск" %}
+            </button>
+          </div>
+        </form>
+
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <!-- TABLE -->
+      {% if rows %}
+        <!-- PAGINATION TOP -->
+          <div class="YY-CARD_WHITE flex items-center mb-4">
+            {% if page > 1 %}
+              <a class="YY-BUTTON_MAIN mr-3"
+                 href="?id={{ request.GET.id }}&mode={{ mode }}&p=1&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                << <<
+              </a>
+              <a class="YY-BUTTON_MAIN mr-6"
+                 href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ page|add:'-1' }}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                <<
+              </a>
+            {% endif %}
+
+            <div class="YY-TEXT-BOLD !mb-0">
+              {% trans "Страницы" %}: {{ page }} / {{ pages }}
+            </div>
+
+            {% if page < pages %}
+              <a class="YY-BUTTON_MAIN ml-6"
+                 href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ page|add:'1' }}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                >>
+              </a>
+              <a class="YY-BUTTON_MAIN ml-3"
+                 href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ pages }}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                >> >>
+              </a>
+            {% endif %}
+          </div>
+          <div class="YY-MAIN_BOTTOM_DIV">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH" style="width:50%;">{% trans "Компания" %}</th>
+                <th class="YY-TH_TH"  style="width:50%;">{% trans "Категории" %}</th>
+                <th class="YY-TH_TH">{% trans "Поиск" %}</th>
+                <th class="YY-TH_TH">{% trans "Клиент" %}</th>
+                <th class="YY-TH_TH">&nbsp;</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for it in rows %}
+                <tr class="YY-TB_TR align-top">
+                  <td class="YY-TB_TD">
+                    <span class="YY-TEXT-BOLD">{{ it.contact.company_name }}</span>
+                    <div class="YY-TEXT !mb-0">{{ it.contact.address }}</div>
+                    <div class="YY-TEXT !mb-0">{{ it.contact.city_land }}</div>
+                  </td>
+
+                  <td class="YY-TB_TD">{{ it.contact.branches_html|safe }}</td>
+                  <td class="YY-TB_TD text-center">{{ it.ratings.rate_cb_100 }}</td>
+
+                  <td class="YY-TB_TD text-center {{ it.ratings.rate_cl_bg }}">
+                    {{ it.ratings.rate_cl|default:"-" }}
+                  </td>
+
+                  <td class="YY-TB_TD">
+                    {% if it.meta.in_list %}
+                      {% if it.meta.list_active %}
+                        <div class="YY-STATUS_GREEN mb-2">{% trans "В списке" %}</div>
+                      {% else %}
+                        <div class="YY-STATUS_YELLOW mb-2">{% trans "Отписан" %}</div>
+                      {% endif %}
+
+                      <form method="post" class="mb-6">
+                        {% csrf_token %}
+                        <input type="hidden" name="contact_id" value="{{ it.meta.contact_id }}">
+                        <button type="submit" name="action" value="exclude" class="YY-BUTTON_TAB_RED w-full">
+                          {% trans "Исключить" %}
+                        </button>
+                      </form>
+
+                      {% if it.meta.list_active %}
+                        <form method="post" class="mb-6">
+                          {% csrf_token %}
+                          <input type="hidden" name="contact_id" value="{{ it.meta.contact_id }}">
+                          <button type="submit" name="action" value="unsubscribe" class="YY-BUTTON_TAB_MAIN w-full">
+                            {% trans "Отписать" %}
+                          </button>
+                        </form>
+                      {% else %}
+                        <form method="post" class="mb-6">
+                          {% csrf_token %}
+                          <input type="hidden" name="contact_id" value="{{ it.meta.contact_id }}">
+                          <button type="submit" name="action" value="subscribe" class="YY-BUTTON_TAB_MAIN w-full">
+                            {% trans "Подписать" %}
+                          </button>
+                        </form>
+                      {% endif %}
+                    {% else %}
+                      <div class="YY-STATUS_GRAY mb-2">{% trans "Не в списке" %}</div>
+                      <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="contact_id" value="{{ it.meta.contact_id }}">
+                        <button type="submit" name="action" value="include" class="YY-BUTTON_TAB_MAIN w-full mb-6">
+                          {% trans "Включить" %}
+                        </button>
+                      </form>
+                    {% endif %}
+                    <a href="#"
+                      class="YY-BUTTON_TAB_MAIN"
+                      data-yy-modal="url=/panel/lists/lists/list/modal/?id={{ it.ui_id }}">
+                      {% trans "Больше" %}
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          </div>
+          <!-- PAGINATION BOTTOM -->
+          <div class="YY-CARD_WHITE flex items-center mt-6">
+            {% if page > 1 %}
+              <a class="YY-BUTTON_MAIN mr-3"
+                 href="?id={{ request.GET.id }}&mode={{ mode }}&p=1&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                << <<
+              </a>
+              <a class="YY-BUTTON_MAIN mr-6"
+                 href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ page|add:'-1' }}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                <<
+              </a>
+            {% endif %}
+
+            <div class="YY-TEXT-BOLD !mb-0">
+              {% trans "Страницы" %}: {{ page }} / {{ pages }}
+            </div>
+
+            {% if page < pages %}
+              <a class="YY-BUTTON_MAIN ml-6"
+                 href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ page|add:'1' }}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                >>
+              </a>
+              <a class="YY-BUTTON_MAIN ml-3"
+                 href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ pages }}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                >> >>
+              </a>
+            {% endif %}
+          </div>
+
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
+      {% endif %}
+
+    </td>
+  </tr>
+</table>
+
+{% endblock %}

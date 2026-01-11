@@ -1,7 +1,10 @@
-# FILE: web/panel/aap_lists/views/lists.py  (обновлено — 2026-01-11)
+# FILE: web/panel/aap_lists/views/lists.py
+# DATE: 2026-01-11
 # PURPOSE: /panel/lists/lists/ — списки рассылок: add/edit/archive.
 #          В селекте audience_task_id = РЕАЛЬНЫЙ pk (НЕ encode).
-#          UI ограничивает одним AudienceTask, M2M оставляем.
+# CHANGE:
+# - add: больше не залипаем в edit после добавления (redirect на чистый URL)
+# - в списке есть ui_id для ссылок (edit/manage)
 
 from __future__ import annotations
 
@@ -144,7 +147,7 @@ def lists_view(request):
                 title=title,
             )
             obj.audience_tasks.set([task_obj])
-            return redirect(f"{request.path}?state=edit&id={encode_id(int(obj.id))}")
+            return redirect(request.path)
 
         if action == "save":
             post_id = (request.POST.get("id") or "").strip()
