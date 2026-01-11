@@ -145,7 +145,7 @@
         <!-- ================= RATED ================= -->
 
         <div data-panel="rated" class="{% if tab != 'rated' %}hidden{% endif %}">
-
+        {% if rated_rows %}
           <!-- PAGINATION TOP -->
           <div class="YY-CARD_WHITE flex items-center mb-4">
             {% if rated_page > 1 %}
@@ -181,7 +181,7 @@
             {% endif %}
           </div>
 
-          {% if rated_rows %}
+          
           <div class="YY-MAIN_BOTTOM_DIV">
             <table class="w-full text-left">
               <thead>
@@ -217,12 +217,6 @@
               </tbody>
             </table>
           </div>
-          {% else %}
-            <div class="YY-CARD_WHITE">
-              {% trans "Здесь пока нет данных" %}
-            </div>
-          {% endif %}
-
           <!-- PAGINATION BOTTOM -->
           <div class="YY-CARD_WHITE flex items-center mt-6">
             {% if rated_page > 1 %}
@@ -258,12 +252,18 @@
             {% endif %}
           </div>
 
+          {% else %}
+            <div class="YY-CARD_WHITE">
+              {% trans "Здесь пока нет данных" %}
+            </div>
+          {% endif %}
+
         </div>
 
         <!-- ================= ALL ================= -->
 
         <div data-panel="all" class="{% if tab != 'all' %}hidden{% endif %}">
-
+          {% if all_rows %}
           <!-- PAGINATION TOP -->
           <div class="YY-CARD_WHITE flex items-center mb-4">
             {% if all_page > 1 %}
@@ -299,7 +299,6 @@
             {% endif %}
           </div>
 
-          {% if all_rows %}
           <div class="YY-MAIN_BOTTOM_DIV">
             <table class="w-full text-left">
               <thead>
@@ -333,12 +332,6 @@
               </tbody>
             </table>
           </div>
-          {% else %}
-            <div class="YY-CARD_WHITE">
-              {% trans "Здесь пока нет данных" %}
-            </div>
-          {% endif %}
-
           <!-- PAGINATION BOTTOM -->
           <div class="YY-CARD_WHITE flex items-center mt-6">
             {% if all_page > 1 %}
@@ -373,6 +366,12 @@
               </a>
             {% endif %}
           </div>
+
+          {% else %}
+            <div class="YY-CARD_WHITE">
+              {% trans "Здесь пока нет данных" %}
+            </div>
+          {% endif %}
 
         </div>
 

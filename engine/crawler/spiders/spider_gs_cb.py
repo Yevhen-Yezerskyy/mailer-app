@@ -1,17 +1,9 @@
-# FILE: engine/crawler/spiders/spider_gs_cb.py  (обновлено — 2026-01-03)
+# FILE: engine/crawler/spiders/spider_gs_cb.py  (новое — 2026-01-12)
 # PATH: engine/crawler/spiders/spider_gs_cb.py
-# Смысл:
-# - БД пишем ТОЛЬКО в closed().
-# - Перед стартом: если cb_crawler.collected=true => close_spider("ALREADY COLLECTED") и НЕ лезем в БД в closed().
-# - Любой request-fail => close_spider("REQUEST FAILED <url>").
-# - parse_list: FAILED TO PARSE / FAILED TO LOCATE GSBIS / PLZ MISMATCH; далее yield gsbiz + paging.
-# - parse_detail: если парсер не понял страницу => close_spider("FAILED TO PARSE <current_url>").
-# - closed():
-#   0) ALREADY COLLECTED => SKIP DB (ничего не пишем)
-#   1) REQUEST FAILED / FAILED TO PARSE / FAILED TO LOCATE GSBIS => cb_crawler.collected=true, collected_num=0, reason=<reason>
-#   2) PLZ MISMATCH => cb_crawler.collected=true, collected_num=0, reason="PLZ MISMATCH"
-#   3) иначе: пишем raw_contacts_gb + cb_crawler.collected=true, collected_num=<n>, reason=NULL
-# - Дебаг: печать в closed() по веткам (без json-dump всей пачки).
+# CHANGE:
+# - Добавлено обнаружение "Rechtschreibvorschläge" на странице выдачи.
+# - При наличии — close_spider("SPELL SUGGESTION") и в closed() это уходит в mark_fail
+#   (collected=true, collected_num=0, reason="SPELL SUGGESTION").
 
 from __future__ import annotations
 
@@ -29,6 +21,7 @@ from engine.crawler.parsers.parser_gs_cb import parse_gs_cb_detail
 
 PLZ_RE = re.compile(r"\b(\d{5})\b")
 TREFFER_RE = re.compile(r"\b(\d+)\s*Treffer\b", re.IGNORECASE)
+SPELL_SUGGEST_RE = re.compile(r"rechtschreibvorschl(?:a|ä)ge", re.IGNORECASE)
 
 
 class GelbeSeitenCBSpider(scrapy.Spider):
@@ -116,6 +109,14 @@ class GelbeSeitenCBSpider(scrapy.Spider):
         has_any_signal = has_treffer or bool(gsbiz_links) or bool(next_href) or has_addr
         return not has_any_signal
 
+    def _has_spell_suggestion(self, response) -> bool:
+        """
+        GelbeSeiten подмешивают результаты через автокоррекцию:
+        "Die Treffer beinhalten auch Rechtschreibvorschläge."
+        Для seed-запроса это шум — гасим.
+        """
+        return bool(SPELL_SUGGEST_RE.search(response.text or ""))
+
     @staticmethod
     def _reason_is_fail(reason: str) -> bool:
         r = (reason or "").strip()
@@ -123,6 +124,7 @@ class GelbeSeitenCBSpider(scrapy.Spider):
             r.startswith("REQUEST FAILED")
             or r.startswith("FAILED TO PARSE")
             or r.startswith("FAILED TO LOCATE GSBIS")
+            or r.startswith("SPELL SUGGESTION")
         )
 
     # -------------------- parse list --------------------
@@ -140,6 +142,11 @@ class GelbeSeitenCBSpider(scrapy.Spider):
             gsbiz_links.append(x)
 
         next_href = response.css('a.pagination__next::attr(href)').get()
+
+        # 0) SPELL SUGGESTION (автокоррекция / подмешивание чужих рубрик)
+        if self._has_spell_suggestion(response):
+            self.crawler.engine.close_spider(self, reason="SPELL SUGGESTION")
+            return
 
         # 1) FAILED TO PARSE
         if self._looks_unparseable(response, gsbiz_links, next_href):
