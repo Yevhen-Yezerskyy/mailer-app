@@ -1,0 +1,146 @@
+<!-- FILE: web/templates/panels/aap_lists/lists.html  (обновлено — 2026-01-11) -->
+<!-- CHANGE: добавлен обязательный select аудитории + колонка аудитории в таблице; delete -> архивирование. -->
+
+{% extends "panels/base.html" %}
+{% load i18n %}
+
+{% block content %}
+
+<!-- TOP TABLE -->
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+
+  {% if state == "edit" and edit_obj %}
+    <div class="YY-STATUS_GREEN mb-5">
+      {% trans "Редактирование списка" %}:
+    </div>
+  {% else %}
+    <div class="YY-STATUS_GREEN mb-5">
+      {% trans "Новый список рассылки" %}
+    </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    {% if state == "edit" and edit_obj %}
+      <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
+    {% endif %}
+
+    {% if form.non_field_errors %}
+      <div class="YY-CARD_IN_FORM_ERROR mb-3">
+        {{ form.non_field_errors }}
+      </div>
+    {% endif %}
+
+    <label class="YY-LABEL">{% trans "Название" %}</label>
+    {{ form.title }}
+    {% if form.title.errors %}
+      <div class="YY-CARD_IN_FORM_ERROR mt-3">
+        {{ form.title.errors }}
+      </div>
+    {% endif %}
+
+    <label class="YY-LABEL">{% trans "Аудитория" %}</label>
+    {{ form.audience_task_id }}
+    {% if form.audience_task_id.errors %}
+      <div class="YY-CARD_IN_FORM_ERROR mt-3">
+        {{ form.audience_task_id.errors }}
+      </div>
+    {% endif %}
+
+    <div class="flex gap-3 mt-3">
+      {% if state == "edit" and edit_obj %}
+        <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">
+          {% trans "Сохранить изменения" %}
+        </button>
+        <button type="submit" name="action" value="cancel" class="YY-BUTTON_MAIN" formnovalidate>
+          {% trans "Отменить" %}
+        </button>
+      {% else %}
+        <button type="submit" name="action" value="add" class="YY-BUTTON_MAIN">
+          {% trans "Добавить" %}
+        </button>
+      {% endif %}
+    </div>
+
+  </form>
+
+</div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-STATUS_BLUE mb-2">
+          {% trans "Контакты" %}
+        </div>
+        <div class="YY-STATUS_GRAY mb-2">
+          {% trans "Пока: один список = одна аудитория. Позже сделаем выбор нескольких аудиторий." %}
+        </div>
+        <div class="YY-STATUS_GRAY">
+          {% trans "Удаление = архивирование (скрываем из списка)." %}
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<!-- BOTTOM TABLE -->
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      {% if lists %}
+        <div class="YY-MAIN_BOTTOM_DIV">
+
+            <table class="w-full text-left">
+              <thead>
+                <tr class="YY-TH_TR">
+                  <th class="YY-TH_TH w-[50%]">{% trans "Список" %}</th>
+                  <th class="YY-TH_TH w-[50%]">{% trans "Аудитория" %}</th>
+                  <th class="YY-TH_TH">&nbsp;</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for it in lists %}
+                  <tr class="YY-TB_TR align-top">
+                    <td class="YY-TB_TD">
+                      <span class="YY-TEXT-BOLD">{{ it.title }}</span>
+                    </td>
+
+                    <td class="YY-TB_TD">
+                        {{ it.one_task.title }}
+                    </td>
+
+                    <td class="YY-TB_TD">
+                      <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
+                        {% trans "Изменить" %}
+                      </a>
+
+                      <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete">
+                        <input type="hidden" name="id" value="{{ it.ui_id }}">
+                        <button type="submit" class="YY-BUTTON_TAB_RED">
+                          {% trans "Удалить" %}
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+
+
+        </div>
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
+      {% endif %}
+    </td>
+  </tr>
+</table>
+
+{% endblock %}

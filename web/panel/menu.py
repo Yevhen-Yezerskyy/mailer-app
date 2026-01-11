@@ -44,6 +44,25 @@ PANEL_MENU = [
         ],
     },
     {
+        # CONTACTS / LISTS
+        "title": _("Контакты"),
+        "open_prefixes": ["/panel/lists/"],
+        "items": [
+            {
+                "title": _("Списки рассылок"),
+                "page_title": _("Контакты : Списки рассылок"),
+                "url_name": "lists:lists",
+                "active_prefixes": ["/panel/lists/lists/"],
+            },
+            {
+                "title": _("Все контакты"),
+                "page_title": _("Контакты : Все контакты"),
+                "url_name": "lists:contacts",
+                "active_prefixes": ["/panel/lists/contacts/"],
+            },
+        ],
+    },    
+    {
         # AUDIENCE
     "title": _("Настройки"),
         "open_prefixes": ["/panel/settings/"],

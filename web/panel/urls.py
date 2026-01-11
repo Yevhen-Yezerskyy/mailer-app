@@ -47,5 +47,6 @@ urlpatterns = [
     path("", RedirectView.as_view(url="audience/how/", permanent=False), name="dashboard"),
 
     path("audience/", include_flagged("panel.aap_audience.urls")),
+    path("lists/", include_flagged("panel.aap_lists.urls")),
     path("settings/", include_flagged("panel.aap_settings.urls")),
 ]
