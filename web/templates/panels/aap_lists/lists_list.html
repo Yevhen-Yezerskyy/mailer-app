@@ -53,59 +53,57 @@
 
     <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
       <div class="YY-CARD_WHITE">
-        <form method="get">
-          <input type="hidden" name="id" value="{{ request.GET.id }}">
-          <input type="hidden" name="mode" value="{{ mode }}">
 
-          <div class="grid grid-cols-2 gap-4 mb-6">
+          <form method="get">
+            <input type="hidden" name="id" value="{{ request.GET.id }}">
+            <input type="hidden" name="mode" value="{{ mode }}">
+            <input type="hidden" name="p" value="1">
+            <input type="hidden" name="search" value="1">
 
-            <div class="flex gap-3">
-              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">Email:</label>
-              <input class="YY-INPUT flex-1" name="q_email" value="{{ q_email }}">
+            <div class="grid grid-cols-2 gap-4 mb-6">
+
+              <div class="flex gap-3">
+                <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">Email:</label>
+                <input class="YY-INPUT flex-1" name="q_email" value="{{ q_email }}">
+              </div>
+
+              <div class="flex gap-3">
+                <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "Компания" %}:</label>
+                <input class="YY-INPUT flex-1" name="q_company" value="{{ q_company }}">
+              </div>
+
+              <div class="flex gap-3">
+                <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "Категория" %}:</label>
+                <input class="YY-INPUT flex-1" name="q_branch" value="{{ q_branch }}">
+              </div>
+
+              <div class="flex gap-3">
+                <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "Адрес, город" %}:</label>
+                <input class="YY-INPUT flex-1" name="q_addr" value="{{ q_addr }}">
+              </div>
+
+              <div class="flex gap-3">
+                <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">PLZ:</label>
+                <input class="YY-INPUT flex-1" name="q_plz" value="{{ q_plz }}">
+              </div>
+
+              <div class="flex gap-3">
+                <label class="YY-LABEL" style="width:130px !Important;">{% trans "В списке" %}:</label>
+                <input type="checkbox" name="in_list" value="1" {% if in_list_only %}checked{% endif %}>
+              </div>
+
             </div>
 
-            <div class="flex gap-3">
-              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "Компания" %}:</label>
-              <input class="YY-INPUT flex-1" name="q_company" value="{{ q_company }}">
+            <div class="flex gap-3 mt-4">
+              <button type="submit" class="YY-BUTTON_MAIN">
+                {% trans "Искать" %}
+              </button>
+
+              <a class="YY-BUTTON_MAIN" href="?id={{ request.GET.id }}&mode={{ mode }}">
+                {% trans "Очистить поиск" %}
+              </a>
             </div>
-
-            <div class="flex gap-3">
-              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "Категория" %}:</label>
-              <input class="YY-INPUT flex-1" name="q_branch" value="{{ q_branch }}">
-            </div>
-
-            <div class="flex gap-3">
-              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "Адрес, город" %}:</label>
-              <input class="YY-INPUT flex-1" name="q_addr" value="{{ q_addr }}">
-            </div>
-
-            <div class="flex gap-3">
-              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">PLZ:</label>
-              <input class="YY-INPUT flex-1" name="q_plz" value="{{ q_plz }}">
-            </div>
-            
-            <div class="flex gap-3">
-              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "В списке" %}:</label>
-              <input type="checkbox" name="in_list" value="1" {% if in_list_only %}checked{% endif %}>
-            </div>
-            
-          </div>
-
-          <div class="flex gap-3 mt-4">
-            <button type="submit" class="YY-BUTTON_MAIN">
-              {% trans "Искать" %}
-            </button>
-
-            <button type="submit"
-                    name="action"
-                    value="clear_search"
-                    formmethod="post"
-                    class="YY-BUTTON_MAIN">
-              {% trans "Очистить поиск" %}
-            </button>
-          </div>
-        </form>
-
+          </form>
       </div>
     </td>
   </tr>
@@ -120,11 +118,11 @@
           <div class="YY-CARD_WHITE flex items-center mb-4">
             {% if page > 1 %}
               <a class="YY-BUTTON_MAIN mr-3"
-                 href="?id={{ request.GET.id }}&mode={{ mode }}&p=1&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                href="?id={{ request.GET.id }}&mode={{ mode }}&p=1{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}{% endif %}">
                 << <<
               </a>
               <a class="YY-BUTTON_MAIN mr-6"
-                 href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ page|add:'-1' }}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ page|add:'-1' }}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}{% endif %}">
                 <<
               </a>
             {% endif %}
@@ -135,15 +133,16 @@
 
             {% if page < pages %}
               <a class="YY-BUTTON_MAIN ml-6"
-                 href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ page|add:'1' }}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ page|add:'1' }}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}{% endif %}">
                 >>
               </a>
               <a class="YY-BUTTON_MAIN ml-3"
-                 href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ pages }}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ pages }}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}{% endif %}">
                 >> >>
               </a>
             {% endif %}
-          </div>
+          </div>          
+
           <div class="YY-MAIN_BOTTOM_DIV">
           <table class="w-full text-left">
             <thead>
@@ -161,7 +160,8 @@
                   <td class="YY-TB_TD">
                     <span class="YY-TEXT-BOLD">{{ it.contact.company_name }}</span>
                     <div class="YY-TEXT !mb-0">{{ it.contact.address }}</div>
-                    <div class="YY-TEXT !mb-0">{{ it.contact.city_land }}</div>
+                    <div class="YY-TEXT">{{ it.contact.city_land }}</div>
+                    <div class="YY-TEXT !mb-0"><a href="mailto:{{ it.contact.email }}" target="_blank" style="text-decoration:underline;">{{ it.contact.email }}</a></div>
                   </td>
 
                   <td class="YY-TB_TD">{{ it.contact.branches_html|safe }}</td>
@@ -226,14 +226,14 @@
           </table>
           </div>
           <!-- PAGINATION BOTTOM -->
-          <div class="YY-CARD_WHITE flex items-center mt-6">
+          <div class="YY-CARD_WHITE flex items-center mb-4">
             {% if page > 1 %}
               <a class="YY-BUTTON_MAIN mr-3"
-                 href="?id={{ request.GET.id }}&mode={{ mode }}&p=1&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                href="?id={{ request.GET.id }}&mode={{ mode }}&p=1{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}{% endif %}">
                 << <<
               </a>
               <a class="YY-BUTTON_MAIN mr-6"
-                 href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ page|add:'-1' }}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ page|add:'-1' }}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}{% endif %}">
                 <<
               </a>
             {% endif %}
@@ -244,15 +244,15 @@
 
             {% if page < pages %}
               <a class="YY-BUTTON_MAIN ml-6"
-                 href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ page|add:'1' }}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ page|add:'1' }}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}{% endif %}">
                 >>
               </a>
               <a class="YY-BUTTON_MAIN ml-3"
-                 href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ pages }}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}">
+                href="?id={{ request.GET.id }}&mode={{ mode }}&p={{ pages }}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% if in_list_only %}&in_list=1{% endif %}{% endif %}">
                 >> >>
               </a>
             {% endif %}
-          </div>
+          </div>          
 
       {% else %}
         <div class="YY-CARD_WHITE mb-10">

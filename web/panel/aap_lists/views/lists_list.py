@@ -1,10 +1,12 @@
-# FILE: web/panel/aap_lists/views/lists_list.py
-# DATE: 2026-01-11
+# FILE: web/panel/aap_lists/views/lists_list.py  (новое — 2026-01-11)
 # PURPOSE: /panel/lists/lists/list/?id=... — управление конкретным списком рассылки.
 # CHANGE:
-# - POST-экшены НЕ сбрасывают mode/поиск/страницу: редирект на request.get_full_path()
-# - clear_search сбрасывает только поиск, но сохраняет id+mode
-# - убран весь мусор с подменой request.GET / dummy resolve_pk (используем contact_id напрямую)
+# - Поиск починен: частичные совпадения (email/company), адрес ищем только по ra.address_list[1].
+# - Поиск категорий: partial match по gb_branches.name + gb_branch_i18n.name_original/name_trans, язык учитывается (lang IN ...).
+# - Если q_branch задан, но совпадений нет -> 0 результатов (WHERE FALSE), а не "всё подряд".
+# - Mode переключается "чисто" (поиск не цепляем), clear_search убран (теперь просто ссылка в шаблоне).
+# - Пагинация: при новом поиске всегда p=1; если p улетел за pages -> клампим.
+# - in_list: checked по умолчанию только если нет параметров поиска; при поиске передаём in_list=1/0 явно.
 
 from __future__ import annotations
 
@@ -135,7 +137,6 @@ def _lists_set_active(list_id: int, contact_ids: list[int], active: bool) -> Non
 
 
 def _bulk_add_by_rate(task_id: int, list_id: int, ws_id, *, rate_max: int) -> None:
-    # membership (upsert active=true)
     with connection.cursor() as cur:
         cur.execute(
             """
@@ -155,7 +156,6 @@ def _bulk_add_by_rate(task_id: int, list_id: int, ws_id, *, rate_max: int) -> No
             [int(task_id), int(rate_max), int(list_id)],
         )
 
-    # ws catalog (upsert active=true)
     with connection.cursor() as cur:
         cur.execute(
             """
@@ -176,13 +176,28 @@ def _bulk_add_by_rate(task_id: int, list_id: int, ws_id, *, rate_max: int) -> No
         )
 
 
-def _fetch_branch_ids_by_text(q: str, ui_lang: str, limit: int = 200) -> list[int]:
+def _lang_candidates(ui_lang: str) -> list[str]:
+    x = (ui_lang or "").strip().lower()
+    if not x:
+        return ["ru", "rus", "en", "eng", "de", "deu"]
+    if x in ("ru", "rus"):
+        return ["ru", "rus"]
+    if x in ("en", "eng"):
+        return ["en", "eng"]
+    if x in ("de", "deu"):
+        return ["de", "deu"]
+    if x in ("uk", "ukr"):
+        return ["uk", "ukr"]
+    return [x]
+
+
+def _fetch_branch_ids_by_text(q: str, ui_lang: str, limit: int = 400) -> list[int]:
     s = (q or "").strip()
     if not s:
         return []
 
-    lang = (ui_lang or "ru").strip().lower()
     pat = f"%{s}%"
+    langs = _lang_candidates(ui_lang)
 
     with connection.cursor() as cur:
         cur.execute(
@@ -190,13 +205,14 @@ def _fetch_branch_ids_by_text(q: str, ui_lang: str, limit: int = 200) -> list[in
             SELECT DISTINCT b.id::int
             FROM public.gb_branches b
             LEFT JOIN public.gb_branch_i18n i
-              ON i.branch_id = b.id AND i.lang = %s
+              ON i.branch_id = b.id AND i.lang = ANY(%s::text[])
             WHERE b.name ILIKE %s
+               OR i.name_original ILIKE %s
                OR i.name_trans ILIKE %s
             ORDER BY b.id ASC
             LIMIT %s
             """,
-            [lang, pat, pat, int(limit)],
+            [langs, pat, pat, pat, int(limit)],
         )
         return [int(r[0]) for r in cur.fetchall()]
 
@@ -205,7 +221,7 @@ def _packets_for_rc_ids(rc_ids: list[int], *, ui_lang: str) -> list[dict]:
     out: list[dict] = []
     for rc_id in rc_ids:
         p = build_contact_packet(int(rc_id), ui_lang)
-        p["ui_id"] = encode_id(int(rc_id))  # для модалки
+        p["ui_id"] = encode_id(int(rc_id))
         out.append(p)
     return out
 
@@ -230,26 +246,26 @@ def _fetch_rows(
     where = ["rc.task_id = %s"]
     params: list[Any] = [int(task_id)]
 
-    # режимы (работают только если поиск не активен)
-    if not search_active:
-        if mode == "list":
-            where.append("lc.contact_id IS NOT NULL")
-        else:  # audience
-            where.append("lc.contact_id IS NULL")
+    # base mode
+    if mode == "list":
+        where.append("lc.contact_id IS NOT NULL")
     else:
-        # поиск: если in_list_only включен — ограничиваемся членами списка
-        if in_list_only:
-            where.append("lc.contact_id IS NOT NULL")
+        where.append("lc.contact_id IS NULL")
+
+    # search override: "в списке" ограничивает только при активном поиске (и расширяет audience->list по смыслу)
+    if search_active and in_list_only:
+        where.append("lc.contact_id IS NOT NULL")
 
     need_join_aggr = False
+
     if q_email:
         need_join_aggr = True
-        where.append("ra.email ILIKE %s")
+        where.append("COALESCE(ra.email, '') ILIKE %s")
         params.append(f"%{q_email.strip()}%")
 
     if q_company:
         need_join_aggr = True
-        where.append("ra.company_name ILIKE %s")
+        where.append("COALESCE(ra.company_name, '') ILIKE %s")
         params.append(f"%{q_company.strip()}%")
 
     if q_plz:
@@ -259,13 +275,16 @@ def _fetch_rows(
 
     if q_addr:
         need_join_aggr = True
-        where.append("EXISTS (SELECT 1 FROM unnest(ra.address_list) a WHERE a ILIKE %s)")
+        where.append("COALESCE(ra.address_list[1], '') ILIKE %s")
         params.append(f"%{q_addr.strip()}%")
 
-    if branch_ids:
+    if q_branch:
         need_join_aggr = True
-        where.append("ra.branches && %s::int[]")
-        params.append(branch_ids)
+        if branch_ids:
+            where.append("ra.branches && %s::int[]")
+            params.append(branch_ids)
+        else:
+            where.append("FALSE")
 
     where_sql = " AND ".join(where)
 
@@ -273,7 +292,6 @@ def _fetch_rows(
     join_lc_sql = "LEFT JOIN public.lists_contacts lc ON lc.list_id = %s AND lc.contact_id = rc.contact_id"
     params_with_list = [int(list_id)] + params
 
-    # total
     with connection.cursor() as cur:
         cur.execute(
             f"""
@@ -289,7 +307,6 @@ def _fetch_rows(
 
     offset = (int(page) - 1) * PAGE_SIZE
 
-    # ids + membership flags
     with connection.cursor() as cur:
         cur.execute(
             f"""
@@ -357,19 +374,11 @@ def lists_list_view(request):
         m = (request.GET.get("mode") or "list").strip().lower()
         return m if m in ("list", "audience") else "list"
 
-    # -----------------------
-    # POST actions (важно: НЕ сбрасываем текущий mode/поиск/страницу)
-    # -----------------------
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
 
         def _redir_same():
             return redirect(request.get_full_path())
-
-        def _redir_clean_search():
-            # сбрасываем только поиск/страницу/галки поиска; сохраняем id+mode
-            mode = _get_mode()
-            return redirect(f"{request.path}?id={request.GET.get('id') or ''}&mode={mode}")
 
         if action == "bulk_add_by_rate":
             rate_max = _safe_int(request.POST.get("rate_max"), DEFAULT_RATE_MAX)
@@ -378,10 +387,6 @@ def lists_list_view(request):
             _bulk_add_by_rate(int(task.id), int(ml.id), ws_id, rate_max=rate_max)
             return _redir_same()
 
-        if action == "clear_search":
-            return _redir_clean_search()
-
-        # row actions (работаем по contact_id)
         cid_s = (request.POST.get("contact_id") or "").strip()
         contact_id = None
         if cid_s:
@@ -404,11 +409,7 @@ def lists_list_view(request):
 
         return _redir_same()
 
-    # -----------------------
-    # GET state
-    # -----------------------
     mode = _get_mode()
-    page = _safe_int(request.GET.get("p"), 1)
 
     q_email = (request.GET.get("q_email") or "").strip()
     q_company = (request.GET.get("q_company") or "").strip()
@@ -416,13 +417,20 @@ def lists_list_view(request):
     q_addr = (request.GET.get("q_addr") or "").strip()
     q_plz = (request.GET.get("q_plz") or "").strip()
 
-    # default checked, но только если параметр вообще есть (чтобы "по умолчанию checked" работал)
-    if "in_list" in request.GET:
+    
+    search_active = any([q_email, q_company, q_branch, q_addr, q_plz]) or ("in_list" in request.GET)
+
+    if not search_active:
+        in_list_only = True
+    elif "in_list" in request.GET:
         in_list_only = (request.GET.get("in_list") or "").strip() in ("1", "true", "on", "yes")
     else:
-        in_list_only = True
+        in_list_only = False
 
-    search_active = any([q_email, q_company, q_branch, q_addr, q_plz]) or ("in_list" in request.GET)
+
+
+    # page: при активном поиске всегда ожидаем p=1 с формы, но на всякий случай
+    page = _safe_int(request.GET.get("p"), 1)
 
     total, rows = _fetch_rows(
         task_id=int(task.id),
@@ -440,6 +448,23 @@ def lists_list_view(request):
     )
 
     pages = max(1, int(math.ceil(total / float(PAGE_SIZE))) if total else 1)
+    if page > pages:
+        page = pages
+        total, rows = _fetch_rows(
+            task_id=int(task.id),
+            list_id=int(ml.id),
+            mode=mode,
+            page=page,
+            ui_lang=ui_lang,
+            q_email=q_email,
+            q_company=q_company,
+            q_branch=q_branch,
+            q_addr=q_addr,
+            q_plz=q_plz,
+            in_list_only=bool(in_list_only),
+            search_active=bool(search_active),
+        )
+
     list_active_cnt = _list_active_cnt(int(ml.id))
 
     return render(
