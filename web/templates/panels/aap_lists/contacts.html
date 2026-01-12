@@ -1,0 +1,262 @@
+<!-- FILE: web/templates/panels/aap_lists/contacts.html  (обновлено — 2026-01-12) -->
+<!-- CHANGE:
+  - добавлен фильтр "Неподписанные"
+  - "Все контакты" появляется если выбран list / nol / unsub
+  - поиск сохраняет фильтр unsub (как list/nol)
+  - пагинация сохраняет unsub (как list/nol)
+-->
+
+{% extends "panels/base.html" %}
+{% load i18n %}
+
+{% block content %}
+
+<!-- TOP TABLE -->
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-STATUS_BLUE mb-6">
+          {% trans "Контакты. Списки рассылок:" %}
+        </div>
+
+        {% for it in lists %}
+          <a href="?list={{ it.ui_id }}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}"
+             class="{% if it.is_active %}YY-BUTTON_TAB_GREEN{% else %}YY-BUTTON_TAB_MAIN{% endif %} mb-2 w-full">
+            {% trans "Список рассылки" %}: {{ it.title }}, {% trans "Контакты" %}: {{ it.cnt }}
+          </a>
+        {% endfor %}
+
+        <a href="?nol=1{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}"
+           class="{% if no_list_item.is_active %}YY-BUTTON_TAB_GREEN{% else %}YY-BUTTON_TAB_MAIN{% endif %} mb-2 w-full">
+          {% trans "Список рассылки: Без списка, Контакты" %}: {{ no_list_item.cnt }}
+        </a>
+
+        <a href="?unsub=1{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}"
+           class="{% if unsub_item.is_active %}YY-BUTTON_TAB_GREEN{% else %}YY-BUTTON_TAB_MAIN{% endif %} mb-2 w-full">
+          {% trans "Неподписанные" %}: {{ unsub_item.cnt }}
+        </a>
+
+        {% if filter_active %}
+          <a href="?{% if search_active %}q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}"
+             class="YY-BUTTON_TAB_MAIN mt-6 w-full">
+            {% trans "Все контакты" %}
+          </a>
+        {% endif %}
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+        <form method="get">
+          {% if list_filter_ui %}
+            <input type="hidden" name="list" value="{{ list_filter_ui }}">
+          {% endif %}
+          {% if no_list %}
+            <input type="hidden" name="nol" value="1">
+          {% endif %}
+          {% if unsub %}
+            <input type="hidden" name="unsub" value="1">
+          {% endif %}
+          <input type="hidden" name="p" value="1">
+
+          <div class="grid grid-cols-2 gap-4 mb-6">
+
+            <div class="flex gap-3">
+              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">Email:</label>
+              <input class="YY-INPUT flex-1" name="q_email" value="{{ q_email }}">
+            </div>
+
+            <div class="flex gap-3">
+              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "Компания" %}:</label>
+              <input class="YY-INPUT flex-1" name="q_company" value="{{ q_company }}">
+            </div>
+
+            <div class="flex gap-3">
+              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "Категория" %}:</label>
+              <input class="YY-INPUT flex-1" name="q_branch" value="{{ q_branch }}">
+            </div>
+
+            <div class="flex gap-3">
+              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">{% trans "Адрес, город" %}:</label>
+              <input class="YY-INPUT flex-1" name="q_addr" value="{{ q_addr }}">
+            </div>
+
+            <div class="flex gap-3">
+              <label class="YY-LABEL" style="width:130px !Important;margin-top:8px !Important;">PLZ:</label>
+              <input class="YY-INPUT flex-1" name="q_plz" value="{{ q_plz }}">
+            </div>
+
+          </div>
+
+          <div class="flex gap-3 mt-4">
+            <button type="submit" class="YY-BUTTON_MAIN">
+              {% trans "Искать" %}
+            </button>
+
+            <a class="YY-BUTTON_MAIN"
+               href="?{% if list_filter_ui %}list={{ list_filter_ui }}&{% endif %}{% if no_list %}nol=1&{% endif %}{% if unsub %}unsub=1&{% endif %}">
+              {% trans "Очистить поиск" %}
+            </a>
+          </div>
+        </form>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+
+      {% if rows %}
+        <!-- PAGINATION TOP -->
+        <div class="YY-CARD_WHITE flex items-center mb-4">
+          {% if page > 1 %}
+            <a class="YY-BUTTON_MAIN mr-3"
+              href="?p=1{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
+              << <<
+            </a>
+            <a class="YY-BUTTON_MAIN mr-6"
+              href="?p={{ page|add:'-1' }}{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
+              <<
+            </a>
+          {% endif %}
+
+          <div class="YY-TEXT-BOLD !mb-0">
+            {% trans "Страницы" %}: {{ page }} / {{ pages }}
+          </div>
+
+          {% if page < pages %}
+            <a class="YY-BUTTON_MAIN ml-6"
+              href="?p={{ page|add:'1' }}{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
+              >>
+            </a>
+            <a class="YY-BUTTON_MAIN ml-3"
+              href="?p={{ pages }}{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
+              >> >>
+            </a>
+          {% endif %}
+        </div>
+
+        <div class="YY-MAIN_BOTTOM_DIV">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH" style="width:50%;">{% trans "Компания" %}</th>
+                <th class="YY-TH_TH" style="width:50%;">{% trans "Категории" %}</th>
+                <th class="YY-TH_TH">&nbsp;</th>
+                <th class="YY-TH_TH">&nbsp;</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for it in rows %}
+                <tr class="YY-TB_TR align-top">
+                  <td class="YY-TB_TD">
+                    <span class="YY-TEXT-BOLD">{{ it.company_name }}</span>
+                    <div class="YY-TEXT !mb-0">{{ it.address }}</div>
+                    <div class="YY-TEXT">{{ it.city_land }}</div>
+
+                    <div class="YY-TEXT mb-4">
+                      <a href="mailto:{{ it.email }}" target="_blank" style="text-decoration:underline;">{{ it.email }}</a>
+                    </div>
+                  </td>
+
+                  <td class="YY-TB_TD">
+                    {{ it.branches_html|safe }}
+                  </td>
+
+                  <td class="YY-TB_TD">
+                   {% if it.lists %}
+                    <div class="YY-STATUS_YELLOW">
+                        {% trans "Списки рассылок" %}: {{ it.lists_str }}
+                    </div>
+                    {% else %}
+                    <div class="YY-STATUS_GRAY">
+                      {% trans "Списки рассылок: нет" %}
+                    </div>
+                    {% endif %}
+                 </td>
+
+                  <td class="YY-TB_TD">
+                    {% if it.forget_allowed %}
+                      <form method="post" class="mb-2"
+                        onsubmit="return confirm('{% trans "Забыть контакт? Он будет удалён из контактов workspace." %}');">
+                        {% csrf_token %}
+                        <input type="hidden" name="contact_id" value="{{ it.aggr_id }}">
+                        <button type="submit" name="action" value="forget" class="YY-BUTTON_TAB_RED w-full">
+                          {% trans "Забыть" %}
+                        </button>
+                      </form>
+                    {% endif %}
+
+                    {% if it.active %}
+                      <form method="post" class="mb-10">
+                        {% csrf_token %}
+                        <input type="hidden" name="contact_id" value="{{ it.aggr_id }}">
+                        <button type="submit" name="action" value="unsubscribe" class="YY-BUTTON_TAB_MAIN w-full">
+                          {% trans "Отписать" %}
+                        </button>
+                      </form>
+                    {% else %}
+                      <form method="post" class="mb-10">
+                        {% csrf_token %}
+                        <input type="hidden" name="contact_id" value="{{ it.aggr_id }}">
+                        <button type="submit" name="action" value="subscribe" class="YY-BUTTON_TAB_MAIN w-full">
+                          {% trans "Подписать" %}
+                        </button>
+                      </form>
+                    {% endif %}
+
+                    <a href="#"
+                      class="YY-BUTTON_TAB_MAIN w-full inline-block text-center"
+                      data-yy-modal="url=/panel/lists/contacts/modal/?id={{ it.ui_id }}">
+                      {% trans "Больше" %}
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- PAGINATION BOTTOM -->
+        <div class="YY-CARD_WHITE flex items-center mb-4">
+          {% if page > 1 %}
+            <a class="YY-BUTTON_MAIN mr-3"
+              href="?p=1{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
+              << <<
+            </a>
+            <a class="YY-BUTTON_MAIN mr-6"
+              href="?p={{ page|add:'-1' }}{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
+              <<
+            </a>
+          {% endif %}
+
+          <div class="YY-TEXT-BOLD !mb-0">
+            {% trans "Страницы" %}: {{ page }} / {{ pages }}
+          </div>
+
+          {% if page < pages %}
+            <a class="YY-BUTTON_MAIN ml-6"
+              href="?p={{ page|add:'1' }}{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
+              >>
+            </a>
+            <a class="YY-BUTTON_MAIN ml-3"
+              href="?p={{ pages }}{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
+              >> >>
+            </a>
+          {% endif %}
+        </div>
+
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
+      {% endif %}
+
+    </td>
+  </tr>
+</table>
+
+{% endblock %}

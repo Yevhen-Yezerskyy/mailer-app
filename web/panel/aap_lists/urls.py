@@ -1,14 +1,13 @@
 # FILE: web/panel/aap_lists/urls.py
-# DATE: 2026-01-11
+# DATE: 2026-01-12
 # PURPOSE: URL-ы раздела "Lists" панели (lists / list-manage / contacts).
 # CHANGE:
-# - добавлена управлялка списка: /panel/lists/lists/list/?id=...
-# - добавлена модалка: /panel/lists/lists/list/modal/?id=... (rate_contacts.id, encode)
+# - добавлена модалка контакта: /panel/lists/contacts/modal/?id=... (raw_contacts_aggr.id, encode)
 
 from django.urls import path
 from django.views.generic import RedirectView
 
-from .views import contacts, lists, lists_list, modal_lists_list
+from .views import contacts, lists, lists_list, modal_contacts, modal_lists_list
 
 app_name = "lists"
 
@@ -18,4 +17,5 @@ urlpatterns = [
     path("lists/list/", lists_list.lists_list_view, name="lists_list"),
     path("lists/list/modal/", modal_lists_list.modal_lists_list_view, name="lists_list_modal"),
     path("contacts/", contacts.contacts_view, name="contacts"),
+    path("contacts/modal/", modal_contacts.modal_contacts_view, name="contacts_modal"),
 ]

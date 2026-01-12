@@ -1,0 +1,94 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_lists/modal_contacts.html  (новое — 2026-01-12) -->
+<!-- PURPOSE: Модалка контакта по aggr_id: контакт (format_data.get_contact) + списки + аудитории с rate_cl/rate_cb. -->
+
+<div class="YY-CARD_WHITE overflow-hidden" style="max-height:90vh;width:900px;">
+
+  <button type="button" class="YY-BUTTON_MAIN" data-yy-modal-close
+          style="position:absolute;top:10px;right:10px;">✕</button>
+
+  <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
+
+  {% if status == "done" %}
+
+    <span class="YY-TEXT-BOLD !mb-0">{{ contact.company_name }}</span>
+    <div class="YY-TEXT mb-4">{{ contact.address }}</div>
+
+    <div class="YY-TEXT-BOLD !mb-1">{% trans "Списки рассылки" %}:</div>
+    <div class="YY-TEXT ml-6 mb-4">
+    {% if lists %}
+    
+        {% for l in lists %}
+          <div class="YY-STATUS_YELLOW mb-1">
+            {{ l.title }}
+          </div>
+        {% endfor %}
+      
+    {% else %}
+          <div class="YY-STATUS_GRAY">{% trans "Нет в списках рассылок" %}</div>
+    {% endif %}
+    </div>
+
+    <div class="YY-TEXT-BOLD !mb-1">{% trans "Аудитории" %}:</div>
+    {% if audiences %}
+      <div class="ml-6 mb-4">
+        {% for a in audiences %}
+          <div class="YY-STATUS_BLUE mb-1">
+            {{ a.title }}&nbsp;&nbsp;&nbsp;&nbsp;{% trans "Рейтинги: Поиск" %}: {{ a.rate_cb|default:"None" }}, {% trans "Компания" %}: {{ a.rate_cl|default:"None" }}
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="YY-STATUS_GRAY ml-6 mb-4">{% trans "нет" %}</div>
+    {% endif %}
+
+    {% if contact.branches_html %}
+      <div class="YY-TEXT-BOLD !mb-0">{% trans "Категории / отрасли:" %}</div>
+      <div class="YY-TEXT ml-6 mb-4">{{ contact.branches_html|safe }}</div>
+    {% endif %}
+
+    {% if contact.tags_html %}
+      <div class="YY-TEXT-BOLD !mb-0">{% trans "Теги / направления деятельности:" %}</div>
+      <div class="YY-TEXT ml-6 mb-4">{{ contact.tags_html|safe }}</div>
+    {% endif %}
+
+    <div class="YY-TEXT-BOLD !mb-0">{% trans "Адрес:" %}</div>
+    <div class="YY-TEXT ml-6 !mb-0">{{ contact.address }}</div>
+    <div class="YY-TEXT ml-6 mb-4">{{ contact.city_land }}</div>
+
+    {% if contact.phones_html %}
+      <div class="YY-TEXT-BOLD !mb-0">{% trans "Телефон:" %}</div>
+      <div class="YY-TEXT ml-6 mb-4">{{ contact.phones_html|safe }}</div>
+    {% endif %}
+
+    {% if contact.email_html %}
+      <div class="YY-TEXT-BOLD !mb-0">{% trans "Email:" %}</div>
+      <div class="ml-6 mb-4">{{ contact.email_html|safe }}</div>
+    {% endif %}
+
+    {% if contact.website_html %}
+      <div class="YY-TEXT-BOLD !mb-0">{% trans "Web-site:" %}</div>
+      <div class="ml-6 mb-4">{{ contact.website_html|safe }}</div>
+    {% endif %}
+
+    {% if contact.socials_html %}
+      <div class="YY-TEXT-BOLD !mb-0">{% trans "Социальные сети:" %}</div>
+      <div class="ml-6 mb-4">{{ contact.socials_html|safe }}</div>
+    {% endif %}
+
+    {% if contact.description %}
+      <div class="YY-TEXT-BOLD !mb-0">{% trans "Описание:" %}</div>
+      <div class="YY-TEXT ml-6 mb-4">{{ contact.description }}</div>
+    {% endif %}
+
+    {% if contact.source_urls_html %}
+      <div class="YY-TEXT-BOLD !mb-0">{% trans "Источник:" %}</div>
+      <div class="YY-TEXT ml-6 mb-4">{{ contact.source_urls_html|safe }}</div>
+    {% endif %}
+
+  {% else %}
+    <div class="YY-STATUS_GRAY w-full">{% trans "Здесь пока нет данных" %}</div>
+  {% endif %}
+
+  </div>
+</div>
