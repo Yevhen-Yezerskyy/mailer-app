@@ -1,12 +1,8 @@
-# FILE: web/panel/aap_lists/views/lists_list.py  (новое — 2026-01-11)
+# FILE: web/panel/aap_lists/views/lists_list.py  (обновлено — 2026-01-12)
 # PURPOSE: /panel/lists/lists/list/?id=... — управление конкретным списком рассылки.
-# CHANGE:
-# - Поиск починен: частичные совпадения (email/company), адрес ищем только по ra.address_list[1].
-# - Поиск категорий: partial match по gb_branches.name + gb_branch_i18n.name_original/name_trans, язык учитывается (lang IN ...).
-# - Если q_branch задан, но совпадений нет -> 0 результатов (WHERE FALSE), а не "всё подряд".
-# - Mode переключается "чисто" (поиск не цепляем), clear_search убран (теперь просто ссылка в шаблоне).
-# - Пагинация: при новом поиске всегда p=1; если p улетел за pages -> клампим.
-# - in_list: checked по умолчанию только если нет параметров поиска; при поиске передаём in_list=1/0 явно.
+# CHANGE (2026-01-12):
+# - Под новое кеширование format_data.build_contact_packet(): прокидываем rate_cb/rate_cl (снапшот) в вызов,
+#   чтобы ключ кеша учитывал текущие рейтинги и UI не показывал устаревшие значения.
 
 from __future__ import annotations
 
@@ -217,10 +213,10 @@ def _fetch_branch_ids_by_text(q: str, ui_lang: str, limit: int = 400) -> list[in
         return [int(r[0]) for r in cur.fetchall()]
 
 
-def _packets_for_rc_ids(rc_ids: list[int], *, ui_lang: str) -> list[dict]:
+def _packets_for_rows(rows_for_packets: list[tuple[int, Any, Any]], *, ui_lang: str) -> list[dict]:
     out: list[dict] = []
-    for rc_id in rc_ids:
-        p = build_contact_packet(int(rc_id), ui_lang)
+    for rc_id, rate_cb, rate_cl in rows_for_packets:
+        p = build_contact_packet(int(rc_id), ui_lang, rate_cb=rate_cb, rate_cl=rate_cl)
         p["ui_id"] = encode_id(int(rc_id))
         out.append(p)
     return out
@@ -314,7 +310,9 @@ def _fetch_rows(
               rc.id::bigint,
               rc.contact_id::bigint,
               (lc.contact_id IS NOT NULL) AS in_list,
-              lc.active AS list_active
+              lc.active AS list_active,
+              rc.rate_cb,
+              rc.rate_cl
             FROM public.rate_contacts rc
             {join_lc_sql}
             {join_aggr_sql}
@@ -330,11 +328,11 @@ def _fetch_rows(
         )
         rows = cur.fetchall()
 
-    rc_ids = [int(r[0]) for r in rows]
-    packets = _packets_for_rc_ids(rc_ids, ui_lang=ui_lang)
+    rows_for_packets: list[tuple[int, Any, Any]] = [(int(r[0]), r[4], r[5]) for r in rows]
+    packets = _packets_for_rows(rows_for_packets, ui_lang=ui_lang)
 
     meta_by_rc: dict[int, dict[str, Any]] = {}
-    for rc_id, contact_id, in_list, list_active in rows:
+    for rc_id, contact_id, in_list, list_active, _rate_cb, _rate_cl in rows:
         meta_by_rc[int(rc_id)] = {
             "contact_id": int(contact_id),
             "in_list": bool(in_list),
@@ -386,7 +384,7 @@ def lists_list_view(request):
                 rate_max = 100
             _bulk_add_by_rate(int(task.id), int(ml.id), ws_id, rate_max=rate_max)
             return _redir_same()
-        
+
         if action == "clear_list":
             with connection.cursor() as cur:
                 cur.execute(
@@ -428,7 +426,6 @@ def lists_list_view(request):
     q_addr = (request.GET.get("q_addr") or "").strip()
     q_plz = (request.GET.get("q_plz") or "").strip()
 
-    
     search_active = any([q_email, q_company, q_branch, q_addr, q_plz]) or ("in_list" in request.GET)
 
     if not search_active:
@@ -437,8 +434,6 @@ def lists_list_view(request):
         in_list_only = (request.GET.get("in_list") or "").strip() in ("1", "true", "on", "yes")
     else:
         in_list_only = False
-
-
 
     # page: при активном поиске всегда ожидаем p=1 с формы, но на всякий случай
     page = _safe_int(request.GET.get("p"), 1)

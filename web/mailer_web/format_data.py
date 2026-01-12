@@ -1,6 +1,4 @@
-# FILE: web/mailer_web/format_data.py
-# DATE: 2026-01-05
-# (новое) 2026-01-05
+# FILE: web/mailer_web/format_data.py  (обновлено — 2026-01-12)
 # PURPOSE:
 #   format_data v8:
 #   - UI зовёт ТОЛЬКО публичные функции (get_contact / get_ratings / build_contact_packet).
@@ -14,6 +12,10 @@
 #     То же самое в ratings.chosen_cb (вместо city_str).
 #   - _choose_cb_id memoized на TTL_HOUR (как ratings_raw) — второй проход быстрый.
 #   - Убрана мёртвая ветка (дублирующий return) в get_contact_raw.
+# CHANGE:
+#   - Для кеширования рейтингов добавлены опциональные rate_cb/rate_cl параметры (для строки контакта).
+#   - TTL НЕ меняем, но добавляем rate_cb/rate_cl в ключ memo для ratings_raw (если переданы),
+#     чтобы при изменении рейтингов ключ кеша менялся и не отдавался старый результат.
 
 from __future__ import annotations
 
@@ -170,7 +172,7 @@ def _rate_cl_bg(rate_cl: Any) -> str:
 
 def _rate_cb_1_100(rate_cb: Any) -> Optional[int]:
     return rate_cb
-   
+
 #    if rate_cb is None:
 #        return None
 #    try:
@@ -197,6 +199,16 @@ def _safe_int_list(v: Any) -> List[int]:
         except Exception:
             pass
     return out
+
+
+def _rate_key(v: Any) -> Optional[int]:
+    # для ключа кеша: None или int
+    if v is None:
+        return None
+    try:
+        return int(v)
+    except Exception:
+        return None
 
 
 # ============================================================
@@ -580,8 +592,12 @@ def get_contact(aggr_id: Optional[int], ui_lang: str) -> Optional[Dict[str, Any]
 # RATINGS RAW (PRIVATE)
 # ============================================================
 
-def get_ratings_raw(rate_contact_id: int) -> Optional[Dict[str, Any]]:
-    def _load(_: Tuple[str, int]):
+def get_ratings_raw(rate_contact_id: int, *, rate_cb: Any = None, rate_cl: Any = None) -> Optional[Dict[str, Any]]:
+    rc = int(rate_contact_id)
+    k_cb = _rate_key(rate_cb)
+    k_cl = _rate_key(rate_cl)
+
+    def _load(_: Tuple[str, int, Optional[int], Optional[int]]):
         with connection.cursor() as cur:
             cur.execute(
                 """
@@ -590,7 +606,7 @@ def get_ratings_raw(rate_contact_id: int) -> Optional[Dict[str, Any]]:
                 WHERE id = %s
                 LIMIT 1
                 """,
-                [int(rate_contact_id)],
+                [int(rc)],
             )
             row = cur.fetchone()
             if not row:
@@ -603,7 +619,9 @@ def get_ratings_raw(rate_contact_id: int) -> Optional[Dict[str, Any]]:
                 "rate_cb": row[4],
             }
 
-    return memo(("ratings_raw", int(rate_contact_id)), _load, ttl=TTL_HOUR, version=MEMO_VERSION)
+    # ВАЖНО: TTL оставляем как был (TTL_HOUR),
+    # но добавляем rate_cb/rate_cl в ключ (если UI их передал), чтобы кеш автоматически "инвалидировался" при изменении.
+    return memo(("ratings_raw", int(rc), k_cb, k_cl), _load, ttl=TTL_HOUR, version=MEMO_VERSION)
 
 
 def get_aggr_cb_ids(aggr_id: int) -> List[int]:
@@ -774,10 +792,10 @@ def build_ratings(r: Dict[str, Any], cb_ids: List[int], ui_lang: str) -> Dict[st
 # RATINGS (PUBLIC)
 # ============================================================
 
-def get_ratings(rate_contact_id: Optional[int], ui_lang: str) -> Optional[Dict[str, Any]]:
+def get_ratings(rate_contact_id: Optional[int], ui_lang: str, *, rate_cb: Any = None, rate_cl: Any = None) -> Optional[Dict[str, Any]]:
     if not rate_contact_id:
         return None
-    rr = get_ratings_raw(int(rate_contact_id))
+    rr = get_ratings_raw(int(rate_contact_id), rate_cb=rate_cb, rate_cl=rate_cl)
     if not rr:
         return None
     cb_ids = get_aggr_cb_ids(int(rr["aggr_id"]))
@@ -788,11 +806,10 @@ def get_ratings(rate_contact_id: Optional[int], ui_lang: str) -> Optional[Dict[s
 # PACKET (PUBLIC)
 # ============================================================
 
-def build_contact_packet(rate_contact_id: int, ui_lang: str) -> Dict[str, Any]:
-    ratings = get_ratings(int(rate_contact_id), ui_lang)
+def build_contact_packet(rate_contact_id: int, ui_lang: str, *, rate_cb: Any = None, rate_cl: Any = None) -> Dict[str, Any]:
+    ratings = get_ratings(int(rate_contact_id), ui_lang, rate_cb=rate_cb, rate_cl=rate_cl)
     contact = get_contact(get_aggr_id_by_rate_contact(int(rate_contact_id)), ui_lang)
     return {"contact": contact, "ratings": ratings}
-
 
 
 def iter_city_land(city_ids: List[int]):

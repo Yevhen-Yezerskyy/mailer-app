@@ -2,13 +2,15 @@
 # CHANGE:
 # - Убрана логика "начать рейтингование".
 # - Добавлены кнопки "+100/+200/+500/+1000" (только когда рейтингование не запущено и criteria_changed=false).
-# - Добавлена кнопка "Удалить все рейтинги" (всегда доступна): rate_cl/hash_task -> NULL; все __tasks_rating -> done=true.
+# - Добавлена кнопка "Удалить все рейтинги" (всегда доступна): rate_cl/hash_task -> NULL; все __tasks_rating -> done=true; subscribers_limit -> 0.
 # - Кнопки бакетов (1-30/31-70/71-100) сделаны ссылками на нужную страницу вкладки rated.
+# - В выборке строк для таблиц добавлены rc.rate_cb/rc.rate_cl и прокинуты в build_contact_packet(..., rate_cb=..., rate_cl=...)
+#   для корректного ключа кеша format_data.
 
 from __future__ import annotations
 
 import math
-from typing import Any
+from typing import Any, Optional
 
 from django.db import connection
 from django.http import HttpResponseRedirect
@@ -94,17 +96,15 @@ def _count_rated_lt(task_id: int, *, lt_rate: int) -> int:
 
 
 def _page_for_offset(offset_cnt: int) -> int:
-    # offset_cnt = количество строк ДО нужной группы (0-based)
     if offset_cnt <= 0:
         return 1
     return int(1 + (int(offset_cnt) // int(PAGE_SIZE)))
 
 
-def _packets_for_ids(rate_contact_ids: list[int], *, ui_lang: str) -> list[dict]:
+def _packets_for_rows(rows: list[tuple[int, Any, Any]], *, ui_lang: str) -> list[dict]:
     out: list[dict] = []
-    for rc_id in rate_contact_ids:
-        p = build_contact_packet(int(rc_id), ui_lang)
-        # ui_id — UI/URL логика вьюхи (не format_data)
+    for rc_id, rate_cb, rate_cl in rows:
+        p = build_contact_packet(int(rc_id), ui_lang, rate_cb=rate_cb, rate_cl=rate_cl)
         p["ui_id"] = encode_id(int(rc_id))
         out.append(p)
     return out
@@ -129,7 +129,7 @@ def _fetch_contacts_rated(task_id: int, *, page: int, ui_lang: str) -> tuple[int
     with connection.cursor() as cur:
         cur.execute(
             """
-            SELECT rc.id::bigint
+            SELECT rc.id::bigint, rc.rate_cb, rc.rate_cl
             FROM public.rate_contacts rc
             WHERE rc.task_id = %s
               AND rc.rate_cl IS NOT NULL
@@ -140,9 +140,9 @@ def _fetch_contacts_rated(task_id: int, *, page: int, ui_lang: str) -> tuple[int
             """,
             [int(task_id), int(PAGE_SIZE), int(offset)],
         )
-        ids = [int(r[0]) for r in cur.fetchall()]
+        rows = [(int(r[0]), r[1], r[2]) for r in (cur.fetchall() or [])]
 
-    return total, _packets_for_ids(ids, ui_lang=ui_lang)
+    return total, _packets_for_rows(rows, ui_lang=ui_lang)
 
 
 def _fetch_contacts_all(task_id: int, *, page: int, ui_lang: str) -> tuple[int, list[dict]]:
@@ -161,7 +161,7 @@ def _fetch_contacts_all(task_id: int, *, page: int, ui_lang: str) -> tuple[int, 
     with connection.cursor() as cur:
         cur.execute(
             """
-            SELECT rc.id::bigint
+            SELECT rc.id::bigint, rc.rate_cb, rc.rate_cl
             FROM public.rate_contacts rc
             WHERE rc.task_id = %s
             ORDER BY rc.rate_cb ASC NULLS LAST, rc.contact_id ASC
@@ -169,9 +169,9 @@ def _fetch_contacts_all(task_id: int, *, page: int, ui_lang: str) -> tuple[int, 
             """,
             [int(task_id), int(PAGE_SIZE), int(offset)],
         )
-        ids = [int(r[0]) for r in cur.fetchall()]
+        rows = [(int(r[0]), r[1], r[2]) for r in (cur.fetchall() or [])]
 
-    return total, _packets_for_ids(ids, ui_lang=ui_lang)
+    return total, _packets_for_rows(rows, ui_lang=ui_lang)
 
 
 def _rating_any_exists(task_id: int) -> bool:
@@ -234,7 +234,6 @@ def _rating_insert(task_id: int, type_: str, hash_task: int) -> None:
 
 
 def _ratings_clear(task_id: int) -> None:
-    # Важно: не удаляем строки, а сбрасываем клиентский рейтинг и hash_task.
     with connection.cursor() as cur:
         cur.execute(
             """
@@ -288,7 +287,6 @@ def status_task_view(request):
 
     ui_lang = getattr(request, "LANGUAGE_CODE", "") or "ru"
 
-    # actions (правая верхняя карточка)
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
 
@@ -307,7 +305,6 @@ def status_task_view(request):
             elif action == "rating_add_1000":
                 add = 1000
 
-            # +N доступно только если нет активной задачи и критерии не изменены
             active_now = _rating_active_exists(int(task.id))
             any_now = _rating_any_exists(int(task.id))
             changed_now = False
@@ -339,7 +336,6 @@ def status_task_view(request):
         rated_31_70_pct = _pct(rated_31_70_cnt, contacts_rated)
         rated_71_100_pct = _pct(rated_71_100_cnt, contacts_rated)
 
-        # pages for bucket anchors (вкладка rated, сортировка rate_cl ASC)
         bucket_1_30_page = _page_for_offset(_count_rated_lt(int(task.id), lt_rate=1))
         bucket_31_70_page = _page_for_offset(_count_rated_lt(int(task.id), lt_rate=31))
         bucket_71_100_page = _page_for_offset(_count_rated_lt(int(task.id), lt_rate=71))
