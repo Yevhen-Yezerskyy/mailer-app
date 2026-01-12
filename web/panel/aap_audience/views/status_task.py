@@ -1,7 +1,9 @@
-# FILE: web/panel/aap_audience/views/status_task.py
-# DATE: 2026-01-05
-# CHANGE: нижние таблицы (rated/all) теперь собираются ТОЛЬКО через format_data.build_contact_packet(rate_contacts.id);
-#         никаких JOIN в raw_contacts_aggr/форматирования в status_task.py; добавлен ui_id для модалки.
+# FILE: web/panel/aap_audience/views/status_task.py  (обновлено — 2026-01-12)
+# CHANGE:
+# - Убрана логика "начать рейтингование".
+# - Добавлены кнопки "+100/+200/+500/+1000" (только когда рейтингование не запущено и criteria_changed=false).
+# - Добавлена кнопка "Удалить все рейтинги" (всегда доступна): rate_cl/hash_task -> NULL; все __tasks_rating -> done=true.
+# - Кнопки бакетов (1-30/31-70/71-100) сделаны ссылками на нужную страницу вкладки rated.
 
 from __future__ import annotations
 
@@ -74,6 +76,28 @@ def _fetch_rated_buckets(task_id: int) -> tuple[int, int, int]:
         cur.execute(sql, [int(task_id)])
         row = cur.fetchone() or (0, 0, 0)
         return int(row[0] or 0), int(row[1] or 0), int(row[2] or 0)
+
+
+def _count_rated_lt(task_id: int, *, lt_rate: int) -> int:
+    sql = """
+        SELECT COUNT(*)::int
+        FROM public.rate_contacts rc
+        WHERE rc.task_id = %s
+          AND rc.rate_cl IS NOT NULL
+          AND rc.hash_task IS NOT NULL
+          AND rc.hash_task NOT IN (-1,0,1)
+          AND rc.rate_cl < %s
+    """
+    with connection.cursor() as cur:
+        cur.execute(sql, [int(task_id), int(lt_rate)])
+        return int((cur.fetchone() or [0])[0] or 0)
+
+
+def _page_for_offset(offset_cnt: int) -> int:
+    # offset_cnt = количество строк ДО нужной группы (0-based)
+    if offset_cnt <= 0:
+        return 1
+    return int(1 + (int(offset_cnt) // int(PAGE_SIZE)))
 
 
 def _packets_for_ids(rate_contact_ids: list[int], *, ui_lang: str) -> list[dict]:
@@ -209,6 +233,41 @@ def _rating_insert(task_id: int, type_: str, hash_task: int) -> None:
         )
 
 
+def _ratings_clear(task_id: int) -> None:
+    # Важно: не удаляем строки, а сбрасываем клиентский рейтинг и hash_task.
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE public.rate_contacts
+            SET rate_cl = NULL,
+                hash_task = NULL,
+                updated_at = now()
+            WHERE task_id = %s
+            """,
+            [int(task_id)],
+        )
+        cur.execute(
+            """
+            UPDATE public.__tasks_rating
+            SET done = true,
+                updated_at = now()
+            WHERE task_id = %s
+              AND type IN ('contacts','contacts_update')
+              AND done = false
+            """,
+            [int(task_id)],
+        )
+        cur.execute(
+            """
+            UPDATE public.aap_audience_audiencetask
+            SET subscribers_limit = 0,
+                updated_at = now()
+            WHERE id = %s
+            """,
+            [int(task_id)],
+        )
+
+
 def status_task_view(request):
     res = resolve_pk_or_redirect(request, AudienceTask, param="id")
     if isinstance(res, HttpResponseRedirect):
@@ -233,17 +292,34 @@ def status_task_view(request):
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
 
-        if action == "rating_start_contacts":
-            if (not _rating_any_exists(int(task.id))) and (not _rating_active_exists(int(task.id))):
-                _rating_insert(int(task.id), "contacts", current_hash)
+        if action == "rating_clear_ratings":
+            _ratings_clear(int(task.id))
             return redirect(f"{request.path}?id={task.ui_id}")
 
-        if action == "rating_next_1000":
-            if _rating_any_exists(int(task.id)) and (not _rating_active_exists(int(task.id))):
+        if action in ("rating_add_100", "rating_add_200", "rating_add_500", "rating_add_1000"):
+            add = 0
+            if action == "rating_add_100":
+                add = 100
+            elif action == "rating_add_200":
+                add = 200
+            elif action == "rating_add_500":
+                add = 500
+            elif action == "rating_add_1000":
+                add = 1000
+
+            # +N доступно только если нет активной задачи и критерии не изменены
+            active_now = _rating_active_exists(int(task.id))
+            any_now = _rating_any_exists(int(task.id))
+            changed_now = False
+            if (not active_now) and any_now:
+                changed_now = _criteria_changed(int(task.id), current_hash)
+
+            if (not active_now) and (not changed_now) and add > 0:
                 AudienceTask.objects.filter(id=task.id, workspace_id=ws_id, user=user).update(
-                    subscribers_limit=int(task.subscribers_limit or 0) + 1000
+                    subscribers_limit=int(task.subscribers_limit or 0) + int(add)
                 )
                 _rating_insert(int(task.id), "contacts", current_hash)
+
             return redirect(f"{request.path}?id={task.ui_id}")
 
         if action == "rating_start_contacts_update":
@@ -255,11 +331,18 @@ def status_task_view(request):
 
     rated_1_30_cnt = rated_31_70_cnt = rated_71_100_cnt = 0
     rated_1_30_pct = rated_31_70_pct = rated_71_100_pct = 0
+    bucket_1_30_page = bucket_31_70_page = bucket_71_100_page = 1
+
     if contacts_rated > 0:
         rated_1_30_cnt, rated_31_70_cnt, rated_71_100_cnt = _fetch_rated_buckets(int(task.id))
         rated_1_30_pct = _pct(rated_1_30_cnt, contacts_rated)
         rated_31_70_pct = _pct(rated_31_70_cnt, contacts_rated)
         rated_71_100_pct = _pct(rated_71_100_cnt, contacts_rated)
+
+        # pages for bucket anchors (вкладка rated, сортировка rate_cl ASC)
+        bucket_1_30_page = _page_for_offset(_count_rated_lt(int(task.id), lt_rate=1))
+        bucket_31_70_page = _page_for_offset(_count_rated_lt(int(task.id), lt_rate=31))
+        bucket_71_100_page = _page_for_offset(_count_rated_lt(int(task.id), lt_rate=71))
 
     tab = (request.GET.get("tab") or "rated").strip()
     if tab not in ("rated", "all"):
@@ -290,6 +373,9 @@ def status_task_view(request):
             "rated_1_30_pct": rated_1_30_pct,
             "rated_31_70_pct": rated_31_70_pct,
             "rated_71_100_pct": rated_71_100_pct,
+            "bucket_1_30_page": bucket_1_30_page,
+            "bucket_31_70_page": bucket_31_70_page,
+            "bucket_71_100_page": bucket_71_100_page,
             "rating_any_exists": rating_any_exists,
             "rating_active_exists": rating_active_exists,
             "criteria_changed": criteria_changed,

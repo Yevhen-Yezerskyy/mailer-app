@@ -3,9 +3,12 @@
 
 {% block content %}
 <!-- FILE: web/templates/panels/aap_audience/status_task.html -->
-<!-- DATE: 2026-01-05 -->
-<!-- CHANGE: нижние таблицы читают данные из format_data.build_contact_packet(): it.contact.* и it.ratings.* (город = ratings.chosen_cb.city_str). -->
-
+<!-- DATE: 2026-01-12 -->
+<!-- CHANGE:
+- Убрана логика "начать рейтингование/не начато".
+- Добавлены кнопки "+100/+200/+500/+1000" (только когда rating_active_exists=false и criteria_changed=false).
+- Кнопка "Удалить все рейтинги" всегда видима (даже при active).
+- Бакеты 1-30/31-70/71-100 сделаны ссылками на вкладку rated с нужной страницей. -->
 
 <!-- TOP TABLE -->
 <table class="YY-MAIN_TABLE">
@@ -33,7 +36,7 @@
         </div>
 
         <div class="YY-STATUS_YELLOW mb-8">
-          {% trans "Контактов к рейтингованию" %}: {{ t.subscribers_limit }}
+          {% trans "Контактов к рейтингованию" %}: {{ t.subscribers_limit|default_if_none:0 }}
         </div>
 
         <a href="../" class="YY-BUTTON_MAIN">
@@ -46,70 +49,89 @@
     <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
       <div class="YY-CARD_WHITE">
 
-          {% if rating_active_exists %}
-            <div class="YY-STATUS_YELLOW mb-8">
-              {% trans "Рейтингование контактов запущено" %}
-            </div>
-          {% else %}
+        {% if rating_active_exists %}
+          <div class="YY-STATUS_YELLOW mb-4">
+            {% trans "Рейтингование контактов запущено" %}
+          </div>
+        {% else %}
 
-          {% if not rating_any_exists %}
-            <div class="YY-STATUS_GRAY mb-2">
-              {% trans "Рейтингование не начато" %}
+          {% if criteria_changed %}
+            <div class="YY-STATUS_YELLOW mb-2">
+              {% trans "Критерии оценки изменены" %}
             </div>
 
-            <form method="post">
+            <form method="post" class="mb-2">
               {% csrf_token %}
-              <button type="submit" name="action" value="rating_start_contacts" class="YY-BUTTON_MAIN w-full">
-                {% trans "Начать рейтингование" %}
+              <button type="submit" name="action" value="rating_start_contacts_update" class="YY-BUTTON_MAIN w-full">
+                {% trans "Провести повторное рейтингование" %}
               </button>
             </form>
-
           {% else %}
+          <div class="flex gap-3 mb-6">
+            <div class="YY-BUTTON_GREEN" style="width:250px !Important;margin-right:60px !Important;">
+              {% trans "Присвоить рейтинг" %}:
+            </div>
 
-            {% if criteria_changed %}
-              <div class="YY-STATUS_YELLOW mb-2">
-                {% trans "Критерии оценки изменены" %}
-              </div>
+            
+              <form method="post">
+                {% csrf_token %}
+                <button type="submit" name="action" value="rating_add_100" class="YY-BUTTON_MAIN">
+                  {% trans "+ 100" %}
+                </button>
+              </form>
 
               <form method="post">
                 {% csrf_token %}
-                <button type="submit" name="action" value="rating_start_contacts_update" class="YY-BUTTON_MAIN w-full">
-                  {% trans "Провести повторное рейтингование" %}
+                <button type="submit" name="action" value="rating_add_200" class="YY-BUTTON_MAIN">
+                  {% trans "+ 200" %}
                 </button>
               </form>
-                {% else %}
-              <div class="YY-STATUS_GREEN w-full mb-2">
-                {% trans "Рейтингование завершено" %}
-              </div>
 
               <form method="post">
                 {% csrf_token %}
-                <button type="submit" name="action" value="rating_next_1000" class="YY-BUTTON_MAIN w-full">
-                  {% trans "Рейтинговать следуюющую 1 000" %}
+                <button type="submit" name="action" value="rating_add_500" class="YY-BUTTON_MAIN">
+                  {% trans "+ 500" %}
                 </button>
               </form>
-            {% endif %}
 
+              <form method="post">
+                {% csrf_token %}
+                <button type="submit" name="action" value="rating_add_1000" class="YY-BUTTON_MAIN">
+                  {% trans "+ 1 000" %}
+                </button>
+              </form>
+            </div>
           {% endif %}
+
         {% endif %}
 
-          <div class="YY-STATUS_BLUE w-full mb-1 mt-8">
-            {% trans "Контакты: присвоен рейтинг" %}: {{ contacts_rated }}
-          </div>
+        <form method="post" class="mb-6">
+          {% csrf_token %}
+          <button type="submit" name="action" value="rating_clear_ratings" class="YY-BUTTON_MAIN w-full">
+            {% trans "Удалить все рейтинги" %}
+          </button>
+        </form>
 
-          {% if contacts_rated|default:0|add:0 > 0 %}
-            <div class="YY-STATUS_GREEN w-full mb-1">
-              - {% trans "Рейтинг 1-30" %}: {{ rated_1_30_cnt }} ({{ rated_1_30_pct }}%)
-            </div>
+        <div class="YY-STATUS_BLUE w-full mb-1">
+          {% trans "Контакты: присвоен рейтинг" %}: {{ contacts_rated }}
+        </div>
 
-            <div class="YY-STATUS_YELLOW w-full mb-1">
-              - {% trans "Рейтинг 31-70" %}: {{ rated_31_70_cnt }} ({{ rated_31_70_pct }}%)
-            </div>
+        {% if contacts_rated|default:0|add:0 > 0 %}
+          <a class="YY-STATUS_GREEN w-full mb-1 block"
+             href="?id={{ request.GET.id }}&tab=rated&p_rated={{ bucket_1_30_page }}&p_all={{ all_page }}">
+            - {% trans "Рейтинг 1-30" %}: {{ rated_1_30_cnt }} ({{ rated_1_30_pct }}%)
+          </a>
 
-            <div class="YY-STATUS_GRAY w-full mb-1">
-              - {% trans "Рейтинг 71-100" %}: {{ rated_71_100_cnt }} ({{ rated_71_100_pct }}%)
-            </div>
-          {% endif %}
+          <a class="YY-STATUS_YELLOW w-full mb-1 block"
+             href="?id={{ request.GET.id }}&tab=rated&p_rated={{ bucket_31_70_page }}&p_all={{ all_page }}">
+            - {% trans "Рейтинг 31-70" %}: {{ rated_31_70_cnt }} ({{ rated_31_70_pct }}%)
+          </a>
+
+          <a class="YY-STATUS_GRAY w-full mb-1 block"
+             href="?id={{ request.GET.id }}&tab=rated&p_rated={{ bucket_71_100_page }}&p_all={{ all_page }}">
+            - {% trans "Рейтинг 71-100" %}: {{ rated_71_100_cnt }} ({{ rated_71_100_pct }}%)
+          </a>
+        {% endif %}
 
       </div>
     </td>
@@ -181,7 +203,6 @@
             {% endif %}
           </div>
 
-          
           <div class="YY-MAIN_BOTTOM_DIV">
             <table class="w-full text-left">
               <thead>
@@ -217,6 +238,7 @@
               </tbody>
             </table>
           </div>
+
           <!-- PAGINATION BOTTOM -->
           <div class="YY-CARD_WHITE flex items-center mt-6">
             {% if rated_page > 1 %}
@@ -332,6 +354,7 @@
               </tbody>
             </table>
           </div>
+
           <!-- PAGINATION BOTTOM -->
           <div class="YY-CARD_WHITE flex items-center mt-6">
             {% if all_page > 1 %}
