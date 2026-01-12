@@ -1,8 +1,12 @@
-<!-- FILE: web/templates/panels/aap_lists/lists.html  (обновлено — 2026-01-11) -->
-<!-- CHANGE: добавлен обязательный select аудитории + колонка аудитории в таблице; delete -> архивирование. -->
-
 {% extends "panels/base.html" %}
 {% load i18n %}
+<!-- FILE: web/templates/panels/aap_lists/lists.html  (обновлено — 2026-01-12) -->
+<!-- CHANGE:
+  - правая верхняя карточка: total/rated + бакеты 1-30/31-70/71-100 по всем таскам
+  - таблица: под названием списка показываем размер (COUNT(*) по lists_contacts, active игнор)
+  - таблица: под аудиторией показываем total/rated + бакеты по task_id
+  - кнопку "Удалить" показываем только если размер списка = 0
+-->
 
 {% block content %}
 
@@ -73,15 +77,27 @@
 
     <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
       <div class="YY-CARD_WHITE">
-        <div class="YY-STATUS_BLUE mb-2">
-          {% trans "Контакты" %}
+        <div class="YY-STATUS_BLUE mb-10">
+          {% trans "Всего собрано контактов" %}: {{ contacts_total }}
         </div>
-        <div class="YY-STATUS_GRAY mb-2">
-          {% trans "Пока: один список = одна аудитория. Позже сделаем выбор нескольких аудиторий." %}
+
+        <div class="YY-STATUS_GREEN mb-4">
+          {% trans "Отрейтинговано" %}: {{ contacts_rated }}
         </div>
-        <div class="YY-STATUS_GRAY">
-          {% trans "Удаление = архивирование (скрываем из списка)." %}
-        </div>
+
+        {% if contacts_rated > 0 %}
+          <div class="YY-STATUS_GREEN mb-1">
+            - {% trans "Рейтинг 1-30" %}: {{ rated_1_30_cnt }} ({{ rated_1_30_pct }}%)
+          </div>
+
+          <div class="YY-STATUS_YELLOW mb-1">
+            - {% trans "Рейтинг 31-70" %}: {{ rated_31_70_cnt }} ({{ rated_31_70_pct }}%)
+          </div>
+
+          <div class="YY-STATUS_GRAY mb-1">
+            - {% trans "Рейтинг 71-100" %}: {{ rated_71_100_cnt }} ({{ rated_71_100_pct }}%)
+          </div>
+        {% endif %}
       </div>
     </td>
   </tr>
@@ -107,29 +123,61 @@
     {% for it in lists %}
       <tr class="YY-TB_TR align-top">
         <td class="YY-TB_TD">
-          <span class="YY-TEXT-BOLD">{{ it.title }}</span>
+
+          <div class="YY-STATUS_BLUE mb-1">
+            {{ it.title }}
+          </div>
+          <div class="YY-STATUS_YELLOW">
+            {% trans "Контактов в списке" %}: {{ it.contacts_total|default:"0" }}
+          </div>
         </td>
 
         <td class="YY-TB_TD">
-          {{ it.one_task.title }}
+          <div class="YY-STATUS_BLUE mb-1">
+            {{ it.one_task.title }}
+          </div>
+
+          <div class="YY-STATUS_YELLOW">
+            {% trans "Всего собрано" %}: {{ it.task_contacts_total }}
+          </div>
+        </td>
+
+        <td class="YY-TB_TD">
+           <div class="YY-STATUS_GREEN mb-1">
+            {% trans "Отрейтинговано" %}: {{ it.task_contacts_rated }}
+          </div>
+
+          {% if it.task_contacts_rated > 0 %}
+            <div class="YY-STATUS_GREEN mb-1">
+              - {% trans "Рейтинг 1-30" %}: {{ it.rated_1_30_cnt }} ({{ it.rated_1_30_pct }}%)
+            </div>
+
+            <div class="YY-STATUS_YELLOW mb-1">
+              - {% trans "Рейтинг 31-70" %}: {{ it.rated_31_70_cnt }} ({{ it.rated_31_70_pct }}%)
+            </div>
+
+            <div class="YY-STATUS_GRAY mb-1">
+              - {% trans "Рейтинг 71-100" %}: {{ it.rated_71_100_cnt }} ({{ it.rated_71_100_pct }}%)
+            </div>
+          {% endif %}
+
         </td>
 
         <td class="YY-TB_TD">
           <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
             {% trans "Изменить" %}
           </a>
-
-          <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete">
-            <input type="hidden" name="id" value="{{ it.ui_id }}">
-            <button type="submit" class="YY-BUTTON_TAB_RED">
-              {% trans "Удалить" %}
-            </button>
-          </form>
-        </td>
-        <td class="YY-TB_TD">
-          <a href="list/?id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">
+          {% if it.contacts_total == 0 %}
+            <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="delete">
+              <input type="hidden" name="id" value="{{ it.ui_id }}">
+              <button type="submit" class="YY-BUTTON_TAB_RED mb-2">
+                {% trans "Удалить" %}
+              </button>
+            </form>
+          {% endif %}          
+          <a href="list/?id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN mt-6">
             {% trans "Управлять" %}
           </a>
         </td>
@@ -138,7 +186,6 @@
     {% endfor %}
   </tbody>
 </table>
-
 
         </div>
       {% else %}

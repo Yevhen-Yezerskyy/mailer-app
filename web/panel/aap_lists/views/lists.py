@@ -1,13 +1,16 @@
 # FILE: web/panel/aap_lists/views/lists.py
-# DATE: 2026-01-11
-# PURPOSE: /panel/lists/lists/ — списки рассылок: add/edit/archive.
-#          В селекте audience_task_id = РЕАЛЬНЫЙ pk (НЕ encode).
+# DATE: 2026-01-12
+# PURPOSE: /panel/lists/lists/ — списки рассылок: add/edit/archive + статистика по контактам/рейтингам.
 # CHANGE:
-# - add: больше не залипаем в edit после добавления (redirect на чистый URL)
-# - в списке есть ui_id для ссылок (edit/manage)
+# - добавлены агрегаты: общий total/rated/buckets по rate_contacts (все таски пользователя) и per-task для таблицы
+# - в таблице: показываем размер списка (COUNT(*) по lists_contacts), аудитория: total/rated/buckets
+# - кнопку "Удалить" показываем только если в списке 0 контактов (COUNT(*)==0)
 
 from __future__ import annotations
 
+from typing import Any, Dict, Iterable, List, Tuple
+
+from django.db import connection
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 
@@ -23,6 +26,12 @@ def _guard(request):
     if not ws_id or not getattr(user, "is_authenticated", False):
         return None, None
     return ws_id, user
+
+
+def _pct(part: int, total: int) -> int:
+    if not total:
+        return 0
+    return int(round((int(part) * 100.0) / float(int(total))))
 
 
 def _lists_qs(ws_id, user):
@@ -77,6 +86,89 @@ def _get_edit_obj(request, ws_id, user):
     )
 
 
+def _fetch_lists_contacts_cnt(list_ids: List[int]) -> Dict[int, int]:
+    if not list_ids:
+        return {}
+    sql = """
+        SELECT lc.list_id::bigint, COUNT(*)::int
+        FROM public.lists_contacts lc
+        WHERE lc.list_id = ANY(%s)
+        GROUP BY lc.list_id
+    """
+    out: Dict[int, int] = {}
+    with connection.cursor() as cur:
+        cur.execute(sql, [list_ids])
+        for lid, cnt in cur.fetchall() or []:
+            out[int(lid)] = int(cnt or 0)
+    return out
+
+
+def _fetch_rate_stats_by_task(task_ids: List[int]) -> Dict[int, Dict[str, int]]:
+    """
+    Rated: rate_cl IS NOT NULL AND rate_cl <> 0
+    Buckets: 1-30 / 31-70 / 71-100 по rate_cl (только rate_cl, без hash_task).
+    """
+    if not task_ids:
+        return {}
+
+    sql = """
+        SELECT
+            rc.task_id::bigint AS task_id,
+            COUNT(*)::int AS total_cnt,
+            SUM(CASE WHEN rc.rate_cl IS NOT NULL AND rc.rate_cl <> 0 THEN 1 ELSE 0 END)::int AS rated_cnt,
+            SUM(CASE WHEN rc.rate_cl BETWEEN 1 AND 30 THEN 1 ELSE 0 END)::int AS c1,
+            SUM(CASE WHEN rc.rate_cl BETWEEN 31 AND 70 THEN 1 ELSE 0 END)::int AS c2,
+            SUM(CASE WHEN rc.rate_cl BETWEEN 71 AND 100 THEN 1 ELSE 0 END)::int AS c3
+        FROM public.rate_contacts rc
+        WHERE rc.task_id = ANY(%s)
+        GROUP BY rc.task_id
+    """
+
+    out: Dict[int, Dict[str, int]] = {}
+    with connection.cursor() as cur:
+        cur.execute(sql, [task_ids])
+        for row in cur.fetchall() or []:
+            task_id = int(row[0])
+            out[task_id] = {
+                "total": int(row[1] or 0),
+                "rated": int(row[2] or 0),
+                "c1": int(row[3] or 0),
+                "c2": int(row[4] or 0),
+                "c3": int(row[5] or 0),
+            }
+    return out
+
+
+def _sum_overall(task_stats: Dict[int, Dict[str, int]]) -> Dict[str, int]:
+    total = sum(int(v.get("total", 0) or 0) for v in task_stats.values())
+    rated = sum(int(v.get("rated", 0) or 0) for v in task_stats.values())
+    c1 = sum(int(v.get("c1", 0) or 0) for v in task_stats.values())
+    c2 = sum(int(v.get("c2", 0) or 0) for v in task_stats.values())
+    c3 = sum(int(v.get("c3", 0) or 0) for v in task_stats.values())
+    return {"total": total, "rated": rated, "c1": c1, "c2": c2, "c3": c3}
+
+
+def _apply_task_stats_to_list_items(items, task_stats: Dict[int, Dict[str, int]], list_cnt: Dict[int, int]):
+    for it in items:
+        it.contacts_total = int(list_cnt.get(int(it.id), 0))
+
+        t = getattr(it, "one_task", None)
+        st = task_stats.get(int(t.id), {}) if t else {}
+
+        it.task_contacts_total = int(st.get("total", 0))
+        it.task_contacts_rated = int(st.get("rated", 0))
+
+        it.rated_1_30_cnt = int(st.get("c1", 0))
+        it.rated_31_70_cnt = int(st.get("c2", 0))
+        it.rated_71_100_cnt = int(st.get("c3", 0))
+
+        it.rated_1_30_pct = _pct(it.rated_1_30_cnt, it.task_contacts_rated)
+        it.rated_31_70_pct = _pct(it.rated_31_70_cnt, it.task_contacts_rated)
+        it.rated_71_100_pct = _pct(it.rated_71_100_cnt, it.task_contacts_rated)
+
+    return items
+
+
 def lists_view(request):
     ws_id, user = _guard(request)
     if not ws_id:
@@ -117,6 +209,15 @@ def lists_view(request):
         form = MailingListForm(request.POST, audience_choices=choices)
         if not form.is_valid():
             lists = _bind_one_task(_with_ui_ids(_lists_qs(ws_id, user)))
+
+            task_ids = [int(t.id) for t in _tasks_qs(ws_id, user)]
+            task_stats = _fetch_rate_stats_by_task(task_ids)
+            overall = _sum_overall(task_stats)
+
+            list_ids = [int(x.id) for x in lists]
+            list_cnt = _fetch_lists_contacts_cnt(list_ids)
+            _apply_task_stats_to_list_items(lists, task_stats, list_cnt)
+
             return render(
                 request,
                 "panels/aap_lists/lists.html",
@@ -125,6 +226,14 @@ def lists_view(request):
                     "state": state,
                     "form": form,
                     "edit_obj": edit_obj,
+                    "contacts_total": int(overall["total"]),
+                    "contacts_rated": int(overall["rated"]),
+                    "rated_1_30_cnt": int(overall["c1"]),
+                    "rated_31_70_cnt": int(overall["c2"]),
+                    "rated_71_100_cnt": int(overall["c3"]),
+                    "rated_1_30_pct": _pct(int(overall["c1"]), int(overall["rated"])),
+                    "rated_31_70_pct": _pct(int(overall["c2"]), int(overall["rated"])),
+                    "rated_71_100_pct": _pct(int(overall["c3"]), int(overall["rated"])),
                 },
             )
 
@@ -188,6 +297,14 @@ def lists_view(request):
     form = MailingListForm(initial=init, audience_choices=choices)
     lists = _bind_one_task(_with_ui_ids(_lists_qs(ws_id, user)))
 
+    task_ids = [int(t.id) for t in _tasks_qs(ws_id, user)]
+    task_stats = _fetch_rate_stats_by_task(task_ids)
+    overall = _sum_overall(task_stats)
+
+    list_ids = [int(x.id) for x in lists]
+    list_cnt = _fetch_lists_contacts_cnt(list_ids)
+    _apply_task_stats_to_list_items(lists, task_stats, list_cnt)
+
     return render(
         request,
         "panels/aap_lists/lists.html",
@@ -196,5 +313,13 @@ def lists_view(request):
             "state": state,
             "form": form,
             "edit_obj": edit_obj,
+            "contacts_total": int(overall["total"]),
+            "contacts_rated": int(overall["rated"]),
+            "rated_1_30_cnt": int(overall["c1"]),
+            "rated_31_70_cnt": int(overall["c2"]),
+            "rated_71_100_cnt": int(overall["c3"]),
+            "rated_1_30_pct": _pct(int(overall["c1"]), int(overall["rated"])),
+            "rated_31_70_pct": _pct(int(overall["c2"]), int(overall["rated"])),
+            "rated_71_100_pct": _pct(int(overall["c3"]), int(overall["rated"])),
         },
     )
