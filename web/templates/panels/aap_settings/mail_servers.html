@@ -101,10 +101,17 @@
                 <label class="YY-LABEL">Username:</label>
                 {{ form.smtp_username }}
               </div>
-
               <div>
-                <label class="YY-LABEL">Password / Token:</label>
-                {{ form.smtp_secret }}
+                  <label class="YY-LABEL">Password / Token</label>
+
+                  <div class="relative">
+                    {{ form.smtp_secret }}
+                    <button type="button"
+                            class="absolute right-2 top-1 text-[#006991] text-xl"
+                            onclick="yyTogglePassword('id_smtp_secret')">
+                      👁︎
+                    </button>
+                  </div>
               </div>
             </div>
             
@@ -146,9 +153,25 @@
 
   <div>
     <label class="YY-LABEL">Password / Token:</label>
-    {{ form.imap_secret }}
+
+      <div class="relative">
+      {{ form.imap_secret }}
+      <button type="button"
+              class="absolute right-2 top-1 text-[#006991] text-xl"
+              onclick="yyTogglePassword('id_imap_secret')">
+        👁︎
+      </button>
+    </div>
+
   </div>
 </div>
+<script>
+  function yyTogglePassword(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.type = (el.type === "password") ? "text" : "password";
+  }
+</script>
 
             <div class="flex gap-3 mt-6">
               <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">

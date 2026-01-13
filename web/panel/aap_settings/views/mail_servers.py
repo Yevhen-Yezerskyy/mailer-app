@@ -1,11 +1,15 @@
 # FILE: web/panel/aap_settings/views/mail_servers.py
 # DATE: 2026-01-13
-# PURPOSE: /panel/settings/mail-servers/ — список mailboxes + add/edit form + apply preset (без проверок пока).
+# PURPOSE: /panel/settings/mail-servers/ — apply preset без валидации; email→username; IMAP полностью опционален.
+# CHANGE:
+# - apply_preset: не вызываем form.is_valid(), просто рендерим bound-form
+# - если email заполнен и username пустой → подставляем email в smtp_username и imap_username
+# - IMAP presence: по факту заполненных полей (imap_*), без обязательности
 
 from __future__ import annotations
 
-from django.shortcuts import redirect, render
 from django.http import HttpResponseRedirect
+from django.shortcuts import redirect, render
 
 from mailer_web.access import encode_id, resolve_pk_or_redirect
 from panel.aap_settings.forms import MailServerForm
@@ -22,8 +26,7 @@ def _guard(request):
 
 def _preset_choices():
     qs = (
-        ProviderPreset.objects
-        .filter(is_active=True)
+        ProviderPreset.objects.filter(is_active=True)
         .values_list("code", "name")
         .distinct()
         .order_by("name", "code")
@@ -52,6 +55,34 @@ def _conn_map(mailbox: Mailbox):
     return out
 
 
+def _imap_any(post) -> bool:
+    keys = [
+        "imap_host",
+        "imap_port",
+        "imap_security",
+        "imap_auth_type",
+        "imap_username",
+        "imap_secret",
+    ]
+    for k in keys:
+        v = (post.get(k) or "")
+        if str(v).strip():
+            return True
+    return False
+
+
+def _apply_email_to_usernames(post):
+    email = (post.get("email") or "").strip()
+    if not email:
+        return post
+
+    if not (post.get("smtp_username") or "").strip():
+        post["smtp_username"] = email
+    if not (post.get("imap_username") or "").strip():
+        post["imap_username"] = email
+    return post
+
+
 def _apply_preset_to_post(post, code: str):
     """
     Apply preset values into POST-like dict (in-place).
@@ -62,23 +93,24 @@ def _apply_preset_to_post(post, code: str):
 
     if smtp:
         post["smtp_host"] = smtp.host or post.get("smtp_host", "")
+        ports = []
         try:
             ports = smtp.ports_json or []
         except Exception:
             ports = []
-        if ports and not post.get("smtp_port"):
+        if ports and not (post.get("smtp_port") or "").strip():
             post["smtp_port"] = str(int(ports[0]))
         post["smtp_security"] = smtp.security or post.get("smtp_security", "")
         post["smtp_auth_type"] = smtp.auth_type or post.get("smtp_auth_type", "")
 
     if imap:
-        post["has_imap"] = "on"
         post["imap_host"] = imap.host or post.get("imap_host", "")
+        ports = []
         try:
             ports = imap.ports_json or []
         except Exception:
             ports = []
-        if ports and not post.get("imap_port"):
+        if ports and not (post.get("imap_port") or "").strip():
             post["imap_port"] = str(int(ports[0]))
         post["imap_security"] = imap.security or post.get("imap_security", "")
         post["imap_auth_type"] = imap.auth_type or post.get("imap_auth_type", "")
@@ -103,24 +135,19 @@ def mail_servers_view(request):
     if edit_obj:
         state = "edit"
 
-    # list for bottom table
     items = list(Mailbox.objects.filter(workspace_id=ws_id).order_by("name"))
     for it in items:
         it.ui_id = encode_id(int(it.id))
 
-    # init form (GET)
     init = {
         "name": "",
         "email": "",
-        "is_active": True,
         "preset_code": "",
-        "has_imap": False,
     }
 
     if edit_obj:
         init["name"] = edit_obj.name or ""
         init["email"] = edit_obj.email or ""
-        init["is_active"] = bool(edit_obj.is_active)
 
         cm = _conn_map(edit_obj)
         smtp = cm.get("smtp")
@@ -132,19 +159,17 @@ def mail_servers_view(request):
             init["smtp_security"] = smtp.security
             init["smtp_auth_type"] = smtp.auth_type
             init["smtp_username"] = smtp.username
-            init["smtp_secret"] = ""  # не показываем
+            init["smtp_secret"] = ""  # не показываем исходное
             ex = smtp.extra_json or {}
-            init["from_email"] = (ex.get("from_email") or "").strip()
             init["from_name"] = (ex.get("from_name") or "").strip()
 
         if imap:
-            init["has_imap"] = True
             init["imap_host"] = imap.host
             init["imap_port"] = imap.port
             init["imap_security"] = imap.security
             init["imap_auth_type"] = imap.auth_type
             init["imap_username"] = imap.username
-            init["imap_secret"] = ""  # не показываем
+            init["imap_secret"] = ""  # не показываем исходное
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -152,7 +177,6 @@ def mail_servers_view(request):
         if action == "close":
             return redirect(request.path)
 
-        # delete
         if action == "delete":
             token = (request.POST.get("id") or "").strip()
             if token:
@@ -174,64 +198,44 @@ def mail_servers_view(request):
             if code:
                 _apply_preset_to_post(post, code)
 
+            _apply_email_to_usernames(post)
+
+            # ВАЖНО: без is_valid() — просто показать форму с подставленными значениями
             form = MailServerForm(post, preset_choices=preset_choices)
             return render(
                 request,
                 "panels/aap_settings/mail_servers.html",
-                {
-                    "state": state or "add",
-                    "form": form,
-                    "edit_obj": edit_obj,
-                    "items": items,
-                },
+                {"state": state or "add", "form": form, "edit_obj": edit_obj, "items": items},
             )
 
-        # checks (placeholders)
         if action in ("check_domain", "check_smtp", "check_imap"):
-            # TODO: call engine later
             return redirect(request.get_full_path())
+
+        _apply_email_to_usernames(post)
 
         form = MailServerForm(post, preset_choices=preset_choices)
         if not form.is_valid():
             return render(
                 request,
                 "panels/aap_settings/mail_servers.html",
-                {
-                    "state": state or "add",
-                    "form": form,
-                    "edit_obj": edit_obj,
-                    "items": items,
-                },
+                {"state": state or "add", "form": form, "edit_obj": edit_obj, "items": items},
             )
 
         name = (form.cleaned_data["name"] or "").strip()
         email = (form.cleaned_data["email"] or "").strip()
         domain = (email.split("@", 1)[1] if "@" in email else "").strip().lower()
-        is_active = bool(form.cleaned_data.get("is_active"))
 
-        # upsert mailbox
         if edit_obj:
             mb = edit_obj
             mb.name = name
             mb.email = email
             mb.domain = domain
-            mb.is_active = is_active
-            mb.save(update_fields=["name", "email", "domain", "is_active", "updated_at"])
+            mb.save(update_fields=["name", "email", "domain", "updated_at"])
         else:
-            mb = Mailbox.objects.create(
-                workspace_id=ws_id,
-                name=name,
-                email=email,
-                domain=domain,
-                is_active=is_active,
-            )
+            mb = Mailbox.objects.create(workspace_id=ws_id, name=name, email=email, domain=domain)
 
-        # SMTP upsert (required)
         smtp_extra = {}
-        fe = (form.cleaned_data.get("from_email") or "").strip()
         fn = (form.cleaned_data.get("from_name") or "").strip()
-        if fe:
-            smtp_extra["from_email"] = fe
         if fn:
             smtp_extra["from_name"] = fn
 
@@ -249,18 +253,18 @@ def mail_servers_view(request):
             },
         )
 
-        # IMAP optional: create/update or delete
-        if form.cleaned_data.get("has_imap"):
+        # IMAP полностью опционален: если хоть что-то заполнено — пишем; иначе удаляем запись.
+        if _imap_any(post):
             MailboxConnection.objects.update_or_create(
                 mailbox_id=int(mb.id),
                 kind="imap",
                 defaults={
-                    "host": (form.cleaned_data["imap_host"] or "").strip(),
-                    "port": int(form.cleaned_data["imap_port"]),
-                    "security": form.cleaned_data["imap_security"],
-                    "auth_type": form.cleaned_data["imap_auth_type"],
-                    "username": (form.cleaned_data["imap_username"] or "").strip(),
-                    "secret_enc": form.cleaned_data["imap_secret"],  # TODO: encrypt later
+                    "host": (form.cleaned_data.get("imap_host") or "").strip(),
+                    "port": int(form.cleaned_data.get("imap_port") or 0) if str(form.cleaned_data.get("imap_port") or "").strip() else 0,
+                    "security": (form.cleaned_data.get("imap_security") or "none"),
+                    "auth_type": (form.cleaned_data.get("imap_auth_type") or "login"),
+                    "username": (form.cleaned_data.get("imap_username") or "").strip(),
+                    "secret_enc": (form.cleaned_data.get("imap_secret") or ""),
                     "extra_json": {},
                 },
             )
@@ -271,16 +275,9 @@ def mail_servers_view(request):
             return redirect(f"{request.path}?state=edit&id={encode_id(int(mb.id))}")
         return redirect(request.path)
 
-    # GET
     form = MailServerForm(initial=init, preset_choices=preset_choices)
-
     return render(
         request,
         "panels/aap_settings/mail_servers.html",
-        {
-            "state": state,
-            "form": form,
-            "edit_obj": edit_obj,
-            "items": items,
-        },
+        {"state": state, "form": form, "edit_obj": edit_obj, "items": items},
     )
