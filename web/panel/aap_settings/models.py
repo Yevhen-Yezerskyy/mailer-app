@@ -1,7 +1,9 @@
 # FILE: web/panel/aap_settings/models.py
 # DATE: 2026-01-13
 # PURPOSE: Почтовые ящики (Mailbox), транспорты SMTP/IMAP (MailboxConnection) и справочник пресетов (ProviderPreset).
-# CHANGE: Удалена старая MailConnection; новая структура без статусов/логов (они вне Django).
+# CHANGE:
+# - Mailbox: name уникален в рамках workspace_id
+# - Mailbox: email уникален глобально (по всей базе)
 
 from __future__ import annotations
 
@@ -39,10 +41,12 @@ class Mailbox(models.Model):
         db_table = "aap_settings_mailboxes"
         ordering = ["name"]
         constraints = [
-            models.UniqueConstraint(fields=["workspace_id", "email"], name="aap_settings_mailbox_ws_email_uniq"),
+            models.UniqueConstraint(fields=["workspace_id", "name"], name="aap_settings_mailbox_ws_name_uniq"),
+            models.UniqueConstraint(fields=["email"], name="aap_settings_mailbox_email_uniq"),
         ]
         indexes = [
             models.Index(fields=["workspace_id", "is_active"]),
+            models.Index(fields=["email"]),
         ]
 
     def __str__(self) -> str:

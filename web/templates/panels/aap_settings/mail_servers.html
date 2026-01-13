@@ -1,9 +1,32 @@
 {% extends "panels/base.html" %}
 {% load i18n %}
-<!-- FILE: web/templates/panels/aap_settings/mail_servers.html  (новое — 2026-01-13) -->
+<!-- FILE: web/templates/panels/aap_settings/mail_servers.html  (обновлено — 2026-01-13) -->
 <!-- PURPOSE: Settings → Mail servers: список ящиков + add/edit форма (SMTP обяз., IMAP опц.) + apply preset. -->
+<!-- CHANGE: секреты: "********" (readonly) + глазик → confirm modal → AJAX secret → подставить в поле. -->
 
 {% block content %}
+
+<div id="yy-secret-modal" class="fixed inset-0 hidden z-[9999]">
+  <div class="absolute inset-0 bg-black/40"></div>
+  <div class="relative mx-auto mt-24 max-w-[520px]">
+    <div class="YY-CARD_WHITE shadow-lg">
+      <div class="YY-STATUS_YELLOW mb-4">
+        {% trans "Показать пароль?" %}
+      </div>
+      <div class="mb-6">
+        {% trans "Пароль будет показан на экране. Продолжить?" %}
+      </div>
+      <div class="flex gap-3 justify-end">
+        <button type="button" class="YY-BUTTON_MAIN" onclick="yySecretModalClose()">
+          {% trans "Отмена" %}
+        </button>
+        <button type="button" class="YY-BUTTON_TAB_RED" onclick="yySecretModalConfirm()">
+          {% trans "Показать" %}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <table class="YY-MAIN_TABLE">
   <tr>
@@ -23,8 +46,6 @@
                 {{ form.non_field_errors }}
               </div>
             {% endif %}
-            
-
 
             <div class="grid grid-cols-3 gap-4 mb-7">
 
@@ -37,6 +58,7 @@
                   <label class="YY-LABEL">Email:</label>
                     {{ form.email }}
                 </div>
+
               <div>
                 <label class="YY-LABEL">{% trans "Отправитель" %}:</label>
                 {{ form.from_name }}
@@ -101,77 +123,142 @@
                 <label class="YY-LABEL">Username:</label>
                 {{ form.smtp_username }}
               </div>
-              <div>
-                  <label class="YY-LABEL">Password / Token</label>
 
-                  <div class="relative">
-                    {{ form.smtp_secret }}
-                    <button type="button"
-                            class="absolute right-2 top-1 text-[#006991] text-xl"
-                            onclick="yyTogglePassword('id_smtp_secret')">
-                      👁︎
-                    </button>
-                  </div>
+              <div>
+                <label class="YY-LABEL">Password / Token</label>
+
+                <div class="relative">
+                  {{ form.smtp_secret }}
+                  <button type="button"
+                          class="absolute right-2 top-1 text-[#006991] text-xl"
+                          onclick="yyTogglePasswordOrReveal('smtp', 'id_smtp_secret')">
+                    👁︎
+                  </button>
+                </div>
               </div>
             </div>
-            
 
- <div class="YY-STATUS_BLUE mb-2">
-  IMAP:
-</div>
+            <div class="YY-STATUS_BLUE mb-2">
+              IMAP:
+            </div>
 
-<div class="grid grid-cols-2 gap-4 mb-2">
-  <div>
-    <label class="YY-LABEL">Host:</label>
-    {{ form.imap_host }}
-  </div>
-  <div>
-    <label class="YY-LABEL">Port:</label>
-    {{ form.imap_port }}
-  </div>
-</div>
+            <div class="grid grid-cols-2 gap-4 mb-2">
+              <div>
+                <label class="YY-LABEL">Host:</label>
+                {{ form.imap_host }}
+              </div>
+              <div>
+                <label class="YY-LABEL">Port:</label>
+                {{ form.imap_port }}
+              </div>
+            </div>
 
-<div class="grid grid-cols-[1fr_1fr_3fr_3fr] gap-4">
-  <div>
-    <label class="YY-LABEL">Security:</label>
-    <div class="max-w-[220px]">
-      {{ form.imap_security }}
-    </div>
-  </div>
+            <div class="grid grid-cols-[1fr_1fr_3fr_3fr] gap-4">
+              <div>
+                <label class="YY-LABEL">Security:</label>
+                <div class="max-w-[220px]">
+                  {{ form.imap_security }}
+                </div>
+              </div>
 
-  <div>
-    <label class="YY-LABEL">Auth:</label>
-    <div class="max-w-[220px]">
-      {{ form.imap_auth_type }}
-    </div>
-  </div>
+              <div>
+                <label class="YY-LABEL">Auth:</label>
+                <div class="max-w-[220px]">
+                  {{ form.imap_auth_type }}
+                </div>
+              </div>
 
-  <div>
-    <label class="YY-LABEL">Username:</label>
-    {{ form.imap_username }}
-  </div>
+              <div>
+                <label class="YY-LABEL">Username:</label>
+                {{ form.imap_username }}
+              </div>
 
-  <div>
-    <label class="YY-LABEL">Password / Token:</label>
+              <div>
+                <label class="YY-LABEL">Password / Token:</label>
 
-      <div class="relative">
-      {{ form.imap_secret }}
-      <button type="button"
-              class="absolute right-2 top-1 text-[#006991] text-xl"
-              onclick="yyTogglePassword('id_imap_secret')">
-        👁︎
-      </button>
-    </div>
+                <div class="relative">
+                  {{ form.imap_secret }}
+                  <button type="button"
+                          class="absolute right-2 top-1 text-[#006991] text-xl"
+                          onclick="yyTogglePasswordOrReveal('imap', 'id_imap_secret')">
+                    👁︎
+                  </button>
+                </div>
 
-  </div>
-</div>
-<script>
-  function yyTogglePassword(id) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.type = (el.type === "password") ? "text" : "password";
-  }
-</script>
+              </div>
+            </div>
+
+            <script>
+              let yySecretModalState = null;
+
+              function yySecretModalOpen(state) {
+                yySecretModalState = state;
+                const el = document.getElementById("yy-secret-modal");
+                if (el) el.classList.remove("hidden");
+              }
+
+              function yySecretModalClose() {
+                yySecretModalState = null;
+                const el = document.getElementById("yy-secret-modal");
+                if (el) el.classList.add("hidden");
+              }
+
+              async function yySecretModalConfirm() {
+                const st = yySecretModalState;
+                yySecretModalClose();
+                if (!st) return;
+                await yyRevealSecret(st.kind, st.inputId);
+              }
+
+              function yyGetMailboxToken() {
+                const hidden = document.querySelector('input[name="id"]');
+                if (!hidden) return "";
+                return (hidden.value || "").trim();
+              }
+
+              async function yyRevealSecret(kind, inputId) {
+                const token = yyGetMailboxToken();
+                if (!token) return;
+
+                const url = `secret/?id=${encodeURIComponent(token)}&kind=${encodeURIComponent(kind)}`;
+
+                let data = null;
+                try {
+                  const resp = await fetch(url, { method: "GET", credentials: "same-origin" });
+                  data = await resp.json();
+                } catch (e) {
+                  alert("Error");
+                  return;
+                }
+
+                if (!data || !data.ok) {
+                  alert("Error");
+                  return;
+                }
+
+                const el = document.getElementById(inputId);
+                if (!el) return;
+
+                el.value = data.secret || "";
+                el.removeAttribute("readonly");
+                el.removeAttribute("data-yy-masked");
+                el.type = "text";
+                el.focus();
+              }
+
+              function yyTogglePasswordOrReveal(kind, inputId) {
+                const el = document.getElementById(inputId);
+                if (!el) return;
+
+                const masked = (el.getAttribute("data-yy-masked") || "") === "1";
+                if (masked) {
+                  yySecretModalOpen({ kind: kind, inputId: inputId });
+                  return;
+                }
+
+                el.type = (el.type === "password") ? "text" : "password";
+              }
+            </script>
 
             <div class="flex gap-3 mt-6">
               <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">

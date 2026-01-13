@@ -1,19 +1,23 @@
 # FILE: web/panel/aap_settings/views/mail_servers.py
 # DATE: 2026-01-13
-# PURPOSE: /panel/settings/mail-servers/ — apply preset без валидации; email→username; IMAP полностью опционален.
+# PURPOSE: /panel/settings/mail-servers/ — SMTP обяз., IMAP опц.; apply preset без валидации; reveal secret по кнопке "глаз" через AJAX + confirm modal.
 # CHANGE:
-# - apply_preset: не вызываем form.is_valid(), просто рендерим bound-form
-# - если email заполнен и username пустой → подставляем email в smtp_username и imap_username
-# - IMAP presence: по факту заполненных полей (imap_*), без обязательности
+# - fix: edit_obj.ui_id всегда задан
+# - fix: секреты не затираются при сохранении (если не меняли)
+# - UX: если секрет уже сохранён — показываем "********" (readonly) + глазик → confirm → AJAX /secret/
+# - add: mail_server_secret_view (JSON endpoint to reveal smtp/imap secret)
 
 from __future__ import annotations
 
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect, render
 
-from mailer_web.access import encode_id, resolve_pk_or_redirect
+from mailer_web.access import decode_id, encode_id, resolve_pk_or_redirect
 from panel.aap_settings.forms import MailServerForm
 from panel.aap_settings.models import Mailbox, MailboxConnection, ProviderPreset
+
+
+SECRET_MASK = "********"
 
 
 def _guard(request):
@@ -118,6 +122,46 @@ def _apply_preset_to_post(post, code: str):
     return post
 
 
+def _norm_secret_from_cleaned(v: str) -> str:
+    s = (v or "").strip()
+    if s == SECRET_MASK:
+        return ""
+    return s
+
+
+def mail_server_secret_view(request):
+    ws_id = _guard(request)
+    if not ws_id:
+        return JsonResponse({"ok": False, "error": "auth"}, status=403)
+
+    token = (request.GET.get("id") or "").strip()
+    kind = (request.GET.get("kind") or "").strip().lower()
+
+    if not token or kind not in ("smtp", "imap"):
+        return JsonResponse({"ok": False, "error": "bad_request"}, status=400)
+
+    try:
+        mailbox_id = int(decode_id(token))
+    except Exception:
+        return JsonResponse({"ok": False, "error": "bad_id"}, status=400)
+
+    mb = Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).only("id").first()
+    if not mb:
+        return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+
+    conn = (
+        MailboxConnection.objects.filter(mailbox_id=int(mb.id), kind=kind)
+        .only("secret_enc")
+        .first()
+    )
+    if not conn or not (conn.secret_enc or "").strip():
+        return JsonResponse({"ok": False, "error": "no_secret"}, status=404)
+
+    # NOTE: пока "нормального key management" нет — secret_enc хранится обратимо.
+    # Позже: заменить на encrypt/decrypt и тут возвращать decrypt().
+    return JsonResponse({"ok": True, "secret": str(conn.secret_enc)})
+
+
 def mail_servers_view(request):
     ws_id = _guard(request)
     if not ws_id:
@@ -134,6 +178,7 @@ def mail_servers_view(request):
         state = "add"
     if edit_obj:
         state = "edit"
+        edit_obj.ui_id = encode_id(int(edit_obj.id))
 
     items = list(Mailbox.objects.filter(workspace_id=ws_id).order_by("name"))
     for it in items:
@@ -142,8 +187,11 @@ def mail_servers_view(request):
     init = {
         "name": "",
         "email": "",
-        "preset_code": "",
+        "preset_code": "",  # после save — пусто (не "липнет")
     }
+
+    smtp_has_secret = False
+    imap_has_secret = False
 
     if edit_obj:
         init["name"] = edit_obj.name or ""
@@ -159,9 +207,12 @@ def mail_servers_view(request):
             init["smtp_security"] = smtp.security
             init["smtp_auth_type"] = smtp.auth_type
             init["smtp_username"] = smtp.username
-            init["smtp_secret"] = ""  # не показываем исходное
             ex = smtp.extra_json or {}
             init["from_name"] = (ex.get("from_name") or "").strip()
+
+            if (smtp.secret_enc or "").strip():
+                smtp_has_secret = True
+                init["smtp_secret"] = SECRET_MASK
 
         if imap:
             init["imap_host"] = imap.host
@@ -169,7 +220,10 @@ def mail_servers_view(request):
             init["imap_security"] = imap.security
             init["imap_auth_type"] = imap.auth_type
             init["imap_username"] = imap.username
-            init["imap_secret"] = ""  # не показываем исходное
+
+            if (imap.secret_enc or "").strip():
+                imap_has_secret = True
+                init["imap_secret"] = SECRET_MASK
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -200,8 +254,11 @@ def mail_servers_view(request):
 
             _apply_email_to_usernames(post)
 
-            # ВАЖНО: без is_valid() — просто показать форму с подставленными значениями
-            form = MailServerForm(post, preset_choices=preset_choices)
+            form = MailServerForm(
+                post,
+                preset_choices=preset_choices,
+                require_smtp_secret=not bool(edit_obj),
+            )
             return render(
                 request,
                 "panels/aap_settings/mail_servers.html",
@@ -213,8 +270,17 @@ def mail_servers_view(request):
 
         _apply_email_to_usernames(post)
 
-        form = MailServerForm(post, preset_choices=preset_choices)
+        form = MailServerForm(
+            post,
+            preset_choices=preset_choices,
+            require_smtp_secret=not bool(edit_obj),
+            workspace_id=ws_id,
+            mailbox_id=(int(edit_obj.id) if edit_obj else None),
+        )
+        
         if not form.is_valid():
+            if edit_obj and not getattr(edit_obj, "ui_id", None):
+                edit_obj.ui_id = encode_id(int(edit_obj.id))
             return render(
                 request,
                 "panels/aap_settings/mail_servers.html",
@@ -234,10 +300,19 @@ def mail_servers_view(request):
         else:
             mb = Mailbox.objects.create(workspace_id=ws_id, name=name, email=email, domain=domain)
 
+        cm_now = _conn_map(mb)
+        smtp_now = cm_now.get("smtp")
+        imap_now = cm_now.get("imap")
+
         smtp_extra = {}
         fn = (form.cleaned_data.get("from_name") or "").strip()
         if fn:
             smtp_extra["from_name"] = fn
+
+        smtp_secret_new = _norm_secret_from_cleaned(form.cleaned_data.get("smtp_secret") or "")
+        smtp_secret_to_store = smtp_secret_new
+        if not smtp_secret_new and smtp_now:
+            smtp_secret_to_store = (smtp_now.secret_enc or "").strip()
 
         MailboxConnection.objects.update_or_create(
             mailbox_id=int(mb.id),
@@ -248,23 +323,29 @@ def mail_servers_view(request):
                 "security": form.cleaned_data["smtp_security"],
                 "auth_type": form.cleaned_data["smtp_auth_type"],
                 "username": (form.cleaned_data["smtp_username"] or "").strip(),
-                "secret_enc": form.cleaned_data["smtp_secret"],  # TODO: encrypt later
+                "secret_enc": smtp_secret_to_store,  # TODO: encrypt later
                 "extra_json": smtp_extra,
             },
         )
 
-        # IMAP полностью опционален: если хоть что-то заполнено — пишем; иначе удаляем запись.
         if _imap_any(post):
+            imap_secret_new = _norm_secret_from_cleaned(form.cleaned_data.get("imap_secret") or "")
+            imap_secret_to_store = imap_secret_new
+            if not imap_secret_new and imap_now:
+                imap_secret_to_store = (imap_now.secret_enc or "").strip()
+
             MailboxConnection.objects.update_or_create(
                 mailbox_id=int(mb.id),
                 kind="imap",
                 defaults={
                     "host": (form.cleaned_data.get("imap_host") or "").strip(),
-                    "port": int(form.cleaned_data.get("imap_port") or 0) if str(form.cleaned_data.get("imap_port") or "").strip() else 0,
+                    "port": int(form.cleaned_data.get("imap_port") or 0)
+                    if str(form.cleaned_data.get("imap_port") or "").strip()
+                    else 0,
                     "security": (form.cleaned_data.get("imap_security") or "none"),
                     "auth_type": (form.cleaned_data.get("imap_auth_type") or "login"),
                     "username": (form.cleaned_data.get("imap_username") or "").strip(),
-                    "secret_enc": (form.cleaned_data.get("imap_secret") or ""),
+                    "secret_enc": imap_secret_to_store,
                     "extra_json": {},
                 },
             )
@@ -275,7 +356,13 @@ def mail_servers_view(request):
             return redirect(f"{request.path}?state=edit&id={encode_id(int(mb.id))}")
         return redirect(request.path)
 
-    form = MailServerForm(initial=init, preset_choices=preset_choices)
+    form = MailServerForm(
+        initial=init,
+        preset_choices=preset_choices,
+        require_smtp_secret=not bool(edit_obj),
+        smtp_masked=smtp_has_secret,
+        imap_masked=imap_has_secret,
+    )
     return render(
         request,
         "panels/aap_settings/mail_servers.html",
