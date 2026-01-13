@@ -1,156 +1,264 @@
-<!-- FILE: web/templates/panels/aap_settings/mail_servers.html -->
-
 {% extends "panels/base.html" %}
-{% block title %}Mail Servers{% endblock %}
-
-{% block sidebar_menu %}
-  {% include "panels/aap_settings/menu_left.html" %}
-{% endblock %}
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_settings/mail_servers.html  (новое — 2026-01-13) -->
+<!-- PURPOSE: Settings → Mail servers: список ящиков + add/edit форма (SMTP обяз., IMAP опц.) + apply preset. -->
 
 {% block content %}
-<div class="panel-page">
-  <h1 class="panel-title">Почтовые сервера</h1>
-  <p class="panel-subtitle">Настройка SMTP и IMAP-подключений для отправки и чтения писем.</p>
 
-  <div class="panel-card">
-    <h2 class="panel-card-title">Текущие подключения</h2>
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-[60%]">
+      <div class="YY-CARD_WHITE">
 
-    {% if connections %}
-      <table class="panel-table">
-        <thead>
-          <tr>
-            <th>Название</th>
-            <th>От кого</th>
-            <th>Статус</th>
-            <th>SMTP</th>
-            <th>IMAP</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for conn in connections %}
-            <tr>
-              <td>{{ conn.name }}</td>
-              <td>{{ conn.from_name }} &lt;{{ conn.from_email }}&gt;</td>
-              <td>{{ conn.status }}</td>
-              <td>{{ conn.smtp_status }}</td>
-              <td>{{ conn.imap_status }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% else %}
-      <p>Пока нет ни одного почтового подключения.</p>
-    {% endif %}
+        {% if state == "add" or state == "edit" %}
+          <form method="post">
+            {% csrf_token %}
+
+            {% if state == "edit" and edit_obj %}
+              <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
+            {% endif %}
+
+            {% if form.non_field_errors %}
+              <div class="YY-CARD_IN_FORM_ERROR mb-3">
+                {{ form.non_field_errors }}
+              </div>
+            {% endif %}
+            
+
+
+            <div class="grid grid-cols-3 gap-4 mb-7">
+
+                <div>
+                  <label class="YY-LABEL">{% trans "Название сервера" %}:</label>
+                  {{ form.name }}
+                </div>
+
+                <div>
+                  <label class="YY-LABEL">Email:</label>
+                    {{ form.email }}
+                </div>
+              <div>
+                <label class="YY-LABEL">{% trans "Отправитель" %}:</label>
+                {{ form.from_name }}
+              </div>
+
+            </div>
+
+            <div class="grid grid-cols-[1fr_2fr_auto] gap-4 mb-12">
+
+              <div class="YY-STATUS_BLUE">
+                {% trans "Провайдер" %}:
+              </div>
+
+              <div>
+                {{ form.preset_code }}
+              </div>
+
+              <div>
+                <button
+                  type="submit"
+                  name="action"
+                  value="apply_preset"
+                  class="YY-BUTTON_MAIN !py-2"
+                  formnovalidate
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+
+            <div class="YY-STATUS_BLUE mb-2">
+              SMTP:
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-2">
+              <div>
+                <label class="YY-LABEL">Host:</label>
+                {{ form.smtp_host }}
+              </div>
+              <div>
+                <label class="YY-LABEL">Port:</label>
+                {{ form.smtp_port }}
+              </div>
+            </div>
+
+            <div class="grid grid-cols-[1fr_1fr_3fr_3fr] gap-4 mb-12">
+              <div>
+                <label class="YY-LABEL">Security:</label>
+                <div class="max-w-[220px]">
+                  {{ form.smtp_security }}
+                </div>
+              </div>
+
+              <div>
+                <label class="YY-LABEL">Auth:</label>
+                <div class="max-w-[220px]">
+                  {{ form.smtp_auth_type }}
+                </div>
+              </div>
+
+              <div>
+                <label class="YY-LABEL">Username:</label>
+                {{ form.smtp_username }}
+              </div>
+
+              <div>
+                <label class="YY-LABEL">Password / Token:</label>
+                {{ form.smtp_secret }}
+              </div>
+            </div>
+            
+
+ <div class="YY-STATUS_BLUE mb-2">
+  IMAP:
+</div>
+
+<div class="grid grid-cols-2 gap-4 mb-2">
+  <div>
+    <label class="YY-LABEL">Host:</label>
+    {{ form.imap_host }}
   </div>
-
-  <div class="panel-card">
-    <h2 class="panel-card-title">Добавить новое подключение</h2>
-
-    <form method="post" class="panel-form">
-      {% csrf_token %}
-      {{ form.non_field_errors }}
-
-      <!-- Общие поля -->
-      <div class="panel-form-group">
-        <div class="panel-form-row">
-          <label for="{{ form.name.id_for_label }}" class="panel-form-label">Name</label>
-          {{ form.name }}
-          {{ form.name.errors }}
-        </div>
-
-        <div class="panel-form-row">
-          <label for="{{ form.from_name.id_for_label }}" class="panel-form-label">From name</label>
-          {{ form.from_name }}
-          {{ form.from_name.errors }}
-        </div>
-
-        <div class="panel-form-row">
-          <label for="{{ form.from_email.id_for_label }}" class="panel-form-label">From email</label>
-          {{ form.from_email }}
-          {{ form.from_email.errors }}
-        </div>
-      </div>
-
-      <hr class="panel-separator" />
-
-      <!-- SMTP блок -->
-      <h3 class="panel-block-title">SMTP (отправка писем)</h3>
-
-      <div class="panel-form-group panel-two-columns">
-        <div class="panel-form-row">
-          <label for="{{ form.smtp_host.id_for_label }}" class="panel-form-label">SMTP хост</label>
-          {{ form.smtp_host }}
-          {{ form.smtp_host.errors }}
-        </div>
-
-        <div class="panel-form-row">
-          <label for="{{ form.smtp_port.id_for_label }}" class="panel-form-label">SMTP порт</label>
-          {{ form.smtp_port }}
-          {{ form.smtp_port.errors }}
-        </div>
-
-        <div class="panel-form-row">
-          <label for="{{ form.smtp_encryption.id_for_label }}" class="panel-form-label">SMTP шифрование</label>
-          {{ form.smtp_encryption }}
-          {{ form.smtp_encryption.errors }}
-        </div>
-
-        <div class="panel-form-row">
-          <label for="{{ form.smtp_username.id_for_label }}" class="panel-form-label">SMTP логин</label>
-          {{ form.smtp_username }}
-          {{ form.smtp_username.errors }}
-        </div>
-
-        <div class="panel-form-row panel-span-2">
-          <label for="{{ form.smtp_password.id_for_label }}" class="panel-form-label">SMTP пароль</label>
-          {{ form.smtp_password }}
-          {{ form.smtp_password.errors }}
-        </div>
-      </div>
-
-      <hr class="panel-separator" />
-
-      <!-- IMAP блок -->
-      <h3 class="panel-block-title">IMAP (чтение ответов)</h3>
-
-      <div class="panel-form-group panel-two-columns">
-        <div class="panel-form-row">
-          <label for="{{ form.imap_host.id_for_label }}" class="panel-form-label">IMAP хост</label>
-          {{ form.imap_host }}
-          {{ form.imap_host.errors }}
-        </div>
-
-        <div class="panel-form-row">
-          <label for="{{ form.imap_port.id_for_label }}" class="panel-form-label">IMAP порт</label>
-          {{ form.imap_port }}
-          {{ form.imap_port.errors }}
-        </div>
-
-        <div class="panel-form-row">
-          <label for="{{ form.imap_encryption.id_for_label }}" class="panel-form-label">IMAP шифрование</label>
-          {{ form.imap_encryption }}
-          {{ form.imap_encryption.errors }}
-        </div>
-
-        <div class="panel-form-row">
-          <label for="{{ form.imap_username.id_for_label }}" class="panel-form-label">IMAP логин</label>
-          {{ form.imap_username }}
-          {{ form.imap_username.errors }}
-        </div>
-
-        <div class="panel-form-row panel-span-2">
-          <label for="{{ form.imap_password.id_for_label }}" class="panel-form-label">IMAP пароль</label>
-          {{ form.imap_password }}
-          {{ form.imap_password.errors }}
-        </div>
-      </div>
-
-      <div class="panel-form-actions">
-        <button type="submit" class="panel-button-primary">
-          Сохранить подключение
-        </button>
-      </div>
-    </form>
+  <div>
+    <label class="YY-LABEL">Port:</label>
+    {{ form.imap_port }}
   </div>
 </div>
+
+<div class="grid grid-cols-[1fr_1fr_3fr_3fr] gap-4">
+  <div>
+    <label class="YY-LABEL">Security:</label>
+    <div class="max-w-[220px]">
+      {{ form.imap_security }}
+    </div>
+  </div>
+
+  <div>
+    <label class="YY-LABEL">Auth:</label>
+    <div class="max-w-[220px]">
+      {{ form.imap_auth_type }}
+    </div>
+  </div>
+
+  <div>
+    <label class="YY-LABEL">Username:</label>
+    {{ form.imap_username }}
+  </div>
+
+  <div>
+    <label class="YY-LABEL">Password / Token:</label>
+    {{ form.imap_secret }}
+  </div>
+</div>
+
+            <div class="flex gap-3 mt-6">
+              <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">
+                {% trans "Сохранить" %}
+              </button>
+              <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN" formnovalidate>
+                {% trans "Закрыть" %}
+              </button>
+            </div>
+
+          </form>
+
+        {% else %}
+          <div class="YY-STATUS_BLUE">
+            {% trans "Ваши почтовые серверы:" %}
+          </div>
+        {% endif %}
+
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-[40%]">
+      <div class="YY-CARD_WHITE">
+
+        {% if state == "add" or state == "edit" %}
+          <div class="YY-STATUS_BLUE mb-5">
+            {% trans "Проверки" %}
+          </div>
+
+          <div class="flex gap-3 flex-wrap">
+            <button class="YY-BUTTON_MAIN" disabled>
+              {% trans "Проверить домен" %}
+            </button>
+            <button class="YY-BUTTON_MAIN" disabled>
+              {% trans "Проверить SMTP" %}
+            </button>
+            <button class="YY-BUTTON_MAIN" disabled>
+              {% trans "Проверить IMAP" %}
+            </button>
+          </div>
+
+          <div class="YY-STATUS_YELLOW mt-6">
+            {% trans "Пока не реализовано" %}
+          </div>
+        {% else %}
+          <a href="?state=add" class="YY-BUTTON_MAIN">
+            {% trans "Добавить почтовый сервер" %}
+          </a>
+        {% endif %}
+
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      {% if items %}
+        <div class="YY-MAIN_BOTTOM_DIV">
+
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH w-[40%]">{% trans "Название" %}</th>
+                <th class="YY-TH_TH w-[40%]">{% trans "Email" %}</th>
+                <th class="YY-TH_TH">&nbsp;</th>
+                <th class="YY-TH_TH">&nbsp;</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for it in items %}
+                <tr class="YY-TB_TR align-top">
+                  <td class="YY-TB_TD">
+                    <div class="YY-STATUS_BLUE">{{ it.name }}</div>
+                    {% if not it.is_active %}
+                      <div class="YY-STATUS_GRAY">{% trans "Выключен" %}</div>
+                    {% endif %}
+                  </td>
+                  <td class="YY-TB_TD">
+                    <div class="YY-STATUS_YELLOW">{{ it.email }}</div>
+                  </td>
+                  <td class="YY-TB_TD">
+                    <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">
+                      {% trans "Изменить" %}
+                    </a>
+                  </td>
+                  <td class="YY-TB_TD">
+                    <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete">
+                      <input type="hidden" name="id" value="{{ it.ui_id }}">
+                      <button type="submit" class="YY-BUTTON_TAB_RED">
+                        {% trans "Удалить" %}
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+        </div>
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
+      {% endif %}
+    </td>
+  </tr>
+</table>
+
 {% endblock %}

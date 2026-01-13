@@ -1,60 +1,120 @@
-# FILE: web/panel/aap_settings/models.py  (обновлено — 2025-12-18)
-# CHANGE: модель переехала под panel/, сохранены старые app_label и db_table,
-#         БД/таблицы/миграции не меняем.
+# FILE: web/panel/aap_settings/models.py
+# DATE: 2026-01-13
+# PURPOSE: Почтовые ящики (Mailbox), транспорты SMTP/IMAP (MailboxConnection) и справочник пресетов (ProviderPreset).
+# CHANGE: Удалена старая MailConnection; новая структура без статусов/логов (они вне Django).
+
+from __future__ import annotations
 
 from django.db import models
 
 
-class MailConnection(models.Model):
-    """
-    Подключение почтового ящика в рамках воркспейса.
-    Все статусы служебные, меняются только кодом.
-    """
+class ConnKind(models.TextChoices):
+    SMTP = "smtp", "SMTP"
+    IMAP = "imap", "IMAP"
 
-    workspace_id = models.UUIDField(
-        db_index=True,
-        help_text="UUID воркспейса (как в workspace_link у пользователя)",
-    )
 
-    name = models.CharField(
-        max_length=255,
-        help_text="Название подключения, видно только внутри панели",
-    )
+class Security(models.TextChoices):
+    NONE = "none", "None"
+    SSL = "ssl", "SSL"
+    STARTTLS = "starttls", "STARTTLS"
 
-    soft_deleted = models.BooleanField(
-        default=False,
-        help_text="Если включено — подключение скрыто, но не удалено",
-    )
 
-    smtp_config = models.JSONField(default=dict, blank=True)
-    smtp_status = models.CharField(max_length=32, default="not_checked")
+class AuthType(models.TextChoices):
+    LOGIN = "login", "Login"
+    OAUTH2 = "oauth2", "OAuth2"
 
-    imap_config = models.JSONField(default=dict, blank=True)
-    imap_status = models.CharField(max_length=32, default="not_checked")
 
-    from_email = models.EmailField(max_length=254)
-    from_name = models.CharField(max_length=255)
-
-    status = models.CharField(max_length=32, default="not_checked")
-
-    last_check_payload = models.JSONField(default=dict, blank=True)
-    last_checked_at = models.DateTimeField(null=True, blank=True)
+class Mailbox(models.Model):
+    workspace_id = models.UUIDField(db_index=True, help_text="UUID воркспейса")
+    name = models.CharField(max_length=255, help_text="Название ящика (для UI)")
+    email = models.EmailField(max_length=254, help_text="Полный email адрес")
+    domain = models.CharField(max_length=255, help_text="Домен email (для DNS-проверок)")
+    is_active = models.BooleanField(default=True, help_text="Если false — ящик полностью выключен")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         app_label = "aap_settings"
-        db_table = "aap_settings_mailconnection"
+        db_table = "aap_settings_mailboxes"
         ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(fields=["workspace_id", "email"], name="aap_settings_mailbox_ws_email_uniq"),
+        ]
         indexes = [
-            models.Index(fields=["workspace_id", "soft_deleted"]),
+            models.Index(fields=["workspace_id", "is_active"]),
         ]
 
-    def __str__(self):
-        return f"{self.name} <{self.from_email}>"
+    def __str__(self) -> str:
+        return f"{self.name} <{self.email}>"
 
-    STATUS_NOT_CHECKED = "not_checked"
-    STATUS_OK = "ok"
-    STATUS_PARTIAL = "partial"
-    STATUS_ERROR = "error"
+
+class MailboxConnection(models.Model):
+    mailbox = models.ForeignKey(Mailbox, on_delete=models.CASCADE, related_name="connections")
+
+    kind = models.CharField(max_length=8, choices=ConnKind.choices)
+    host = models.CharField(max_length=255)
+    port = models.IntegerField()
+
+    security = models.CharField(max_length=16, choices=Security.choices, default=Security.NONE)
+    auth_type = models.CharField(max_length=16, choices=AuthType.choices, default=AuthType.LOGIN)
+
+    username = models.CharField(max_length=255)
+    secret_enc = models.TextField(help_text="Зашифрованный пароль или refresh_token")
+
+    extra_json = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="SMTP/IMAP-специфичные опции (SMTP: from_email/from_name; IMAP: folders/idle и т.п.)",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = "aap_settings"
+        db_table = "aap_settings_mailbox_connections"
+        constraints = [
+            models.UniqueConstraint(fields=["mailbox", "kind"], name="aap_settings_mailbox_conn_kind_uniq"),
+        ]
+        indexes = [
+            models.Index(fields=["mailbox", "kind"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.mailbox.email} [{self.kind}]"
+
+
+class ProviderPreset(models.Model):
+    code = models.CharField(
+        max_length=64,
+        help_text="Стабильный код провайдера (gmail, ionos, …). Может иметь 2 записи: smtp + imap.",
+    )
+    name = models.CharField(max_length=255, help_text="Отображаемое имя провайдера")
+
+    kind = models.CharField(max_length=8, choices=ConnKind.choices)
+    host = models.CharField(max_length=255)
+
+    ports_json = models.JSONField(help_text="Список портов, например [587, 465]")
+    security = models.CharField(max_length=16, choices=Security.choices, default=Security.NONE)
+    auth_type = models.CharField(max_length=16, choices=AuthType.choices, default=AuthType.LOGIN)
+
+    extra_json = models.JSONField(default=dict, blank=True, help_text="Дефолты/подсказки (например IMAP folders)")
+
+    is_active = models.BooleanField(default=True)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        app_label = "aap_settings"
+        db_table = "aap_settings_provider_presets"
+        ordering = ["order", "name"]
+        constraints = [
+            models.UniqueConstraint(fields=["code", "kind"], name="aap_settings_provider_preset_code_kind_uniq"),
+        ]
+        indexes = [
+            models.Index(fields=["is_active", "order"]),
+            models.Index(fields=["code", "kind"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.code}/{self.kind})"

@@ -1,115 +1,134 @@
-# FILE: web/panel/aap_settings/forms.py  (обновлено — 2025-12-18)
-# CHANGE: исправлен импорт MailConnection после переезда аппа под panel/,
-#         логика формы и сохранения без изменений.
+# FILE: web/panel/aap_settings/forms.py
+# DATE: 2026-01-13
+# PURPOSE: Form для страницы "Почтовые серверы": add/edit mailbox + SMTP (обяз.) + IMAP (опц.) + apply preset.
+# CHANGE: Убраны все поля активности (is_active / has_imap не считается активностью).
+
+from __future__ import annotations
+
+from typing import List, Tuple
 
 from django import forms
+from django.utils.translation import gettext_lazy as _
 
-from panel.aap_settings.models import MailConnection
 
-
-ENCRYPTION_CHOICES = [
-    ("ssl", "SSL / TLS"),
+SECURITY_CHOICES = [
     ("starttls", "STARTTLS"),
-    ("none", "Без шифрования (не рекомендуется)"),
+    ("ssl", "SSL / TLS"),
+    ("none", "None"),
+]
+
+AUTH_CHOICES = [
+    ("login", "LOGIN"),
+    ("oauth2", "OAuth2"),
 ]
 
 
-class MailConnectionForm(forms.ModelForm):
-    """
-    Форма для создания/редактирования почтового подключения.
-    """
-
-    # SMTP
-    smtp_host = forms.CharField(label="SMTP хост", max_length=255, required=True)
-    smtp_port = forms.IntegerField(label="SMTP порт", required=True, initial=587)
-    smtp_encryption = forms.ChoiceField(
-        label="SMTP шифрование",
-        choices=ENCRYPTION_CHOICES,
-        initial="starttls",
+class MailServerForm(forms.Form):
+    name = forms.CharField(
+        label=_("Название"),
         required=True,
-    )
-    smtp_username = forms.CharField(label="SMTP логин", max_length=255, required=True)
-    smtp_password = forms.CharField(
-        label="SMTP пароль",
-        widget=forms.PasswordInput(render_value=True),
-        required=True,
+        widget=forms.TextInput(attrs={"class": "YY-INPUT", "placeholder": _("Для какой рассылки, компании?")}),
     )
 
-    # IMAP
-    imap_host = forms.CharField(label="IMAP хост", max_length=255, required=True)
-    imap_port = forms.IntegerField(label="IMAP порт", required=True, initial=993)
-    imap_encryption = forms.ChoiceField(
-        label="IMAP шифрование",
-        choices=ENCRYPTION_CHOICES,
-        initial="ssl",
+    email = forms.EmailField(
+        label=_("Email"),
         required=True,
-    )
-    imap_username = forms.CharField(label="IMAP логин", max_length=255, required=True)
-    imap_password = forms.CharField(
-        label="IMAP пароль",
-        widget=forms.PasswordInput(render_value=True),
-        required=True,
+        widget=forms.TextInput(attrs={"class": "YY-INPUT", "placeholder": "name@domain.tld"}),
     )
 
-    class Meta:
-        model = MailConnection
-        fields = ["name", "from_name", "from_email"]
+    # Presets (apply only, not required)
+    preset_code = forms.ChoiceField(
+        label=_("Пресет провайдера"),
+        required=False,
+        widget=forms.Select(attrs={"class": "YY-INPUT !mb-0"}),
+    )
 
-    def __init__(self, *args, workspace_id=None, **kwargs):
-        self.workspace_id = workspace_id
+    # SMTP (required)
+    smtp_host = forms.CharField(label="SMTP host", required=True, widget=forms.TextInput(attrs={"class": "YY-INPUT"}))
+    smtp_port = forms.IntegerField(label="SMTP port", required=True, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-24"}))
+    smtp_security = forms.ChoiceField(
+        label="SMTP security",
+        choices=SECURITY_CHOICES,
+        required=True,
+        widget=forms.Select(attrs={"class": "YY-INPUT !px-1"}),
+    )
+    smtp_auth_type = forms.ChoiceField(
+        label="SMTP auth",
+        choices=AUTH_CHOICES,
+        required=True,
+        widget=forms.Select(attrs={"class": "YY-INPUT !px-1"}),
+    )
+    smtp_username = forms.CharField(label="SMTP username", required=True, widget=forms.TextInput(attrs={"class": "YY-INPUT"}))
+    smtp_secret = forms.CharField(label="SMTP password / token", required=True, widget=forms.PasswordInput(attrs={"class": "YY-INPUT"}))
+
+    from_name = forms.CharField(
+        label=_("Отправитель:"),
+        required=False,
+        widget=forms.TextInput(attrs={"class": "YY-INPUT", "placeholder": _("Отправитель")}),
+    )
+
+    # IMAP (optional by presence, not by "active" flag)
+    imap_host = forms.CharField(label="IMAP host", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT"}))
+    imap_port = forms.IntegerField(label="IMAP port", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-24"}))
+    imap_security = forms.ChoiceField(
+        label="IMAP security",
+        choices=SECURITY_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={"class": "YY-INPUT !px-1"}),
+    )
+    imap_auth_type = forms.ChoiceField(
+        label="IMAP auth",
+        choices=AUTH_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={"class": "YY-INPUT !px-1"}),
+    )
+    imap_username = forms.CharField(label="IMAP username", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT"}))
+    imap_secret = forms.CharField(label="IMAP password / token", required=False, widget=forms.PasswordInput(attrs={"class": "YY-INPUT"}))
+
+    def __init__(self, *args, preset_choices: List[Tuple[str, str]] | None = None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["preset_code"].choices = [("", "—")] + (preset_choices or [])
 
-        if self.instance and self.instance.pk:
-            smtp = self.instance.smtp_config or {}
-            imap = self.instance.imap_config or {}
+    def clean(self):
+        cleaned = super().clean()
 
-            self.fields["smtp_host"].initial = smtp.get("host", "")
-            self.fields["smtp_port"].initial = smtp.get("port", 587)
-            self.fields["smtp_encryption"].initial = smtp.get("encryption", "starttls")
-            self.fields["smtp_username"].initial = smtp.get("username", "")
-            self.fields["smtp_password"].initial = smtp.get("password", "")
+        missing = []
+        for f in [
+            "name",
+            "email",
+            "smtp_host",
+            "smtp_port",
+            "smtp_security",
+            "smtp_auth_type",
+            "smtp_username",
+            "smtp_secret",
+        ]:
+            if not (cleaned.get(f) or "").__str__().strip():
+                missing.append(f)
 
-            self.fields["imap_host"].initial = imap.get("host", "")
-            self.fields["imap_port"].initial = imap.get("port", 993)
-            self.fields["imap_encryption"].initial = imap.get("encryption", "ssl")
-            self.fields["imap_username"].initial = imap.get("username", "")
-            self.fields["imap_password"].initial = imap.get("password", "")
+        # IMAP: если хоть что-то заполнено — считаем, что IMAP хотят использовать
+        imap_fields = [
+            "imap_host",
+            "imap_port",
+            "imap_security",
+            "imap_auth_type",
+            "imap_username",
+            "imap_secret",
+        ]
+        imap_any = any(
+            cleaned.get(f) not in (None, "", [])
+            for f in imap_fields
+        )
 
-    def clean_smtp_port(self):
-        port = self.cleaned_data["smtp_port"]
-        if port <= 0 or port > 65535:
-            raise forms.ValidationError("Некорректный порт SMTP.")
-        return port
+        if imap_any:
+            for f in imap_fields:
+                v = cleaned.get(f)
+                if v is None or (isinstance(v, str) and not v.strip()):
+                    missing.append(f)
 
-    def clean_imap_port(self):
-        port = self.cleaned_data["imap_port"]
-        if port <= 0 or port > 65535:
-            raise forms.ValidationError("Некорректный порт IMAP.")
-        return port
+        if missing:
+            self.add_error(None, _("Заполните все поля."))
+            for f in missing:
+                self.add_error(f, "")
 
-    def save(self, commit=True):
-        instance = super().save(commit=False)
-
-        if self.workspace_id is not None:
-            instance.workspace_id = self.workspace_id
-
-        instance.smtp_config = {
-            "host": self.cleaned_data["smtp_host"],
-            "port": self.cleaned_data["smtp_port"],
-            "encryption": self.cleaned_data["smtp_encryption"],
-            "username": self.cleaned_data["smtp_username"],
-            "password": self.cleaned_data["smtp_password"],
-        }
-
-        instance.imap_config = {
-            "host": self.cleaned_data["imap_host"],
-            "port": self.cleaned_data["imap_port"],
-            "encryption": self.cleaned_data["imap_encryption"],
-            "username": self.cleaned_data["imap_username"],
-            "password": self.cleaned_data["imap_password"],
-            "folders": [],
-        }
-
-        if commit:
-            instance.save()
-        return instance
+        return cleaned

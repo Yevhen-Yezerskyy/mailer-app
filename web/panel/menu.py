@@ -63,7 +63,6 @@ PANEL_MENU = [
         ],
     },    
     {
-        # AUDIENCE
     "title": _("Настройки"),
         "open_prefixes": ["/panel/settings/"],
         "items": [
