@@ -1,10 +1,10 @@
-<!-- FILE: web/templates/panels/aap_campaigns/templates.html -->
-<!-- DATE: 2026-01-14 -->
-<!-- PURPOSE: CRUD + User-editor (Quill only). -->
-<!-- CHANGE: HTML и CSS раздельно: Quill редактирует только HTML, CSS живёт отдельным live <style>. -->
-
 {% extends "panels/base.html" %}
 {% load i18n %}
+
+<!-- FILE: web/templates/panels/aap_campaigns/templates.html -->
+<!-- DATE: 2026-01-14 -->
+<!-- PURPOSE: CRUD + User-editor (TinyMCE inline). -->
+<!-- CHANGE: Quill -> TinyMCE. HTML отдельно, CSS отдельно. Подключены tinymce + config + runtime. -->
 
 {% block content %}
 
@@ -32,8 +32,11 @@
               {% trans "Редактор" %}
             </div>
 
-            <div id="yyQuillStyleHost"></div>
-            <div id="yyQuillEditor" class="YY-CARD_WHITE" style="min-height:320px;"></div>
+            <div id="yyTinyStyleHost"></div>
+            <div id="yyTinyEditor"
+                 class="YY-CARD_WHITE"
+                 style="min-height:320px;"
+                 contenteditable="true"></div>
 
             <input type="hidden" name="editor_html" id="yyEditorHtml">
             <input type="hidden" name="css_text" id="yyCssText">
@@ -117,7 +120,7 @@
 
 {% block extra_js %}
   {{ block.super }}
-  <link rel="stylesheet" href="/static/vendor/quill/quill.snow.css">
-  <script src="/static/vendor/quill/quill.min.js"></script>
+  <script src="/static/vendor/tinymce/tinymce.min.js"></script>
+  <script src="/static/js/campaign_templates_tinymce_config.js"></script>
   <script src="/static/js/campaign_templates_editor.js"></script>
 {% endblock %}

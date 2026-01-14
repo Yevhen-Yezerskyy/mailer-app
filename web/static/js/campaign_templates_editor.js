@@ -1,8 +1,8 @@
 // FILE: web/static/js/campaign_templates_editor.js
 // DATE: 2026-01-14
-// PURPOSE: User-mode only (Quill).
-// CHANGE: Quill получает только HTML; CSS живёт отдельно (1 live <style>), запоминаем lastCssText.
-//         Save отправляет editor_html + css_text.
+// PURPOSE: User-mode runtime (TinyMCE inline).
+// CHANGE: Runtime отдельно от init-config: live <style>, загрузка HTML/CSS, submit -> hidden поля.
+//         Конфиг берём из window.yyTinyBuildConfig().
 
 (function () {
   "use strict";
@@ -24,7 +24,7 @@
   }
 
   function ensureLiveStyleEl() {
-    const host = $("#yyQuillStyleHost");
+    const host = $("#yyTinyStyleHost");
     let el = document.getElementById("yyLiveCss");
     if (el) return el;
 
@@ -45,20 +45,15 @@
     const form = $("#yyTplForm");
     if (!form) return;
 
-    const editorEl = $("#yyQuillEditor");
+    const editorEl = $("#yyTinyEditor");
     const hiddenHtml = $("#yyEditorHtml");
     const hiddenCss = $("#yyCssText");
     if (!editorEl || !hiddenHtml || !hiddenCss) return;
 
-    if (!window.Quill) {
-      console.error("Quill not loaded");
+    if (!window.tinymce || typeof window.yyTinyBuildConfig !== "function") {
+      console.error("TinyMCE or config not loaded");
       return;
     }
-
-    const quill = new window.Quill(editorEl, {
-      theme: "snow",
-      modules: { toolbar: true },
-    });
 
     const liveStyle = ensureLiveStyleEl();
     let lastCssText = "";
@@ -79,26 +74,38 @@
     const state = (getParam("state") || "").trim();
     const uiId = (getParam("id") || "").trim();
 
-    if (state === "edit" && uiId) {
+    function loadExistingInto(editor) {
+      if (!(state === "edit" && uiId)) {
+        editor.setContent("");
+        applyCss("");
+        return;
+      }
+
       const id = encodeURIComponent(uiId);
       const urlHtml = `/panel/campaigns/templates/render-user-html/?id=${id}`;
       const urlCss = `/panel/campaigns/templates/render-user-css/?id=${id}`;
 
       fetchText(urlHtml)
         .then((html) => {
-          quill.root.innerHTML = html || "";
+          editor.setContent(html || "");
           return fetchText(urlCss);
         })
-        .then((css) => {
-          applyCss(css);
-        })
+        .then((css) => applyCss(css))
         .catch((e) => console.error(e));
-    } else {
-      applyCss("");
     }
 
+    // Хук для init-config
+    window.yyTplRuntimeOnEditorInit = function (editor) {
+      loadExistingInto(editor);
+    };
+
+    // init TinyMCE (конфиг отдельно)
+    window.tinymce.init(window.yyTinyBuildConfig(editorEl));
+
     form.addEventListener("submit", () => {
-      hiddenHtml.value = quill.root.innerHTML || "";
+      const ed = window.tinymce.get(editorEl.id);
+      const html = ed ? ed.getContent({ format: "html" }) : (editorEl.innerHTML || "");
+      hiddenHtml.value = html || "";
       hiddenCss.value = lastCssText || "";
     });
   }

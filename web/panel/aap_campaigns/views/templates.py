@@ -1,8 +1,10 @@
 # FILE: web/panel/aap_campaigns/views/templates.py
 # DATE: 2026-01-14
-# PURPOSE: /panel/campaigns/templates/ — CRUD шаблонов писем (User-mode только).
-# CHANGE: HTML берём только из Quill (editor_html) и санитайзим; стили берём только как CSS-текст (css_text),
-#         конвертим CSS->JSON питоном и сохраняем. Никаких стилей из HTML.
+# PURPOSE: /panel/campaigns/templates/ — CRUD шаблонов писем (User-mode).
+# CHANGE:
+#   - sanitize_stored_html -> sanitize
+#   - при сохранении используем editor_template_parse_html()
+#   - логика CRUD не менялась
 
 from __future__ import annotations
 
@@ -14,7 +16,11 @@ from django.shortcuts import redirect, render
 
 from mailer_web.access import encode_id, resolve_pk_or_redirect
 from panel.aap_campaigns.models import Templates
-from engine.common.email_template import sanitize_stored_html, styles_css_to_json
+from engine.common.email_template import (
+    sanitize,
+    styles_css_to_json,
+    editor_template_parse_html,
+)
 
 
 def _guard(request) -> tuple[Optional[UUID], Optional[object]]:
@@ -90,7 +96,9 @@ def templates_view(request):
         if not template_name:
             return redirect(request.path)
 
-        clean_html = sanitize_stored_html(editor_html)
+        # важно: парсим editor-html -> чистый template-html
+        clean_html = editor_template_parse_html(editor_html)
+        clean_html = sanitize(clean_html)
         styles_obj = styles_css_to_json(css_text)
 
         if action == "add":
@@ -119,6 +127,7 @@ def templates_view(request):
                 obj.template_html = clean_html
                 obj.styles = styles_obj
                 obj.save(update_fields=["template_name", "template_html", "styles", "updated_at"])
+
             return redirect(f"{request.path}?state=edit&id={encode_id(int(obj.id))}")
 
         return redirect(request.path)
