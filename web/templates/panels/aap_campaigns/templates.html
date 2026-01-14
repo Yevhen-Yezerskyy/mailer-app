@@ -1,7 +1,7 @@
 <!-- FILE: web/templates/panels/aap_campaigns/templates.html -->
 <!-- DATE: 2026-01-14 -->
-<!-- PURPOSE: /panel/campaigns/templates/ — CRUD + редактор шаблона: User(Quill) / Advanced(CodeMirror). -->
-<!-- CHANGE: Добавлен UI-переключатель режимов и подключение JS, поля form.template_html/styles прячутся и синхронизируются через JS. -->
+<!-- PURPOSE: CRUD + User-editor (Quill only). -->
+<!-- CHANGE: HTML и CSS раздельно: Quill редактирует только HTML, CSS живёт отдельным live <style>. -->
 
 {% extends "panels/base.html" %}
 {% load i18n %}
@@ -13,197 +13,44 @@
     <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
       <div class="YY-CARD_WHITE">
 
-        {% if state == "edit" and edit_obj %}
+        {% if state == "edit" and edit_obj or state == "add" %}
           <div class="YY-STATUS_GREEN mb-5">
-            {% trans "Редактирование шаблона" %}:
+            {% if state == "edit" %}{% trans "Редактирование шаблона" %}{% else %}{% trans "Новый шаблон" %}{% endif %}
           </div>
 
           <form method="post" id="yyTplForm">
             {% csrf_token %}
-            <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
-
-            {% if form.non_field_errors %}
-              <div class="YY-CARD_IN_FORM_ERROR mb-3">
-                {{ form.non_field_errors }}
-              </div>
+            {% if edit_obj %}
+              <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
             {% endif %}
 
             <label class="YY-LABEL">{% trans "Название" %}</label>
-            {{ form.template_name }}
-            {% if form.template_name.errors %}
-              <div class="YY-CARD_IN_FORM_ERROR mt-3">
-                {{ form.template_name.errors }}
-              </div>
-            {% endif %}
+            <input type="text" name="template_name" class="YY-INPUT w-full"
+                   value="{{ edit_obj.template_name|default:'' }}">
 
-            <div class="flex gap-2 mt-4">
-              <button type="button" class="YY-BUTTON_TAB_MAIN" id="yyModeUser">
-                {% trans "User" %}
-              </button>
-              <button type="button" class="YY-BUTTON_TAB_MAIN" id="yyModeAdv">
-                {% trans "Advanced" %}
-              </button>
-
-              <div class="flex-1"></div>
-
-              <button type="button" class="YY-BUTTON_TAB_MAIN" id="yyPreviewBtn">
-                {% trans "Preview" %}
-              </button>
+            <div class="YY-STATUS_BLUE mt-4 mb-2">
+              {% trans "Редактор" %}
             </div>
 
-            <div class="mt-3">
-              <div id="yyModeUserBox" class="hidden">
-                <div class="YY-STATUS_BLUE mb-2">
-                  {% trans "Редактор (User)" %}
-                </div>
+            <div id="yyQuillStyleHost"></div>
+            <div id="yyQuillEditor" class="YY-CARD_WHITE" style="min-height:320px;"></div>
 
-                <div id="yyQuillStyleHost"></div>
-                <div id="yyQuillEditor" class="YY-CARD_WHITE" style="min-height: 320px;"></div>
-              </div>
+            <input type="hidden" name="editor_html" id="yyEditorHtml">
+            <input type="hidden" name="css_text" id="yyCssText">
 
-              <div id="yyModeAdvBox" class="hidden">
-                <div class="YY-STATUS_BLUE mb-2">
-                  {% trans "Редактор (Advanced)" %}
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <div class="YY-LABEL mb-1">{% trans "HTML" %}</div>
-                    <div id="yyCMHtmlHost" class="YY-CARD_WHITE" style="min-height: 320px;"></div>
-                  </div>
-                  <div>
-                    <div class="YY-LABEL mb-1">{% trans "Styles (JSON)" %}</div>
-                    <div id="yyCMJsonHost" class="YY-CARD_WHITE" style="min-height: 320px;"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="hidden">
-              <label class="YY-LABEL mt-4">{% trans "HTML шаблон" %}</label>
-              {{ form.template_html }}
-              {% if form.template_html.errors %}
-                <div class="YY-CARD_IN_FORM_ERROR mt-3">
-                  {{ form.template_html.errors }}
-                </div>
-              {% endif %}
-
-              <label class="YY-LABEL mt-4">{% trans "Styles (JSON)" %}</label>
-              {{ form.styles }}
-              {% if form.styles.errors %}
-                <div class="YY-CARD_IN_FORM_ERROR mt-3">
-                  {{ form.styles.errors }}
-                </div>
-              {% endif %}
-            </div>
-
-            <div class="flex gap-3 mt-3">
-              <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN" id="yyTplSaveBtn">
-                {% trans "Сохранить изменения" %}
+            <div class="flex gap-3 mt-4">
+              <button type="submit" name="action"
+                      value="{% if state == 'edit' %}save{% else %}add{% endif %}"
+                      class="YY-BUTTON_MAIN">
+                {% trans "Сохранить" %}
               </button>
 
-              <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN" formnovalidate id="yyTplCloseBtn">
+              <button type="submit" name="action" value="close"
+                      class="YY-BUTTON_MAIN" formnovalidate>
                 {% trans "Закрыть" %}
               </button>
             </div>
-
           </form>
-
-        {% elif state == "add" %}
-          <div class="YY-STATUS_GREEN mb-5">
-            {% trans "Новый шаблон" %}
-          </div>
-
-          <form method="post" id="yyTplForm">
-            {% csrf_token %}
-
-            {% if form.non_field_errors %}
-              <div class="YY-CARD_IN_FORM_ERROR mb-3">
-                {{ form.non_field_errors }}
-              </div>
-            {% endif %}
-
-            <label class="YY-LABEL">{% trans "Название" %}</label>
-            {{ form.template_name }}
-            {% if form.template_name.errors %}
-              <div class="YY-CARD_IN_FORM_ERROR mt-3">
-                {{ form.template_name.errors }}
-              </div>
-            {% endif %}
-
-            <div class="flex gap-2 mt-4">
-              <button type="button" class="YY-BUTTON_TAB_MAIN" id="yyModeUser">
-                {% trans "User" %}
-              </button>
-              <button type="button" class="YY-BUTTON_TAB_MAIN" id="yyModeAdv">
-                {% trans "Advanced" %}
-              </button>
-
-              <div class="flex-1"></div>
-
-              <button type="button" class="YY-BUTTON_TAB_MAIN" id="yyPreviewBtn">
-                {% trans "Preview" %}
-              </button>
-            </div>
-
-            <div class="mt-3">
-              <div id="yyModeUserBox" class="hidden">
-                <div class="YY-STATUS_BLUE mb-2">
-                  {% trans "Редактор (User)" %}
-                </div>
-
-                <div id="yyQuillStyleHost"></div>
-                <div id="yyQuillEditor" class="YY-CARD_WHITE" style="min-height: 320px;"></div>
-              </div>
-
-              <div id="yyModeAdvBox" class="hidden">
-                <div class="YY-STATUS_BLUE mb-2">
-                  {% trans "Редактор (Advanced)" %}
-                </div>
-
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <div class="YY-LABEL mb-1">{% trans "HTML" %}</div>
-                    <div id="yyCMHtmlHost" class="YY-CARD_WHITE" style="min-height: 320px;"></div>
-                  </div>
-                  <div>
-                    <div class="YY-LABEL mb-1">{% trans "Styles (JSON)" %}</div>
-                    <div id="yyCMJsonHost" class="YY-CARD_WHITE" style="min-height: 320px;"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="hidden">
-              <label class="YY-LABEL mt-4">{% trans "HTML шаблон" %}</label>
-              {{ form.template_html }}
-              {% if form.template_html.errors %}
-                <div class="YY-CARD_IN_FORM_ERROR mt-3">
-                  {{ form.template_html.errors }}
-                </div>
-              {% endif %}
-
-              <label class="YY-LABEL mt-4">{% trans "Styles (JSON)" %}</label>
-              {{ form.styles }}
-              {% if form.styles.errors %}
-                <div class="YY-CARD_IN_FORM_ERROR mt-3">
-                  {{ form.styles.errors }}
-                </div>
-              {% endif %}
-            </div>
-
-            <div class="flex gap-3 mt-3">
-              <button type="submit" name="action" value="add" class="YY-BUTTON_MAIN" id="yyTplAddBtn">
-                {% trans "Добавить" %}
-              </button>
-
-              <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN" formnovalidate id="yyTplCloseBtn">
-                {% trans "Закрыть" %}
-              </button>
-            </div>
-
-          </form>
-
         {% else %}
           <div class="YY-STATUS_GREEN mb-5">
             {% trans "Шаблоны писем" %}
@@ -220,81 +67,57 @@
     <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
       <div class="YY-CARD_WHITE">
         <div class="YY-STATUS_BLUE">
-          {% trans "Шаблоны писем (workspace)" %}
+          {% trans "Шаблоны (workspace)" %}
         </div>
       </div>
     </td>
   </tr>
 </table>
 
-{% if state == "" %}
-  <table class="YY-MAIN_TABLE">
-    <tr>
-      <td class="YY-MAIN_BOTTOM_TD">
-        {% if items %}
-          <div class="YY-MAIN_BOTTOM_DIV">
-
-            <table class="w-full text-left">
-              <thead>
-                <tr class="YY-TH_TR">
-                  <th class="YY-TH_TH w-[70%]">{% trans "Название" %}</th>
-                  <th class="YY-TH_TH">&nbsp;</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for it in items %}
-                  <tr class="YY-TB_TR align-top">
-                    <td class="YY-TB_TD">
-                      <div class="YY-STATUS_BLUE">
-                        {{ it.template_name }}
-                      </div>
-                    </td>
-
-                    <td class="YY-TB_TD">
-                      <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
-                        {% trans "Изменить" %}
-                      </a>
-
-                      <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="id" value="{{ it.ui_id }}">
-                        <button type="submit" class="YY-BUTTON_TAB_RED">
-                          {% trans "Удалить" %}
-                        </button>
-                      </form>
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-
-          </div>
-        {% else %}
-          <div class="YY-CARD_WHITE mb-10">
-            {% trans "Здесь пока нет данных" %}
-          </div>
-        {% endif %}
-      </td>
-    </tr>
-  </table>
-{% endif %}
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      {% if items %}
+        <table class="w-full text-left">
+          <thead>
+            <tr class="YY-TH_TR">
+              <th class="YY-TH_TH w-[70%]">{% trans "Название" %}</th>
+              <th class="YY-TH_TH">&nbsp;</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD">
+                  <div class="YY-STATUS_BLUE">{{ it.template_name }}</div>
+                </td>
+                <td class="YY-TB_TD">
+                  <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
+                    {% trans "Изменить" %}
+                  </a>
+                  <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="id" value="{{ it.ui_id }}">
+                    <button type="submit" class="YY-BUTTON_TAB_RED">
+                      {% trans "Удалить" %}
+                    </button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    </td>
+  </tr>
+</table>
 
 {% endblock %}
 
 {% block extra_js %}
   {{ block.super }}
-
-  <!-- Vendor libs должны лежать в static (этап-1: без глобальных шаблонов). -->
   <link rel="stylesheet" href="/static/vendor/quill/quill.snow.css">
   <script src="/static/vendor/quill/quill.min.js"></script>
-
-  <link rel="stylesheet" href="/static/vendor/codemirror/codemirror.css">
-  <script src="/static/vendor/codemirror/codemirror.js"></script>
-  <script src="/static/vendor/codemirror/mode/xml/xml.js"></script>
-  <script src="/static/vendor/codemirror/mode/javascript/javascript.js"></script>
-  <script src="/static/vendor/codemirror/mode/css/css.js"></script>
-  <script src="/static/vendor/codemirror/mode/htmlmixed/htmlmixed.js"></script>
-
   <script src="/static/js/campaign_templates_editor.js"></script>
 {% endblock %}

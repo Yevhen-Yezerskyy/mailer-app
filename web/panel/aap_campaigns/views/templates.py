@@ -1,11 +1,11 @@
 # FILE: web/panel/aap_campaigns/views/templates.py
 # DATE: 2026-01-14
-# PURPOSE: /panel/campaigns/templates/ — CRUD-страница шаблонов Templates.
-# CHANGE: по умолчанию форма скрыта; add/edit скрывают список; add редиректит в edit; выход из edit/add через action=close на чистый URL.
+# PURPOSE: /panel/campaigns/templates/ — CRUD шаблонов писем (User-mode только).
+# CHANGE: HTML берём только из Quill (editor_html) и санитайзим; стили берём только как CSS-текст (css_text),
+#         конвертим CSS->JSON питоном и сохраняем. Никаких стилей из HTML.
 
 from __future__ import annotations
 
-import json
 from typing import Optional, Union
 from uuid import UUID
 
@@ -13,8 +13,8 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 
 from mailer_web.access import encode_id, resolve_pk_or_redirect
-from panel.aap_campaigns.forms import TemplatesForm
 from panel.aap_campaigns.models import Templates
+from engine.common.email_template import sanitize_stored_html, styles_css_to_json
 
 
 def _guard(request) -> tuple[Optional[UUID], Optional[object]]:
@@ -37,9 +37,7 @@ def _with_ui_ids(items):
 
 def _get_state(request) -> str:
     st = (request.GET.get("state") or "").strip()
-    if st in ("add", "edit"):
-        return st
-    return ""
+    return st if st in ("add", "edit") else ""
 
 
 def _get_edit_obj(request, ws_id: UUID) -> Union[None, Templates, HttpResponseRedirect]:
@@ -55,22 +53,12 @@ def _get_edit_obj(request, ws_id: UUID) -> Union[None, Templates, HttpResponseRe
     return Templates.objects.filter(id=int(res), workspace_id=ws_id).first()
 
 
-def _styles_to_text(styles) -> str:
-    if not styles:
-        return ""
-    try:
-        return json.dumps(styles, ensure_ascii=False, indent=2)
-    except Exception:
-        return ""
-
-
 def templates_view(request):
     ws_id, user = _guard(request)
     if not ws_id:
         return redirect("/")
 
     state = _get_state(request)
-
     edit_obj = _get_edit_obj(request, ws_id) if state == "edit" else None
     if isinstance(edit_obj, HttpResponseRedirect):
         return edit_obj
@@ -95,24 +83,23 @@ def templates_view(request):
             Templates.objects.filter(id=int(res), workspace_id=ws_id).delete()
             return redirect(request.path)
 
-        form = TemplatesForm(request.POST)
-        if not form.is_valid():
-            items = _with_ui_ids(_qs(ws_id)) if state == "" else None
-            return render(
-                request,
-                "panels/aap_campaigns/templates.html",
-                {
-                    "items": items,
-                    "state": state,
-                    "form": form,
-                    "edit_obj": edit_obj,
-                },
-            )
+        template_name = (request.POST.get("template_name") or "").strip()
+        editor_html = request.POST.get("editor_html") or ""
+        css_text = request.POST.get("css_text") or ""
 
-        data = form.to_model_fields()
+        if not template_name:
+            return redirect(request.path)
+
+        clean_html = sanitize_stored_html(editor_html)
+        styles_obj = styles_css_to_json(css_text)
 
         if action == "add":
-            obj = Templates.objects.create(workspace_id=ws_id, **data)
+            obj = Templates.objects.create(
+                workspace_id=ws_id,
+                template_name=template_name,
+                template_html=clean_html,
+                styles=styles_obj,
+            )
             return redirect(f"{request.path}?state=edit&id={encode_id(int(obj.id))}")
 
         if action == "save":
@@ -127,36 +114,22 @@ def templates_view(request):
                 return res
 
             obj = Templates.objects.filter(id=int(res), workspace_id=ws_id).first()
-            if obj is None:
-                return redirect(request.path)
-
-            obj.template_name = data["template_name"]
-            obj.template_html = data["template_html"]
-            obj.styles = data["styles"]
-            obj.save(update_fields=["template_name", "template_html", "styles", "updated_at"])
-
+            if obj:
+                obj.template_name = template_name
+                obj.template_html = clean_html
+                obj.styles = styles_obj
+                obj.save(update_fields=["template_name", "template_html", "styles", "updated_at"])
             return redirect(f"{request.path}?state=edit&id={encode_id(int(obj.id))}")
 
         return redirect(request.path)
 
-    # GET
-    init = {"template_name": "", "template_html": "", "styles": ""}
-
-    if state == "edit" and edit_obj:
-        init["template_name"] = edit_obj.template_name or ""
-        init["template_html"] = edit_obj.template_html or ""
-        init["styles"] = _styles_to_text(edit_obj.styles)
-
-    form = TemplatesForm(initial=init)
-    items = _with_ui_ids(_qs(ws_id)) if state == "" else None
-
+    items = _with_ui_ids(_qs(ws_id))
     return render(
         request,
         "panels/aap_campaigns/templates.html",
         {
             "items": items,
             "state": state,
-            "form": form,
             "edit_obj": edit_obj,
         },
     )
