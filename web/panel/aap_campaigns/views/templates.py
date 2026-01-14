@@ -1,7 +1,7 @@
 # FILE: web/panel/aap_campaigns/views/templates.py
 # DATE: 2026-01-14
-# PURPOSE: /panel/campaigns/templates/ — простая CRUD-страница шаблонов (add/edit/delete) для модели Templates.
-# CHANGE: action=add теперь редиректит на чистый URL (как в aap_lists), без перехода в режим edit.
+# PURPOSE: /panel/campaigns/templates/ — CRUD-страница шаблонов Templates.
+# CHANGE: по умолчанию форма скрыта; add/edit скрывают список; add редиректит в edit; выход из edit/add через action=close на чистый URL.
 
 from __future__ import annotations
 
@@ -35,8 +35,15 @@ def _with_ui_ids(items):
     return items
 
 
+def _get_state(request) -> str:
+    st = (request.GET.get("state") or "").strip()
+    if st in ("add", "edit"):
+        return st
+    return ""
+
+
 def _get_edit_obj(request, ws_id: UUID) -> Union[None, Templates, HttpResponseRedirect]:
-    if request.GET.get("state") != "edit":
+    if _get_state(request) != "edit":
         return None
     if not request.GET.get("id"):
         return None
@@ -62,16 +69,16 @@ def templates_view(request):
     if not ws_id:
         return redirect("/")
 
-    edit_obj = _get_edit_obj(request, ws_id)
+    state = _get_state(request)
+
+    edit_obj = _get_edit_obj(request, ws_id) if state == "edit" else None
     if isinstance(edit_obj, HttpResponseRedirect):
         return edit_obj
-
-    state = "edit" if edit_obj else ""
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
 
-        if action == "cancel":
+        if action == "close":
             return redirect(request.path)
 
         if action == "delete":
@@ -90,7 +97,7 @@ def templates_view(request):
 
         form = TemplatesForm(request.POST)
         if not form.is_valid():
-            items = _with_ui_ids(_qs(ws_id))
+            items = _with_ui_ids(_qs(ws_id)) if state == "" else None
             return render(
                 request,
                 "panels/aap_campaigns/templates.html",
@@ -105,8 +112,8 @@ def templates_view(request):
         data = form.to_model_fields()
 
         if action == "add":
-            Templates.objects.create(workspace_id=ws_id, **data)
-            return redirect(request.path)
+            obj = Templates.objects.create(workspace_id=ws_id, **data)
+            return redirect(f"{request.path}?state=edit&id={encode_id(int(obj.id))}")
 
         if action == "save":
             post_id = (request.POST.get("id") or "").strip()
@@ -134,13 +141,14 @@ def templates_view(request):
 
     # GET
     init = {"template_name": "", "template_html": "", "styles": ""}
-    if edit_obj:
+
+    if state == "edit" and edit_obj:
         init["template_name"] = edit_obj.template_name or ""
         init["template_html"] = edit_obj.template_html or ""
         init["styles"] = _styles_to_text(edit_obj.styles)
 
     form = TemplatesForm(initial=init)
-    items = _with_ui_ids(_qs(ws_id))
+    items = _with_ui_ids(_qs(ws_id)) if state == "" else None
 
     return render(
         request,

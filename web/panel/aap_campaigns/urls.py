@@ -1,17 +1,23 @@
-# FILE: web/panel/aap_campaigns/urls.py
+# FILE: web/panel/aap_campaigns/urls.py  (новое)
 # DATE: 2026-01-14
-# PURPOSE: URL-ы раздела "Campaigns" панели (campaigns / templates).
-# CHANGE: (new) базовые урлы + редирект корня на campaigns/.
+# PURPOSE: URLs для campaigns/templates + server-api для редактора.
+
+from __future__ import annotations
 
 from django.urls import path
-from django.views.generic import RedirectView
 
-from .views import campaigns, templates
+from panel.aap_campaigns.views.templates import templates_view
+from panel.aap_campaigns.views.templates_api import (
+    templates_normalize_view,
+    templates_preview_view,
+    templates_render_user_view,
+)
 
-app_name = "campaigns"
+app_name = "aap_campaigns"
 
 urlpatterns = [
-    path("", RedirectView.as_view(url="campaigns/", permanent=False)),
-    path("campaigns/", campaigns.campaigns_view, name="campaigns"),
-    path("templates/", templates.templates_view, name="templates"),
+    path("templates/", templates_view, name="templates"),
+    path("templates/_render_user/", templates_render_user_view, name="templates_render_user"),
+    path("templates/_normalize/", templates_normalize_view, name="templates_normalize"),
+    path("templates/_preview/", templates_preview_view, name="templates_preview"),
 ]
