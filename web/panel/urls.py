@@ -1,6 +1,7 @@
-# FILE: web/panel/urls.py  (обновлено — 2025-12-21)
-# PURPOSE: корень панели /panel/ редиректит на /panel/audience/
-#          + включаем флаг request._tw_classmap_enabled для всего дерева panel-urls.
+# FILE: web/panel/urls.py
+# DATE: 2026-01-14
+# PURPOSE: Корень панели /panel/ + include всех panel-app urlconf.
+# CHANGE: Добавлен роут /panel/campaigns/ → panel.aap_campaigns.urls (include_flagged).
 
 from __future__ import annotations
 
@@ -49,4 +50,5 @@ urlpatterns = [
     path("audience/", include_flagged("panel.aap_audience.urls")),
     path("lists/", include_flagged("panel.aap_lists.urls")),
     path("settings/", include_flagged("panel.aap_settings.urls")),
+    path("campaigns/", include_flagged("panel.aap_campaigns.urls")),
 ]

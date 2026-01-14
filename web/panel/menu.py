@@ -1,11 +1,13 @@
-# FILE: web/panel/menu.py  (новое — 2025-12-18)
-# Смысл: единый источник правды для меню панели (порядок, i18n, title, urls)
+# FILE: web/panel/menu.py
+# DATE: 2026-01-14
+# PURPOSE: Единый источник правды для меню панели.
+# CHANGE: Добавлен раздел "Кампании" с пунктами "Кампании" и "Шаблоны писем".
 
 from django.utils.translation import gettext_lazy as _
 
 PANEL_MENU = [
     {
-        # DASHBOARD (корень панели)
+        # DASHBOARD
         "title": _("Панель управления"),
         "page_title": _("Панель управления"),
         "open_prefixes": ["/panel/overview"],
@@ -61,9 +63,29 @@ PANEL_MENU = [
                 "active_prefixes": ["/panel/lists/contacts/"],
             },
         ],
-    },    
+    },
     {
-    "title": _("Настройки"),
+        # CAMPAIGNS
+        "title": _("Кампании"),
+        "open_prefixes": ["/panel/campaigns/"],
+        "items": [
+            {
+                "title": _("Кампании"),
+                "page_title": _("Кампании"),
+                "url_name": "campaigns:campaigns",
+                "active_prefixes": ["/panel/campaigns/campaigns/"],
+            },
+            {
+                "title": _("Шаблоны писем"),
+                "page_title": _("Кампании : Шаблоны писем"),
+                "url_name": "campaigns:templates",
+                "active_prefixes": ["/panel/campaigns/templates/"],
+            },
+        ],
+    },
+    {
+        # SETTINGS
+        "title": _("Настройки"),
         "open_prefixes": ["/panel/settings/"],
         "items": [
             {
@@ -78,7 +100,6 @@ PANEL_MENU = [
                 "url_name": "settings:mail_servers",
                 "active_prefixes": ["/panel/settings/mail-servers/"],
             },
-
         ],
     },
 ]

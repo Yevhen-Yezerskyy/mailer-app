@@ -1,0 +1,142 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_campaigns/templates.html -->
+<!-- DATE: 2026-01-14 -->
+<!-- PURPOSE: /panel/campaigns/templates/ — простая страница шаблонов (add/edit/delete). -->
+
+{% block content %}
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+
+{% if state == "edit" and edit_obj %}
+  <div class="YY-STATUS_GREEN mb-5">
+    {% trans "Редактирование шаблона" %}:
+  </div>
+{% else %}
+  <div class="YY-STATUS_GREEN mb-5">
+    {% trans "Новый шаблон" %}
+  </div>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+
+  {% if state == "edit" and edit_obj %}
+    <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
+  {% endif %}
+
+  {% if form.non_field_errors %}
+    <div class="YY-CARD_IN_FORM_ERROR mb-3">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
+
+  <label class="YY-LABEL">{% trans "Название" %}</label>
+  {{ form.template_name }}
+  {% if form.template_name.errors %}
+    <div class="YY-CARD_IN_FORM_ERROR mt-3">
+      {{ form.template_name.errors }}
+    </div>
+  {% endif %}
+
+  <label class="YY-LABEL mt-4">{% trans "HTML шаблон" %}</label>
+  {{ form.template_html }}
+  {% if form.template_html.errors %}
+    <div class="YY-CARD_IN_FORM_ERROR mt-3">
+      {{ form.template_html.errors }}
+    </div>
+  {% endif %}
+
+  <label class="YY-LABEL mt-4">{% trans "Styles (JSON)" %}</label>
+  {{ form.styles }}
+  {% if form.styles.errors %}
+    <div class="YY-CARD_IN_FORM_ERROR mt-3">
+      {{ form.styles.errors }}
+    </div>
+  {% endif %}
+
+  <div class="flex gap-3 mt-3">
+    {% if state == "edit" and edit_obj %}
+      <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">
+        {% trans "Сохранить изменения" %}
+      </button>
+      <button type="submit" name="action" value="cancel" class="YY-BUTTON_MAIN" formnovalidate>
+        {% trans "Отменить" %}
+      </button>
+    {% else %}
+      <button type="submit" name="action" value="add" class="YY-BUTTON_MAIN">
+        {% trans "Добавить" %}
+      </button>
+    {% endif %}
+  </div>
+
+</form>
+
+</div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-STATUS_BLUE">
+          {% trans "Шаблоны писем (workspace)" %}
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      {% if items %}
+        <div class="YY-MAIN_BOTTOM_DIV">
+
+<table class="w-full text-left">
+  <thead>
+    <tr class="YY-TH_TR">
+      <th class="YY-TH_TH w-[70%]">{% trans "Название" %}</th>
+      <th class="YY-TH_TH">&nbsp;</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for it in items %}
+      <tr class="YY-TB_TR align-top">
+        <td class="YY-TB_TD">
+          <div class="YY-STATUS_BLUE">
+            {{ it.template_name }}
+          </div>
+        </td>
+
+        <td class="YY-TB_TD">
+          <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
+            {% trans "Изменить" %}
+          </a>
+
+          <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="id" value="{{ it.ui_id }}">
+            <button type="submit" class="YY-BUTTON_TAB_RED">
+              {% trans "Удалить" %}
+            </button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+        </div>
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
+      {% endif %}
+    </td>
+  </tr>
+</table>
+
+{% endblock %}
