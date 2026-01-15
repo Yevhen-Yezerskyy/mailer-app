@@ -1,10 +1,6 @@
 // FILE: web/static/js/campaign_templates_editor.js  (обновлено — 2026-01-15)
-// PURPOSE: TinyMCE runtime + advanced switch через Python API (без JS-парсинга).
-// CHANGE:
-//   - GET load: /templates/_render-user-html|css/
-//   - Advanced enter: POST /templates/_parse-editor-html/ (TinyMCE html -> template_html with {{ ..content.. }})
-//   - Back to user:  POST /templates/_render-editor-html/ (template_html -> TinyMCE html wrapped with demo-content)
-//   - Submit: hidden editor_html/css_text заполняются из текущего режима; серверный save-пайплайн одинаковый.
+// CHANGE: live-CSS теперь инжектится ВНУТРЬ iframe через Tiny API (а не <style> в основном документе).
+//         Убран reliance на contenteditable div — работаем с tinymce.get("yyTinyEditor").
 
 (function () {
   "use strict";
@@ -34,24 +30,6 @@
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return await r.json();
-  }
-
-  function ensureLiveStyleEl() {
-    const host = $("#yyTinyStyleHost");
-    let el = document.getElementById("yyLiveCss");
-    if (el) return el;
-
-    el = document.createElement("style");
-    el.id = "yyLiveCss";
-    el.type = "text/css";
-
-    if (host) {
-      host.innerHTML = "";
-      host.appendChild(el);
-    } else {
-      (document.head || document.documentElement).appendChild(el);
-    }
-    return el;
   }
 
   function formatCss(cssText) {
@@ -118,22 +96,41 @@
     const form = $("#yyTplForm");
     if (!form) return;
 
-    const editorEl = $("#yyTinyEditor");
+    const editorTextarea = $("#yyTinyEditor");
     const hiddenHtml = $("#yyEditorHtml");
     const hiddenCss = $("#yyCssText");
-    if (!editorEl || !hiddenHtml || !hiddenCss) return;
+    if (!editorTextarea || !hiddenHtml || !hiddenCss) return;
 
     const advHtml = $("#yyAdvHtml");
     const advCss = $("#yyAdvCss");
 
     if (!window.tinymce || typeof window.yyTinyBuildConfig !== "function") return;
 
-    const liveStyle = ensureLiveStyleEl();
     let lastCssText = "";
+    let currentEditor = null;
+
+    function ensureIframeStyle(editor) {
+      const doc = editor && editor.getDoc ? editor.getDoc() : null;
+      if (!doc) return null;
+
+      let el = doc.getElementById("yyLiveCss");
+      if (el) return el;
+
+      el = doc.createElement("style");
+      el.id = "yyLiveCss";
+      el.type = "text/css";
+      (doc.head || doc.documentElement).appendChild(el);
+      return el;
+    }
 
     function applyCss(cssText) {
       lastCssText = (cssText || "").trim();
-      liveStyle.textContent = lastCssText;
+
+      // ВАЖНО: теперь CSS должен попадать внутрь iframe
+      if (currentEditor) {
+        const styleEl = ensureIframeStyle(currentEditor);
+        if (styleEl) styleEl.textContent = lastCssText;
+      }
     }
 
     window.yyTplSetCss = (css) => applyCss(css);
@@ -163,15 +160,20 @@
     }
 
     window.yyTplRuntimeOnEditorInit = function (editor) {
+      currentEditor = editor;
+
+      // применим CSS повторно (если он пришёл до init)
+      applyCss(lastCssText);
+
       loadExistingInto(editor);
     };
 
-    window.tinymce.init(window.yyTinyBuildConfig(editorEl));
+    window.tinymce.init(window.yyTinyBuildConfig());
 
     window.yyTplSwitchToAdvanced = async function () {
       try {
-        const ed = window.tinymce.get(editorEl.id);
-        const html = ed ? ed.getContent({ format: "html" }) : (editorEl.innerHTML || "");
+        const ed = window.tinymce.get("yyTinyEditor");
+        const html = ed ? ed.getContent({ format: "html" }) : "";
         const data = await postJson("/panel/campaigns/templates/_parse-editor-html/", { editor_html: html || "" });
         if (!data || !data.ok) return;
 
@@ -191,9 +193,8 @@
 
         applyCss(css);
 
-        const ed = window.tinymce.get(editorEl.id);
+        const ed = window.tinymce.get("yyTinyEditor");
         if (ed) ed.setContent(data.editor_html || "");
-        else editorEl.innerHTML = data.editor_html || "";
 
         showUserMode();
       } catch (e) {}
@@ -211,8 +212,8 @@
         return;
       }
 
-      const ed = window.tinymce.get(editorEl.id);
-      const html = ed ? ed.getContent({ format: "html" }) : (editorEl.innerHTML || "");
+      const ed = window.tinymce.get("yyTinyEditor");
+      const html = ed ? ed.getContent({ format: "html" }) : "";
       hiddenHtml.value = html || "";
       hiddenCss.value = lastCssText || "";
     });

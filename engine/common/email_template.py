@@ -39,7 +39,7 @@ _EDITOR_WRAP_CLASS = "yy_content_wrap"
 
 def _wrap_editor_content(inner_html: str) -> str:
     return (
-        f'<table class="{_EDITOR_WRAP_CLASS}">'
+        f'<table class="{_EDITOR_WRAP_CLASS} mceNonEditable">'
         f"<tr><td>{inner_html}</td></tr>"
         f"</table>"
     )
