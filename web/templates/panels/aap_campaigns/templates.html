@@ -1,8 +1,9 @@
-<!-- FILE: web/templates/panels/aap_campaigns/templates.html  (обновлено — 2026-01-15) -->
-<!-- CHANGE: TinyMCE переведён с inline(contenteditable div) на iframe (textarea). Убран внешний toolbar-host. -->
-
 {% extends "panels/base.html" %}
 {% load i18n %}
+
+<!-- FILE: web/templates/panels/aap_campaigns/templates.html -->
+<!-- DATE: 2026-01-15 -->
+<!-- CHANGE: Подключены CodeMirror + darcula theme для advanced textarea (HTML/CSS). TinyMCE не трогали. -->
 
 {% block content %}
 
@@ -22,11 +23,10 @@
   <tr>
     <td class="YY-MAIN_TOP_LEFT_TD w-[70%]">
       <div class="YY-CARD_WHITE">
-        <input type="text" name="template_name" class="YY-INPUT w-full" value="{{ edit_obj.template_name|default:'' }}">
+        <input type="text" name="template_name" class="YY-INPUT !mb-3" value="{{ edit_obj.template_name|default:'' }}">
 
         {% if state == "edit" and edit_obj or state == "add" %}
           <div id="yyUserModeLeft">
-            <!-- TinyMCE iframe mode -->
             <textarea id="yyTinyEditor"
                       class="border border-[#cbcbcb] bg-white w-full"
                       style="height:800px;"
@@ -34,8 +34,8 @@
           </div>
 
           <div id="yyAdvancedModeLeft" class="hidden">
-            <textarea id="yyAdvHtml"
-                      class="YY-CARD_WHITE w-full" style="height:900px;"
+            <textarea id="yyAdvHtml"                     
+                      style="height:900px;"
                       spellcheck="false"></textarea>
           </div>
         {% else %}
@@ -52,50 +52,43 @@
       <div class="YY-CARD_WHITE">
 
         {% if state == "edit" and edit_obj or state == "add" %}
-
           <div id="yyUserModeRight">
-
-          <div class="flex gap-3 mt-4 flex-wrap">
-            <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToAdvanced()">
-                {% trans "Advanced editor" %}
-            </button>
+            <div class="grid grid-cols-2 gap-3 mb-5">
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToAdvanced()">
+                ADVANNCED
+              </button>
               <button type="button" class="YY-BUTTON_MAIN" disabled>
-                {% trans "Превью" %}
+                {% trans "Предпросмотр" %}
               </button>
             </div>
           </div>
 
-
-          <div id="yyAdvancedModeRight" class="hidden">
+           <div id="yyAdvancedModeRight" class="hidden">
+            <div class="grid grid-cols-2 gap-3 mb-5">
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToUser()">
+                USER-FRIENDLY
+              </button>
+              <button type="button" class="YY-BUTTON_MAIN" disabled>
+                {% trans "Предпросмотр" %}
+              </button>
+            </div>
             <textarea id="yyAdvCss"
                       class="YY-INPUT w-full"
-                      style="min-height:320px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"
+                      style="min-height:700px;"
                       spellcheck="false"></textarea>
 
-            <div class="flex gap-3 mt-4 flex-wrap">
-              <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToUser()">
-                {% trans "Вернуться" %}
-              </button>
-              <button type="button" class="YY-BUTTON_MAIN" disabled>
-                {% trans "Превью" %}
-              </button>
-            </div>
+         </div>
+          <div class="grid grid-cols-2 gap-3">
+            <button type="submit" name="action"
+                    value="{% if state == 'edit' %}save{% else %}add{% endif %}"
+                    class="YY-BUTTON_MAIN">
+              {% trans "Сохранить" %}
+            </button>
+            <button type="submit" name="action" value="close"
+                    class="YY-BUTTON_MAIN" formnovalidate>
+              {% trans "Закрыть" %}
+            </button>
           </div>
-
-
-          <div class="flex gap-3 mt-4">
-              <button type="submit" name="action"
-                      value="{% if state == 'edit' %}save{% else %}add{% endif %}"
-                      class="YY-BUTTON_MAIN">
-                {% trans "Сохранить" %}
-              </button>
-              <button type="submit" name="action" value="close"
-                      class="YY-BUTTON_MAIN" formnovalidate>
-                {% trans "Закрыть" %}
-              </button>
-            </div>
-          </div>
-
         {% else %}
           <button class="YY-BUTTON_MAIN" disabled>
             {% trans "Добавить шаблон" %}
@@ -167,6 +160,17 @@
 
 {% block extra_js %}
   {{ block.super }}
+
+  <!-- CodeMirror (advanced) -->
+  <link rel="stylesheet" href="/static/vendor/codemirror/codemirror.css">
+  <link rel="stylesheet" href="/static/vendor/codemirror/theme/material-darker.css">
+  <script src="/static/vendor/codemirror/codemirror.js"></script>
+  <script src="/static/vendor/codemirror/mode/xml/xml.js"></script>
+  <script src="/static/vendor/codemirror/mode/javascript/javascript.js"></script>
+  <script src="/static/vendor/codemirror/mode/css/css.js"></script>
+  <script src="/static/vendor/codemirror/mode/htmlmixed/htmlmixed.js"></script>
+
+  <!-- Tiny + runtime -->
   <script src="/static/vendor/tinymce/tinymce.min.js"></script>
   <script src="/static/js/campaign_templates_tinymce_config.js"></script>
   <script src="/static/js/campaign_templates_editor.js"></script>

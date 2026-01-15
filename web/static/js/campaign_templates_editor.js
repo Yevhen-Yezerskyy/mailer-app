@@ -1,6 +1,7 @@
-// FILE: web/static/js/campaign_templates_editor.js  (обновлено — 2026-01-15)
-// CHANGE: live-CSS теперь инжектится ВНУТРЬ iframe через Tiny API (а не <style> в основном документе).
-//         Убран reliance на contenteditable div — работаем с tinymce.get("yyTinyEditor").
+// FILE: web/static/js/campaign_templates_editor.js
+// DATE: 2026-01-15
+// CHANGE: CodeMirror (darcula) для advanced textarea (HTML/CSS) + soft-tabs (2 пробела).
+//         При загрузке/сейве нормализуем табы -> "  ". TinyMCE не трогаем.
 
 (function () {
   "use strict";
@@ -30,6 +31,10 @@
     });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return await r.json();
+  }
+
+  function normalizeTabsTo2Spaces(s) {
+    return (s || "").replace(/\t/g, "  ");
   }
 
   function formatCss(cssText) {
@@ -106,6 +111,70 @@
 
     if (!window.tinymce || typeof window.yyTinyBuildConfig !== "function") return;
 
+    // --- CodeMirror (optional) ---
+    let cmHtml = null;
+    let cmCss = null;
+
+    function cmGetValue(cm, el) {
+      if (cm && typeof cm.getValue === "function") return cm.getValue();
+      return el ? (el.value || "") : "";
+    }
+
+    function cmSetValue(cm, el, v) {
+      const val = v == null ? "" : String(v);
+      if (cm && typeof cm.setValue === "function") {
+        cm.setValue(val);
+        return;
+      }
+      if (el) el.value = val;
+    }
+
+    function cmRefresh(cm) {
+      try {
+        if (cm && typeof cm.refresh === "function") cm.refresh();
+      } catch (e) {}
+    }
+
+    function initCodeMirrorIfPossible() {
+      if (!window.CodeMirror) return;
+      if (!advHtml || !advCss) return;
+      if (cmHtml || cmCss) return;
+
+      try {
+        const common = {
+          theme: "material-darker",
+          lineNumbers: true,
+          lineWrapping: true,
+          indentUnit: 2,
+          tabSize: 2,
+          indentWithTabs: false,
+          smartIndent: true,
+          extraKeys: {
+            Tab: (cm) => cm.execCommand("insertSoftTab"),
+            "Shift-Tab": (cm) => cm.execCommand("indentLess"),
+          },
+        };
+
+        cmHtml = window.CodeMirror.fromTextArea(
+          advHtml,
+          Object.assign({}, common, { mode: "htmlmixed" })
+        );
+
+        cmCss = window.CodeMirror.fromTextArea(
+          advCss,
+          Object.assign({}, common, { mode: "css" })
+        );
+
+        // <<< ВОТ ТУТ МЕНЯЕШЬ ВЫСОТЫ >>>
+        cmHtml.setSize("100%", "700px"); // HTML editor
+        cmCss.setSize("100%", "550px");  // CSS editor
+
+      } catch (e) {
+        cmHtml = null;
+        cmCss = null;
+      }
+    }
+
     let lastCssText = "";
     let currentEditor = null;
 
@@ -126,7 +195,6 @@
     function applyCss(cssText) {
       lastCssText = (cssText || "").trim();
 
-      // ВАЖНО: теперь CSS должен попадать внутрь iframe
       if (currentEditor) {
         const styleEl = ensureIframeStyle(currentEditor);
         if (styleEl) styleEl.textContent = lastCssText;
@@ -161,10 +229,7 @@
 
     window.yyTplRuntimeOnEditorInit = function (editor) {
       currentEditor = editor;
-
-      // применим CSS повторно (если он пришёл до init)
       applyCss(lastCssText);
-
       loadExistingInto(editor);
     };
 
@@ -177,18 +242,31 @@
         const data = await postJson("/panel/campaigns/templates/_parse-editor-html/", { editor_html: html || "" });
         if (!data || !data.ok) return;
 
-        if (advHtml) advHtml.value = (data.template_html || "").trim();
-        if (advCss) advCss.value = formatCss(lastCssText);
+        initCodeMirrorIfPossible();
+
+        const tpl = normalizeTabsTo2Spaces((data.template_html || "").trim());
+        const css = normalizeTabsTo2Spaces(formatCss(lastCssText));
+
+        cmSetValue(cmHtml, advHtml, tpl);
+        cmSetValue(cmCss, advCss, css);
+
         showAdvancedMode();
+
+        setTimeout(() => {
+          cmRefresh(cmHtml);
+          cmRefresh(cmCss);
+        }, 0);
       } catch (e) {}
     };
 
     window.yyTplSwitchToUser = async function () {
       try {
-        const tpl = advHtml ? (advHtml.value || "") : "";
-        const css = advCss ? (advCss.value || "") : "";
+        initCodeMirrorIfPossible();
 
-        const data = await postJson("/panel/campaigns/templates/_render-editor-html/", { template_html: tpl });
+        const tpl = normalizeTabsTo2Spaces(cmGetValue(cmHtml, advHtml));
+        const css = normalizeTabsTo2Spaces(cmGetValue(cmCss, advCss));
+
+        const data = await postJson("/panel/campaigns/templates/_render-editor-html/", { template_html: tpl || "" });
         if (!data || !data.ok) return;
 
         applyCss(css);
@@ -207,8 +285,9 @@
       const mode = modeEl ? (modeEl.value || "user") : "user";
 
       if (mode === "advanced") {
-        hiddenHtml.value = advHtml ? (advHtml.value || "") : "";
-        hiddenCss.value = advCss ? (advCss.value || "") : "";
+        initCodeMirrorIfPossible();
+        hiddenHtml.value = normalizeTabsTo2Spaces(cmGetValue(cmHtml, advHtml));
+        hiddenCss.value = normalizeTabsTo2Spaces(cmGetValue(cmCss, advCss));
         return;
       }
 
