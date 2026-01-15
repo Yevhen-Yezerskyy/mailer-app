@@ -1,10 +1,6 @@
-# FILE: web/panel/aap_campaigns/views/templates.py
-# DATE: 2026-01-14
-# PURPOSE: /panel/campaigns/templates/ — CRUD шаблонов писем (User-mode).
-# CHANGE:
-#   - sanitize_stored_html -> sanitize
-#   - при сохранении используем editor_template_parse_html()
-#   - логика CRUD не менялась
+# FILE: web/panel/aap_campaigns/views/templates.py  (обновлено — 2026-01-14)
+# PURPOSE: /panel/campaigns/templates/ — CRUD шаблонов писем (user + advanced mode).
+# CHANGE: Сервер всегда берёт editor_html/css_text (hidden), независимо от режима; пайплайн сохранения одинаковый.
 
 from __future__ import annotations
 
@@ -90,13 +86,14 @@ def templates_view(request):
             return redirect(request.path)
 
         template_name = (request.POST.get("template_name") or "").strip()
+
+        # ВАЖНО: независимо от режима — берём hidden (их заполняет JS)
         editor_html = request.POST.get("editor_html") or ""
         css_text = request.POST.get("css_text") or ""
 
         if not template_name:
             return redirect(request.path)
 
-        # важно: парсим editor-html -> чистый template-html
         clean_html = editor_template_parse_html(editor_html)
         clean_html = sanitize(clean_html)
         styles_obj = styles_css_to_json(css_text)

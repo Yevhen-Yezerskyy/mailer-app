@@ -1,8 +1,10 @@
-// FILE: web/static/js/campaign_templates_editor.js
-// DATE: 2026-01-14
-// PURPOSE: User-mode runtime (TinyMCE inline).
-// CHANGE: Runtime отдельно от init-config: live <style>, загрузка HTML/CSS, submit -> hidden поля.
-//         Конфиг берём из window.yyTinyBuildConfig().
+// FILE: web/static/js/campaign_templates_editor.js  (обновлено — 2026-01-15)
+// PURPOSE: TinyMCE runtime + advanced switch через Python API (без JS-парсинга).
+// CHANGE:
+//   - GET load: /templates/_render-user-html|css/
+//   - Advanced enter: POST /templates/_parse-editor-html/ (TinyMCE html -> template_html with {{ ..content.. }})
+//   - Back to user:  POST /templates/_render-editor-html/ (template_html -> TinyMCE html wrapped with demo-content)
+//   - Submit: hidden editor_html/css_text заполняются из текущего режима; серверный save-пайплайн одинаковый.
 
 (function () {
   "use strict";
@@ -23,6 +25,17 @@
     return await r.text();
   }
 
+  async function postJson(url, payload) {
+    const r = await fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload || {}),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  }
+
   function ensureLiveStyleEl() {
     const host = $("#yyTinyStyleHost");
     let el = document.getElementById("yyLiveCss");
@@ -41,6 +54,66 @@
     return el;
   }
 
+  function formatCss(cssText) {
+    const txt = (cssText || "").trim();
+    if (!txt) return "";
+
+    const out = [];
+    const re = /([\s\S]*?)\{([\s\S]*?)\}/g;
+    let m;
+    while ((m = re.exec(txt))) {
+      const sel = (m[1] || "").trim();
+      const body = (m[2] || "").trim();
+      if (!sel) continue;
+
+      const props = [];
+      body.split(";").forEach((p) => {
+        const s = (p || "").trim();
+        if (!s) return;
+        const idx = s.indexOf(":");
+        if (idx === -1) return;
+        const k = s.slice(0, idx).trim();
+        const v = s.slice(idx + 1).trim();
+        if (!k) return;
+        props.push(`  ${k}: ${v};`);
+      });
+
+      if (!props.length) continue;
+      out.push(`${sel} {\n${props.join("\n")}\n}\n`);
+    }
+
+    return out.join("\n").trim() + "\n";
+  }
+
+  function setMode(mode) {
+    const el = $("#yyEditorMode");
+    if (el) el.value = mode === "advanced" ? "advanced" : "user";
+  }
+
+  function showUserMode() {
+    const aL = $("#yyAdvancedModeLeft");
+    const aR = $("#yyAdvancedModeRight");
+    const uL = $("#yyUserModeLeft");
+    const uR = $("#yyUserModeRight");
+    if (aL) aL.classList.add("hidden");
+    if (aR) aR.classList.add("hidden");
+    if (uL) uL.classList.remove("hidden");
+    if (uR) uR.classList.remove("hidden");
+    setMode("user");
+  }
+
+  function showAdvancedMode() {
+    const aL = $("#yyAdvancedModeLeft");
+    const aR = $("#yyAdvancedModeRight");
+    const uL = $("#yyUserModeLeft");
+    const uR = $("#yyUserModeRight");
+    if (uL) uL.classList.add("hidden");
+    if (uR) uR.classList.add("hidden");
+    if (aL) aL.classList.remove("hidden");
+    if (aR) aR.classList.remove("hidden");
+    setMode("advanced");
+  }
+
   function init() {
     const form = $("#yyTplForm");
     if (!form) return;
@@ -50,10 +123,10 @@
     const hiddenCss = $("#yyCssText");
     if (!editorEl || !hiddenHtml || !hiddenCss) return;
 
-    if (!window.tinymce || typeof window.yyTinyBuildConfig !== "function") {
-      console.error("TinyMCE or config not loaded");
-      return;
-    }
+    const advHtml = $("#yyAdvHtml");
+    const advCss = $("#yyAdvCss");
+
+    if (!window.tinymce || typeof window.yyTinyBuildConfig !== "function") return;
 
     const liveStyle = ensureLiveStyleEl();
     let lastCssText = "";
@@ -63,13 +136,8 @@
       liveStyle.textContent = lastCssText;
     }
 
-    // публично (на будущее для коллектора)
-    window.yyTplSetCss = function (cssText) {
-      applyCss(cssText);
-    };
-    window.yyTplGetCss = function () {
-      return lastCssText;
-    };
+    window.yyTplSetCss = (css) => applyCss(css);
+    window.yyTplGetCss = () => lastCssText;
 
     const state = (getParam("state") || "").trim();
     const uiId = (getParam("id") || "").trim();
@@ -82,8 +150,8 @@
       }
 
       const id = encodeURIComponent(uiId);
-      const urlHtml = `/panel/campaigns/templates/render-user-html/?id=${id}`;
-      const urlCss = `/panel/campaigns/templates/render-user-css/?id=${id}`;
+      const urlHtml = `/panel/campaigns/templates/_render-user-html/?id=${id}`;
+      const urlCss = `/panel/campaigns/templates/_render-user-css/?id=${id}`;
 
       fetchText(urlHtml)
         .then((html) => {
@@ -91,18 +159,58 @@
           return fetchText(urlCss);
         })
         .then((css) => applyCss(css))
-        .catch((e) => console.error(e));
+        .catch(() => {});
     }
 
-    // Хук для init-config
     window.yyTplRuntimeOnEditorInit = function (editor) {
       loadExistingInto(editor);
     };
 
-    // init TinyMCE (конфиг отдельно)
     window.tinymce.init(window.yyTinyBuildConfig(editorEl));
 
+    window.yyTplSwitchToAdvanced = async function () {
+      try {
+        const ed = window.tinymce.get(editorEl.id);
+        const html = ed ? ed.getContent({ format: "html" }) : (editorEl.innerHTML || "");
+        const data = await postJson("/panel/campaigns/templates/_parse-editor-html/", { editor_html: html || "" });
+        if (!data || !data.ok) return;
+
+        if (advHtml) advHtml.value = (data.template_html || "").trim();
+        if (advCss) advCss.value = formatCss(lastCssText);
+        showAdvancedMode();
+      } catch (e) {}
+    };
+
+    window.yyTplSwitchToUser = async function () {
+      try {
+        const tpl = advHtml ? (advHtml.value || "") : "";
+        const css = advCss ? (advCss.value || "") : "";
+
+        const data = await postJson("/panel/campaigns/templates/_render-editor-html/", { template_html: tpl });
+        if (!data || !data.ok) return;
+
+        applyCss(css);
+
+        const ed = window.tinymce.get(editorEl.id);
+        if (ed) ed.setContent(data.editor_html || "");
+        else editorEl.innerHTML = data.editor_html || "";
+
+        showUserMode();
+      } catch (e) {}
+    };
+
+    showUserMode();
+
     form.addEventListener("submit", () => {
+      const modeEl = $("#yyEditorMode");
+      const mode = modeEl ? (modeEl.value || "user") : "user";
+
+      if (mode === "advanced") {
+        hiddenHtml.value = advHtml ? (advHtml.value || "") : "";
+        hiddenCss.value = advCss ? (advCss.value || "") : "";
+        return;
+      }
+
       const ed = window.tinymce.get(editorEl.id);
       const html = ed ? ed.getContent({ format: "html" }) : (editorEl.innerHTML || "");
       hiddenHtml.value = html || "";

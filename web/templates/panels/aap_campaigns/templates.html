@@ -1,47 +1,82 @@
 {% extends "panels/base.html" %}
 {% load i18n %}
 
-<!-- FILE: web/templates/panels/aap_campaigns/templates.html -->
-<!-- DATE: 2026-01-14 -->
-<!-- PURPOSE: CRUD + User-editor (TinyMCE inline). -->
-<!-- CHANGE: Quill -> TinyMCE. HTML отдельно, CSS отдельно. Подключены tinymce + config + runtime. -->
+<!-- FILE: web/templates/panels/aap_campaigns/templates.html  (обновлено — 2026-01-15) -->
+<!-- PURPOSE: Templates: список + edit (TinyMCE user-mode) + advanced (2 textarea). -->
+<!-- CHANGE: FIX вложенных form; top 60/40 как mail_servers; bottom table как mail_servers; advanced CSS textarea выше. -->
 
 {% block content %}
 
+{% if state == "edit" and edit_obj or state == "add" %}
+  <form method="post" id="yyTplForm">
+    {% csrf_token %}
+    {% if edit_obj %}
+      <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
+    {% endif %}
+
+    <input type="hidden" name="editor_mode" id="yyEditorMode" value="user">
+    <input type="hidden" name="editor_html" id="yyEditorHtml">
+    <input type="hidden" name="css_text" id="yyCssText">
+{% endif %}
+
 <table class="YY-MAIN_TABLE">
   <tr>
-    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+    <td class="YY-MAIN_TOP_LEFT_TD w-[60%]">
       <div class="YY-CARD_WHITE">
 
         {% if state == "edit" and edit_obj or state == "add" %}
-          <div class="YY-STATUS_GREEN mb-5">
-            {% if state == "edit" %}{% trans "Редактирование шаблона" %}{% else %}{% trans "Новый шаблон" %}{% endif %}
-          </div>
 
-          <form method="post" id="yyTplForm">
-            {% csrf_token %}
-            {% if edit_obj %}
-              <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
-            {% endif %}
-
-            <label class="YY-LABEL">{% trans "Название" %}</label>
-            <input type="text" name="template_name" class="YY-INPUT w-full"
-                   value="{{ edit_obj.template_name|default:'' }}">
-
-            <div class="YY-STATUS_BLUE mt-4 mb-2">
+          <div id="yyUserModeLeft">
+            <div class="YY-STATUS_BLUE mb-2">
               {% trans "Редактор" %}
             </div>
-
             <div id="yyTinyStyleHost"></div>
             <div id="yyTinyEditor"
                  class="YY-CARD_WHITE"
                  style="min-height:320px;"
                  contenteditable="true"></div>
+          </div>
 
-            <input type="hidden" name="editor_html" id="yyEditorHtml">
-            <input type="hidden" name="css_text" id="yyCssText">
+          <div id="yyAdvancedModeLeft" class="hidden">
+            <div class="YY-STATUS_BLUE mb-2">
+              {% trans "Advanced editor (HTML)" %}
+            </div>
+            <textarea id="yyAdvHtml"
+                      class="YY-INPUT w-full"
+                      style="min-height:320px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"
+                      spellcheck="false"></textarea>
+          </div>
 
-            <div class="flex gap-3 mt-4">
+        {% else %}
+          <div class="YY-STATUS_BLUE">
+            {% trans "Ваши шаблоны:" %}
+          </div>
+        {% endif %}
+
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-[40%]">
+      <div class="YY-CARD_WHITE">
+
+        {% if state == "edit" and edit_obj or state == "add" %}
+
+          <div id="yyUserModeRight">
+            <div class="YY-STATUS_GREEN mb-5">
+              {% trans "Редакция" %}
+            </div>
+
+            <label class="YY-LABEL">{% trans "Название" %}</label>
+            <input type="text"
+                   name="template_name"
+                   class="YY-INPUT w-full"
+                   value="{{ edit_obj.template_name|default:'' }}">
+
+            <div class="flex gap-3 mt-4 flex-wrap">
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToAdvanced()">
+                {% trans "Advanced editor" %}
+              </button>
+
               <button type="submit" name="action"
                       value="{% if state == 'edit' %}save{% else %}add{% endif %}"
                       class="YY-BUTTON_MAIN">
@@ -53,65 +88,116 @@
                 {% trans "Закрыть" %}
               </button>
             </div>
-          </form>
-        {% else %}
-          <div class="YY-STATUS_GREEN mb-5">
-            {% trans "Шаблоны писем" %}
           </div>
 
-          <a href="?state=add" class="YY-BUTTON_MAIN">
-            {% trans "Добавить новый шаблон" %}
-          </a>
+          <div id="yyAdvancedModeRight" class="hidden">
+            <div class="YY-STATUS_GREEN mb-5">
+              {% trans "Advanced editor" %}
+            </div>
+
+            <div class="YY-STATUS_BLUE mb-2">
+              {% trans "CSS" %}
+            </div>
+
+            <textarea id="yyAdvCss"
+                      class="YY-INPUT w-full"
+                      style="min-height:320px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;"
+                      spellcheck="false"></textarea>
+
+            <div class="flex gap-3 mt-4 flex-wrap">
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToUser()">
+                {% trans "Вернуться" %}
+              </button>
+              <button type="button" class="YY-BUTTON_MAIN" disabled>
+                {% trans "Превью" %}
+              </button>
+            </div>
+
+            <div class="mt-4">
+              <label class="YY-LABEL">{% trans "Название" %}</label>
+              <input type="text"
+                     name="template_name"
+                     class="YY-INPUT w-full"
+                     value="{{ edit_obj.template_name|default:'' }}">
+            </div>
+
+            <div class="flex gap-3 mt-4 flex-wrap">
+              <button type="submit" name="action"
+                      value="{% if state == 'edit' %}save{% else %}add{% endif %}"
+                      class="YY-BUTTON_MAIN">
+                {% trans "Сохранить" %}
+              </button>
+
+              <button type="submit" name="action" value="close"
+                      class="YY-BUTTON_MAIN" formnovalidate>
+                {% trans "Закрыть" %}
+              </button>
+            </div>
+          </div>
+
+        {% else %}
+          <button class="YY-BUTTON_MAIN" disabled>
+            {% trans "Добавить шаблон" %}
+          </button>
         {% endif %}
 
-      </div>
-    </td>
-
-    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
-      <div class="YY-CARD_WHITE">
-        <div class="YY-STATUS_BLUE">
-          {% trans "Шаблоны (workspace)" %}
-        </div>
       </div>
     </td>
   </tr>
 </table>
 
+{% if state == "edit" and edit_obj or state == "add" %}
+  </form>
+{% endif %}
+
 <table class="YY-MAIN_TABLE">
   <tr>
     <td class="YY-MAIN_BOTTOM_TD">
+
       {% if items %}
-        <table class="w-full text-left">
-          <thead>
-            <tr class="YY-TH_TR">
-              <th class="YY-TH_TH w-[70%]">{% trans "Название" %}</th>
-              <th class="YY-TH_TH">&nbsp;</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for it in items %}
-              <tr class="YY-TB_TR">
-                <td class="YY-TB_TD">
-                  <div class="YY-STATUS_BLUE">{{ it.template_name }}</div>
-                </td>
-                <td class="YY-TB_TD">
-                  <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
-                    {% trans "Изменить" %}
-                  </a>
-                  <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="delete">
-                    <input type="hidden" name="id" value="{{ it.ui_id }}">
-                    <button type="submit" class="YY-BUTTON_TAB_RED">
-                      {% trans "Удалить" %}
-                    </button>
-                  </form>
-                </td>
+        <div class="YY-MAIN_BOTTOM_DIV">
+
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH w-[70%]">{% trans "Название" %}</th>
+                <th class="YY-TH_TH">&nbsp;</th>
+                <th class="YY-TH_TH">&nbsp;</th>
               </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {% for it in items %}
+                <tr class="YY-TB_TR align-top">
+                  <td class="YY-TB_TD">
+                    <div class="YY-STATUS_BLUE">{{ it.template_name }}</div>
+                  </td>
+                  <td class="YY-TB_TD">
+                    <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">
+                      {% trans "Изменить" %}
+                    </a>
+                  </td>
+                  <td class="YY-TB_TD">
+                    <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete">
+                      <input type="hidden" name="id" value="{{ it.ui_id }}">
+                      <button type="submit" class="YY-BUTTON_TAB_RED">
+                        {% trans "Удалить" %}
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+        </div>
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
       {% endif %}
+
     </td>
   </tr>
 </table>

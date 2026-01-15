@@ -1,14 +1,6 @@
-# FILE: engine/common/email_template.py  (новое, версия 4 — финал)
-# DATE: 2026-01-14
-# PURPOSE: Тупой, детерминированный пайплайн HTML-шаблонов писем.
-#   - styles_json <-> css
-#   - editor_template_render_html / editor_template_parse_html
-#   - editor_render_html / editor_parse_html
-#   - render_html: content -> sanitize -> vars -> inline styles + drop class
-# PRINCIPLE:
-#   - НИКАКИХ парсеров
-#   - линейный проход
-#   - {{ ..content.. }} — ТОЛЬКО точное совпадение
+# FILE: engine/common/email_template.py  (обновлено — 2026-01-15)
+# PURPOSE: Детерминированный пайплайн HTML-шаблонов писем.
+# CHANGE: разрешён тег <content>; обёртка TinyMCE заменена table-><content class="yy_content_wrap">..</content>.
 
 from __future__ import annotations
 
@@ -44,6 +36,7 @@ PLACEHOLDER = "{{ ..content.. }}"
 
 _EDITOR_WRAP_CLASS = "yy_content_wrap"
 
+
 def _wrap_editor_content(inner_html: str) -> str:
     return (
         f'<table class="{_EDITOR_WRAP_CLASS}">'
@@ -51,10 +44,10 @@ def _wrap_editor_content(inner_html: str) -> str:
         f"</table>"
     )
 
+
 def _unwrap_editor_content(html_text: str) -> str:
-    # тупо вырезаем нашу таблицу-обёртку
     m = re.search(
-        rf'(?is)<table[^>]*class=["\'][^"\']*{_EDITOR_WRAP_CLASS}[^"\']*["\'][^>]*>'
+        rf'(?is)<table\b[^>]*class=["\'][^"\']*{_EDITOR_WRAP_CLASS}[^"\']*["\'][^>]*>'
         r'.*?<td>(.*?)</td>.*?</table>',
         html_text or "",
     )
@@ -111,6 +104,7 @@ def styles_css_to_json(css_text: str) -> Dict[str, Dict[str, str]]:
 _TAG_RE = re.compile(r"(?is)<(/?)([a-z0-9]+)([^>]*)>")
 _ATTR_RE = re.compile(r'([a-z0-9_-]+)\s*=\s*(".*?"|\'.*?\'|[^\s>]+)', re.I)
 
+
 def sanitize(html_text: str) -> str:
     html_text = html_text or ""
     out: list[str] = []
@@ -163,9 +157,15 @@ def editor_template_render_html(template_html: str, content_html: str) -> str:
 
 
 def editor_template_parse_html(editor_html: str) -> str:
-    inner = _unwrap_editor_content(editor_html or "")
+    # FIX: не полагаемся на точный порядок атрибутов/пробелов
     base = sanitize(editor_html or "")
-    return base.replace(_wrap_editor_content(inner), PLACEHOLDER, 1)
+    base = re.sub(
+        rf'(?is)<table\b[^>]*class=["\'][^"\']*{_EDITOR_WRAP_CLASS}[^"\']*["\'][^>]*>.*?</table>',
+        PLACEHOLDER,
+        base,
+        count=1,
+    )
+    return base
 
 
 def editor_render_html(html_text: str) -> str:
@@ -205,7 +205,5 @@ def render_html(
             flags=re.I,
         )
 
-    # выкидываем все class=
     html0 = re.sub(r'\sclass="[^"]*"', "", html0)
-
     return html0
