@@ -167,7 +167,7 @@
 
         // <<< ВОТ ТУТ МЕНЯЕШЬ ВЫСОТЫ >>>
         cmHtml.setSize("100%", "700px"); // HTML editor
-        cmCss.setSize("100%", "550px");  // CSS editor
+        cmCss.setSize("100%", "700px");  // CSS editor
 
       } catch (e) {
         cmHtml = null;

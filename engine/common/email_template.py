@@ -18,7 +18,7 @@ ALLOWED_TAGS = {
     "table", "tbody", "thead", "tfoot", "tr", "td", "th",
     "p", "br", "hr",
     "h1", "h2", "h3", "h4",
-    "strong", "i", "a",
+    "strong", "em", "a",
 }
 
 ALLOWED_ATTRS = {
