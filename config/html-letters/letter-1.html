@@ -4,129 +4,151 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
 
-        p {
-            font-size: 15px;
-            line-height: 21px;
-            padding-bottom: 15px;
-        }
+p {
+    font-size: 15px;
+    line-height: 21px;
+    padding-bottom: 10px;
+}
 
-        strong {
-            font-weight: 700;
-        }
+.spacer{
+    height: 8px;
+    line-height: 8px;
+    font-size: 1px;
+}
+.padding-0 {
+    padding:0;
+}
 
-        em {
-            font-style: italic;
-        }
+strong {
+    font-weight: 700;
+}
 
-        a {
-            text-decoration: underline;
-        }
+em {
+    font-style: italic;
+}
 
-        .table_main {
-            width: 100%;
-            border-collapse: collapse;
-            border-spacing: 0;
-        }
+a {
+    text-decoration: underline;
+}
 
-        .td_main {
-            text-align: left;
-        }
+.table_main {
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+}
 
-        .table-600 {
-            width: 600px;
-            border-collapse: collapse;
-            border-spacing: 0;
-            text-align: left;
-        }
+.td_main {
+    text-align: left;
+}
 
-        .td-body {
-            padding: 20px 7px 30px 7px; 
-        }
-        .footer {
-            font-size: 13px;
-            line-height: 20px;
-        }
-        .footer-sm {
-            font-size: 10px;
-            line-height: 20px;
-        }
-        .bg-1 {
-            background: #f7fef7;
-        }
-        .bg-2 {
-             background: #16974B;
-        }
+.table-600 {
+    width: 600px;
+    border-collapse: collapse;
+    border-spacing: 0;
+    text-align: left;
+}
 
-        .border-bottom-1 {
-             border-bottom: 2px solid #005522;
-        }
+.td-body {
+    padding: 20px 7px 30px 7px; 
+}
+.footer {
+    font-size: 13px;
+    line-height: 20px;
+}
+.footer-sm {
+    font-size: 10px;
+    line-height: 20px;
+}
+.bg-1 {
+    background: #f7fef7;
+}
+.bg-2 {
+        background: #16974B;
+}
 
-        .font-st {
-            font-family: Verdana, Arial, sans-serif;
-        }
+.border-bottom-1 {
+        border-bottom: 2px solid #005522;
+}
 
-        .color-1 {
-            color: #003816;
-        }
-        .color-2 {
-            color: #ffffff;
-        }
-    
-        .td-header-l {
-            padding: 3px 0 10px 7px;
-            vertical-align: bottom;
-        }
-        .td-header-r {
-            padding: 3px 7px 10px 0;
-            vertical-align: bottom;
-        }
+.font-st {
+    font-family: Verdana, Arial, sans-serif;
+}
+
+.color-1 {
+    color: #003816;
+}
+.color-2 {
+    color: #ffffff;
+}
 
 
-        .header-1 {
-            font-size: 18px;
-            line-height: 35px; 
-            font-weight: 700;
-            text-align: left;
-            margin: 0;
-        }
+.td-header-tl {
+    padding: 15px 0 0 7px;
 
-        .header-2 {
-            font-size: 13px;
-            line-height: 17px;
-            font-weight: 400;
-            text-align: left;
-            margin: 0;
-        }
+}
 
-        .header-1-r {
-            font-size: 18px;
-            line-height: 35px; 
-            font-weight: 700;
-            text-align: right;
-            margin: 0;
-        }
+.td-header-tr {
+    padding: 15px 7px 0 0;
+}
 
-        .header-2-r {
-            font-size: 13px;
-            line-height: 17px;
-            font-weight: 400;
-            text-align: right;
-            margin: 0;
-        }
+.td-header-bl {
+    padding: 15px 0 12px 7px;
 
-        .table_important {
-            width: 100%;
-            border-collapse: collapse;
-            border-spacing: 0;
-            border: none;
-            padding-bottom: 15px;
-        }
+}
 
-        .td_important {
-            border: none;
-            border-left: 5px solid #16974B;
-            padding: 10px 0 10px 12px;
-        }
+.td-header-br {
+    padding: 15px 7px 12px 0;
+}
+
+.header-tl {
+    font-size: 18px;
+    line-height: 18px; 
+    font-weight: 700;
+    text-align: left;
+    margin: 0;
+    padding: 0;
+}
+
+.header-tr {
+    font-size: 18px;
+    line-height: 18px; 
+    font-weight: 700;
+    text-align: right;
+    margin: 0;
+    padding: 0;
+}
+
+
+.header-bl {
+    font-size: 13px;
+    line-height: 13px;
+    font-weight: 400;
+    text-align: left;
+    margin: 0;
+    padding: 0;
+}
+.header-br {
+    font-size: 13px;
+    line-height: 13px;
+    font-weight: 400;
+    text-align: right;
+    margin: 0;
+    padding: 0;
+}
+
+.table_important {
+    width: 100%;
+    border-collapse: collapse;
+    border-spacing: 0;
+    border: none;
+    padding-bottom: 15px;
+}
+
+.td_important {
+    border: none;
+    border-left: 5px solid #16974B;
+    padding: 10px 0 10px 12px;
+}
 
   </style>
 </head>
@@ -136,12 +158,19 @@
             <td class="td_main">
                 <table class="table-600">
                     <tr>
-                        <td class="td-header-l bg-2 border-bottom-1">
-                            <p class="header-2 font-st color-2">Dienstleistung, Produkt</p>
+                        <td class="td-header-tl bg-2">
+                            <p class="header-tl font-st color-2">&nbsp;</p>
                         </td>
-                        <td class="td-header-r bg-2 border-bottom-1">
-                            <p class="header-1-r font-st color-2">Mein Unternehmen GmbH</p>
-                            <p class="header-2-r font-st color-2">Dienstleistungen, Produkte</p>
+                        <td class="td-header-tr bg-2">
+                            <p class="header-tr font-st color-2">Mein Unternehmen GmbH</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="td-header-bl bg-2 border-bottom-1">
+                            <p class="header-bl font-st color-2">Dienstleistung, Produkt</p>
+                        </td>
+                        <td class="td-header-br bg-2 border-bottom-1">
+                            <p class="header-br font-st color-2">Dienstleistungen, Produkte</p>
                         </td>
                     </tr>
                 </table>
@@ -157,7 +186,12 @@
                             nisl sit amet erat.</p>
                             <table class="table_important">
                                 <tr>
-                                    <td class="td_important bg-1"><p class="font-st color-1">Maecenas ligula massa, varius a, semper congue, euismod non, mi. Proin porttitor, orci nec nonummy molestie. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi.</p></td>
+                                    <td class="td_important bg-1">
+                                        <p class="font-st color-1 padding-0">Maecenas ligula massa, varius a, semper congue, euismod non, mi. Proin porttitor, orci nec nonummy molestie. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi.</p>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="spacer">&nbsp;</td>
                                 </tr>
                             </table>
                             
