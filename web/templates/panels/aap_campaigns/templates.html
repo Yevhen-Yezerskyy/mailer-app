@@ -1,9 +1,12 @@
 {% extends "panels/base.html" %}
 {% load i18n %}
 
-<!-- FILE: web/templates/panels/aap_campaigns/templates.html -->
-<!-- DATE: 2026-01-15 -->
-<!-- CHANGE: Подключены CodeMirror + darcula theme для advanced textarea (HTML/CSS). TinyMCE не трогали. -->
+<!-- FILE: web/templates/panels/aap_campaigns/templates.html  (обновлено — 2026-01-17) -->
+<!-- CHANGE:
+  - Preview: кнопки теперь просто вызывают yyTplPreview* (YYModal сам открывается внутри).
+  - Tiny config переехал в /static/js/campaign_templates/tinymce_config.js.
+  - Подключены split JS modules (campaign_templates/*).
+-->
 
 {% block content %}
 
@@ -34,7 +37,7 @@
           </div>
 
           <div id="yyAdvancedModeLeft" class="hidden">
-            <textarea id="yyAdvHtml"                     
+            <textarea id="yyAdvHtml"
                       style="height:900px;"
                       spellcheck="false"></textarea>
           </div>
@@ -57,27 +60,28 @@
               <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToAdvanced()">
                 ADVANNCED
               </button>
-              <button type="button" class="YY-BUTTON_MAIN" disabled>
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplPreviewCurrent()">
                 {% trans "Предпросмотр" %}
               </button>
             </div>
           </div>
 
-           <div id="yyAdvancedModeRight" class="hidden">
+          <div id="yyAdvancedModeRight" class="hidden">
             <div class="grid grid-cols-2 gap-3 mb-5">
               <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToUser()">
                 USER-FRIENDLY
               </button>
-              <button type="button" class="YY-BUTTON_MAIN" disabled>
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplPreviewCurrent()">
                 {% trans "Предпросмотр" %}
               </button>
             </div>
+
             <textarea id="yyAdvCss"
                       class="YY-INPUT w-full"
                       style="min-height:700px;"
                       spellcheck="false"></textarea>
+          </div>
 
-         </div>
           <div class="grid grid-cols-2 gap-3 mt-5">
             <button type="submit" name="action"
                     value="{% if state == 'edit' %}save{% else %}add{% endif %}"
@@ -114,7 +118,8 @@
           <table class="w-full text-left">
             <thead>
               <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[70%]">{% trans "Название" %}</th>
+                <th class="YY-TH_TH w-[55%]">{% trans "Название" %}</th>
+                <th class="YY-TH_TH">{% trans "Предпросмотр" %}</th>
                 <th class="YY-TH_TH">&nbsp;</th>
                 <th class="YY-TH_TH">&nbsp;</th>
               </tr>
@@ -125,11 +130,19 @@
                   <td class="YY-TB_TD">
                     <div class="YY-STATUS_BLUE">{{ it.template_name }}</div>
                   </td>
+
+                  <td class="YY-TB_TD">
+                    <button type="button" class="YY-BUTTON_TAB_MAIN" onclick="yyTplPreviewById('{{ it.ui_id }}')">
+                      {% trans "Открыть" %}
+                    </button>
+                  </td>
+
                   <td class="YY-TB_TD">
                     <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">
                       {% trans "Изменить" %}
                     </a>
                   </td>
+
                   <td class="YY-TB_TD">
                     <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
                       {% csrf_token %}
@@ -170,8 +183,16 @@
   <script src="/static/vendor/codemirror/mode/css/css.js"></script>
   <script src="/static/vendor/codemirror/mode/htmlmixed/htmlmixed.js"></script>
 
-  <!-- Tiny + runtime -->
+  <!-- Tiny -->
   <script src="/static/vendor/tinymce/tinymce.min.js"></script>
-  <script src="/static/js/campaign_templates_tinymce_config.js"></script>
-  <script src="/static/js/campaign_templates_editor.js"></script>
+  <script src="/static/js/campaign_templates/tinymce_config.js"></script>
+
+  <!-- Campaign Templates (split JS) -->
+  <script src="/static/js/campaign_templates/state.js"></script>
+  <script src="/static/js/campaign_templates/tinymce.js"></script>
+  <script src="/static/js/campaign_templates/codemirror.js"></script>
+  <script src="/static/js/campaign_templates/mode_switch.js"></script>
+  <script src="/static/js/campaign_templates/preview.js"></script>
+  <script src="/static/js/campaign_templates/submit.js"></script>
+  <script src="/static/js/campaign_templates/main.js"></script>
 {% endblock %}

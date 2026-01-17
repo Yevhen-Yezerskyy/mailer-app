@@ -1,6 +1,6 @@
-# FILE: web/panel/aap_campaigns/views/templates.py  (обновлено — 2026-01-14)
+# FILE: web/panel/aap_campaigns/views/templates.py  (обновлено — 2026-01-17)
 # PURPOSE: /panel/campaigns/templates/ — CRUD шаблонов писем (user + advanced mode).
-# CHANGE: Сервер всегда берёт editor_html/css_text (hidden), независимо от режима; пайплайн сохранения одинаковый.
+# CHANGE: Без логических изменений. (Preview реализован через templates_api + JS/HTML.)
 
 from __future__ import annotations
 
@@ -12,11 +12,8 @@ from django.shortcuts import redirect, render
 
 from mailer_web.access import encode_id, resolve_pk_or_redirect
 from panel.aap_campaigns.models import Templates
-from engine.common.email_template import (
-    sanitize,
-    styles_css_to_json,
-    editor_template_parse_html,
-)
+from engine.common.email_template import sanitize
+from panel.aap_campaigns.template_editor import styles_css_to_json, editor_template_parse_html
 
 
 def _guard(request) -> tuple[Optional[UUID], Optional[object]]:

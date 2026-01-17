@@ -1,6 +1,8 @@
-# FILE: engine/common/email_template.py  (обновлено — 2026-01-15)
-# PURPOSE: Детерминированный пайплайн HTML-шаблонов писем.
-# CHANGE: разрешён тег <content>; обёртка TinyMCE заменена table-><content class="yy_content_wrap">..</content>.
+# FILE: engine/common/email_template.py  (обновлено — 2026-01-17)
+# PURPOSE: Детерминированный финальный рендер HTML-писем: склейка template+content, подмена переменных,
+#          sanitize (whitelist), разворачивание styles_json в inline, удаление class-атрибутов.
+# CHANGE: Вынесены editor-специфичные штуки (PLACEHOLDER/wrap/parse/CSS<->JSON helpers) в aap_campaigns.
+#         В тексте sanitize делает только замену "<"->"&lt;" и ">"->"&gt;" (без html.escape).
 
 from __future__ import annotations
 
@@ -32,29 +34,7 @@ ALLOWED_ATTRS = {
 
 PLACEHOLDER = "{{ ..content.. }}"
 
-# ---- TinyMCE-safe wrapper ----
-
-_EDITOR_WRAP_CLASS = "yy_content_wrap"
-
-
-def _wrap_editor_content(inner_html: str) -> str:
-    return (
-        f'<table class="{_EDITOR_WRAP_CLASS} mceNonEditable">'
-        f"<tr><td>{inner_html}</td></tr>"
-        f"</table>"
-    )
-
-
-def _unwrap_editor_content(html_text: str) -> str:
-    m = re.search(
-        rf'(?is)<table\b[^>]*class=["\'][^"\']*{_EDITOR_WRAP_CLASS}[^"\']*["\'][^>]*>'
-        r'.*?<td>(.*?)</td>.*?</table>',
-        html_text or "",
-    )
-    return m.group(1) if m else ""
-
-
-# ---- JSON <-> CSS ----
+# ---- styles ----
 
 def _parse_styles_json(styles: StylesJSON) -> Dict[str, Dict[str, Any]]:
     if styles is None:
@@ -70,39 +50,15 @@ def _parse_styles_json(styles: StylesJSON) -> Dict[str, Dict[str, Any]]:
     return {}
 
 
-def styles_json_to_css(styles: StylesJSON) -> str:
-    obj = _parse_styles_json(styles)
-    out: list[str] = []
-    for sel in sorted(obj):
-        rules = obj.get(sel)
-        if not isinstance(rules, dict):
-            continue
-        decls = [f"{k}:{v};" for k, v in sorted(rules.items()) if v is not None]
-        if decls:
-            out.append(f"{sel}{{{''.join(decls)}}}")
-    return "\n".join(out)
-
-
-def styles_css_to_json(css_text: str) -> Dict[str, Dict[str, str]]:
-    css_text = (css_text or "").strip()
-    out: Dict[str, Dict[str, str]] = {}
-    for m in re.finditer(r"(?s)([^{}]+)\{([^}]*)\}", css_text):
-        sel = m.group(1).strip()
-        body = m.group(2).strip()
-        rules: Dict[str, str] = {}
-        for part in body.split(";"):
-            if ":" in part:
-                k, v = part.split(":", 1)
-                rules[k.strip()] = v.strip()
-        if rules:
-            out[sel] = rules
-    return out
-
-
 # ---- sanitize (плоский, линейный) ----
 
 _TAG_RE = re.compile(r"(?is)<(/?)([a-z0-9]+)([^>]*)>")
 _ATTR_RE = re.compile(r'([a-z0-9_-]+)\s*=\s*(".*?"|\'.*?\'|[^\s>]+)', re.I)
+
+
+def _escape_text_minimal(s: str) -> str:
+    # ВАЖНО: по договорённости — только "<" и ">"
+    return (s or "").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def sanitize(html_text: str) -> str:
@@ -112,7 +68,7 @@ def sanitize(html_text: str) -> str:
 
     for m in _TAG_RE.finditer(html_text):
         if m.start() > pos:
-            out.append(_html.escape(html_text[pos:m.start()], quote=False))
+            out.append(_escape_text_minimal(html_text[pos:m.start()]))
 
         slash, tag, attr_text = m.groups()
         tag = tag.lower()
@@ -133,6 +89,7 @@ def sanitize(html_text: str) -> str:
                 continue
             if v and v[0] in "\"'" and v[-1] == v[0]:
                 v = v[1:-1]
+            # attrs: экранируем для корректного HTML (не текст-нод)
             attrs_out.append(f'{k}="{_html.escape(v, quote=True)}"')
 
         if attrs_out:
@@ -143,37 +100,84 @@ def sanitize(html_text: str) -> str:
         pos = m.end()
 
     if pos < len(html_text):
-        out.append(_html.escape(html_text[pos:], quote=False))
+        out.append(_escape_text_minimal(html_text[pos:]))
 
     return "".join(out)
 
 
-# ---- editor helpers ----
+# ---- inline styles helpers ----
 
-def editor_template_render_html(template_html: str, content_html: str) -> str:
-    html0 = sanitize(template_html or "")
-    wrapped = _wrap_editor_content(content_html or "")
-    return html0.replace(PLACEHOLDER, wrapped, 1)
+_SEL_TAG_RE = re.compile(r"^[a-z0-9]+$", re.I)
+_SEL_CLASS_RE = re.compile(r"^\.[a-z0-9_-]+$", re.I)
 
 
-def editor_template_parse_html(editor_html: str) -> str:
-    # FIX: не полагаемся на точный порядок атрибутов/пробелов
-    base = sanitize(editor_html or "")
-    base = re.sub(
-        rf'(?is)<table\b[^>]*class=["\'][^"\']*{_EDITOR_WRAP_CLASS}[^"\']*["\'][^>]*>.*?</table>',
-        PLACEHOLDER,
-        base,
-        count=1,
+def _merge_style_attr(attrs_text: str, add_style: str) -> str:
+    """
+    attrs_text — это часть внутри тега между '<tag' и '>'.
+    add_style — уже собранная строка 'k:v;k2:v2;'
+    """
+    add_style = (add_style or "").strip()
+    if not add_style:
+        return attrs_text
+
+    m = re.search(r'(?is)\bstyle\s*=\s*"([^"]*)"', attrs_text or "")
+    if not m:
+        return (attrs_text or "") + f' style="{_html.escape(add_style, quote=True)}"'
+
+    old = m.group(1) or ""
+    merged = old + ("" if old.endswith(";") or not old else ";") + add_style
+    merged_esc = _html.escape(merged, quote=True)
+    return (attrs_text or "")[: m.start()] + f'style="{merged_esc}"' + (attrs_text or "")[m.end() :]
+
+
+def _apply_inline_for_tag(html0: str, tag: str, style: str) -> str:
+    tag_l = tag.lower()
+
+    pat = re.compile(rf'(?is)<{re.escape(tag_l)}\b([^>]*)>')
+    def repl(m: re.Match) -> str:
+        attrs = m.group(1) or ""
+        new_attrs = _merge_style_attr(attrs, style)
+        return f"<{tag_l}{new_attrs}>"
+
+    return pat.sub(repl, html0)
+
+
+def _apply_inline_for_class(html0: str, cls: str, style: str) -> str:
+    cls = cls.strip().lstrip(".")
+    if not cls:
+        return html0
+
+    # Ищем любой открывающий тег с class="... cls ..."
+    pat = re.compile(
+        rf'(?is)<([a-z0-9]+)\b([^>]*\bclass\s*=\s*"[^"]*\b{re.escape(cls)}\b[^"]*"[^>]*)>'
     )
-    return base
+
+    def repl(m: re.Match) -> str:
+        tag = (m.group(1) or "").lower()
+        attrs = m.group(2) or ""
+        new_attrs = _merge_style_attr(attrs, style)
+        return f"<{tag}{new_attrs}>"
+
+    return pat.sub(repl, html0)
 
 
-def editor_render_html(html_text: str) -> str:
-    return sanitize(html_text or "")
+def _inline_style_apply(html0: str, selector: str, rules: Dict[str, Any]) -> str:
+    if not selector or not isinstance(rules, dict):
+        return html0
 
+    style = "".join(f"{k}:{v};" for k, v in rules.items() if v is not None)
+    if not style:
+        return html0
 
-def editor_parse_html(html_text: str) -> str:
-    return sanitize(html_text or "")
+    sel = selector.strip()
+    if _SEL_TAG_RE.match(sel):
+        return _apply_inline_for_tag(html0, sel, style)
+
+    if _SEL_CLASS_RE.match(sel):
+        return _apply_inline_for_class(html0, sel, style)
+
+    # Остальные селекторы (p strong, #id, [attr]) — пока игнорируем сознательно.
+    return html0
 
 
 # ---- final render ----
@@ -184,26 +188,23 @@ def render_html(
     styles: StylesJSON,
     vars_json: Optional[Dict[str, Any]] = None,
 ) -> str:
+    # 1) template + content
     html0 = (template_html or "").replace(PLACEHOLDER, content_html or "", 1)
-    html0 = sanitize(html0)
 
+    # 2) vars substitution (до sanitize, по договорённости)
     if vars_json:
         for k, v in vars_json.items():
             html0 = html0.replace(f"{{{{ {k} }}}}", "" if v is None else str(v))
 
+    # 3) sanitize
+    html0 = sanitize(html0)
+
+    # 4) inline styles
     styles_obj = _parse_styles_json(styles)
     for sel, rules in styles_obj.items():
-        if not isinstance(rules, dict):
-            continue
-        style = "".join(f"{k}:{v};" for k, v in rules.items() if v is not None)
-        if not style:
-            continue
-        html0 = re.sub(
-            rf'(<{sel}\b[^>]*)(>)',
-            rf'\1 style="{_html.escape(style, quote=True)}"\2',
-            html0,
-            flags=re.I,
-        )
+        html0 = _inline_style_apply(html0, str(sel), rules)
 
+    # 5) drop class attributes
     html0 = re.sub(r'\sclass="[^"]*"', "", html0)
+
     return html0

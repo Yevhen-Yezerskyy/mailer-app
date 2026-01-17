@@ -1,3 +1,10 @@
+// FILE: web/static/js/script.js
+// DATE: 2026-01-17
+// PURPOSE: Общий JS панели: sidebar, details icons, tabs, global loading, YYModal.
+// CHANGE (fix modal):
+// - close по клику на фон (backdrop) / контейнер модалки
+// - остальное без изменений (url=/text=/post=...)
+
 document.addEventListener("DOMContentLoaded", () => {
 
   /* ===============================
@@ -97,29 +104,38 @@ document.addEventListener("click", function (e) {
   if (panel) panel.classList.remove("hidden");
 });
 
-// FILE: web/static/js/script.js  (обновлено — 2025-12-26)
-// PURPOSE: модалка (open/close) + open по data-yy-modal-url (fetch, 404 ок) + close по фону/крестику/ESC.
-
-// FILE: web/static/js/script.js  (обновлено — 2025-12-26)
-// PURPOSE: минимальная модалка: open(arg) где arg = "url=..." или "text=..."; close по фону/крестику/ESC.
+// FILE: web/static/js/script.js  (обновлено — 2026-01-17)
+// PURPOSE: минимальная модалка: open(arg[, payload]) где arg = "url=..." | "text=..." | "post=..."; close по фону/крестику/ESC.
 
 (function () {
   const $ = (s) => document.querySelector(s);
 
   function openModal(html) {
     const m = $("#yy-modal");
-    if (!m) return;
-    $("#yy-modal-body").innerHTML = html || "";
+    const body = $("#yy-modal-body");
+    if (!m || !body) return;
+    body.innerHTML = html || "";
     m.classList.remove("hidden");
   }
 
   function closeModal() {
     const m = $("#yy-modal");
+    const body = $("#yy-modal-body");
     if (!m) return;
     m.classList.add("hidden");
+    if (body) body.innerHTML = "";
   }
 
-  async function open(arg) {
+  function _getCookie(name) {
+    try {
+      const m = document.cookie.match(new RegExp("(^|;\\s*)" + name + "=([^;]+)"));
+      return m ? decodeURIComponent(m[2]) : "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  async function open(arg, payload) {
     const s = String(arg || "");
 
     if (s.startsWith("url=")) {
@@ -127,6 +143,26 @@ document.addEventListener("click", function (e) {
       let html = "";
       try {
         const r = await fetch(url, { credentials: "same-origin" });
+        if (r && r.ok) html = await r.text();
+      } catch (_) {}
+      openModal(html);
+      return;
+    }
+
+    if (s.startsWith("post=")) {
+      const url = s.slice(5).trim();
+      let html = "";
+      try {
+        const csrftoken = _getCookie("csrftoken");
+        const headers = { "Content-Type": "application/json" };
+        if (csrftoken) headers["X-CSRFToken"] = csrftoken;
+
+        const r = await fetch(url, {
+          method: "POST",
+          credentials: "same-origin",
+          headers,
+          body: JSON.stringify(payload || {}),
+        });
         if (r && r.ok) html = await r.text();
       } catch (_) {}
       openModal(html);
@@ -142,16 +178,46 @@ document.addEventListener("click", function (e) {
   }
 
   document.addEventListener("click", (e) => {
+    // close by X / any element with data-yy-modal-close
     if (e.target.closest("[data-yy-modal-close]")) {
       e.preventDefault();
       closeModal();
       return;
     }
 
+    // FIX: close by backdrop click (любая из типовых структур)
+    const modalRoot = $("#yy-modal");
+    if (modalRoot && !modalRoot.classList.contains("hidden")) {
+      const isRootClick = (e.target === modalRoot);
+      const isBackdropClick =
+        !!e.target.closest("#yy-modal-backdrop") ||
+        !!e.target.closest("[data-yy-modal-backdrop]") ||
+        (e.target.id === "yy-modal-backdrop");
+
+      if (isRootClick || isBackdropClick) {
+        e.preventDefault();
+        closeModal();
+        return;
+      }
+    }
+
+    // open
     const opener = e.target.closest("[data-yy-modal]");
     if (opener) {
       e.preventDefault();
-      open(opener.getAttribute("data-yy-modal") || "");
+      const arg = opener.getAttribute("data-yy-modal") || "";
+      let payload = null;
+
+      const raw = opener.getAttribute("data-yy-modal-payload") || "";
+      if (raw) {
+        try {
+          payload = JSON.parse(raw);
+        } catch (_) {
+          payload = null;
+        }
+      }
+
+      open(arg, payload);
     }
   });
 
