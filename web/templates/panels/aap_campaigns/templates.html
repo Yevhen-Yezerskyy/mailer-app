@@ -4,7 +4,9 @@
 <!-- FILE: web/templates/panels/aap_campaigns/templates.html -->
 <!-- DATE: 2026-01-18 -->
 <!-- PURPOSE: CRUD шаблонов писем (user + advanced mode). -->
-<!-- CHANGE: Добавлены кнопки выбора GlobalTemplate (загрузка в редактор через gl_tpl, без чтения/загрузки текущего Templates.html/styles). -->
+<!-- CHANGE:
+  - submit-guard: алерт + отмена submit, если template_name пустой (в add/edit).
+-->
 
 {% block content %}
 
@@ -24,9 +26,9 @@
   <tr>
     <td class="YY-MAIN_TOP_LEFT_TD w-[70%]">
       <div class="YY-CARD_WHITE">
-        <input type="text" name="template_name" class="YY-INPUT !mb-3" value="{{ edit_obj.template_name|default:'' }}">
-
+        
         {% if state == "edit" and edit_obj or state == "add" %}
+        <input type="text" name="template_name" class="YY-INPUT !mb-3" value="{{ edit_obj.template_name|default:'' }}" placeholder="{% trans "Ваш шаблон: название" %}">
           <div id="yyUserModeLeft">
             <textarea id="yyTinyEditor"
                       class="border border-[#cbcbcb] bg-white w-full"
@@ -40,11 +42,9 @@
                       spellcheck="false"></textarea>
           </div>
         {% else %}
-          <div class="YY-CARD_WHITE">
             <div class="YY-STATUS_BLUE">
               {% trans "Ваши шаблоны:" %}
             </div>
-          </div>
         {% endif %}
       </div>
     </td>
@@ -56,7 +56,7 @@
           <div id="yyUserModeRight">
             <div class="grid grid-cols-2 gap-3 mb-10">
               <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToAdvanced()">
-                ADVANCED
+                {% trans "Экспертный режим" %}
               </button>
               <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplPreviewCurrent()">
                 {% trans "Предпросмотр" %}
@@ -64,18 +64,20 @@
             </div>
 
             {% if global_tpl_items %}
-              <div class="YY-STATUS_YELLOW mb-2">TEMPLATES</div>
-              <div class="flex flex-wrap gap-2 mb-10">
-                {% for gt in global_tpl_items %}
+              <div class="YY-STATUS_YELLOW mb-2">{% trans "Глобальные шаблоны" %}:</div>
+              <div class="grid grid-cols-2 gap-3 mb-10">
+                 {% for gt in global_tpl_items %}
+                 <div>
                   {% if gt.is_current %}
                     <button type="button"
-                            class="YY-BUTTON_GREEN yy-tpl-global-btn"
-                            data-gid="{{ gt.id }}">{{ gt.template_name }}</button>
+                            class="YY-BUTTON_GREEN yy-tpl-global-btn w-full"
+                            data-gid="{{ gt.id }}">{% trans "Шаблон" %} - {{ gt.template_name }}</button>
                   {% else %}
                     <button type="button"
-                            class="YY-BUTTON_TAB_MAIN yy-tpl-global-btn"
-                            data-gid="{{ gt.id }}">{{ gt.template_name }}</button>
+                            class="YY-BUTTON_MAIN yy-tpl-global-btn w-full"
+                            data-gid="{{ gt.id }}">{% trans "Шаблон" %} - {{ gt.template_name }}</button>
                   {% endif %}
+                  </div>
                 {% endfor %}
               </div>
             {% endif %}
@@ -83,7 +85,7 @@
             <div class="grid grid-cols-2 gap-3 mb-10">
               <div>
                 {% if global_style_gid and global_colors %}
-                  <div class="YY-STATUS_YELLOW mb-2">COLORS</div>
+                  <div class="YY-STATUS_YELLOW mb-2">{% trans "Цвета" %}:</div>
                   <div class="flex flex-wrap gap-2 mb-5">
                     {% for k in global_colors %}
                       <button type="button"
@@ -97,7 +99,7 @@
               </div>
               <div>
                 {% if global_style_gid and global_fonts %}
-                  <div class="YY-STATUS_YELLOW mb-2">FONTS</div>
+                  <div class="YY-STATUS_YELLOW mb-2">{% trans "Шрифты" %}:</div>
                   <div class="flex flex-wrap gap-2">
                     {% for k in global_fonts %}
                       <button type="button"
@@ -115,7 +117,7 @@
           <div id="yyAdvancedModeRight" class="hidden">
             <div class="grid grid-cols-2 gap-3 mb-5">
               <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToUser()">
-                USER-FRIENDLY
+                {% trans "Визуальный режим" %}
               </button>
               <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplPreviewCurrent()">
                 {% trans "Предпросмотр" %}
@@ -140,9 +142,9 @@
             </button>
           </div>
         {% else %}
-          <button class="YY-BUTTON_MAIN" disabled>
+          <a href="?state=add" class="YY-BUTTON_MAIN mb-2">
             {% trans "Добавить шаблон" %}
-          </button>
+          </a>
         {% endif %}
 
       </div>
@@ -164,8 +166,8 @@
           <table class="w-full text-left">
             <thead>
               <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[55%]">{% trans "Название" %}</th>
-                <th class="YY-TH_TH">{% trans "Предпросмотр" %}</th>
+                <th class="YY-TH_TH w-[100%]">{% trans "Список шаблонов:" %}</th>
+                <th class="YY-TH_TH">&nbsp;</th>
                 <th class="YY-TH_TH">&nbsp;</th>
                 <th class="YY-TH_TH">&nbsp;</th>
               </tr>
@@ -176,19 +178,6 @@
                   <td class="YY-TB_TD">
                     <div class="YY-STATUS_BLUE">{{ it.template_name }}</div>
                   </td>
-
-                  <td class="YY-TB_TD">
-                    <button type="button" class="YY-BUTTON_TAB_MAIN" onclick="yyTplPreviewById('{{ it.ui_id }}')">
-                      {% trans "Открыть" %}
-                    </button>
-                  </td>
-
-                  <td class="YY-TB_TD">
-                    <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">
-                      {% trans "Изменить" %}
-                    </a>
-                  </td>
-
                   <td class="YY-TB_TD">
                     <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
                       {% csrf_token %}
@@ -198,6 +187,17 @@
                         {% trans "Удалить" %}
                       </button>
                     </form>
+                  </td>
+                  <td class="YY-TB_TD">
+                    <button type="button" class="YY-BUTTON_TAB_MAIN" onclick="yyTplPreviewById('{{ it.ui_id }}')">
+                      {% trans "Предпросмотр" %}
+                    </button>
+                  </td>
+
+                  <td class="YY-TB_TD">
+                    <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">
+                      {% trans "Изменить" %}
+                    </a>
                   </td>
                 </tr>
               {% endfor %}
@@ -219,6 +219,33 @@
 
 {% block extra_js %}
   {{ block.super }}
+<script>
+  (function () {
+    const form = document.getElementById("yyTplForm");
+    if (!form) return;
+
+    form.addEventListener("submit", function (e) {
+      // Кто инициировал submit (кнопка)
+      const btn = e.submitter || document.activeElement;
+      const action = btn && btn.value ? String(btn.value).trim() : "";
+
+      // close/delete — всегда пропускаем
+      if (action === "close" || action === "delete") return;
+
+      // add/save — требуем имя
+      if (action === "add" || action === "save") {
+        const inp = form.querySelector('input[name="template_name"]');
+        const name = (inp && inp.value ? inp.value : "").trim();
+        if (!name) {
+          alert("{% trans "Пожалуйста, заполните название шаблона" %}");
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      }
+    });
+  })();
+</script>
 
   <!-- CodeMirror (advanced) -->
   <link rel="stylesheet" href="/static/vendor/codemirror/codemirror.css">

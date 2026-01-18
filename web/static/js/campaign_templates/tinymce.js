@@ -1,7 +1,11 @@
 // FILE: web/static/js/campaign_templates/tinymce.js
 // DATE: 2026-01-18
-// PURPOSE: TinyMCE runtime: live-css storage + apply to editor iframe + загрузка html/css в edit/add.
-// CHANGE: add-mode: если state=add и есть gl_tpl, грузим HTML+CSS из _render-user-*(?gl_tpl=...).
+// PURPOSE: TinyMCE runtime: базовый CSS + overlays (colors/fonts) как отдельные <style> в iframe.
+// CHANGE:
+//   - ВОССТАНОВЛЕНО: yyTplApplyOverlay() + раздельные style-теги (base/color/font), чтобы colors/fonts не ломались.
+//   - yyTplSetCss(css) ставит БАЗУ и сбрасывает overlays.
+//   - yyTplGetCss() возвращает итоговый CSS (base + overlays) для сохранения.
+//   - Загрузка: если в URL есть gl_tpl — грузим GlobalTemplate (HTML+CSS) независимо от state; иначе edit по id.
 
 (function () {
   "use strict";
@@ -22,38 +26,84 @@
     return await r.text();
   }
 
-  let lastCssText = "";
+  const IDS = {
+    base: "yyCssBase",
+    color: "yyCssOverlayColor",
+    font: "yyCssOverlayFont",
+  };
 
-  function ensureIframeStyle(editor) {
+  function ensureStyle(editor, id) {
     const doc = editor && editor.getDoc ? editor.getDoc() : null;
     if (!doc) return null;
 
-    let el = doc.getElementById("yyLiveCss");
+    let el = doc.getElementById(id);
     if (el) return el;
 
     el = doc.createElement("style");
-    el.id = "yyLiveCss";
+    el.id = id;
     el.type = "text/css";
     (doc.head || doc.documentElement).appendChild(el);
     return el;
   }
 
-  function applyCssToEditor(editor, cssText) {
-    lastCssText = (cssText || "").trim();
-    const styleEl = ensureIframeStyle(editor);
-    if (styleEl) styleEl.textContent = lastCssText;
+  function setBaseCss(editor, cssText) {
+    const base = ensureStyle(editor, IDS.base);
+    if (base) base.textContent = String(cssText || "").trim();
   }
 
+  function setOverlayCss(editor, type, cssText) {
+    const id = type === "colors" ? IDS.color : IDS.font;
+    const el = ensureStyle(editor, id);
+    if (el) el.textContent = String(cssText || "").trim();
+  }
+
+  function clearOverlays(editor) {
+    setOverlayCss(editor, "colors", "");
+    setOverlayCss(editor, "fonts", "");
+  }
+
+  function getAllCss(editor) {
+    const doc = editor && editor.getDoc ? editor.getDoc() : null;
+    if (!doc) return "";
+
+    const base = (doc.getElementById(IDS.base)?.textContent || "").trim();
+    const c = (doc.getElementById(IDS.color)?.textContent || "").trim();
+    const f = (doc.getElementById(IDS.font)?.textContent || "").trim();
+
+    let out = "";
+    if (base) out += base + "\n";
+    if (c) out += "\n" + c + "\n";
+    if (f) out += "\n" + f + "\n";
+    return out.trim() + (out.trim() ? "\n" : "");
+  }
+
+  // --- globals ---
   window.yyTplSetCss = function (css) {
-    lastCssText = (css || "").trim();
     try {
       const ed = window.tinymce ? window.tinymce.get("yyTinyEditor") : null;
-      if (ed) applyCssToEditor(ed, lastCssText);
+      if (!ed) return;
+      setBaseCss(ed, css || "");
+      clearOverlays(ed);
+    } catch (_) {}
+  };
+
+  window.yyTplApplyOverlay = function (type, css) {
+    try {
+      const ed = window.tinymce ? window.tinymce.get("yyTinyEditor") : null;
+      if (!ed) return;
+      if (type !== "colors" && type !== "fonts") return;
+      setOverlayCss(ed, type, css || "");
     } catch (_) {}
   };
 
   window.yyTplGetCss = function () {
-    return lastCssText || "";
+    try {
+      const ed = window.tinymce ? window.tinymce.get("yyTinyEditor") : null;
+      if (!ed) return "";
+      return getAllCss(ed);
+    } catch (_) {
+      return "";
+    }
   };
 
   window.YYCampaignTplTiny = {
@@ -75,13 +125,14 @@
 
   function loadExistingInto(editor) {
     const state = (getParam("state") || "").trim();
-
-    // edit
     const uiId = (getParam("id") || "").trim();
-    if (state === "edit" && uiId) {
-      const id = encodeURIComponent(uiId);
-      const urlHtml = `/panel/campaigns/templates/_render-user-html/?id=${id}`;
-      const urlCss = `/panel/campaigns/templates/_render-user-css/?id=${id}`;
+    const glTpl = (getParam("gl_tpl") || "").trim();
+
+    // 1) OVERRIDE: если есть gl_tpl — грузим GlobalTemplate независимо от state.
+    if (glTpl) {
+      const g = encodeURIComponent(glTpl);
+      const urlHtml = `/panel/campaigns/templates/_render-user-html/?gl_tpl=${g}`;
+      const urlCss = `/panel/campaigns/templates/_render-user-css/?gl_tpl=${g}`;
 
       fetchText(urlHtml)
         .then((html) => {
@@ -95,12 +146,11 @@
       return;
     }
 
-    // add (по gl_tpl)
-    const glTpl = (getParam("gl_tpl") || "").trim();
-    if (state === "add" && glTpl) {
-      const g = encodeURIComponent(glTpl);
-      const urlHtml = `/panel/campaigns/templates/_render-user-html/?gl_tpl=${g}`;
-      const urlCss = `/panel/campaigns/templates/_render-user-css/?gl_tpl=${g}`;
+    // 2) edit: грузим текущий Templates по id.
+    if (state === "edit" && uiId) {
+      const id = encodeURIComponent(uiId);
+      const urlHtml = `/panel/campaigns/templates/_render-user-html/?id=${id}`;
+      const urlCss = `/panel/campaigns/templates/_render-user-css/?id=${id}`;
 
       fetchText(urlHtml)
         .then((html) => {
@@ -122,7 +172,9 @@
   }
 
   window.yyTplRuntimeOnEditorInit = function (editor) {
-    applyCssToEditor(editor, lastCssText);
+    ensureStyle(editor, IDS.base);
+    ensureStyle(editor, IDS.color);
+    ensureStyle(editor, IDS.font);
     loadExistingInto(editor);
   };
 

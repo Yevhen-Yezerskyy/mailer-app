@@ -2,12 +2,14 @@
 # DATE: 2026-01-18
 # PURPOSE: /panel/campaigns/templates/ — CRUD шаблонов писем (user + advanced mode).
 # CHANGE:
-#   - add-mode: используем gl_tpl из URL (?gl_tpl=<id>), иначе редиректим на случайный активный GlobalTemplate.
-#   - в контекст прокидываем gl_tpl (id) + списки keys для colors/fonts (для кнопок, которые рендерит Python).
+#   - Подсветка активного GlobalTemplate: приоритет у ?gl_tpl=..., иначе берём id-<N> из template_html (edit).
+#   - add-mode: если state=add и нет ?gl_tpl=... — редирект на случайный активный GlobalTemplate.
+#   - Контекст НЕ меняем: global_style_gid/global_colors/global_fonts/global_tpl_items.
 
 from __future__ import annotations
 
 import re
+from types import SimpleNamespace
 from typing import Optional, Union
 from uuid import UUID
 
@@ -67,10 +69,7 @@ def _pick_random_active_gl_tpl_id() -> int | None:
     return int(obj.id) if obj else None
 
 
-def _extract_gl_tpl_from_template_html(template_html: str) -> int | None:
-    """
-    id-<N> ищем в class первого HTML-тега.
-    """
+def _extract_global_template_id_from_first_tag(template_html: str) -> int | None:
     s = (template_html or "").lstrip()
     if not s:
         return None
@@ -96,17 +95,34 @@ def _extract_gl_tpl_from_template_html(template_html: str) -> int | None:
     return None
 
 
-def _gl_tpl_keys(gl_tpl_id: int | None) -> tuple[list[str], list[str]]:
-    if not gl_tpl_id:
-        return [], []
-    gt = GlobalTemplate.objects.filter(id=int(gl_tpl_id), is_active=True).first()
+def _global_style_keys_by_gid(gid: int | None) -> tuple[int | None, list[str], list[str]]:
+    if not gid:
+        return None, [], []
+
+    gt = GlobalTemplate.objects.filter(id=int(gid), is_active=True).first()
     if not gt or not isinstance(gt.styles, dict):
-        return [], []
+        return None, [], []
+
     colors = gt.styles.get("colors")
     fonts = gt.styles.get("fonts")
-    colors_keys = sorted(list(colors.keys())) if isinstance(colors, dict) else []
-    fonts_keys = sorted(list(fonts.keys())) if isinstance(fonts, dict) else []
-    return colors_keys, fonts_keys
+
+    c_keys = sorted([k for k in (colors or {}).keys() if isinstance(k, str)]) if isinstance(colors, dict) else []
+    f_keys = sorted([k for k in (fonts or {}).keys() if isinstance(k, str)]) if isinstance(fonts, dict) else []
+    return int(gt.id), c_keys, f_keys
+
+
+def _build_global_tpl_items(current_gid: int | None):
+    out = []
+    qs = GlobalTemplate.objects.filter(is_active=True).order_by("order", "template_name")
+    for gt in qs:
+        out.append(
+            SimpleNamespace(
+                id=int(gt.id),
+                template_name=gt.template_name,
+                is_current=bool(current_gid and int(current_gid) == int(gt.id)),
+            )
+        )
+    return out
 
 
 def templates_view(request):
@@ -119,13 +135,11 @@ def templates_view(request):
     if isinstance(edit_obj, HttpResponseRedirect):
         return edit_obj
 
-    # --- ADD: обязателен gl_tpl в URL (иначе редирект на случайный активный) ---
+    # --- ADD: если state=add и нет gl_tpl в URL — редирект на случайный активный GlobalTemplate ---
     if request.method == "GET" and state == "add":
-        gl_tpl = _get_gl_tpl_from_query(request)
-        if not gl_tpl:
+        if not _get_gl_tpl_from_query(request):
             rid = _pick_random_active_gl_tpl_id()
             if not rid:
-                # нет глобальных шаблонов — просто в список
                 return redirect(request.path)
             return redirect(f"{request.path}?state=add&gl_tpl={rid}")
 
@@ -150,16 +164,13 @@ def templates_view(request):
             return redirect(request.path)
 
         template_name = (request.POST.get("template_name") or "").strip()
-
-        # независимо от режима — берём hidden (их заполняет JS)
         editor_html = request.POST.get("editor_html") or ""
         css_text = request.POST.get("css_text") or ""
 
         if not template_name:
             return redirect(request.path)
 
-        clean_html = editor_template_parse_html(editor_html)
-        clean_html = sanitize(clean_html)
+        clean_html = sanitize(editor_template_parse_html(editor_html))
         styles_obj = styles_css_to_json(css_text)
 
         if action == "add":
@@ -188,19 +199,20 @@ def templates_view(request):
                 obj.template_html = clean_html
                 obj.styles = styles_obj
                 obj.save(update_fields=["template_name", "template_html", "styles", "updated_at"])
+                return redirect(f"{request.path}?state=edit&id={encode_id(int(obj.id))}")
 
-            return redirect(f"{request.path}?state=edit&id={encode_id(int(obj.id))}")
+            return redirect(request.path)
 
         return redirect(request.path)
 
-    # --- контекст для кнопок (python-render) ---
-    gl_tpl: int | None = None
-    if state == "edit" and edit_obj:
-        gl_tpl = _extract_gl_tpl_from_template_html(edit_obj.template_html or "")
-    elif state == "add":
-        gl_tpl = _get_gl_tpl_from_query(request)
+    # --- active GlobalTemplate (подсветка + keys) ---
+    # приоритет: ?gl_tpl=... (в любом state), иначе: edit -> id-<N> из HTML
+    current_gid = _get_gl_tpl_from_query(request)
+    if not current_gid and state == "edit" and edit_obj:
+        current_gid = _extract_global_template_id_from_first_tag(edit_obj.template_html or "")
 
-    colors_keys, fonts_keys = _gl_tpl_keys(gl_tpl)
+    global_style_gid, global_colors, global_fonts = _global_style_keys_by_gid(current_gid)
+    global_tpl_items = _build_global_tpl_items(current_gid)
 
     items = _with_ui_ids(_qs(ws_id))
     return render(
@@ -210,8 +222,9 @@ def templates_view(request):
             "items": items,
             "state": state,
             "edit_obj": edit_obj,
-            "gl_tpl": gl_tpl,
-            "gl_colors": colors_keys,
-            "gl_fonts": fonts_keys,
+            "global_style_gid": global_style_gid,
+            "global_colors": global_colors,
+            "global_fonts": global_fonts,
+            "global_tpl_items": global_tpl_items,
         },
     )
