@@ -1,8 +1,8 @@
 {% extends "panels/base.html" %}
 {% load i18n %}
-<!-- FILE: web/templates/panels/aap_settings/mail_servers.html  (обновлено — 2026-01-13) -->
+<!-- FILE: web/templates/panels/aap_settings/mail_servers.html  (обновлено — 2026-01-18) -->
 <!-- PURPOSE: Settings → Mail servers: список ящиков + add/edit форма (SMTP обяз., IMAP опц.) + apply preset. -->
-<!-- CHANGE: секреты: "********" (readonly) + глазик → confirm modal → AJAX secret → подставить в поле. -->
+<!-- CHANGE: добавлен лимит отправки (писем/час) в форме (1-я строка) и в таблице (3-я колонка). -->
 
 {% block content %}
 
@@ -47,21 +47,25 @@
               </div>
             {% endif %}
 
-            <div class="grid grid-cols-3 gap-4 mb-7">
+            <div class="grid grid-cols-[2fr_2fr_2fr_1fr] gap-4 mb-7">
 
-                <div>
-                  <label class="YY-LABEL">{% trans "Название сервера" %}:</label>
-                  {{ form.name }}
-                </div>
+              <div>
+                <label class="YY-LABEL">{% trans "Название сервера" %}:</label>
+                {{ form.name }}
+              </div>
 
-                <div>
-                  <label class="YY-LABEL">Email:</label>
-                    {{ form.email }}
-                </div>
+              <div>
+                <label class="YY-LABEL">Email:</label>
+                {{ form.email }}
+              </div>
 
               <div>
                 <label class="YY-LABEL">{% trans "Отправитель" %}:</label>
                 {{ form.from_name }}
+              </div>
+              <div>
+                <label class="YY-LABEL">{% trans "Лимит/час" %}:</label>
+                {{ form.limit_hour_sent }}
               </div>
 
             </div>
@@ -323,8 +327,9 @@
           <table class="w-full text-left">
             <thead>
               <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[40%]">{% trans "Название" %}</th>
-                <th class="YY-TH_TH w-[40%]">{% trans "Email" %}</th>
+                <th class="YY-TH_TH w-[30%]">{% trans "Название" %}</th>
+                <th class="YY-TH_TH w-[30%]">{% trans "Email" %}</th>
+                <th class="YY-TH_TH w-[20%]">{% trans "Лимит/час" %}</th>
                 <th class="YY-TH_TH">&nbsp;</th>
                 <th class="YY-TH_TH">&nbsp;</th>
               </tr>
@@ -340,6 +345,9 @@
                   </td>
                   <td class="YY-TB_TD">
                     <div class="YY-STATUS_YELLOW">{{ it.email }}</div>
+                  </td>
+                  <td class="YY-TB_TD">
+                    <div class="YY-STATUS_BLUE">{{ it.limit_hour_sent }}</div>
                   </td>
                   <td class="YY-TB_TD">
                     <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">

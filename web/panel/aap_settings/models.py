@@ -1,9 +1,7 @@
 # FILE: web/panel/aap_settings/models.py
-# DATE: 2026-01-13
+# DATE: 2026-01-18
 # PURPOSE: Почтовые ящики (Mailbox), транспорты SMTP/IMAP (MailboxConnection) и справочник пресетов (ProviderPreset).
-# CHANGE:
-# - Mailbox: name уникален в рамках workspace_id
-# - Mailbox: email уникален глобально (по всей базе)
+# CHANGE: Добавлен Mailbox.limit_hour_sent (лимит писем в час), default=50.
 
 from __future__ import annotations
 
@@ -32,6 +30,8 @@ class Mailbox(models.Model):
     email = models.EmailField(max_length=254, help_text="Полный email адрес")
     domain = models.CharField(max_length=255, help_text="Домен email (для DNS-проверок)")
     is_active = models.BooleanField(default=True, help_text="Если false — ящик полностью выключен")
+
+    limit_hour_sent = models.IntegerField(default=50, help_text="Лимит исходящих писем в час")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -122,3 +122,28 @@ class ProviderPreset(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.code}/{self.kind})"
+
+
+
+class SendingSettings(models.Model):
+    workspace = models.UUIDField(
+        unique=True,
+        db_index=True,
+        help_text="UUID workspace (1 запись на workspace)",
+    )
+
+    value_json = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Глобальные настройки отправки (JSON)",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = "aap_settings"
+        db_table = "aap_settings_sending_settings"
+
+    def __str__(self) -> str:
+        return f"SendingSettings[{self.workspace}]"

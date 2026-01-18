@@ -21,6 +21,7 @@ YY-STATUS_BLUE: px-5 py-2 rounded-md bg-[#effbff] text-[#006991] font-semibold w
 YY-STATUS_GREEN: px-5 py-2 rounded-md bg-[#d6fdda] text-[#016b09] font-semibold whitespace-nowrap w-[100%]
 YY-STATUS_YELLOW: px-5 py-2 rounded-md bg-[#FFF7E0] text-[#B45309] font-semibold whitespace-nowrap w-[100%]
 YY-STATUS_GRAY: px-5 py-2 rounded-md bg-[#f4f4f4] text-[#636363] font-semibold whitespace-nowrap w-[100%]
+YY-STATUS_RED: px-5 py-2 rounded-md bg-[#fff8f8] text-[#8e0000] font-semibold whitespace-nowrap w-[100%]
 
 YY-MAIN_BOTTOM_DIV: border rounded-md bg-[#ffffff] border border-[#71d0f4] overflow-hidden
 

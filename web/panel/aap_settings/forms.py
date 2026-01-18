@@ -1,13 +1,7 @@
 # FILE: web/panel/aap_settings/forms.py
-# DATE: 2026-01-13
+# DATE: 2026-01-18
 # PURPOSE: Form "Почтовые серверы".
-# CHANGE:
-# - apply_preset НЕ триггерит валидацию
-# - IMAP поля не обязательные
-# - smtp_secret обязателен только при add
-# - mask-mode: "********" + readonly
-# - PasswordInput(render_value=True)
-# - ДОБАВЛЕНО: UI-проверка уникальности (name в рамках workspace, email глобально) -> ТОЛЬКО non-field error
+# CHANGE: Добавлен limit_hour_sent (обяз., default=50, max=300) + серверная проверка лимита как non-field error.
 
 from __future__ import annotations
 
@@ -42,6 +36,23 @@ class MailServerForm(forms.Form):
         label=_("Email"),
         required=True,
         widget=forms.TextInput(attrs={"class": "YY-INPUT", "placeholder": "name@domain.tld"}),
+    )
+
+    limit_hour_sent = forms.IntegerField(
+        label=_("Лимит/час"),
+        required=True,
+        initial=50,
+        widget=forms.TextInput(
+            attrs={
+                "class": "YY-INPUT",
+                "inputmode": "numeric",
+                "pattern": r"[0-9]*",
+                "maxlength": "3",
+                "min": "1",
+                "max": "300",
+                "autocomplete": "off",
+            }
+        ),
     )
 
     preset_code = forms.ChoiceField(
@@ -121,6 +132,7 @@ class MailServerForm(forms.Form):
         required_fields = [
             "name",
             "email",
+            "limit_hour_sent",
             "smtp_host",
             "smtp_port",
             "smtp_security",
@@ -138,6 +150,18 @@ class MailServerForm(forms.Form):
         if missing:
             self.add_error(None, _("Заполните все поля."))
             return cleaned  # поля-ошибки НЕ ставим
+
+        # limit_hour_sent — обязателен, 1..300 (ошибка только non-field)
+        try:
+            lim = int(cleaned.get("limit_hour_sent") or 0)
+        except Exception:
+            lim = 0
+        if lim < 1:
+            self.add_error(None, _("Лимит должен быть не меньше 1 письма в час."))
+            return cleaned
+        if lim > 300:
+            self.add_error(None, _("Максимум 300 писем в час."))
+            return cleaned
 
         # UI-уникальность (только non-field error)
         name = (cleaned.get("name") or "").strip()

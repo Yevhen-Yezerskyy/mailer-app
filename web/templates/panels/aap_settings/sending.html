@@ -1,0 +1,132 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_settings/sending.html  (обновлено — 2026-01-18) -->
+<!-- PURPOSE: Settings → Sending: карточный UI-редактор окон отправки по дням недели/праздникам. -->
+<!-- CHANGE: Табличная форма (день + окна), кнопки +/−, Cancel=reload, JSON собирается JS и кладётся в скрытое поле. -->
+
+{% block content %}
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-[60%]">
+      <div class="YY-CARD_WHITE">
+        {% if errors %}
+          <div class="YY-CARD_IN_FORM_ERROR mb-3">
+            {% for e in errors %}<div>{{ e }}</div>{% endfor %}
+          </div>
+        {% endif %}
+
+        <form method="post" id="yySendingForm">
+          {% csrf_token %}
+
+          <textarea name="value_json" id="yyValueJson" class="hidden">{{ value_json_str }}</textarea>
+
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH w-[32%]">{% trans "День недели" %}</th>
+                <th class="YY-TH_TH">{% trans "Окна отправки писем" %}</th>
+              </tr>
+            </thead>
+            <tbody id="yySendingBody">
+              <tr data-yy-day="mon" class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">
+                  <div class="YY-STATUS_GREEN">{% trans "Понедельник" %}</div>
+                </td>
+                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
+              </tr>
+              <tr data-yy-day="tue" class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">
+                  <div class="YY-STATUS_GREEN">{% trans "Вторник" %}</div>
+                </td>
+                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
+              </tr>
+              <tr data-yy-day="wed" class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">
+                  <div class="YY-STATUS_GREEN">{% trans "Среда" %}</div>
+                </td>
+                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
+              </tr>
+              <tr data-yy-day="thu" class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">
+                  <div class="YY-STATUS_GREEN">{% trans "Четверг" %}</div>
+                </td>
+                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
+              </tr>
+              <tr data-yy-day="fri" class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">
+                  <div class="YY-STATUS_GREEN">{% trans "Пятница" %}</div>
+                </td>
+                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
+              </tr>
+
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD" colspan="2">
+                  <div class="h-[3px]"></div>
+                </td>
+              </tr>
+
+              <tr data-yy-day="sat" class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">
+                  <div class="YY-STATUS_YELLOW">{% trans "Суббота" %}</div>
+                </td>
+                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
+              </tr>
+              <tr data-yy-day="sun" class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">
+                  <div class="YY-STATUS_YELLOW">{% trans "Воскресенье" %}</div>
+                </td>
+                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
+              </tr>
+
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD" colspan="2">
+                  <div class="h-[3px]"></div>
+                </td>
+              </tr>
+
+              <tr data-yy-day="hol" class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">
+                  <div class="YY-STATUS_RED">{% trans "Праздники" %}</div>
+                </td>
+                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="flex gap-3 mt-6">
+            <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">
+              {% trans "Сохранить" %}
+            </button>
+
+            <button type="button" class="YY-BUTTON_MAIN" onclick="location.reload()">
+              {% trans "Отменить" %}
+            </button>
+          </div>
+
+        </form>
+
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-[40%]">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-STATUS_BLUE mb-3">{% trans "Окна для отправки писем - глобальная настройка" %}</div>
+        <div>
+           <p class="YY-TEXT">{% trans "Отправка писем не всегда одинаково эффективна. Если отправить письмо в субботу утром, до понедельника оно будет перекрыто другими письмами. Вероятность того, что его прочтут и обратят внимание, снижается." %}</p>
+           <p class="YY-TEXT">{% trans "По опыту рассылок, самое эффективное время для рассылки - с 09:00 по 12:00 со вторника по четверг. В пятницу в то же время эффективность существенно снижается, а понедельник еще ниже. В праздники и выходные дни обычно эффективность составляет 5-10% от возможной." %}</p>
+           <p class="YY-TEXT">{% trans "Мы рекомендуем учитывать это при настройке окон для отправки." %}</p>
+           <p class="YY-TEXT">{% trans "Эти настройки - глобальные для Вашей учетной записи. Для конкретной кампании это может быть переопределено. Тогда глобальные настройки на настройки отправки кампании больше не влияют." %}</p>
+           <p class="YY-TEXT">{% trans "Окна - это отрезки времени, когда письма отправляться будут. Вне окон рассылка не осуществляется. Время (часовой пояс) - Берлин, Германия" %}</p>
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script src="/static/js/aap_settings/sending.js"></script>
+{% endblock %}

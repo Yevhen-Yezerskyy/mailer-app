@@ -1,11 +1,7 @@
 # FILE: web/panel/aap_settings/views/mail_servers.py
-# DATE: 2026-01-13
+# DATE: 2026-01-18
 # PURPOSE: /panel/settings/mail-servers/ — SMTP обяз., IMAP опц.; apply preset без валидации; reveal secret по кнопке "глаз" через AJAX + confirm modal.
-# CHANGE:
-# - fix: edit_obj.ui_id всегда задан
-# - fix: секреты не затираются при сохранении (если не меняли)
-# - UX: если секрет уже сохранён — показываем "********" (readonly) + глазик → confirm → AJAX /secret/
-# - add: mail_server_secret_view (JSON endpoint to reveal smtp/imap secret)
+# CHANGE: Добавлен Mailbox.limit_hour_sent: init + сохранение + вывод в списке.
 
 from __future__ import annotations
 
@@ -187,6 +183,7 @@ def mail_servers_view(request):
     init = {
         "name": "",
         "email": "",
+        "limit_hour_sent": 50,
         "preset_code": "",  # после save — пусто (не "липнет")
     }
 
@@ -196,6 +193,7 @@ def mail_servers_view(request):
     if edit_obj:
         init["name"] = edit_obj.name or ""
         init["email"] = edit_obj.email or ""
+        init["limit_hour_sent"] = int(getattr(edit_obj, "limit_hour_sent", 50) or 50)
 
         cm = _conn_map(edit_obj)
         smtp = cm.get("smtp")
@@ -277,7 +275,7 @@ def mail_servers_view(request):
             workspace_id=ws_id,
             mailbox_id=(int(edit_obj.id) if edit_obj else None),
         )
-        
+
         if not form.is_valid():
             if edit_obj and not getattr(edit_obj, "ui_id", None):
                 edit_obj.ui_id = encode_id(int(edit_obj.id))
@@ -290,15 +288,23 @@ def mail_servers_view(request):
         name = (form.cleaned_data["name"] or "").strip()
         email = (form.cleaned_data["email"] or "").strip()
         domain = (email.split("@", 1)[1] if "@" in email else "").strip().lower()
+        limit_hour_sent = int(form.cleaned_data.get("limit_hour_sent") or 50)
 
         if edit_obj:
             mb = edit_obj
             mb.name = name
             mb.email = email
             mb.domain = domain
-            mb.save(update_fields=["name", "email", "domain", "updated_at"])
+            mb.limit_hour_sent = limit_hour_sent
+            mb.save(update_fields=["name", "email", "domain", "limit_hour_sent", "updated_at"])
         else:
-            mb = Mailbox.objects.create(workspace_id=ws_id, name=name, email=email, domain=domain)
+            mb = Mailbox.objects.create(
+                workspace_id=ws_id,
+                name=name,
+                email=email,
+                domain=domain,
+                limit_hour_sent=limit_hour_sent,
+            )
 
         cm_now = _conn_map(mb)
         smtp_now = cm_now.get("smtp")
