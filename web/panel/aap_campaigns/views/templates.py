@@ -1,7 +1,9 @@
 # FILE: web/panel/aap_campaigns/views/templates.py
 # DATE: 2026-01-18
 # PURPOSE: /panel/campaigns/templates/ — CRUD шаблонов писем (user + advanced mode).
-# CHANGE: В user-mode Python рисует кнопки overlays (colors/fonts) по GlobalTemplate.styles, найденному через id-<N> в template_html.
+# CHANGE:
+#   - add-mode: используем gl_tpl из URL (?gl_tpl=<id>), иначе редиректим на случайный активный GlobalTemplate.
+#   - в контекст прокидываем gl_tpl (id) + списки keys для colors/fonts (для кнопок, которые рендерит Python).
 
 from __future__ import annotations
 
@@ -55,17 +57,30 @@ def _get_edit_obj(request, ws_id: UUID) -> Union[None, Templates, HttpResponseRe
     return Templates.objects.filter(id=int(res), workspace_id=ws_id).first()
 
 
-def _extract_global_template_id_from_first_tag(template_html: str) -> int | None:
+def _get_gl_tpl_from_query(request) -> int | None:
+    raw = (request.GET.get("gl_tpl") or "").strip()
+    return int(raw) if raw.isdigit() else None
+
+
+def _pick_random_active_gl_tpl_id() -> int | None:
+    obj = GlobalTemplate.objects.filter(is_active=True).order_by("?").first()
+    return int(obj.id) if obj else None
+
+
+def _extract_gl_tpl_from_template_html(template_html: str) -> int | None:
+    """
+    id-<N> ищем в class первого HTML-тега.
+    """
     s = (template_html or "").lstrip()
     if not s:
         return None
 
-    m_tag = re.search(r"<\s*([a-zA-Z][a-zA-Z0-9:_-]*)([^>]*)>", s)
+    m_tag = re.search(r"(?is)<\s*([a-zA-Z][a-zA-Z0-9:_-]*)([^>]*)>", s)
     if not m_tag:
         return None
 
     attrs = m_tag.group(2) or ""
-    m_class = re.search(r"""\bclass\s*=\s*(?P<q>["'])(?P<v>.*?)(?P=q)""", attrs, flags=re.IGNORECASE | re.DOTALL)
+    m_class = re.search(r"""(?is)\bclass\s*=\s*(?P<q>["'])(?P<v>.*?)(?P=q)""", attrs)
     if not m_class:
         return None
 
@@ -81,27 +96,17 @@ def _extract_global_template_id_from_first_tag(template_html: str) -> int | None
     return None
 
 
-def _get_global_style_keys(template_html: str) -> tuple[int | None, list[str], list[str]]:
-    gid = _extract_global_template_id_from_first_tag(template_html)
-    if not gid:
-        return None, [], []
-
-    gt = GlobalTemplate.objects.filter(id=gid).first()
-    if not gt:
-        return None, [], []
-
-    styles = gt.styles or {}
-    colors = styles.get("colors") if isinstance(styles, dict) else None
-    fonts = styles.get("fonts") if isinstance(styles, dict) else None
-
-    if not isinstance(colors, dict):
-        colors = {}
-    if not isinstance(fonts, dict):
-        fonts = {}
-
-    c_keys = sorted([k for k in colors.keys() if isinstance(k, str)])
-    f_keys = sorted([k for k in fonts.keys() if isinstance(k, str)])
-    return gid, c_keys, f_keys
+def _gl_tpl_keys(gl_tpl_id: int | None) -> tuple[list[str], list[str]]:
+    if not gl_tpl_id:
+        return [], []
+    gt = GlobalTemplate.objects.filter(id=int(gl_tpl_id), is_active=True).first()
+    if not gt or not isinstance(gt.styles, dict):
+        return [], []
+    colors = gt.styles.get("colors")
+    fonts = gt.styles.get("fonts")
+    colors_keys = sorted(list(colors.keys())) if isinstance(colors, dict) else []
+    fonts_keys = sorted(list(fonts.keys())) if isinstance(fonts, dict) else []
+    return colors_keys, fonts_keys
 
 
 def templates_view(request):
@@ -113,6 +118,16 @@ def templates_view(request):
     edit_obj = _get_edit_obj(request, ws_id) if state == "edit" else None
     if isinstance(edit_obj, HttpResponseRedirect):
         return edit_obj
+
+    # --- ADD: обязателен gl_tpl в URL (иначе редирект на случайный активный) ---
+    if request.method == "GET" and state == "add":
+        gl_tpl = _get_gl_tpl_from_query(request)
+        if not gl_tpl:
+            rid = _pick_random_active_gl_tpl_id()
+            if not rid:
+                # нет глобальных шаблонов — просто в список
+                return redirect(request.path)
+            return redirect(f"{request.path}?state=add&gl_tpl={rid}")
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -136,7 +151,7 @@ def templates_view(request):
 
         template_name = (request.POST.get("template_name") or "").strip()
 
-        # ВАЖНО: независимо от режима — берём hidden (их заполняет JS)
+        # независимо от режима — берём hidden (их заполняет JS)
         editor_html = request.POST.get("editor_html") or ""
         css_text = request.POST.get("css_text") or ""
 
@@ -178,11 +193,14 @@ def templates_view(request):
 
         return redirect(request.path)
 
-    gid = None
-    color_keys: list[str] = []
-    font_keys: list[str] = []
-    if state in ("edit", "add") and edit_obj:
-        gid, color_keys, font_keys = _get_global_style_keys(edit_obj.template_html or "")
+    # --- контекст для кнопок (python-render) ---
+    gl_tpl: int | None = None
+    if state == "edit" and edit_obj:
+        gl_tpl = _extract_gl_tpl_from_template_html(edit_obj.template_html or "")
+    elif state == "add":
+        gl_tpl = _get_gl_tpl_from_query(request)
+
+    colors_keys, fonts_keys = _gl_tpl_keys(gl_tpl)
 
     items = _with_ui_ids(_qs(ws_id))
     return render(
@@ -192,8 +210,8 @@ def templates_view(request):
             "items": items,
             "state": state,
             "edit_obj": edit_obj,
-            "global_style_gid": gid,
-            "global_colors": color_keys,
-            "global_fonts": font_keys,
+            "gl_tpl": gl_tpl,
+            "gl_colors": colors_keys,
+            "gl_fonts": fonts_keys,
         },
     )

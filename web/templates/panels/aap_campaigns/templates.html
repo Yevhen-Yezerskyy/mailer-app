@@ -4,7 +4,7 @@
 <!-- FILE: web/templates/panels/aap_campaigns/templates.html -->
 <!-- DATE: 2026-01-18 -->
 <!-- PURPOSE: CRUD шаблонов писем (user + advanced mode). -->
-<!-- CHANGE: Python рисует кнопки COLORS/FONTS (overlays) по GlobalTemplate.styles; JS только клеит overlay-CSS в Tiny. -->
+<!-- CHANGE: Добавлены кнопки выбора GlobalTemplate (загрузка в редактор через gl_tpl, без чтения/загрузки текущего Templates.html/styles). -->
 
 {% block content %}
 
@@ -62,11 +62,27 @@
                 {% trans "Предпросмотр" %}
               </button>
             </div>
-            
+
+            {% if global_tpl_items %}
+              <div class="YY-STATUS_YELLOW mb-2">TEMPLATES</div>
+              <div class="flex flex-wrap gap-2 mb-10">
+                {% for gt in global_tpl_items %}
+                  {% if gt.is_current %}
+                    <button type="button"
+                            class="YY-BUTTON_GREEN yy-tpl-global-btn"
+                            data-gid="{{ gt.id }}">{{ gt.template_name }}</button>
+                  {% else %}
+                    <button type="button"
+                            class="YY-BUTTON_TAB_MAIN yy-tpl-global-btn"
+                            data-gid="{{ gt.id }}">{{ gt.template_name }}</button>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            {% endif %}
+
             <div class="grid grid-cols-2 gap-3 mb-10">
               <div>
-            {% if global_style_gid and global_colors %}
-              
+                {% if global_style_gid and global_colors %}
                   <div class="YY-STATUS_YELLOW mb-2">COLORS</div>
                   <div class="flex flex-wrap gap-2 mb-5">
                     {% for k in global_colors %}
@@ -77,21 +93,21 @@
                               data-name="{{ k }}">{{ k }}</button>
                     {% endfor %}
                   </div>
-            {% endif %}
-                </div>
-                <div>
-            {% if global_style_gid and global_fonts %}
-              <div class="YY-STATUS_YELLOW mb-2">FONTS</div>
-              <div class="flex flex-wrap gap-2">
-                {% for k in global_fonts %}
-                  <button type="button"
-                          class="YY-BUTTON_TAB_MAIN yy-tpl-overlay-btn"
-                          data-gid="{{ global_style_gid }}"
-                          data-type="fonts"
-                          data-name="{{ k }}">{{ k }}</button>
-                {% endfor %}
+                {% endif %}
               </div>
-            {% endif %}
+              <div>
+                {% if global_style_gid and global_fonts %}
+                  <div class="YY-STATUS_YELLOW mb-2">FONTS</div>
+                  <div class="flex flex-wrap gap-2">
+                    {% for k in global_fonts %}
+                      <button type="button"
+                              class="YY-BUTTON_TAB_MAIN yy-tpl-overlay-btn"
+                              data-gid="{{ global_style_gid }}"
+                              data-type="fonts"
+                              data-name="{{ k }}">{{ k }}</button>
+                    {% endfor %}
+                  </div>
+                {% endif %}
               </div>
             </div>
           </div>

@@ -2,8 +2,8 @@
 # DATE: 2026-01-18
 # PURPOSE: API для TinyMCE/advanced switch + preview + overlays.
 # CHANGE:
-#   - Demo content: по id-<N> из class первого тега берём GlobalTemplate.html_content.
-#   - Новый endpoint: templates/_global-style-css/?gid=<N>&type=colors|fonts&name=<KEY> -> CSS overlay (только блок).
+#   - render-user-html/css: поддержка state=add через ?gl_tpl=<id> (GlobalTemplate.html_template + styles.main).
+#   - styles.main: если styles = {"main": {...}, ...} -> берём только main для базового CSS/preview.
 
 from __future__ import annotations
 
@@ -29,6 +29,13 @@ from panel.models import GlobalTemplate
 _DEMO_FALLBACK_HTML = "<p>[DEMO CONTENT]</p>"
 
 
+def _styles_pick_main(styles_obj) -> dict:
+    if not isinstance(styles_obj, dict):
+        return {}
+    main = styles_obj.get("main")
+    return main if isinstance(main, dict) else styles_obj
+
+
 def _load_obj_by_ui_id(ui_id: str) -> Templates | None:
     ui_id = (ui_id or "").strip()
     if not ui_id:
@@ -38,6 +45,13 @@ def _load_obj_by_ui_id(ui_id: str) -> Templates | None:
     except Exception:
         return None
     return Templates.objects.filter(id=pk).first()
+
+
+def _load_gl_tpl(gl_tpl: str) -> GlobalTemplate | None:
+    raw = (gl_tpl or "").strip()
+    if not raw.isdigit():
+        return None
+    return GlobalTemplate.objects.filter(id=int(raw), is_active=True).first()
 
 
 def _extract_global_template_id_from_first_tag(template_html: str) -> int | None:
@@ -62,10 +76,7 @@ def _extract_global_template_id_from_first_tag(template_html: str) -> int | None
         if token.startswith("id-"):
             tail = token[3:]
             if tail.isdigit():
-                try:
-                    return int(tail)
-                except Exception:
-                    return None
+                return int(tail)
     return None
 
 
@@ -98,26 +109,39 @@ def _read_json(request: HttpRequest) -> dict:
 @require_GET
 @csrf_exempt
 def templates__render_user_html_view(request: HttpRequest) -> HttpResponse:
+    # edit
     obj = _load_obj_by_ui_id(request.GET.get("id") or "")
-    if not obj:
+    if obj:
+        demo_html = _find_demo_content(obj.template_html or "")
+        html = editor_template_render_html(template_html=obj.template_html or "", content_html=demo_html)
+        return HttpResponse(html, content_type="text/html; charset=utf-8")
+
+    # add (по gl_tpl)
+    gt = _load_gl_tpl(request.GET.get("gl_tpl") or "")
+    if not gt:
         return HttpResponse("", content_type="text/html; charset=utf-8")
 
-    demo_html = _find_demo_content(obj.template_html or "")
-    html = editor_template_render_html(
-        template_html=obj.template_html or "",
-        content_html=demo_html,
-    )
+    tpl = gt.html_template or ""
+    content = (gt.html_content or "").strip() or _DEMO_FALLBACK_HTML
+    html = editor_template_render_html(template_html=tpl, content_html=content)
     return HttpResponse(html, content_type="text/html; charset=utf-8")
 
 
 @require_GET
 @csrf_exempt
 def templates__render_user_css_view(request: HttpRequest) -> HttpResponse:
+    # edit
     obj = _load_obj_by_ui_id(request.GET.get("id") or "")
-    if not obj:
+    if obj:
+        css = styles_json_to_css(_styles_pick_main(obj.styles or {}))
+        return HttpResponse(css or "", content_type="text/plain; charset=utf-8")
+
+    # add (по gl_tpl)
+    gt = _load_gl_tpl(request.GET.get("gl_tpl") or "")
+    if not gt:
         return HttpResponse("", content_type="text/plain; charset=utf-8")
 
-    css = styles_json_to_css(obj.styles or {})
+    css = styles_json_to_css(_styles_pick_main(gt.styles or {}))
     return HttpResponse(css or "", content_type="text/plain; charset=utf-8")
 
 
@@ -154,15 +178,11 @@ def templates__preview_modal_by_id_view(request: HttpRequest) -> HttpResponse:
     email_html = render_html(
         template_html=tpl,
         content_html=content,
-        styles=obj.styles or {},
+        styles=_styles_pick_main(obj.styles or {}),
         vars_json=vars_json,
     )
 
-    return render(
-        request,
-        "panels/aap_campaigns/modal_preview.html",
-        {"status": "done", "email_html": email_html or ""},
-    )
+    return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "done", "email_html": email_html or ""})
 
 
 @require_POST
@@ -190,11 +210,7 @@ def templates__preview_modal_from_editor_view(request: HttpRequest) -> HttpRespo
         vars_json=vars_json,
     )
 
-    return render(
-        request,
-        "panels/aap_campaigns/modal_preview.html",
-        {"status": "done", "email_html": email_html or ""},
-    )
+    return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "done", "email_html": email_html or ""})
 
 
 @require_GET
@@ -207,12 +223,12 @@ def templates__global_style_css_view(request: HttpRequest) -> HttpResponse:
     if not (gid_raw.isdigit() and typ in ("colors", "fonts") and name):
         return HttpResponse("", content_type="text/plain; charset=utf-8")
 
-    gt = GlobalTemplate.objects.filter(id=int(gid_raw)).first()
+    gt = GlobalTemplate.objects.filter(id=int(gid_raw), is_active=True).first()
     if not gt:
         return HttpResponse("", content_type="text/plain; charset=utf-8")
 
     styles = gt.styles or {}
-    group = styles.get(typ)
+    group = styles.get(typ) if isinstance(styles, dict) else None
     if not isinstance(group, dict):
         return HttpResponse("", content_type="text/plain; charset=utf-8")
 
