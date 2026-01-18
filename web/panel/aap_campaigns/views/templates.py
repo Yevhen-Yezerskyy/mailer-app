@@ -1,19 +1,22 @@
-# FILE: web/panel/aap_campaigns/views/templates.py  (обновлено — 2026-01-17)
+# FILE: web/panel/aap_campaigns/views/templates.py
+# DATE: 2026-01-18
 # PURPOSE: /panel/campaigns/templates/ — CRUD шаблонов писем (user + advanced mode).
-# CHANGE: Без логических изменений. (Preview реализован через templates_api + JS/HTML.)
+# CHANGE: В user-mode Python рисует кнопки overlays (colors/fonts) по GlobalTemplate.styles, найденному через id-<N> в template_html.
 
 from __future__ import annotations
 
+import re
 from typing import Optional, Union
 from uuid import UUID
 
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 
+from engine.common.email_template import sanitize
 from mailer_web.access import encode_id, resolve_pk_or_redirect
 from panel.aap_campaigns.models import Templates
-from engine.common.email_template import sanitize
-from panel.aap_campaigns.template_editor import styles_css_to_json, editor_template_parse_html
+from panel.aap_campaigns.template_editor import editor_template_parse_html, styles_css_to_json
+from panel.models import GlobalTemplate
 
 
 def _guard(request) -> tuple[Optional[UUID], Optional[object]]:
@@ -50,6 +53,55 @@ def _get_edit_obj(request, ws_id: UUID) -> Union[None, Templates, HttpResponseRe
         return res
 
     return Templates.objects.filter(id=int(res), workspace_id=ws_id).first()
+
+
+def _extract_global_template_id_from_first_tag(template_html: str) -> int | None:
+    s = (template_html or "").lstrip()
+    if not s:
+        return None
+
+    m_tag = re.search(r"<\s*([a-zA-Z][a-zA-Z0-9:_-]*)([^>]*)>", s)
+    if not m_tag:
+        return None
+
+    attrs = m_tag.group(2) or ""
+    m_class = re.search(r"""\bclass\s*=\s*(?P<q>["'])(?P<v>.*?)(?P=q)""", attrs, flags=re.IGNORECASE | re.DOTALL)
+    if not m_class:
+        return None
+
+    class_value = (m_class.group("v") or "").strip()
+    if not class_value:
+        return None
+
+    for token in class_value.split():
+        if token.startswith("id-"):
+            tail = token[3:]
+            if tail.isdigit():
+                return int(tail)
+    return None
+
+
+def _get_global_style_keys(template_html: str) -> tuple[int | None, list[str], list[str]]:
+    gid = _extract_global_template_id_from_first_tag(template_html)
+    if not gid:
+        return None, [], []
+
+    gt = GlobalTemplate.objects.filter(id=gid).first()
+    if not gt:
+        return None, [], []
+
+    styles = gt.styles or {}
+    colors = styles.get("colors") if isinstance(styles, dict) else None
+    fonts = styles.get("fonts") if isinstance(styles, dict) else None
+
+    if not isinstance(colors, dict):
+        colors = {}
+    if not isinstance(fonts, dict):
+        fonts = {}
+
+    c_keys = sorted([k for k in colors.keys() if isinstance(k, str)])
+    f_keys = sorted([k for k in fonts.keys() if isinstance(k, str)])
+    return gid, c_keys, f_keys
 
 
 def templates_view(request):
@@ -126,6 +178,12 @@ def templates_view(request):
 
         return redirect(request.path)
 
+    gid = None
+    color_keys: list[str] = []
+    font_keys: list[str] = []
+    if state in ("edit", "add") and edit_obj:
+        gid, color_keys, font_keys = _get_global_style_keys(edit_obj.template_html or "")
+
     items = _with_ui_ids(_qs(ws_id))
     return render(
         request,
@@ -134,5 +192,8 @@ def templates_view(request):
             "items": items,
             "state": state,
             "edit_obj": edit_obj,
+            "global_style_gid": gid,
+            "global_colors": color_keys,
+            "global_fonts": font_keys,
         },
     )

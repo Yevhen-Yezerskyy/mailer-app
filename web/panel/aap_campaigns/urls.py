@@ -1,6 +1,7 @@
-# FILE: web/panel/aap_campaigns/urls.py  (обновлено — 2026-01-17)
-# PURPOSE: URLs для campaigns/templates + API (Tiny switch + preview-modal).
-# CHANGE: Preview теперь возвращает СРАЗУ HTML модалки (GET by id; POST from editor).
+# FILE: web/panel/aap_campaigns/urls.py
+# DATE: 2026-01-18
+# PURPOSE: URLs для campaigns/templates + API (Tiny switch + preview-modal + overlays).
+# CHANGE: Добавлен endpoint для получения CSS-overlay из GlobalTemplate.styles (colors/fonts).
 
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ from panel.aap_campaigns.views.templates_api import (
     templates__render_editor_html_view,
     templates__preview_modal_by_id_view,
     templates__preview_modal_from_editor_view,
+    templates__global_style_css_view,
 )
 
 app_name = "campaigns"
@@ -26,4 +28,5 @@ urlpatterns = [
     path("templates/_render-editor-html/", templates__render_editor_html_view, name="templates__render_editor_html"),
     path("templates/preview/modal/", templates__preview_modal_by_id_view, name="templates__preview_modal_by_id"),
     path("templates/preview/modal-from-editor/", templates__preview_modal_from_editor_view, name="templates__preview_modal_from_editor"),
+    path("templates/_global-style-css/", templates__global_style_css_view, name="templates__global_style_css"),
 ]
