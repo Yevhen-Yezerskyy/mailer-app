@@ -26,6 +26,7 @@ ALLOWED_ATTRS = {
     "href",
     "colspan",
     "rowspan",
+    "align",
 }
 
 # ---- placeholder ----
