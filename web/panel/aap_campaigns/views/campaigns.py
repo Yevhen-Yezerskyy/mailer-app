@@ -1,11 +1,16 @@
 # FILE: web/panel/aap_campaigns/views/campaigns.py
 # DATE: 2026-01-19
-# PURPOSE: /panel/campaigns/campaigns/ — одна страница: list/add/edit/letter через state в GET.
-# CHANGE: (new) CRUD кампаний + редактирование письма (TinyMCE + CodeMirror) + ready_content.
+# PURPOSE: Кампании — list / add / edit / letter в одном PU через state.
+# CHANGE:
+# - Даты: DD/MM/YYYY (number inputs), без времени
+# - Дефолты: start = today, end = today + 90 days
+# - Без внешних зависимостей
+# - Корректный парсинг state
 
 from __future__ import annotations
 
 import json
+from datetime import date, timedelta
 from typing import Optional, Union
 from uuid import UUID
 
@@ -18,6 +23,8 @@ from panel.aap_campaigns.models import Campaign, Letter, Templates
 from panel.aap_lists.models import MailingList
 from panel.aap_settings.models import Mailbox, SendingSettings
 
+
+# ---------- helpers ----------
 
 def _guard(request) -> tuple[Optional[UUID], Optional[object]]:
     ws_id = getattr(request, "workspace_id", None)
@@ -43,8 +50,8 @@ def _get_state(request) -> str:
 
 
 def _get_edit_obj(request, ws_id: UUID) -> Union[None, Campaign, HttpResponseRedirect]:
-    st = _get_state(request)
-    if st not in ("edit", "letter"):
+    state = _get_state(request)
+    if state not in ("edit", "letter"):
         return None
     if not request.GET.get("id"):
         return None
@@ -70,6 +77,18 @@ def _styles_pick_main(styles_obj):
     return main if isinstance(main, dict) else styles_obj
 
 
+def _parse_date_from_post(request, prefix: str) -> Optional[date]:
+    try:
+        dd = int(request.POST.get(f"{prefix}_dd"))
+        mm = int(request.POST.get(f"{prefix}_mm"))
+        yy = int(request.POST.get(f"{prefix}_yy"))
+        return date(yy, mm, dd)
+    except Exception:
+        return None
+
+
+# ---------- main view ----------
+
 def campaigns_view(request):
     ws_id, _user = _guard(request)
     if not ws_id:
@@ -92,11 +111,10 @@ def campaigns_view(request):
     for it in tpl_items:
         it.ui_id = encode_id(int(it.id))
 
-    parent_items = Campaign.objects.filter(workspace_id=ws_id).order_by("-updated_at")
-    parent_items = _with_ui_ids(parent_items)
+    parent_items = _with_ui_ids(Campaign.objects.filter(workspace_id=ws_id))
 
-    # global window for UI
-    ss, _created = SendingSettings.objects.get_or_create(
+    # global window (UI)
+    ss, _ = SendingSettings.objects.get_or_create(
         workspace_id=ws_id,
         defaults={"value_json": {}},
     )
@@ -107,6 +125,7 @@ def campaigns_view(request):
         letter_obj = _ensure_letter(ws_id, edit_obj)
         letter_obj.ui_id = encode_id(int(letter_obj.id))
 
+    # ---------- POST ----------
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
 
@@ -127,24 +146,14 @@ def campaigns_view(request):
             Campaign.objects.filter(id=int(res), workspace_id=ws_id).delete()
             return redirect(request.path)
 
-        # --- add/save campaign ---
+        # ----- add / save campaign -----
         if action in ("add_campaign", "save_campaign"):
             title = (request.POST.get("title") or "").strip()
             mailing_list_ui = (request.POST.get("mailing_list") or "").strip()
             mailbox_ui = (request.POST.get("mailbox") or "").strip()
             template_ui = (request.POST.get("template") or "").strip()
 
-            campaign_parent_ui = (request.POST.get("campaign_parent") or "").strip()
-            send_after_parent_days_raw = (request.POST.get("send_after_parent_days") or "").strip()
-
-            start_at = (request.POST.get("start_at") or "").strip()
-            end_at = (request.POST.get("end_at") or "").strip()
-            active = bool(request.POST.get("active"))
-
-            use_global_window = bool(request.POST.get("use_global_window"))
-            window_raw = (request.POST.get("window") or "").strip()
-
-            if not (title and mailing_list_ui and mailbox_ui and start_at):
+            if not (title and mailing_list_ui and mailbox_ui):
                 return redirect(request.path)
 
             try:
@@ -160,20 +169,23 @@ def campaigns_view(request):
                 except Exception:
                     template_pk = None
 
-            parent_pk = None
-            if campaign_parent_ui:
+            # dates
+            start_at = _parse_date_from_post(request, "start") or date.today()
+            end_at = _parse_date_from_post(request, "end") or (start_at + timedelta(days=90))
+
+            # chain (only on edit + has parent)
+            send_after_days = 0
+            if edit_obj and edit_obj.campaign_parent_id:
                 try:
-                    parent_pk = int(decode_id(campaign_parent_ui))
+                    send_after_days = int(request.POST.get("send_after_parent_days") or 0)
                 except Exception:
-                    parent_pk = None
+                    send_after_days = 0
+                if send_after_days < 0:
+                    send_after_days = 0
 
-            try:
-                send_after_days = int(send_after_parent_days_raw) if send_after_parent_days_raw else 30
-            except Exception:
-                send_after_days = 30
-            if send_after_days < 0:
-                send_after_days = 0
-
+            # window
+            use_global_window = bool(request.POST.get("use_global_window"))
+            window_raw = (request.POST.get("window") or "").strip()
             window_obj = {}
             if not use_global_window:
                 try:
@@ -188,11 +200,8 @@ def campaigns_view(request):
                     title=title,
                     mailing_list_id=mailing_list_pk,
                     mailbox_id=mailbox_pk,
-                    campaign_parent_id=parent_pk,
-                    send_after_parent_days=send_after_days,
                     start_at=start_at,
-                    end_at=end_at or None,
-                    active=active,
+                    end_at=end_at,
                     window=window_obj,
                 )
                 let = _ensure_letter(ws_id, camp)
@@ -207,22 +216,18 @@ def campaigns_view(request):
             edit_obj.title = title
             edit_obj.mailing_list_id = mailing_list_pk
             edit_obj.mailbox_id = mailbox_pk
-            edit_obj.campaign_parent_id = parent_pk
-            edit_obj.send_after_parent_days = send_after_days
             edit_obj.start_at = start_at
-            edit_obj.end_at = end_at or None
-            edit_obj.active = active
+            edit_obj.end_at = end_at
+            edit_obj.send_after_parent_days = send_after_days
             edit_obj.window = window_obj
             edit_obj.save(
                 update_fields=[
                     "title",
                     "mailing_list",
                     "mailbox",
-                    "campaign_parent",
-                    "send_after_parent_days",
                     "start_at",
                     "end_at",
-                    "active",
+                    "send_after_parent_days",
                     "window",
                     "updated_at",
                 ]
@@ -234,7 +239,7 @@ def campaigns_view(request):
 
             return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_obj.id))}")
 
-        # --- save letter / save ready ---
+        # ----- save letter / ready -----
         if action in ("save_letter", "save_ready"):
             if not edit_obj:
                 return redirect(request.path)
@@ -246,11 +251,11 @@ def campaigns_view(request):
 
             try:
                 subs = json.loads(subjects_json)
-                subs = [str(x).strip() for x in (subs or []) if str(x).strip()] if isinstance(subs, list) else []
+                subs = [str(x).strip() for x in subs if str(x).strip()] if isinstance(subs, list) else []
             except Exception:
                 subs = []
 
-            let.html_content = sanitize(editor_html or "")
+            let.html_content = sanitize(editor_html)
             let.subjects = subs
             let.save(update_fields=["html_content", "subjects", "updated_at"])
 
@@ -270,6 +275,7 @@ def campaigns_view(request):
 
         return redirect(request.path)
 
+    # ---------- GET ----------
     items = _with_ui_ids(_qs(ws_id))
 
     ctx = {

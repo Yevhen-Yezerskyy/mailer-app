@@ -1,334 +1,215 @@
+<!-- FILE: web/templates/panels/aap_campaigns/campaigns.html -->
+<!-- DATE: 2026-01-19 -->
+<!-- PURPOSE:
+  Кампании — единая страница.
+  A: спокойное состояние + кнопка добавления
+  B: add/edit кампании (форма)
+  C: редактор письма
+  D: нижняя таблица кампаний
+-->
+
 {% extends "panels/base.html" %}
 {% load i18n %}
 
-<!-- FILE: web/templates/panels/aap_campaigns/campaigns.html -->
-<!-- DATE: 2026-01-19 -->
-<!-- PURPOSE: Кампании: список + add/edit + письмо (TinyMCE + CodeMirror) в одном URL через state. -->
-<!-- CHANGE: (new) модалка предпросмотра как в templates, subjects с плюсиком (до 3). -->
-
 {% block content %}
 
-{% if state == "add" or state == "edit" or state == "letter" %}
-  <form method="post" id="yySendingForm">
-    {% csrf_token %}
-    {% if edit_obj %}
-      <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
-    {% endif %}
+{# ==================== A. СПОКОЙНОЕ СОСТОЯНИЕ ==================== #}
 
-    {% if state == "letter" %}
-      <input type="hidden" name="editor_mode" id="yyEditorMode" value="user">
-      <input type="hidden" name="editor_html" id="yyEditorHtml">
-      <input type="hidden" name="subjects_json" id="yySubjectsJson">
-      <textarea id="yyInitHtml" class="hidden">{{ letter_obj.html_content|default:"" }}</textarea>
-      <textarea id="yyInitSubjects" class="hidden">{{ letter_obj.subjects|default:"[]"|safe }}</textarea>
-      <input type="hidden" id="yyCampaignId" value="{{ edit_obj.ui_id }}">
-    {% endif %}
-{% endif %}
-
+{% if not state %}
 <table class="YY-MAIN_TABLE">
   <tr>
     <td class="YY-MAIN_TOP_LEFT_TD w-[70%]">
       <div class="YY-CARD_WHITE">
-
-        {% if state == "letter" and edit_obj and letter_obj %}
-          <div class="YY-STATUS_BLUE mb-3">
-            {% trans "Письмо кампании" %}: {{ edit_obj.title }}
-          </div>
-
-          <div class="mb-4">
-            <div class="YY-STATUS_YELLOW mb-2">{% trans "Тема письма" %}</div>
-            <div id="yySubjectsWrap" class="grid grid-cols-1 gap-2"></div>
-            <div class="mt-2">
-              <button type="button" class="YY-BUTTON_TAB_MAIN" id="yySubjectsAddBtn">+</button>
-            </div>
-          </div>
-
-          <div id="yyUserModeLeft">
-            <textarea id="yyTinyEditor"
-                      class="border border-[#cbcbcb] bg-white w-full"
-                      style="height:800px;"
-                      spellcheck="false"></textarea>
-          </div>
-
-          <div id="yyAdvancedModeLeft" class="hidden">
-            <textarea id="yyAdvHtml"
-                      style="height:900px;"
-                      spellcheck="false"></textarea>
-          </div>
-
-        {% elif state == "add" or state == "edit" %}
-          <div class="YY-STATUS_BLUE mb-3">
-            {% if state == "add" %}{% trans "Новая кампания" %}{% else %}{% trans "Редактирование кампании" %}{% endif %}
-          </div>
-
-          <input type="text" name="title" class="YY-INPUT !mb-3"
-                 value="{{ edit_obj.title|default:'' }}" placeholder="{% trans "Название кампании" %}">
-
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <div class="YY-STATUS_YELLOW mb-2">{% trans "Список рассылки" %}</div>
-              <select name="mailing_list" class="YY-INPUT">
-                {% for it in list_items %}
-                  <option value="{{ it.ui_id }}" {% if edit_obj and edit_obj.mailing_list_id == it.id %}selected{% endif %}>{{ it.title }}</option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div>
-              <div class="YY-STATUS_YELLOW mb-2">{% trans "Mailbox (откуда шлём)" %}</div>
-              <select name="mailbox" class="YY-INPUT">
-                {% for it in mb_items %}
-                  <option value="{{ it.ui_id }}" {% if edit_obj and edit_obj.mailbox_id == it.id %}selected{% endif %}>
-                    {{ it.name }} &lt;{{ it.email }}&gt;
-                  </option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div>
-              <div class="YY-STATUS_YELLOW mb-2">{% trans "Дата старта" %}</div>
-              <input type="datetime-local" name="start_at" class="YY-INPUT"
-                     value="{{ edit_obj.start_at|date:'Y-m-d\\TH:i'|default:'' }}">
-            </div>
-
-            <div>
-              <div class="YY-STATUS_YELLOW mb-2">{% trans "Дата конца" %}</div>
-              <input type="datetime-local" name="end_at" class="YY-INPUT"
-                     value="{{ edit_obj.end_at|date:'Y-m-d\\TH:i'|default:'' }}">
-            </div>
-
-            <div>
-              <div class="YY-STATUS_YELLOW mb-2">{% trans "Шаблон (Templates)" %}</div>
-              <select name="template" class="YY-INPUT">
-                <option value="">{% trans "— не выбран —" %}</option>
-                {% for it in tpl_items %}
-                  <option value="{{ it.ui_id }}"
-                    {% if edit_obj and edit_obj.letter and edit_obj.letter.template_id == it.id %}selected{% endif %}>
-                    {{ it.template_name }}
-                  </option>
-                {% endfor %}
-              </select>
-            </div>
-
-            <div>
-              <div class="YY-STATUS_YELLOW mb-2">{% trans "Активна" %}</div>
-              <label class="YY-TEXT flex items-center gap-2">
-                <input type="checkbox" name="active" {% if edit_obj and edit_obj.active %}checked{% endif %}>
-                {% trans "Включить кампанию" %}
-              </label>
-            </div>
-          </div>
-
-          <div class="mt-5">
-            <div class="YY-STATUS_YELLOW mb-2">{% trans "Цепочка" %}</div>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <select name="campaign_parent" class="YY-INPUT">
-                  <option value="">{% trans "— нет родителя —" %}</option>
-                  {% for it in parent_items %}
-                    <option value="{{ it.ui_id }}" {% if edit_obj and edit_obj.campaign_parent_id == it.id %}selected{% endif %}>
-                      {{ it.title }}
-                    </option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div>
-                <input type="number" name="send_after_parent_days" class="YY-INPUT"
-                       value="{{ edit_obj.send_after_parent_days|default:30 }}" placeholder="{% trans "Отправка через N дней" %}">
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-6">
-            <div class="flex items-center gap-2 mb-3">
-              <input type="checkbox" id="yyUseGlobalWindow" name="use_global_window"
-                     {% if not edit_obj or not edit_obj.window %}checked{% endif %}>
-              <label for="yyUseGlobalWindow" class="YY-TEXT">{% trans "Использовать глобальные настройки окна отправки" %}</label>
-            </div>
-
-            <textarea name="window" id="yyValueJson" class="hidden">
-              {% if edit_obj and edit_obj.window %}{{ edit_obj.window|safe }}{% else %}{{ global_window_json_str }}{% endif %}
-            </textarea>
-
-            <div id="yyWindowBox" class="YY-CARD_WHITE" style="margin-top: 30px; border: 1px solid #022a39;">
-              <div class="YY-STATUS_BLUE mb-3">{% trans "Окно отправки" %}</div>
-
-              <table class="w-full text-left">
-                <thead>
-                  <tr class="YY-TH_TR">
-                    <th class="YY-TH_TH w-[32%]">{% trans "День недели" %}</th>
-                    <th class="YY-TH_TH">{% trans "Окна" %}</th>
-                  </tr>
-                </thead>
-                <tbody id="yySendingBody">
-                  <tr data-yy-day="mon" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Понедельник" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
-                  <tr data-yy-day="tue" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Вторник" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
-                  <tr data-yy-day="wed" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Среда" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
-                  <tr data-yy-day="thu" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Четверг" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
-                  <tr data-yy-day="fri" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Пятница" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
-                  <tr class="YY-TB_TR"><td class="YY-TB_TD" colspan="2"><div class="h-[3px]"></div></td></tr>
-                  <tr data-yy-day="sat" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_YELLOW">{% trans "Суббота" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
-                  <tr data-yy-day="sun" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_YELLOW">{% trans "Воскресенье" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
-                  <tr class="YY-TB_TR"><td class="YY-TB_TD" colspan="2"><div class="h-[3px]"></div></td></tr>
-                  <tr data-yy-day="hol" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_RED">{% trans "Праздники" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-        {% else %}
-          <div class="YY-STATUS_BLUE">{% trans "Ваши кампании:" %}</div>
-        {% endif %}
+        <div class="YY-STATUS_BLUE">
+          {% trans "Ваши кампании:" %}
+        </div>
       </div>
     </td>
 
     <td class="YY-MAIN_TOP_RIGHT_TD w-[30%]">
       <div class="YY-CARD_WHITE">
-
-        {% if state == "letter" and edit_obj %}
-          <div id="yyUserModeRight">
-            <div class="grid grid-cols-2 gap-3 mb-10">
-              <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampSwitchToAdvanced()">{% trans "Экспертный режим" %}</button>
-              <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampPreviewCurrent()">{% trans "Предпросмотр" %}</button>
-            </div>
-          </div>
-
-          <div id="yyAdvancedModeRight" class="hidden">
-            <div class="grid grid-cols-2 gap-3 mb-10">
-              <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampSwitchToUser()">{% trans "Визуальный режим" %}</button>
-              <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampPreviewCurrent()">{% trans "Предпросмотр" %}</button>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-3 mt-5">
-            <button type="submit" name="action" value="save_letter" class="YY-BUTTON_MAIN">{% trans "Сохранить" %}</button>
-            <button type="submit" name="action" value="save_ready" class="YY-BUTTON_GREEN">{% trans "Сохранить к отправке" %}</button>
-          </div>
-
-          <div class="grid grid-cols-1 gap-3 mt-5">
-            <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN" formnovalidate>{% trans "Закрыть" %}</button>
-          </div>
-
-        {% elif state == "add" or state == "edit" %}
-          <div class="grid grid-cols-2 gap-3">
-            <button type="submit" name="action"
-                    value="{% if state == 'add' %}add_campaign{% else %}save_campaign{% endif %}"
-                    class="YY-BUTTON_MAIN">{% trans "Сохранить" %}</button>
-            <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN" formnovalidate>{% trans "Закрыть" %}</button>
-          </div>
-
-        {% else %}
-          <a href="?state=add" class="YY-BUTTON_MAIN mb-2">{% trans "Добавить кампанию" %}</a>
-        {% endif %}
-
+        <a href="?state=add" class="YY-BUTTON_MAIN w-full mb-2">
+          {% trans "Добавить кампанию" %}
+        </a>
       </div>
     </td>
   </tr>
 </table>
-
-{% if state == "add" or state == "edit" or state == "letter" %}
-  </form>
 {% endif %}
 
-<table class="YY-MAIN_TABLE">
-  <tr>
-    <td class="YY-MAIN_BOTTOM_TD">
+{# ==================== B. ADD / EDIT КАМПАНИИ ==================== #}
+{% if state == "add" or state == "edit" %}
 
-      {% if items %}
-        <div class="YY-MAIN_BOTTOM_DIV">
-          <table class="w-full text-left">
-            <thead>
-              <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[100%]">{% trans "Список кампаний:" %}</th>
-                <th class="YY-TH_TH">&nbsp;</th>
-                <th class="YY-TH_TH">&nbsp;</th>
-                <th class="YY-TH_TH">&nbsp;</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for it in items %}
-                <tr class="YY-TB_TR align-top">
-                  <td class="YY-TB_TD">
-                    <div class="YY-STATUS_BLUE">{{ it.title }}</div>
-                  </td>
-                  <td class="YY-TB_TD">
-                    <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
-                      {% csrf_token %}
-                      <input type="hidden" name="action" value="delete">
-                      <input type="hidden" name="id" value="{{ it.ui_id }}">
-                      <button type="submit" class="YY-BUTTON_TAB_RED">{% trans "Удалить" %}</button>
-                    </form>
-                  </td>
-                  <td class="YY-TB_TD">
-                    <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">{% trans "Изменить" %}</a>
-                  </td>
-                  <td class="YY-TB_TD">
-                    <a href="?state=letter&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">{% trans "Письмо" %}</a>
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+<!-- FILE: web/templates/panels/aap_campaigns/campaigns.html -->
+<!-- DATE: 2026-01-19 -->
+<!-- PURPOSE: B-block add/edit form (полностью) + окно отправки справа (UI 1:1 как Settings). -->
+
+<form method="post" id="yyCampaignForm">
+  {% csrf_token %}
+  {% if edit_obj %}
+    <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
+  {% endif %}
+
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <!-- LEFT 50% -->
+      <td class="YY-MAIN_TOP_LEFT_TD w-[50%] align-top">
+        <div class="YY-CARD_WHITE">
+
+          <label class="YY-LABEL">{% trans "Название кампании" %}</label>
+          <input type="text" name="title" class="YY-INPUT mb-3"
+                 value="{{ edit_obj.title|default:'' }}">
+
+          <label class="YY-LABEL">{% trans "Список рассылки" %}</label>
+          <select name="mailing_list" class="YY-INPUT mb-3">
+            <option value="">{% trans "— не выбран —" %}</option>
+            {% for it in list_items %}
+              <option value="{{ it.ui_id }}"
+                {% if edit_obj and edit_obj.mailing_list_id == it.id %}selected{% endif %}>
+                {{ it.title }}
+              </option>
+            {% endfor %}
+          </select>
+
+          <label class="YY-LABEL">{% trans "Mailbox" %}</label>
+          <select name="mailbox" class="YY-INPUT mb-3">
+            <option value="">{% trans "— не выбран —" %}</option>
+            {% for it in mb_items %}
+              <option value="{{ it.ui_id }}"
+                {% if edit_obj and edit_obj.mailbox_id == it.id %}selected{% endif %}>
+                {{ it.name }} &lt;{{ it.email }}&gt;
+              </option>
+            {% endfor %}
+          </select>
+
+          <label class="YY-LABEL">{% trans "Шаблон письма" %}</label>
+          <select name="template" class="YY-INPUT mb-4">
+            <option value="">{% trans "— не выбран —" %}</option>
+            {% for it in tpl_items %}
+              <option value="{{ it.ui_id }}"
+                {% if edit_obj and edit_obj.letter and edit_obj.letter.template_id == it.id %}selected{% endif %}>
+                {{ it.template_name }}
+              </option>
+            {% endfor %}
+          </select>
+
+          <label class="YY-LABEL">{% trans "Дата старта" %}</label>
+          <div class="flex gap-2 mb-3">
+            <input type="number" name="start_dd" min="1" max="31" class="yy-input-date-dd" placeholder="DD">
+            <input type="number" name="start_mm" min="1" max="12" class="yy-input-date-mm" placeholder="MM">
+            <input type="number" name="start_yy" min="2020" max="2100" class="yy-input-date-yy" placeholder="YYYY">
+          </div>
+
+          <label class="YY-LABEL">{% trans "Дата конца" %}</label>
+          <div class="flex gap-2 mb-4">
+            <input type="number" name="end_dd" min="1" max="31" class="yy-input-date-dd" placeholder="DD">
+            <input type="number" name="end_mm" min="1" max="12" class="yy-input-date-mm" placeholder="MM">
+            <input type="number" name="end_yy" min="2020" max="2100" class="yy-input-date-yy" placeholder="YYYY">
+          </div>
+
+          {% if state == "edit" and edit_obj and edit_obj.campaign_parent %}
+            <div class="YY-TEXT mb-1">
+              {% trans "Следуем за кампанией" %}: <strong>{{ edit_obj.campaign_parent.title }}</strong>
+            </div>
+            <label class="YY-LABEL">{% trans "Отправлять письма через (дней)" %}</label>
+            <input type="number" name="send_after_parent_days"
+                   class="YY-INPUT"
+                   value="{{ edit_obj.send_after_parent_days }}">
+          {% endif %}
+
         </div>
-      {% else %}
-        <div class="YY-CARD_WHITE mb-10">{% trans "Здесь пока нет данных" %}</div>
-      {% endif %}
+      </td>
 
-    </td>
-  </tr>
-</table>
+      <!-- RIGHT 50% -->
+      <td class="YY-MAIN_TOP_RIGHT_TD w-[50%] align-top">
+        <div class="YY-CARD_WHITE">
+
+          <label class="YY-TEXT flex items-center gap-2 mb-3">
+            <input type="checkbox" id="yyUseGlobalWindow" name="use_global_window"
+                   {% if not edit_obj or not edit_obj.window %}checked{% endif %}>
+            {% trans "Использовать глобальные настройки окна отправки" %}
+          </label>
+
+          <textarea id="yyGlobalWindowJson" class="hidden">{{ global_window_json_str }}</textarea>
+          <textarea name="window" id="yyValueJson" class="hidden">
+            {% if edit_obj and edit_obj.window %}{{ edit_obj.window|safe }}{% endif %}
+          </textarea>
+
+          <div id="yyWindowBox">
+            <table class="w-full text-left">
+              <thead>
+                <tr class="YY-TH_TR">
+                  <th class="YY-TH_TH w-[32%]">{% trans "День недели" %}</th>
+                  <th class="YY-TH_TH">{% trans "Окна отправки писем" %}</th>
+                </tr>
+              </thead>
+              <tbody id="yySendingBody">
+                <tr data-yy-day="mon" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Понедельник" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="tue" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Вторник" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="wed" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Среда" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="thu" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Четверг" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="fri" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Пятница" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
+
+                <tr class="YY-TB_TR"><td class="YY-TB_TD" colspan="2"><div class="h-[3px]"></div></td></tr>
+
+                <tr data-yy-day="sat" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_YELLOW">{% trans "Суббота" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="sun" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_YELLOW">{% trans "Воскресенье" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
+
+                <tr class="YY-TB_TR"><td class="YY-TB_TD" colspan="2"><div class="h-[3px]"></div></td></tr>
+
+                <tr data-yy-day="hol" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_RED">{% trans "Праздники" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="flex justify-end gap-3 mt-6">
+            <button type="submit" name="action"
+                    value="{% if state == 'add' %}add_campaign{% else %}save_campaign{% endif %}"
+                    class="YY-BUTTON_MAIN">
+              {% trans "Сохранить изменения" %}
+            </button>
+            <button type="submit" name="action" value="close"
+                    formnovalidate class="YY-BUTTON_MAIN">
+              {% trans "Закрыть" %}
+            </button>
+          </div>
+
+        </div>
+      </td>
+    </tr>
+  </table>
+</form>
+
+
+{% endif %}
+
+{# ==================== C. РЕДАКТОР ПИСЬМА ==================== #}
+{% if state == "letter" %}
+  {{ block.super }}
+{% endif %}
+
+{# ==================== D. НИЖНЯЯ ТАБЛИЦА ==================== #}
+{% if items %}
+  <div class="YY-CARD_WHITE mt-10">
+    <table class="w-full text-left">
+      <tbody>
+        {% for it in items %}
+          <tr class="YY-TB_TR">
+            <td class="YY-TB_TD"><div class="YY-STATUS_BLUE">{{ it.title }}</div></td>
+            <td class="YY-TB_TD"><a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">{% trans "Изменить" %}</a></td>
+            <td class="YY-TB_TD"><a href="?state=letter&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">{% trans "Письмо" %}</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
 
 {% endblock %}
 
 {% block extra_js %}
   {{ block.super }}
-
-  <!-- windows builder (same as settings/sending) -->
-  <script src="/static/js/aap_settings/sending.js"></script>
-
-  <script>
-    (function () {
-      const cb = document.getElementById("yyUseGlobalWindow");
-      const box = document.getElementById("yyWindowBox");
-      const ta = document.getElementById("yyValueJson");
-      if (!cb || !box || !ta) return;
-
-      function sync() {
-        if (cb.checked) {
-          box.style.opacity = "0.45";
-          box.style.pointerEvents = "none";
-          ta.value = ""; // empty => use global
-        } else {
-          box.style.opacity = "1";
-          box.style.pointerEvents = "auto";
-        }
-      }
-
-      cb.addEventListener("change", sync);
-      sync();
-    })();
-  </script>
-
-  {% if state == "letter" %}
-    <!-- CodeMirror (advanced html) -->
-    <link rel="stylesheet" href="/static/vendor/codemirror/codemirror.css">
-    <link rel="stylesheet" href="/static/vendor/codemirror/theme/material-darker.css">
-    <script src="/static/vendor/codemirror/codemirror.js"></script>
-    <script src="/static/vendor/codemirror/mode/xml/xml.js"></script>
-    <script src="/static/vendor/codemirror/mode/javascript/javascript.js"></script>
-    <script src="/static/vendor/codemirror/mode/css/css.js"></script>
-    <script src="/static/vendor/codemirror/mode/htmlmixed/htmlmixed.js"></script>
-
-    <!-- Tiny -->
-    <script src="/static/vendor/tinymce/tinymce.min.js"></script>
-
-    <!-- Campaign Letter (split JS) -->
-    <script src="/static/js/campaign_letters/tinymce_config.js"></script>
-    <script src="/static/js/campaign_letters/tinymce.js"></script>
-    <script src="/static/js/campaign_letters/codemirror.js"></script>
-    <script src="/static/js/campaign_letters/mode_switch.js"></script>
-    <script src="/static/js/campaign_letters/preview.js"></script>
-    <script src="/static/js/campaign_letters/subjects.js"></script>
-    <script src="/static/js/campaign_letters/submit.js"></script>
+  {% if state == "add" or state == "edit" %}
+    <script src="/static/js/aap_settings/sending_campaign.js"></script>
   {% endif %}
 {% endblock %}
