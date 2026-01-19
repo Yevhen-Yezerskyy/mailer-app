@@ -1,7 +1,7 @@
 # FILE: web/panel/aap_settings/models.py
-# DATE: 2026-01-18
-# PURPOSE: Почтовые ящики (Mailbox), транспорты SMTP/IMAP (MailboxConnection) и справочник пресетов (ProviderPreset).
-# CHANGE: Добавлен Mailbox.limit_hour_sent (лимит писем в час), default=50.
+# DATE: 2026-01-19
+# PURPOSE: Приведение нейминга workspace к единому формату.
+# CHANGE: SendingSettings.workspace -> SendingSettings.workspace_id.
 
 from __future__ import annotations
 
@@ -90,20 +90,17 @@ class MailboxConnection(models.Model):
 
 
 class ProviderPreset(models.Model):
-    code = models.CharField(
-        max_length=64,
-        help_text="Стабильный код провайдера (gmail, ionos, …). Может иметь 2 записи: smtp + imap.",
-    )
-    name = models.CharField(max_length=255, help_text="Отображаемое имя провайдера")
+    code = models.CharField(max_length=64)
+    name = models.CharField(max_length=255)
 
     kind = models.CharField(max_length=8, choices=ConnKind.choices)
     host = models.CharField(max_length=255)
 
-    ports_json = models.JSONField(help_text="Список портов, например [587, 465]")
+    ports_json = models.JSONField()
     security = models.CharField(max_length=16, choices=Security.choices, default=Security.NONE)
     auth_type = models.CharField(max_length=16, choices=AuthType.choices, default=AuthType.LOGIN)
 
-    extra_json = models.JSONField(default=dict, blank=True, help_text="Дефолты/подсказки (например IMAP folders)")
+    extra_json = models.JSONField(default=dict, blank=True)
 
     is_active = models.BooleanField(default=True)
     order = models.IntegerField(default=0)
@@ -124,9 +121,8 @@ class ProviderPreset(models.Model):
         return f"{self.name} ({self.code}/{self.kind})"
 
 
-
 class SendingSettings(models.Model):
-    workspace = models.UUIDField(
+    workspace_id = models.UUIDField(
         unique=True,
         db_index=True,
         help_text="UUID workspace (1 запись на workspace)",
@@ -146,4 +142,4 @@ class SendingSettings(models.Model):
         db_table = "aap_settings_sending_settings"
 
     def __str__(self) -> str:
-        return f"SendingSettings[{self.workspace}]"
+        return f"SendingSettings[{self.workspace_id}]"

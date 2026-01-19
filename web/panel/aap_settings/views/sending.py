@@ -1,7 +1,7 @@
 # FILE: web/panel/aap_settings/views/sending.py
-# DATE: 2026-01-18
+# DATE: 2026-01-19
 # PURPOSE: Settings → Sending: автосоздание SendingSettings для workspace + сохранение value_json из формы.
-# CHANGE: FIX: "_" используется ТОЛЬКО как gettext, created не затирает переводчик.
+# CHANGE: SendingSettings.workspace -> SendingSettings.workspace_id.
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def sending_settings_view(request):
         return redirect("/")
 
     obj, created_flag = SendingSettings.objects.get_or_create(
-        workspace=ws,
+        workspace_id=ws,
         defaults={"value_json": _default_value_json()},
     )
 
