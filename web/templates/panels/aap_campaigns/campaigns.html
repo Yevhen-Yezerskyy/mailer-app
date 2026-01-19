@@ -38,11 +38,8 @@
 {% endif %}
 
 {# ==================== B. ADD / EDIT КАМПАНИИ ==================== #}
-{% if state == "add" or state == "edit" %}
 
-<!-- FILE: web/templates/panels/aap_campaigns/campaigns.html -->
-<!-- DATE: 2026-01-19 -->
-<!-- PURPOSE: B-block add/edit form (полностью) + окно отправки справа (UI 1:1 как Settings). -->
+{% if state == "add" or state == "edit" %}
 
 <form method="post" id="yyCampaignForm">
   {% csrf_token %}
@@ -93,19 +90,44 @@
             {% endfor %}
           </select>
 
-          <label class="YY-LABEL">{% trans "Дата старта" %}</label>
-          <div class="flex gap-2 mb-3">
-            <input type="number" name="start_dd" min="1" max="31" class="yy-input-date-dd" placeholder="DD">
-            <input type="number" name="start_mm" min="1" max="12" class="yy-input-date-mm" placeholder="MM">
-            <input type="number" name="start_yy" min="2020" max="2100" class="yy-input-date-yy" placeholder="YYYY">
-          </div>
+<div class="flex items-center gap-4 mb-4">
+  <div class="YY-STATUS_BLUE !py-1 w-[250px] mr-4">{% trans "Дата начала кампании" %}:</div>
 
-          <label class="YY-LABEL">{% trans "Дата конца" %}</label>
-          <div class="flex gap-2 mb-4">
-            <input type="number" name="end_dd" min="1" max="31" class="yy-input-date-dd" placeholder="DD">
-            <input type="number" name="end_mm" min="1" max="12" class="yy-input-date-mm" placeholder="MM">
-            <input type="number" name="end_yy" min="2020" max="2100" class="yy-input-date-yy" placeholder="YYYY">
-          </div>
+  <input type="number" inputmode="numeric" name="start_dd" maxlength="2"
+         class="YY-DATE-INPUT w-[3.3rem] pl-2"
+         placeholder="DD"
+         value="{% if edit_obj and edit_obj.start_at %}{{ edit_obj.start_at|date:'d' }}{% endif %}">
+
+  <input type="number" inputmode="numeric" name="start_mm" maxlength="2"
+         class="YY-DATE-INPUT w-[3.3rem] pl-2"
+         placeholder="MM"
+         value="{% if edit_obj and edit_obj.start_at %}{{ edit_obj.start_at|date:'m' }}{% endif %}">
+
+  <input type="number" inputmode="numeric" name="start_yy" maxlength="4"
+         class="YY-DATE-INPUT w-[4.7rem] pl-2"
+         placeholder="YYYY"
+         value="{% if edit_obj and edit_obj.start_at %}{{ edit_obj.start_at|date:'Y' }}{% endif %}">
+</div>
+
+<div class="flex items-center gap-4 mb-4">
+  <div class="YY-STATUS_BLUE !py-1 w-[250px] mr-4">{% trans "Дата конца компании" %}:</div>
+
+  <input type="number" inputmode="numeric" name="end_dd" maxlength="2"
+         class="YY-DATE-INPUT w-[3.3rem] pl-2"
+         placeholder="DD"
+         value="{% if edit_obj and edit_obj.end_at %}{{ edit_obj.end_at|date:'d' }}{% endif %}">
+
+  <input type="number" inputmode="numeric" name="end_mm" maxlength="2"
+         class="YY-DATE-INPUT w-[3.3rem] pl-2"
+         placeholder="MM"
+         value="{% if edit_obj and edit_obj.end_at %}{{ edit_obj.end_at|date:'m' }}{% endif %}">
+
+  <input type="number" inputmode="numeric" name="end_yy" maxlength="4"
+         class="YY-DATE-INPUT w-[4.7rem] pl-2"
+         placeholder="YYYY"
+         value="{% if edit_obj and edit_obj.end_at %}{{ edit_obj.end_at|date:'Y' }}{% endif %}">
+</div>
+
 
           {% if state == "edit" and edit_obj and edit_obj.campaign_parent %}
             <div class="YY-TEXT mb-1">
@@ -117,6 +139,22 @@
                    value="{{ edit_obj.send_after_parent_days }}">
           {% endif %}
 
+        </div>
+        <div class="YY-CARD_WHITE mt-2">
+          <div class="flex gap-2">
+            {% if state == "add" %}
+              <button type="submit" name="action" value="add_campaign" class="YY-BUTTON_MAIN w-full">
+                {% trans "Добавить" %}
+              </button>
+            {% else %}
+              <button type="submit" name="action" value="save_campaign" class="YY-BUTTON_MAIN w-full">
+                {% trans "Сохранить изменения" %}
+              </button>
+            {% endif %}
+            <button type="submit" name="action" value="close" formnovalidate class="YY-BUTTON_MAIN w-full">
+              {% trans "Закрыть" %}
+            </button>
+          </div>
         </div>
       </td>
 
@@ -131,57 +169,76 @@
           </label>
 
           <textarea id="yyGlobalWindowJson" class="hidden">{{ global_window_json_str }}</textarea>
-          <textarea name="window" id="yyValueJson" class="hidden">
-            {% if edit_obj and edit_obj.window %}{{ edit_obj.window|safe }}{% endif %}
-          </textarea>
+          <textarea name="window" id="yyValueJson" class="hidden">{{ edit_window_json_str }}</textarea>
 
           <div id="yyWindowBox">
+            
             <table class="w-full text-left">
-              <thead>
-                <tr class="YY-TH_TR">
-                  <th class="YY-TH_TH w-[32%]">{% trans "День недели" %}</th>
-                  <th class="YY-TH_TH">{% trans "Окна отправки писем" %}</th>
-                </tr>
-              </thead>
               <tbody id="yySendingBody">
-                <tr data-yy-day="mon" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Понедельник" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
-                <tr data-yy-day="tue" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Вторник" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
-                <tr data-yy-day="wed" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Среда" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
-                <tr data-yy-day="thu" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Четверг" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
-                <tr data-yy-day="fri" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_GREEN">{% trans "Пятница" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="mon" class="border-b border-t border-[#71d0f4]">
+                  <td class="align-top px-2 py-2 w-[35%]">
+                    <div class="YY-STATUS_GREEN !py-1">{% trans "Понедельник" %}</div>
+                  </td>
+                  <td class="align-top px-2 py-2 w-[65%]"><div class="yy-day-windows"></div></td>
+                </tr>
+                <tr data-yy-day="tue" class="border-b border-[#71d0f4]">
+                  <td class="align-top px-2 py-2">
+                    <div class="YY-STATUS_GREEN !py-1">{% trans "Вторник" %}</div>
+                  </td>
+                  <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
+                </tr>
 
-                <tr class="YY-TB_TR"><td class="YY-TB_TD" colspan="2"><div class="h-[3px]"></div></td></tr>
+                <tr data-yy-day="wed" class="border-b border-[#71d0f4]">
+                  <td class="align-top px-2 py-2">
+                    <div class="YY-STATUS_GREEN !py-1">{% trans "Среда" %}</div>
+                  </td>
+                  <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
+                </tr>
 
-                <tr data-yy-day="sat" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_YELLOW">{% trans "Суббота" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
-                <tr data-yy-day="sun" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_YELLOW">{% trans "Воскресенье" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="thu" class="border-b border-[#71d0f4]">
+                  <td class="align-top px-2 py-2">
+                    <div class="YY-STATUS_GREEN !py-1">{% trans "Четверг" %}</div>
+                  </td>
+                  <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
+                </tr>
 
-                <tr class="YY-TB_TR"><td class="YY-TB_TD" colspan="2"><div class="h-[3px]"></div></td></tr>
-
-                <tr data-yy-day="hol" class="YY-TB_TR align-top"><td class="YY-TB_TD"><div class="YY-STATUS_RED">{% trans "Праздники" %}</div></td><td class="YY-TB_TD"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="fri" class="border-b border-[#71d0f4]">
+                  <td class="align-top px-2 py-2">
+                    <div class="YY-STATUS_GREEN !py-1">{% trans "Пятница" %}</div>
+                  </td>
+                  <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
+                </tr>
+                <tr data-yy-day="sat" class="border-b border-[#71d0f4]">
+                  <td class="align-top px-2 py-2">
+                    <div class="YY-STATUS_YELLOW !py-1">{% trans "Суббота" %}</div>
+                  </td>
+                  <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
+                </tr>
+                <tr data-yy-day="sun" class="border-b border-[#71d0f4]">
+                  <td class="align-top px-2 py-2">
+                    <div class="YY-STATUS_YELLOW !py-1">{% trans "Воскресенье" %}</div>
+                  </td>
+                  <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
+                </tr>
+                <tr data-yy-day="hol" class="border-b border-[#71d0f4]">
+                  <td class="align-top px-2 py-2">
+                    <div class="YY-STATUS_RED !py-1">{% trans "Праздники" %}</div>
+                  </td>
+                  <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
+                </tr>              
               </tbody>
             </table>
-          </div>
 
-          <div class="flex justify-end gap-3 mt-6">
-            <button type="submit" name="action"
-                    value="{% if state == 'add' %}add_campaign{% else %}save_campaign{% endif %}"
-                    class="YY-BUTTON_MAIN">
-              {% trans "Сохранить изменения" %}
-            </button>
-            <button type="submit" name="action" value="close"
-                    formnovalidate class="YY-BUTTON_MAIN">
-              {% trans "Закрыть" %}
-            </button>
-          </div>
 
+          </div>
         </div>
       </td>
     </tr>
   </table>
 </form>
 
-
 {% endif %}
+
 
 {# ==================== C. РЕДАКТОР ПИСЬМА ==================== #}
 {% if state == "letter" %}

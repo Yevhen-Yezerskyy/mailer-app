@@ -15,8 +15,7 @@
   const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun", "hol"];
 
   const INPUT_BASE =
-    "YY-INPUT !mb-0 !w-14 text-center px-4 py-2 rounded-md border border-[#71d0f4] bg-white " +
-    "placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007c09]/10 focus:border-[#007c09]";
+    "w-14 text-center px-1 py-1 rounded-md border border-[#71d0f4] bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#71d0f4]/10 focus:border-[#71d0f4]";
 
   function pad2(v) {
     const s = String(v == null ? "" : v).trim();

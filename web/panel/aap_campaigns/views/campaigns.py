@@ -1,11 +1,6 @@
 # FILE: web/panel/aap_campaigns/views/campaigns.py
 # DATE: 2026-01-19
-# PURPOSE: Кампании — list / add / edit / letter в одном PU через state.
-# CHANGE:
-# - Даты: DD/MM/YYYY (number inputs), без времени
-# - Дефолты: start = today, end = today + 90 days
-# - Без внешних зависимостей
-# - Корректный парсинг state
+# PURPOSE: Fix campaigns add/edit: поддержка *close кнопок + attach letter к edit_obj для селекта template.
 
 from __future__ import annotations
 
@@ -23,8 +18,6 @@ from panel.aap_campaigns.models import Campaign, Letter, Templates
 from panel.aap_lists.models import MailingList
 from panel.aap_settings.models import Mailbox, SendingSettings
 
-
-# ---------- helpers ----------
 
 def _guard(request) -> tuple[Optional[UUID], Optional[object]]:
     ws_id = getattr(request, "workspace_id", None)
@@ -87,8 +80,6 @@ def _parse_date_from_post(request, prefix: str) -> Optional[date]:
         return None
 
 
-# ---------- main view ----------
-
 def campaigns_view(request):
     ws_id, _user = _guard(request)
     if not ws_id:
@@ -99,7 +90,10 @@ def campaigns_view(request):
     if isinstance(edit_obj, HttpResponseRedirect):
         return edit_obj
 
-    # selects
+    # attach letter to edit_obj for template select (do NOT create on GET)
+    if edit_obj:
+        edit_obj.letter = Letter.objects.filter(workspace_id=ws_id, campaign=edit_obj).first()
+
     list_items = MailingList.objects.filter(workspace_id=ws_id, archived=False).order_by("-created_at")
     mb_items = Mailbox.objects.filter(workspace_id=ws_id, is_active=True).order_by("name")
     tpl_items = Templates.objects.filter(workspace_id=ws_id, is_active=True).order_by("order", "template_name")
@@ -113,7 +107,6 @@ def campaigns_view(request):
 
     parent_items = _with_ui_ids(Campaign.objects.filter(workspace_id=ws_id))
 
-    # global window (UI)
     ss, _ = SendingSettings.objects.get_or_create(
         workspace_id=ws_id,
         defaults={"value_json": {}},
@@ -125,7 +118,6 @@ def campaigns_view(request):
         letter_obj = _ensure_letter(ws_id, edit_obj)
         letter_obj.ui_id = encode_id(int(letter_obj.id))
 
-    # ---------- POST ----------
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
 
@@ -146,8 +138,9 @@ def campaigns_view(request):
             Campaign.objects.filter(id=int(res), workspace_id=ws_id).delete()
             return redirect(request.path)
 
-        # ----- add / save campaign -----
-        if action in ("add_campaign", "save_campaign"):
+        if action in ("add_campaign", "save_campaign", "add_campaign_close", "save_campaign_close"):
+            want_close = action in ("add_campaign_close", "save_campaign_close")
+
             title = (request.POST.get("title") or "").strip()
             mailing_list_ui = (request.POST.get("mailing_list") or "").strip()
             mailbox_ui = (request.POST.get("mailbox") or "").strip()
@@ -169,11 +162,9 @@ def campaigns_view(request):
                 except Exception:
                     template_pk = None
 
-            # dates
             start_at = _parse_date_from_post(request, "start") or date.today()
             end_at = _parse_date_from_post(request, "end") or (start_at + timedelta(days=90))
 
-            # chain (only on edit + has parent)
             send_after_days = 0
             if edit_obj and edit_obj.campaign_parent_id:
                 try:
@@ -183,7 +174,6 @@ def campaigns_view(request):
                 if send_after_days < 0:
                     send_after_days = 0
 
-            # window
             use_global_window = bool(request.POST.get("use_global_window"))
             window_raw = (request.POST.get("window") or "").strip()
             window_obj = {}
@@ -194,7 +184,7 @@ def campaigns_view(request):
                 except Exception:
                     window_obj = {}
 
-            if action == "add_campaign":
+            if action in ("add_campaign", "add_campaign_close"):
                 camp = Campaign.objects.create(
                     workspace_id=ws_id,
                     title=title,
@@ -207,9 +197,11 @@ def campaigns_view(request):
                 let = _ensure_letter(ws_id, camp)
                 let.template_id = template_pk
                 let.save(update_fields=["template", "updated_at"])
+
+                if want_close:
+                    return redirect(request.path)
                 return redirect(f"{request.path}?state=letter&id={encode_id(int(camp.id))}")
 
-            # save_campaign
             if not edit_obj:
                 return redirect(request.path)
 
@@ -237,9 +229,10 @@ def campaigns_view(request):
             let.template_id = template_pk
             let.save(update_fields=["template", "updated_at"])
 
+            if want_close:
+                return redirect(request.path)
             return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_obj.id))}")
 
-        # ----- save letter / ready -----
         if action in ("save_letter", "save_ready"):
             if not edit_obj:
                 return redirect(request.path)
@@ -275,9 +268,13 @@ def campaigns_view(request):
 
         return redirect(request.path)
 
-    # ---------- GET ----------
     items = _with_ui_ids(_qs(ws_id))
 
+    edit_window_json_str = ""
+    if edit_obj and isinstance(edit_obj.window, dict):
+        edit_window_json_str = json.dumps(edit_obj.window or {}, ensure_ascii=False)
+
+    # --- ctx ---
     ctx = {
         "items": items,
         "state": state,
@@ -288,5 +285,6 @@ def campaigns_view(request):
         "tpl_items": tpl_items,
         "parent_items": parent_items,
         "global_window_json_str": json.dumps(global_window_json or {}, ensure_ascii=False),
+        "edit_window_json_str": edit_window_json_str,   # ← ВАЖНО
     }
     return render(request, "panels/aap_campaigns/campaigns.html", ctx)

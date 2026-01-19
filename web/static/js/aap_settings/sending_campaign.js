@@ -1,26 +1,28 @@
 // FILE: web/static/js/aap_settings/sending_campaign.js
 // DATE: 2026-01-19
-// PURPOSE: Campaigns add/edit → окно отправки (UI 1:1 как Settings/sending.js), но с чекбоксом "глобальные".
-// CHANGE:
-// - form: #yyCampaignForm
-// - checkbox: #yyUseGlobalWindow
-// - global json: #yyGlobalWindowJson
-// - submit actions: add_campaign / save_campaign (close/прочее не трогаем)
-// - если checkbox checked => textarea window пустая, UI disabled; UI показывает глобальные окна
+// PURPOSE: Campaigns add/edit: окно отправки + валидация формы на submit.
+// CHANGE: Fix submit without button-click (Enter/etc) -> всегда определяем action и сериализуем window.
 
 (function () {
   const form = document.getElementById("yyCampaignForm");
-  const ta = document.getElementById("yyValueJson");          // name="window"
+  const ta = document.getElementById("yyValueJson"); // name="window"
   const taGlobal = document.getElementById("yyGlobalWindowJson");
   const body = document.getElementById("yySendingBody");
   const cb = document.getElementById("yyUseGlobalWindow");
   if (!form || !ta || !taGlobal || !body || !cb) return;
 
+  // --- FIX: remember last clicked submit action (Enter submit has no submitter) ---
+  let lastAction = "";
+  form.addEventListener("click", function (e) {
+    const b = e.target && e.target.closest ? e.target.closest('button[type="submit"][name="action"]') : null;
+    if (!b) return;
+    lastAction = String(b.value || "").trim();
+  });
+
   const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun", "hol"];
 
   const INPUT_BASE =
-    "YY-INPUT !mb-0 !w-14 text-center px-4 py-2 rounded-md border border-[#71d0f4] bg-white " +
-    "placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#007c09]/10 focus:border-[#007c09]";
+    "w-14 text-center px-1 py-1 rounded-md border border-[#71d0f4] bg-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#71d0f4]/10 focus:border-[#71d0f4]";
 
   function pad2(v) {
     const s = String(v == null ? "" : v).trim();
@@ -66,7 +68,7 @@
   }
 
   function ensureState(raw) {
-    const st = (raw && typeof raw === "object" && !Array.isArray(raw)) ? raw : {};
+    const st = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
     DAY_KEYS.forEach((k) => {
       if (!Array.isArray(st[k])) st[k] = [];
       st[k] = st[k].map((w) => {
@@ -78,7 +80,84 @@
     return st;
   }
 
-  // --- Dropdown (single global, 1:1) ---
+  function setInputRed(inp) {
+    if (!inp) return;
+    inp.style.borderColor = "#ef4444";
+  }
+
+  // --- dates (client defaults + helpers) ---
+
+  const startDD = form.querySelector('input[name="start_dd"]');
+  const startMM = form.querySelector('input[name="start_mm"]');
+  const startYY = form.querySelector('input[name="start_yy"]');
+  const endDD = form.querySelector('input[name="end_dd"]');
+  const endMM = form.querySelector('input[name="end_mm"]');
+  const endYY = form.querySelector('input[name="end_yy"]');
+
+  function todayParts() {
+    const d = new Date();
+    return { dd: d.getDate(), mm: d.getMonth() + 1, yy: d.getFullYear() };
+  }
+
+  function addDaysParts(dd, mm, yy, addDays) {
+    const d = new Date(yy, mm - 1, dd);
+    if (Number.isNaN(d.getTime())) return null;
+    d.setDate(d.getDate() + addDays);
+    return { dd: d.getDate(), mm: d.getMonth() + 1, yy: d.getFullYear() };
+  }
+
+  function readDateParts(inpDD, inpMM, inpYY) {
+    const dd = toInt(inpDD && inpDD.value);
+    const mm = toInt(inpMM && inpMM.value);
+    const yy = toInt(inpYY && inpYY.value);
+    return { dd, mm, yy };
+  }
+
+  function isAllEmptyDate(inpDD, inpMM, inpYY) {
+    return !String((inpDD && inpDD.value) || "").trim()
+      && !String((inpMM && inpMM.value) || "").trim()
+      && !String((inpYY && inpYY.value) || "").trim();
+  }
+
+  function isAnyEmptyDate(inpDD, inpMM, inpYY) {
+    const a = String((inpDD && inpDD.value) || "").trim();
+    const b = String((inpMM && inpMM.value) || "").trim();
+    const c = String((inpYY && inpYY.value) || "").trim();
+    return (!a || !b || !c) && !(!a && !b && !c);
+  }
+
+  function buildDate(dd, mm, yy) {
+    if (dd == null || mm == null || yy == null) return null;
+    const d = new Date(yy, mm - 1, dd);
+    if (Number.isNaN(d.getTime())) return null;
+    if (d.getFullYear() !== yy || (d.getMonth() + 1) !== mm || d.getDate() !== dd) return null;
+    return d;
+  }
+
+  function applyDateDefaultsIfEmpty() {
+    if (startDD && startMM && startYY && isAllEmptyDate(startDD, startMM, startYY)) {
+      const t = todayParts();
+      startDD.value = String(t.dd);
+      startMM.value = String(t.mm);
+      startYY.value = String(t.yy);
+    }
+
+    if (endDD && endMM && endYY && isAllEmptyDate(endDD, endMM, endYY)) {
+      const s = readDateParts(startDD, startMM, startYY);
+      const base = (s.dd && s.mm && s.yy) ? s : todayParts();
+      const e = addDaysParts(base.dd, base.mm, base.yy, 90);
+      if (e) {
+        endDD.value = String(e.dd);
+        endMM.value = String(e.mm);
+        endYY.value = String(e.yy);
+      }
+    }
+  }
+
+  applyDateDefaultsIfEmpty();
+
+  // --- Dropdown (single global, same behavior as sending.js: mousedown) ---
+
   const DD = (function () {
     let el = null;
     let activeInput = null;
@@ -102,7 +181,7 @@
 
       document.addEventListener("mousedown", function (e) {
         if (!el || el.style.display === "none") return;
-        if (activeInput && (e.target === activeInput)) return;
+        if (activeInput && e.target === activeInput) return;
         if (el.contains(e.target)) return;
         hide();
       });
@@ -111,6 +190,7 @@
         if (e.key === "Escape") hide();
       });
 
+      window.addEventListener("resize", hide);
       return el;
     }
 
@@ -147,17 +227,20 @@
 
       const margin = 6;
       const viewportH = window.innerHeight || document.documentElement.clientHeight;
+      const viewportW = window.innerWidth || document.documentElement.clientWidth;
 
       root.style.display = "block";
       root.style.left = "0px";
       root.style.top = "0px";
 
-      const h = root.getBoundingClientRect().height || 180;
+      const rr = root.getBoundingClientRect();
+      const h = rr.height || 180;
+      const w = rr.width || 180;
 
       const spaceBelow = viewportH - r.bottom;
       const useUp = spaceBelow < (h + 16);
 
-      const left = Math.max(8, Math.min(r.left, (window.innerWidth - 8 - 180)));
+      const left = Math.max(8, Math.min(r.left, (viewportW - 8 - w)));
       const top = useUp ? (r.top - margin - h) : (r.bottom + margin);
 
       root.style.left = left + "px";
@@ -183,7 +266,7 @@
     return { show, hide };
   })();
 
-  function mkTimeInput(kind /* 'h'|'m' */, placeholder) {
+  function mkTimeInput(kind, placeholder) {
     const inp = document.createElement("input");
     inp.type = "text";
     inp.inputMode = "numeric";
@@ -197,9 +280,10 @@
       const s = String(inp.value || "");
       const cleaned = s.replace(/[^\d]/g, "").slice(0, 2);
       if (cleaned !== s) inp.value = cleaned;
+      inp.style.borderColor = "";
     });
 
-    inp.addEventListener("focus", function () {
+    inp.addEventListener("mousedown", function () {
       const values =
         kind === "h"
           ? Array.from({ length: 24 }, (_, i) => pad2(i))
@@ -208,13 +292,11 @@
       DD.show(inp, values, function (v) {
         inp.value = String(v);
         inp.dispatchEvent(new Event("input", { bubbles: true }));
-        inp.dispatchEvent(new Event("blur", { bubbles: true }));
       });
     });
 
     inp.addEventListener("blur", function () {
       inp.value = pad2(inp.value);
-      setTimeout(() => DD.hide(), 0);
     });
 
     return inp;
@@ -248,12 +330,13 @@
     box.style.pointerEvents = disabled ? "none" : "auto";
   }
 
-  // state sources
+  // --- state sources ---
+
   const globalState = ensureState(safeParseJson(taGlobal.value || "{}"));
-  let state = null;
+  let state = ensureState(safeParseJson(ta.value || "{}"));
 
   function useGlobalNow() {
-    state = JSON.parse(JSON.stringify(globalState));
+    state = ensureState(JSON.parse(JSON.stringify(globalState)));
     setUiDisabled(true);
     ta.value = "";
   }
@@ -262,12 +345,13 @@
     const raw = safeParseJson(ta.value || "{}");
     const custom = ensureState(raw);
     const hasAny = DAY_KEYS.some((k) => Array.isArray(custom[k]) && custom[k].length);
-    state = hasAny ? custom : JSON.parse(JSON.stringify(globalState));
+    state = hasAny ? custom : ensureState(JSON.parse(JSON.stringify(globalState)));
     setUiDisabled(false);
     ta.value = JSON.stringify(state);
   }
 
-  // --- Render (1:1) ---
+  // --- Render (as sending.js: "+" only last / empty) ---
+
   function renderDay(day) {
     const row = body.querySelector(`tr[data-yy-day="${day}"]`);
     if (!row) return;
@@ -278,28 +362,15 @@
     box.innerHTML = "";
     box.className = "yy-day-windows space-y-2";
 
-    const windows = Array.isArray(state[day]) ? state[day] : [];
-
-    function addPlusRow() {
-      const line = document.createElement("div");
-      line.className = "flex items-center gap-2";
-
-      const btn = mkBtn("plus");
-      btn.addEventListener("click", function () {
-        state[day].push({ from: "", to: "" });
-        renderDay(day);
-      });
-
-      line.appendChild(btn);
-      box.appendChild(line);
-    }
+    if (!Array.isArray(state[day])) state[day] = [];
+    const windows = state[day];
 
     function addWindowRow(idx, w) {
       const line = document.createElement("div");
       line.className = "flex items-center gap-2";
 
-      const btn = mkBtn("minus");
-      btn.addEventListener("click", function () {
+      const btnMinus = mkBtn("minus");
+      btnMinus.addEventListener("click", function () {
         state[day].splice(idx, 1);
         renderDay(day);
       });
@@ -317,40 +388,18 @@
       th.value = tp.hh;
       tm.value = tp.mm;
 
-      function sync(doPad) {
-        if (doPad) {
-          fh.value = pad2(fh.value);
-          fm.value = pad2(fm.value);
-          th.value = pad2(th.value);
-          tm.value = pad2(tm.value);
-        }
-
-        const H1 = toInt(fh.value);
-        const M1 = toInt(fm.value);
-        const H2 = toInt(th.value);
-        const M2 = toInt(tm.value);
-
-        const fOk = (H1 != null && M1 != null && H1 >= 0 && H1 <= 23 && M1 >= 0 && M1 <= 59);
-        const tOk = (H2 != null && M2 != null && H2 >= 0 && H2 <= 23 && M2 >= 0 && M2 <= 59);
-
-        const fMin = fOk ? toMinutes(H1, M1) : null;
-        const tMin = tOk ? toMinutes(H2, M2) : null;
-
-        const ok = (fMin != null && tMin != null && fMin < tMin);
-        line.style.opacity = (ok || (!fh.value && !fm.value && !th.value && !tm.value)) ? "1" : "0.85";
-
-        const fromStr = fOk ? (pad2(H1) + ":" + pad2(M1)) : (String(fh.value || "") + ":" + String(fm.value || "")).trim();
-        const toStr = tOk ? (pad2(H2) + ":" + pad2(M2)) : (String(th.value || "") + ":" + String(tm.value || "")).trim();
-
+      function syncToState() {
+        const fromStr = (fh.value || fm.value) ? (pad2(fh.value) + ":" + pad2(fm.value)) : "";
+        const toStr = (th.value || tm.value) ? (pad2(th.value) + ":" + pad2(tm.value)) : "";
         state[day][idx] = { from: fromStr, to: toStr };
       }
 
       [fh, fm, th, tm].forEach((inp) => {
-        inp.addEventListener("input", function () { sync(false); });
-        inp.addEventListener("blur", function () { sync(true); });
+        inp.addEventListener("input", syncToState);
+        inp.addEventListener("blur", syncToState);
       });
 
-      line.appendChild(btn);
+      line.appendChild(btnMinus);
       line.appendChild(fh);
       line.appendChild(mkSep(":"));
       line.appendChild(fm);
@@ -359,19 +408,41 @@
       line.appendChild(mkSep(":"));
       line.appendChild(tm);
 
+      if (idx === windows.length - 1) {
+        const btnPlus = mkBtn("plus");
+        btnPlus.addEventListener("click", function () {
+          state[day].push({ from: "", to: "" });
+          renderDay(day);
+        });
+        line.appendChild(btnPlus);
+      }
+
       box.appendChild(line);
-      sync(true);
+      syncToState();
+    }
+
+    if (windows.length === 0) {
+      const line = document.createElement("div");
+      line.className = "flex items-center gap-2";
+
+      const btnPlus = mkBtn("plus");
+      btnPlus.addEventListener("click", function () {
+        state[day].push({ from: "", to: "" });
+        renderDay(day);
+      });
+
+      line.appendChild(btnPlus);
+      box.appendChild(line);
+      return;
     }
 
     for (let i = 0; i < windows.length; i++) addWindowRow(i, windows[i]);
-    addPlusRow();
   }
 
   function renderAll() {
     DAY_KEYS.forEach(renderDay);
   }
 
-  // init
   if (cb.checked) useGlobalNow();
   else useCustomNow();
   renderAll();
@@ -382,61 +453,197 @@
     renderAll();
   });
 
-  form.addEventListener("submit", function (e) {
-    const btn = e.submitter || document.activeElement;
-    const action = btn && btn.value ? String(btn.value).trim() : "";
+  // --- Submit validation (whole form) ---
 
-    // only for save actions in campaigns form
-    if (action !== "add_campaign" && action !== "save_campaign") return;
+  function clearReds() {
+    form.querySelectorAll("input, select").forEach((el) => { el.style.borderColor = ""; });
+    body.querySelectorAll(".yy-day-windows input").forEach((inp) => { inp.style.borderColor = ""; });
+  }
 
-    if (cb.checked) {
-      ta.value = "";
-      return;
+  function validateRequiredText(name) {
+    const el = form.querySelector(`[name="${name}"]`);
+    if (!el) return true;
+    const v = String(el.value || "").trim();
+    if (!v) {
+      setInputRed(el);
+      return false;
+    }
+    return true;
+  }
+
+  function validateRequiredSelect(name) {
+    const el = form.querySelector(`select[name="${name}"]`);
+    if (!el) return true;
+    const v = String(el.value || "").trim();
+    if (!v) {
+      setInputRed(el);
+      return false;
+    }
+    return true;
+  }
+
+  function validateStartDate() {
+    if (!startDD || !startMM || !startYY) return true;
+
+    const anyEmpty = isAnyEmptyDate(startDD, startMM, startYY);
+    if (anyEmpty) {
+      if (!String(startDD.value || "").trim()) setInputRed(startDD);
+      if (!String(startMM.value || "").trim()) setInputRed(startMM);
+      if (!String(startYY.value || "").trim()) setInputRed(startYY);
+      return false;
     }
 
+    const p = readDateParts(startDD, startMM, startYY);
+    const d = buildDate(p.dd, p.mm, p.yy);
+    if (!d) {
+      setInputRed(startDD); setInputRed(startMM); setInputRed(startYY);
+      return false;
+    }
+
+    startDD.value = pad2(startDD.value);
+    startMM.value = pad2(startMM.value);
+    return true;
+  }
+
+  function validateEndDateAndOrder() {
+    if (!endDD || !endMM || !endYY) return true;
+
+    if (isAllEmptyDate(endDD, endMM, endYY)) {
+      return true; // optional
+    }
+
+    const anyEmpty = isAnyEmptyDate(endDD, endMM, endYY);
+    if (anyEmpty) {
+      if (!String(endDD.value || "").trim()) setInputRed(endDD);
+      if (!String(endMM.value || "").trim()) setInputRed(endMM);
+      if (!String(endYY.value || "").trim()) setInputRed(endYY);
+      return false;
+    }
+
+    const s = readDateParts(startDD, startMM, startYY);
+    const sd = buildDate(s.dd, s.mm, s.yy);
+    const e = readDateParts(endDD, endMM, endYY);
+    const ed = buildDate(e.dd, e.mm, e.yy);
+
+    if (!ed) {
+      setInputRed(endDD); setInputRed(endMM); setInputRed(endYY);
+      return false;
+    }
+
+    if (sd && ed.getTime() < sd.getTime()) {
+      setInputRed(endDD); setInputRed(endMM); setInputRed(endYY);
+      return false;
+    }
+
+    endDD.value = pad2(endDD.value);
+    endMM.value = pad2(endMM.value);
+    return true;
+  }
+
+  function validateWindowsAndSerialize() {
+    if (cb.checked) {
+      ta.value = "";
+      return true;
+    }
+
+    let hasInvalid = false;
+    const out = {};
+    for (const day of DAY_KEYS) out[day] = [];
+
     for (const day of DAY_KEYS) {
-      const arr = Array.isArray(state[day]) ? state[day] : [];
-      for (const w of arr) {
-        const from = String(w.from || "").trim();
-        const to = String(w.to || "").trim();
+      const row = body.querySelector(`tr[data-yy-day="${day}"]`);
+      if (!row) continue;
 
-        if (!from || !to) {
-          alert("Есть пустое окно. Заполни время или удали окно.");
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
+      const box = row.querySelector(".yy-day-windows");
+      if (!box) continue;
+
+      const lines = Array.from(box.children || []);
+      for (const line of lines) {
+        const inputs = Array.from(line.querySelectorAll("input"));
+        if (inputs.length !== 4) continue; // "+" row
+
+        const [fh, fm, th, tm] = inputs;
+        const vfh = String(fh.value || "").trim();
+        const vfm = String(fm.value || "").trim();
+        const vth = String(th.value || "").trim();
+        const vtm = String(tm.value || "").trim();
+
+        const empty = [];
+        if (!vfh) empty.push(fh);
+        if (!vfm) empty.push(fm);
+        if (!vth) empty.push(th);
+        if (!vtm) empty.push(tm);
+
+        if (empty.length > 0) {
+          hasInvalid = true;
+          empty.forEach(setInputRed);
+          continue;
         }
 
-        const fp = parseHHMM(from);
-        const tp = parseHHMM(to);
-        if (!fp || !tp) {
-          alert("Неверное время. Формат HH:MM.");
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
+        const H1 = toInt(vfh);
+        const M1 = toInt(vfm);
+        const H2 = toInt(vth);
+        const M2 = toInt(vtm);
+
+        const fMin = toMinutes(H1, M1);
+        const tMin = toMinutes(H2, M2);
+
+        if (fMin == null || tMin == null || fMin >= tMin) {
+          hasInvalid = true;
+          inputs.forEach(setInputRed);
+          continue;
         }
 
-        const fMin = toMinutes(fp.hh, fp.mm);
-        const tMin = toMinutes(tp.hh, tp.mm);
-        if (fMin == null || tMin == null) {
-          alert("Неверное время. Часы 0-23, минуты 0-59.");
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-        if (fMin >= tMin) {
-          alert("В окне время 'от' должно быть меньше 'до'.");
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-
-        w.from = pad2(fp.hh) + ":" + pad2(fp.mm);
-        w.to = pad2(tp.hh) + ":" + pad2(tp.mm);
+        out[day].push({
+          from: pad2(H1) + ":" + pad2(M1),
+          to: pad2(H2) + ":" + pad2(M2),
+        });
       }
     }
 
-    DAY_KEYS.forEach((k) => { if (!Array.isArray(state[k])) state[k] = []; });
+    if (hasInvalid) return false;
+
+    state = ensureState(out);
     ta.value = JSON.stringify(state);
+    return true;
+  }
+
+  form.addEventListener("submit", function (e) {
+    const submitter = e.submitter || null;
+    let action = submitter && submitter.value ? String(submitter.value).trim() : "";
+    if (!action) action = lastAction;
+
+    // --- FIX: Enter submit -> treat as Save/Add (and serialize window) ---
+    if (!action) {
+      const hasId = !!form.querySelector('input[name="id"]');
+      action = hasId ? "save_campaign" : "add_campaign";
+    }
+
+    if (
+      action !== "add_campaign" &&
+      action !== "save_campaign" &&
+      action !== "add_campaign_close" &&
+      action !== "save_campaign_close"
+    ) {
+      return;
+    }
+
+    clearReds();
+
+    let ok = true;
+    ok = validateRequiredText("title") && ok;
+    ok = validateRequiredSelect("mailing_list") && ok;
+    ok = validateRequiredSelect("mailbox") && ok;
+
+    ok = validateStartDate() && ok;
+    ok = validateEndDateAndOrder() && ok;
+
+    ok = validateWindowsAndSerialize() && ok;
+
+    if (!ok) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
   });
 })();
