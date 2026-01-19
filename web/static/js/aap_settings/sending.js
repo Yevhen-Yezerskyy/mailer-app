@@ -1,6 +1,10 @@
 // FILE: web/static/js/aap_settings/sending.js
 // DATE: 2026-01-19
-// PURPOSE: Fix time dropdown повторное открытие; "+" только в конце последней строки; убрать alert, подсветка ошибок.
+// PURPOSE: Settings → Sending: time dropdown, окна по дням, +/−, сбор JSON перед submit.
+// CHANGE:
+// - "+" больше НЕ валидирует (всегда добавляет строку).
+// - Валидация ТОЛЬКО на submit: пустые инпуты красим (только пустые) и блокируем; from>=to красим всю строку и блокируем.
+// - Без alert. Тайпинг/дропдаун не валидируем, только лёгкий pad2 на blur.
 
 (function () {
   const form = document.getElementById("yySendingForm");
@@ -58,7 +62,7 @@
   }
 
   function ensureState(raw) {
-    const st = (raw && typeof raw === "object" && !Array.isArray(raw)) ? raw : {};
+    const st = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
     DAY_KEYS.forEach((k) => {
       if (!Array.isArray(st[k])) st[k] = [];
       st[k] = st[k].map((w) => {
@@ -95,7 +99,6 @@
       el.style.display = "none";
       document.body.appendChild(el);
 
-      // закрываем ТОЛЬКО кликом вне или Esc
       document.addEventListener("mousedown", function (e) {
         if (!el || el.style.display === "none") return;
         if (activeInput && e.target === activeInput) return;
@@ -107,7 +110,6 @@
         if (e.key === "Escape") hide();
       });
 
-      window.addEventListener("scroll", hide, true);
       window.addEventListener("resize", hide);
 
       return el;
@@ -132,7 +134,7 @@
         item.addEventListener("mouseleave", () => { item.style.background = "transparent"; });
 
         item.addEventListener("mousedown", function (e) {
-          e.preventDefault(); // не теряем фокус
+          e.preventDefault();
           onPick(String(v));
         });
 
@@ -185,43 +187,6 @@
     return { show, hide };
   })();
 
-  // --- Validation helpers (no alerts) ---
-
-  function getWindowValidity(fh, fm, th, tm) {
-    const H1 = toInt(fh.value);
-    const M1 = toInt(fm.value);
-    const H2 = toInt(th.value);
-    const M2 = toInt(tm.value);
-
-    const allEmpty = (!fh.value && !fm.value && !th.value && !tm.value);
-
-    const fOk = (H1 != null && M1 != null && H1 >= 0 && H1 <= 23 && M1 >= 0 && M1 <= 59);
-    const tOk = (H2 != null && M2 != null && H2 >= 0 && H2 <= 23 && M2 >= 0 && M2 <= 59);
-
-    const fMin = fOk ? toMinutes(H1, M1) : null;
-    const tMin = tOk ? toMinutes(H2, M2) : null;
-
-    const ok = (fMin != null && tMin != null && fMin < tMin);
-    const complete = (fh.value && fm.value && th.value && tm.value);
-
-    return { ok, allEmpty, complete };
-  }
-
-  function setInvalidStyle(line, inputs, invalid) {
-    if (!line) return;
-    if (invalid) {
-      line.style.outline = "2px solid #ef4444";
-      line.style.outlineOffset = "2px";
-      line.style.borderRadius = "10px";
-      (inputs || []).forEach((inp) => { inp.style.borderColor = "#ef4444"; });
-    } else {
-      line.style.outline = "";
-      line.style.outlineOffset = "";
-      line.style.borderRadius = "";
-      (inputs || []).forEach((inp) => { inp.style.borderColor = ""; });
-    }
-  }
-
   // --- UI helpers ---
 
   function mkTimeInput(kind /* 'h'|'m' */, placeholder) {
@@ -238,9 +203,10 @@
       const s = String(inp.value || "");
       const cleaned = s.replace(/[^\d]/g, "").slice(0, 2);
       if (cleaned !== s) inp.value = cleaned;
+      // при вводе снимаем красную рамку только с этого инпута
+      inp.style.borderColor = "";
     });
 
-    // показываем dropdown по mousedown (всегда), без искусственных blur
     inp.addEventListener("mousedown", function () {
       const values =
         kind === "h"
@@ -255,7 +221,6 @@
 
     inp.addEventListener("blur", function () {
       inp.value = pad2(inp.value);
-      // DD.hide() тут НЕ трогаем — закрытие только по вне-клику/Esc/scroll/resize
     });
 
     return inp;
@@ -282,6 +247,25 @@
     return { hh: pad2(p.hh), mm: pad2(p.mm) };
   }
 
+  function clearLineOutline(line) {
+    if (!line) return;
+    line.style.outline = "";
+    line.style.outlineOffset = "";
+    line.style.borderRadius = "";
+  }
+
+  function setLineOutlineRed(line) {
+    if (!line) return;
+    line.style.outline = "2px solid #ef4444";
+    line.style.outlineOffset = "2px";
+    line.style.borderRadius = "10px";
+  }
+
+  function setInputRed(inp) {
+    if (!inp) return;
+    inp.style.borderColor = "#ef4444";
+  }
+
   // --- Render ---
 
   function renderDay(day) {
@@ -294,8 +278,8 @@
     box.innerHTML = "";
     box.className = "yy-day-windows space-y-2";
 
-    const windows = Array.isArray(state[day]) ? state[day] : [];
-    const lastIdx = windows.length - 1;
+    if (!Array.isArray(state[day])) state[day] = [];
+    const windows = state[day];
 
     function addWindowRow(idx, w) {
       const line = document.createElement("div");
@@ -320,39 +304,16 @@
       th.value = tp.hh;
       tm.value = tp.mm;
 
-      const inputs = [fh, fm, th, tm];
-
-      function sync(doPad) {
-        if (doPad) {
-          fh.value = pad2(fh.value);
-          fm.value = pad2(fm.value);
-          th.value = pad2(th.value);
-          tm.value = pad2(tm.value);
-        }
-
-        const val = getWindowValidity(fh, fm, th, tm);
-
-        const fromStr = (toInt(fh.value) != null && toInt(fm.value) != null)
-          ? (pad2(toInt(fh.value)) + ":" + pad2(toInt(fm.value)))
-          : "";
-
-        const toStr = (toInt(th.value) != null && toInt(tm.value) != null)
-          ? (pad2(toInt(th.value)) + ":" + pad2(toInt(tm.value)))
-          : "";
-
-        // хранение: либо пусто, либо HH:MM
-        state[day][idx] = {
-          from: (val.complete ? fromStr : ""),
-          to: (val.complete ? toStr : ""),
-        };
-
-        // подсветка: неверно только если пытаются заполнить (complete) и ok=false
-        setInvalidStyle(line, inputs, (val.complete && !val.ok));
+      function syncToState() {
+        // храним как есть (частично тоже), submit валидирует по DOM
+        const fromStr = (fh.value || fm.value) ? (pad2(fh.value) + ":" + pad2(fm.value)) : "";
+        const toStr = (th.value || tm.value) ? (pad2(th.value) + ":" + pad2(tm.value)) : "";
+        state[day][idx] = { from: fromStr, to: toStr };
       }
 
-      inputs.forEach((inp) => {
-        inp.addEventListener("input", function () { sync(false); });
-        inp.addEventListener("blur", function () { sync(true); });
+      [fh, fm, th, tm].forEach((inp) => {
+        inp.addEventListener("input", syncToState);
+        inp.addEventListener("blur", syncToState);
       });
 
       line.appendChild(btnMinus);
@@ -364,21 +325,10 @@
       line.appendChild(mkSep(":"));
       line.appendChild(tm);
 
-      // "+" только в конце последней строки
-      if (idx === lastIdx) {
+      // "+" только у последней строки, БЕЗ валидации
+      if (idx === windows.length - 1) {
         const btnPlus = mkBtn("plus");
         btnPlus.addEventListener("click", function () {
-          sync(true);
-          const val = getWindowValidity(fh, fm, th, tm);
-          if (!val.complete || !val.ok) {
-            setInvalidStyle(line, inputs, true);
-            // фокус на первое пустое/невалидное
-            for (const inp of inputs) {
-              if (!inp.value) { inp.focus(); return; }
-            }
-            fh.focus();
-            return;
-          }
           state[day].push({ from: "", to: "" });
           renderDay(day);
         });
@@ -386,15 +336,26 @@
       }
 
       box.appendChild(line);
-      sync(true);
+      syncToState();
     }
 
-    // если вообще нет окон — создаём одну пустую строку (чтобы было куда жать "+")
+    // если окон 0 — показываем только "+"
     if (windows.length === 0) {
-      state[day].push({ from: "", to: "" });
+      const line = document.createElement("div");
+      line.className = "flex items-center gap-2";
+
+      const btnPlus = mkBtn("plus");
+      btnPlus.addEventListener("click", function () {
+        state[day].push({ from: "", to: "" });
+        renderDay(day);
+      });
+
+      line.appendChild(btnPlus);
+      box.appendChild(line);
+      return;
     }
 
-    for (let i = 0; i < state[day].length; i++) addWindowRow(i, state[day][i]);
+    for (let i = 0; i < windows.length; i++) addWindowRow(i, windows[i]);
   }
 
   function renderAll() {
@@ -403,48 +364,80 @@
 
   renderAll();
 
+  // --- Submit validation (primitive) ---
+
   form.addEventListener("submit", function (e) {
     const btn = e.submitter || document.activeElement;
     const action = btn && btn.value ? String(btn.value).trim() : "";
     if (action && action !== "save") return;
 
+    // сброс красного
+    body.querySelectorAll(".yy-day-windows input").forEach((inp) => { inp.style.borderColor = ""; });
+    body.querySelectorAll(".yy-day-windows > div").forEach((line) => { clearLineOutline(line); });
+
     let hasInvalid = false;
+    const out = {};
+
+    for (const day of DAY_KEYS) out[day] = [];
 
     for (const day of DAY_KEYS) {
-      const arr = Array.isArray(state[day]) ? state[day] : [];
-      const cleaned = [];
+      const row = body.querySelector(`tr[data-yy-day="${day}"]`);
+      if (!row) continue;
 
-      for (const w of arr) {
-        const from = String(w.from || "").trim();
-        const to = String(w.to || "").trim();
+      const box = row.querySelector(".yy-day-windows");
+      if (!box) continue;
 
-        // полностью пустые строки игнорируем (не сохраняем)
-        if (!from && !to) continue;
+      const lines = Array.from(box.children || []);
+      for (const line of lines) {
+        const inputs = Array.from(line.querySelectorAll("input"));
+        if (inputs.length !== 4) continue; // это плюс-строка
 
-        const fp = parseHHMM(from);
-        const tp = parseHHMM(to);
-        const fMin = fp ? toMinutes(fp.hh, fp.mm) : null;
-        const tMin = tp ? toMinutes(tp.hh, tp.mm) : null;
+        const [fh, fm, th, tm] = inputs;
+        const vfh = String(fh.value || "").trim();
+        const vfm = String(fm.value || "").trim();
+        const vth = String(th.value || "").trim();
+        const vtm = String(tm.value || "").trim();
 
-        if (!fp || !tp || fMin == null || tMin == null || fMin >= tMin) {
+        const empty = [];
+        if (!vfh) empty.push(fh);
+        if (!vfm) empty.push(fm);
+        if (!vth) empty.push(th);
+        if (!vtm) empty.push(tm);
+
+        if (empty.length > 0) {
           hasInvalid = true;
-        } else {
-          cleaned.push({ from: pad2(fp.hh) + ":" + pad2(fp.mm), to: pad2(tp.hh) + ":" + pad2(tp.mm) });
+          empty.forEach(setInputRed);
+          continue;
         }
-      }
 
-      state[day] = cleaned;
+        const H1 = toInt(vfh);
+        const M1 = toInt(vfm);
+        const H2 = toInt(vth);
+        const M2 = toInt(vtm);
+
+        const fMin = toMinutes(H1, M1);
+        const tMin = toMinutes(H2, M2);
+
+        if (fMin == null || tMin == null || fMin >= tMin) {
+          hasInvalid = true;
+          inputs.forEach(setInputRed);
+          continue;
+        }
+
+        out[day].push({
+          from: pad2(H1) + ":" + pad2(M1),
+          to: pad2(H2) + ":" + pad2(M2),
+        });
+      }
     }
 
     if (hasInvalid) {
       e.preventDefault();
       e.stopPropagation();
-      // перерендер — подсветит строки по live-логике; добавим пустую строку где надо
-      renderAll();
       return false;
     }
 
-    DAY_KEYS.forEach((k) => { if (!Array.isArray(state[k])) state[k] = []; });
+    state = ensureState(out);
     ta.value = JSON.stringify(state);
   });
 })();
