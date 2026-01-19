@@ -8,7 +8,7 @@
 
 <table class="YY-MAIN_TABLE">
   <tr>
-    <td class="YY-MAIN_TOP_LEFT_TD w-[60%]">
+    <td class="YY-MAIN_TOP_LEFT_TD w-[50%]">
       <div class="YY-CARD_WHITE">
         {% if errors %}
           <div class="YY-CARD_IN_FORM_ERROR mb-3">
@@ -22,75 +22,58 @@
           <textarea name="value_json" id="yyValueJson" class="hidden">{{ value_json_str }}</textarea>
 
           <table class="w-full text-left">
-            <thead>
-              <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[32%]">{% trans "День недели" %}</th>
-                <th class="YY-TH_TH">{% trans "Окна отправки писем" %}</th>
-              </tr>
-            </thead>
             <tbody id="yySendingBody">
-              <tr data-yy-day="mon" class="YY-TB_TR align-top">
-                <td class="YY-TB_TD">
-                  <div class="YY-STATUS_GREEN">{% trans "Понедельник" %}</div>
+              <tr data-yy-day="mon" class="border-b border-t border-[#71d0f4]">
+                <td class="align-top px-2 py-2">
+                  <div class="YY-STATUS_GREEN !py-1">{% trans "Понедельник" %}</div>
                 </td>
-                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
+                <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
               </tr>
-              <tr data-yy-day="tue" class="YY-TB_TR align-top">
-                <td class="YY-TB_TD">
-                  <div class="YY-STATUS_GREEN">{% trans "Вторник" %}</div>
+              <tr data-yy-day="tue" class="border-b border-[#71d0f4]">
+                <td class="align-top px-2 py-2">
+                  <div class="YY-STATUS_GREEN !py-1">{% trans "Вторник" %}</div>
                 </td>
-                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
-              </tr>
-              <tr data-yy-day="wed" class="YY-TB_TR align-top">
-                <td class="YY-TB_TD">
-                  <div class="YY-STATUS_GREEN">{% trans "Среда" %}</div>
-                </td>
-                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
-              </tr>
-              <tr data-yy-day="thu" class="YY-TB_TR align-top">
-                <td class="YY-TB_TD">
-                  <div class="YY-STATUS_GREEN">{% trans "Четверг" %}</div>
-                </td>
-                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
-              </tr>
-              <tr data-yy-day="fri" class="YY-TB_TR align-top">
-                <td class="YY-TB_TD">
-                  <div class="YY-STATUS_GREEN">{% trans "Пятница" %}</div>
-                </td>
-                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
+                <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
               </tr>
 
-              <tr class="YY-TB_TR">
-                <td class="YY-TB_TD" colspan="2">
-                  <div class="h-[3px]"></div>
+              <tr data-yy-day="wed" class="border-b border-[#71d0f4]">
+                <td class="align-top px-2 py-2">
+                  <div class="YY-STATUS_GREEN !py-1">{% trans "Среда" %}</div>
                 </td>
+                <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
               </tr>
 
-              <tr data-yy-day="sat" class="YY-TB_TR align-top">
-                <td class="YY-TB_TD">
-                  <div class="YY-STATUS_YELLOW">{% trans "Суббота" %}</div>
+              <tr data-yy-day="thu" class="border-b border-[#71d0f4]">
+                <td class="align-top px-2 py-2">
+                  <div class="YY-STATUS_GREEN !py-1">{% trans "Четверг" %}</div>
                 </td>
-                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
-              </tr>
-              <tr data-yy-day="sun" class="YY-TB_TR align-top">
-                <td class="YY-TB_TD">
-                  <div class="YY-STATUS_YELLOW">{% trans "Воскресенье" %}</div>
-                </td>
-                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
+                <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
               </tr>
 
-              <tr class="YY-TB_TR">
-                <td class="YY-TB_TD" colspan="2">
-                  <div class="h-[3px]"></div>
+              <tr data-yy-day="fri" class="border-b border-[#71d0f4]">
+                <td class="align-top px-2 py-2">
+                  <div class="YY-STATUS_GREEN !py-1">{% trans "Пятница" %}</div>
                 </td>
+                <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
               </tr>
-
-              <tr data-yy-day="hol" class="YY-TB_TR align-top">
-                <td class="YY-TB_TD">
-                  <div class="YY-STATUS_RED">{% trans "Праздники" %}</div>
+              <tr data-yy-day="sat" class="border-b border-[#71d0f4]">
+                <td class="align-top px-2 py-2">
+                  <div class="YY-STATUS_YELLOW !py-1">{% trans "Суббота" %}</div>
                 </td>
-                <td class="YY-TB_TD"><div class="yy-day-windows"></div></td>
+                <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
               </tr>
+              <tr data-yy-day="sun" class="border-b border-[#71d0f4]">
+                <td class="align-top px-2 py-2">
+                  <div class="YY-STATUS_YELLOW !py-1">{% trans "Воскресенье" %}</div>
+                </td>
+                <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
+              </tr>
+              <tr data-yy-day="hol" class="border-b border-[#71d0f4]">
+                <td class="align-top px-2 py-2">
+                  <div class="YY-STATUS_RED !py-1">{% trans "Праздники" %}</div>
+                </td>
+                <td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td>
+              </tr>              
             </tbody>
           </table>
 
@@ -109,7 +92,7 @@
       </div>
     </td>
 
-    <td class="YY-MAIN_TOP_RIGHT_TD w-[40%]">
+    <td class="YY-MAIN_TOP_RIGHT_TD w-[50%]">
       <div class="YY-CARD_WHITE">
         <div class="YY-STATUS_BLUE mb-3">{% trans "Окна для отправки писем - глобальная настройка" %}</div>
         <div>
