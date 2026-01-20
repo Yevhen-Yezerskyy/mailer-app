@@ -1,5 +1,13 @@
-# FILE: docker-compose.yml  (обновлено — 2026-01-06)
-# PURPOSE: Ограничить CPU для dev Django (0.5) и для prod воркеров (0.20 каждый); prod web без лимита.
+# FILE: docker-compose.yml
+# DATE: 2026-01-20
+# PURPOSE:
+# - DEV: лимит CPU для Django (0.5)
+# - PROD: init-этап (translate.py + collectstatic) выполняется ТОЛЬКО при compose up,
+#         после успеха стартует gunicorn (PID 1, чистый старт воркеров).
+# - PROD воркеры engine: CPU cap как было.
+# NOTE:
+# - docker restart mailer-web-prod НЕ запускает init (без translate/collectstatic).
+# - gunicorn без shell: корректные сигналы/остановка/рестарт.
 
 services:
   # -------- DEV --------
@@ -69,6 +77,36 @@ services:
       - mailer-redis-prod-run:/app/run/redis
     networks: [webnet]
 
+  # One-shot init: translate.py + collectstatic (только на compose up)
+  mailer-init-prod:
+    build:
+      context: .
+      dockerfile: .DockerFiles/Dockerfile_prod_web
+    image: mailer-web-prod:latest
+    container_name: mailer-init-prod
+    working_dir: /app/web
+    restart: "no"
+    depends_on: [mailer-db, mailer-redis-prod]
+    environment:
+      PYTHONPATH: /app
+      DEBUG: "0"
+      DB_HOST: mailer-db
+      DB_PORT: "5432"
+      DB_NAME: mailersys
+      DB_USER: mailersys_user
+      DB_PASSWORD: secret
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - mailer-app-prod:/app
+      - mailer-static:/app/web/staticfiles
+      - mailer-redis-prod-run:/app/run/redis
+    command: >
+      /bin/sh -lc "
+        python translate.py &&
+        python manage.py collectstatic --noinput
+      "
+    networks: [webnet]
+
   mailer-web-prod:
     build:
       context: .
@@ -77,7 +115,13 @@ services:
     container_name: mailer-web-prod
     working_dir: /app/web
     restart: unless-stopped
-    depends_on: [mailer-db, mailer-redis-prod]
+    depends_on:
+      mailer-init-prod:
+        condition: service_completed_successfully
+      mailer-db:
+        condition: service_started
+      mailer-redis-prod:
+        condition: service_started
     environment:
       PYTHONPATH: /app
       DEBUG: "0"
@@ -93,14 +137,11 @@ services:
       - mailer-redis-prod-run:/app/run/redis
     ports:
       - "8001:8000"
-    command: >
-      /bin/sh -lc "
-        python manage.py collectstatic --noinput &&
-        gunicorn mailer_web.wsgi:application --bind 0.0.0.0:8000 --workers 2 --timeout 120
-      "
+    # gunicorn = PID 1 (без sh -lc)
+    command: ["gunicorn", "mailer_web.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120"]
     networks: [webnet]
 
-  # Все воркеры на одном образе; каждому cap 0.20 CPU
+  # Все воркеры на одном образе; каждому cap как было
   mailer-engine-cb-prod:
     build:
       context: .
