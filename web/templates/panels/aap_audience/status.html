@@ -1,8 +1,11 @@
 {% extends "panels/base.html" %}
 {% load i18n %}
 <!-- FILE: web/templates/panels/aap_audience/status.html -->
-<!-- DATE: 2026-01-01 -->
-<!-- CHANGE: колонка "Статус" — активный rating + синий rated + buckets + criteria_changed -->
+<!-- DATE: 2026-01-20 -->
+<!-- CHANGE:
+  - Добавлен статус/кнопка включения run_processing (Сбор контактов) вверху левой колонки (в каждой задаче).
+  - Ничего не фильтруем по run_processing на уровне шаблона.
+-->
 
 {% block content %}
 
@@ -24,7 +27,6 @@
               {% for t in tasks %}
                 <tr class="YY-TB_TR align-top">
                   <td class="YY-TB_TD">
-
                     {% if t.type == "sell" %}
                       <div class="YY-STATUS_GREEN mb-3">
                         {% trans "Поиск клиентов" %}
@@ -88,43 +90,72 @@
                   </td>
 
                   <td class="YY-TB_TD">
+                    {% if t.run_processing %}
+                      <div class="YY-STATUS_GREEN w-full mb-1 !py-1">
+                        {% trans "Сбор контактов включён" %}
+                      </div>
+                      <div class="YY-STATUS_GRAY mb-1 !py-1">
+                          {% trans "Всего собрано контактов" %}: {{ t.contacts_total }}
+                      </div>
+                      <form method="post" class="mb-5">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="toggle_processing">
+                        <input type="hidden" name="task_id" value="{{ t.id }}">
+                        <button type="submit" class="YY-BUTTON_TAB_MAIN">
+                          {% trans "Отключить сбор контактов" %}
+                        </button>
+                      </form>
+                    {% else %}
+                      <div class="YY-STATUS_GRAY w-full mb-1 !py-1">
+                        {% trans "Сбор контактов отключён" %}
+                      </div>
+                      <div class="YY-STATUS_GRAY mb-1 !py-1">
+                          {% trans "Всего собрано контактов" %}: {{ t.contacts_total }}
+                      </div>
+                      <form method="post" class="mb-5">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="toggle_processing">
+                        <input type="hidden" name="task_id" value="{{ t.id }}">
+                        <button type="submit" class="YY-BUTTON_TAB_MAIN">
+                          {% trans "Включить сбор контактов" %}
+                        </button>
+                      </form>
+                    {% endif %}                    
 
                     {% if t.rating_active %}
-                      <div class="YY-STATUS_YELLOW w-full mb-6">
+                      <div class="YY-STATUS_YELLOW w-full mb-5">
                         {% trans "Рейтингование запущено" %}
                       </div>
                     {% endif %}
 
-                    <div class="YY-STATUS_BLUE w-full mb-1">
+                    <div class="YY-STATUS_BLUE w-full mb-1 !py-1">
                       {% trans "Контакты: присвоен рейтинг" %}: {{ t.contacts_rated }}
                     </div>
 
                     {% if t.contacts_rated > 0 %}
-                      <div class="YY-STATUS_GREEN mb-1">
+                      <div class="YY-STATUS_GREEN mb-1 !py-1">
                         - {% trans "Рейтинг 1-30" %}: {{ t.rated_1_30_cnt }} ({{ t.rated_1_30_pct }}%)
                       </div>
 
-                      <div class="YY-STATUS_YELLOW mb-1">
+                      <div class="YY-STATUS_YELLOW mb-1 !py-1">
                         - {% trans "Рейтинг 31-70" %}: {{ t.rated_31_70_cnt }} ({{ t.rated_31_70_pct }}%)
                       </div>
 
-                      <div class="YY-STATUS_GRAY mb-1">
+                      <div class="YY-STATUS_GRAY mb-1 !py-1">
                         - {% trans "Рейтинг 71-100" %}: {{ t.rated_71_100_cnt }} ({{ t.rated_71_100_pct }}%)
                       </div>
                     {% endif %}
 
-                    <div class="YY-STATUS_GRAY mb-6 mt-6">
-                      {% trans "Всего собрано контактов" %}: {{ t.contacts_total }}
-                    </div>
+
 
                     {% if t.criteria_changed %}
-                      <div class="YY-STATUS_YELLOW mb-6">
+                      <div class="YY-STATUS_YELLOW mb-1 !py-1">
                         {% trans "Критерии оценки изменены" %}
                       </div>
                     {% endif %}
 
                     <a href="task/?id={{ t.ui_id }}"
-                       class="YY-BUTTON_TAB_MAIN">
+                       class="YY-BUTTON_TAB_MAIN mt-5">
                       {% trans "Смотреть / управлять" %}
                     </a>
 

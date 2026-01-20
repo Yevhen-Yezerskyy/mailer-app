@@ -3,12 +3,10 @@
 
 {% block content %}
 <!-- FILE: web/templates/panels/aap_audience/status_task.html -->
-<!-- DATE: 2026-01-12 -->
+<!-- DATE: 2026-01-20 -->
 <!-- CHANGE:
-- Убрана логика "начать рейтингование/не начато".
-- Добавлены кнопки "+100/+200/+500/+1000" (только когда rating_active_exists=false и criteria_changed=false).
-- Кнопка "Удалить все рейтинги" всегда видима (даже при active).
-- Бакеты 1-30/31-70/71-100 сделаны ссылками на вкладку rated с нужной страницей. -->
+- Добавлен toggle run_processing (Сбор контактов) сверху справа: одна строка (статус слева, кнопка справа).
+- Остальная логика страницы сохранена. -->
 
 <!-- TOP TABLE -->
 <table class="YY-MAIN_TABLE">
@@ -49,6 +47,30 @@
     <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
       <div class="YY-CARD_WHITE">
 
+        <div class="grid grid-cols-[2fr_1fr] gap-3 mb-12">
+          {% if t.run_processing %}
+            <div class="YY-STATUS_GREEN !mb-0 !py-1">
+              {% trans "Сбор контактов включён" %}
+            </div>
+            <form method="post" class="!mb-0 w-full">
+              {% csrf_token %}
+              <button type="submit" name="action" value="toggle_processing" class="YY-BUTTON_MAIN w-full">
+                {% trans "Отключить" %}
+              </button>
+            </form>
+          {% else %}
+            <div class="YY-STATUS_GRAY !mb-0 !py-1">
+              {% trans "Сбор контактов отключён" %}
+            </div>
+            <form method="post" class="!mb-0 w-full">
+              {% csrf_token %}
+              <button type="submit" name="action" value="toggle_processing" class="YY-BUTTON_MAIN w-full">
+                {% trans "Включить" %}
+              </button>
+            </form>
+          {% endif %}
+        </div>
+
         {% if rating_active_exists %}
           <div class="YY-STATUS_YELLOW mb-4">
             {% trans "Рейтингование контактов запущено" %}
@@ -72,7 +94,6 @@
               {% trans "Присвоить рейтинг" %}:
             </div>
 
-            
               <form method="post">
                 {% csrf_token %}
                 <button type="submit" name="action" value="rating_add_100" class="YY-BUTTON_MAIN">

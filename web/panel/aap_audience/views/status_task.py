@@ -1,16 +1,13 @@
-# FILE: web/panel/aap_audience/views/status_task.py  (обновлено — 2026-01-12)
+# FILE: web/panel/aap_audience/views/status_task.py
+# DATE: 2026-01-20
 # CHANGE:
-# - Убрана логика "начать рейтингование".
-# - Добавлены кнопки "+100/+200/+500/+1000" (только когда рейтингование не запущено и criteria_changed=false).
-# - Добавлена кнопка "Удалить все рейтинги" (всегда доступна): rate_cl/hash_task -> NULL; все __tasks_rating -> done=true; subscribers_limit -> 0.
-# - Кнопки бакетов (1-30/31-70/71-100) сделаны ссылками на нужную страницу вкладки rated.
-# - В выборке строк для таблиц добавлены rc.rate_cb/rc.rate_cl и прокинуты в build_contact_packet(..., rate_cb=..., rate_cl=...)
-#   для корректного ключа кеша format_data.
+# - Добавлен action=toggle_processing: переключает AudienceTask.run_processing на странице задачи.
+# - Остальная логика страницы сохранена.
 
 from __future__ import annotations
 
 import math
-from typing import Any, Optional
+from typing import Any
 
 from django.db import connection
 from django.http import HttpResponseRedirect
@@ -289,6 +286,12 @@ def status_task_view(request):
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
+
+        if action == "toggle_processing":
+            AudienceTask.objects.filter(id=task.id, workspace_id=ws_id, user=user).update(
+                run_processing=not bool(task.run_processing)
+            )
+            return redirect(f"{request.path}?id={task.ui_id}")
 
         if action == "rating_clear_ratings":
             _ratings_clear(int(task.id))

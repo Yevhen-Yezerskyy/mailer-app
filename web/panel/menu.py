@@ -38,7 +38,7 @@ PANEL_MENU = [
                 "active_prefixes": ["/panel/audience/clar/"],
             },
             {
-                "title": _("Готовые аудитории"),
+                "title": _("Сбор контактов / Рейтинг"),
                 "page_title": _("Аудитория : Собранные компании"),
                 "url_name": "audience:status",
                 "active_prefixes": ["/panel/audience/status/"],

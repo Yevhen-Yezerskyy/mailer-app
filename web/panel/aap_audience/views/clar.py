@@ -1,9 +1,8 @@
 # FILE: web/panel/aap_audience/views/clar.py
-# DATE: 2026-01-05
+# DATE: 2026-01-20
 # CHANGE:
-# - Ничего не "ломаем": файл остаётся как был (2025-12-27), со всеми статусами/прогрессом/топ-15 и т.д.
-# - Единственное изменение: update_rate теперь вызывается в нормальной сигнатуре (позиционные аргументы),
-#   потому что clar_items.py больше не поддерживает kwargs-обвязку.
+# - Полностью убран run_processing из страницы: нет toggle_processing, нет условного показа/загрузки списков.
+# - Списки городов/категорий грузятся всегда в режиме edit (как и UI в шаблоне).
 
 from __future__ import annotations
 
@@ -218,12 +217,6 @@ def clar_view(request):
             if action == "cancel":
                 return redirect(request.path)
 
-            if action == "toggle_processing":
-                AudienceTask.objects.filter(id=edit_task.id, workspace_id=ws_id, user=user).update(
-                    run_processing=not edit_task.run_processing
-                )
-                return redirect(f"{request.path}?state=edit&id={encode_id(int(edit_task.id))}")
-
             if action in ("rate_city", "rate_branch"):
                 type_ = "city" if action == "rate_city" else "branch"
                 value_id = (request.POST.get("value_id") or "").strip()
@@ -293,10 +286,8 @@ def clar_view(request):
             "geo": h64_text((edit_task.task or "") + (edit_task.task_geo or "")),
         }
 
-        # ✅ грузим списки городов/категорий только если реально будут показаны (run_processing=True)
-        if edit_task.run_processing:
-            edit_cities = load_sorted_cities(ws_id, user.id, int(edit_task.id))
-            edit_branches = load_sorted_branches(ws_id, user.id, int(edit_task.id), ui_lang=ui_lang)
+        edit_cities = load_sorted_cities(ws_id, user.id, int(edit_task.id))
+        edit_branches = load_sorted_branches(ws_id, user.id, int(edit_task.id), ui_lang=ui_lang)
 
     tasks = _with_ui_ids(_get_tasks(request))
     if ws_id and getattr(user, "is_authenticated", False) and tasks:

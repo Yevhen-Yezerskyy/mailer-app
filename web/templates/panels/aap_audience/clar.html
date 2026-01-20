@@ -1,5 +1,11 @@
 <!-- FILE: web/templates/panels/aap_audience/clar.html -->
-<!-- DATE: 2025-12-27 -->
+<!-- DATE: 2026-01-20 -->
+<!-- CHANGE:
+  Убрано всё, связанное с run_processing:
+  - удалены блоки включения/отключения обработки
+  - убраны условия показа UI по run_processing (города/категории показываются всегда в edit)
+  - убран статус "Обработка включена/отключена" из списка задач
+-->
 
 {% extends "panels/base.html" %}
 {% load i18n %}
@@ -22,7 +28,7 @@
               <div class="YY-STATUS_YELLOW mb-2">
                   {% trans "Поиск поставщиков / подрядчиков" %}
             </div>
-            {% endif %}          
+            {% endif %}
           <form method="post">
             {% csrf_token %}
 
@@ -61,28 +67,6 @@
 
       <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
         <div class="YY-CARD_WHITE">
-
-          {% if edit_task.run_processing %}
-            <form method="post" class="mb-5">
-              {% csrf_token %}
-              <div class="YY-STATUS_GREEN w-full mb-2">
-                {% trans "Обработка задачи включена" %}
-              </div>
-              <button type="submit" name="action" value="toggle_processing" class="YY-BUTTON_MAIN w-full mb-5">
-                {% trans "Отключить обработку задачи" %}
-              </button>
-            </form>
-          {% else %}
-            <form method="post" class="mb-5">
-              {% csrf_token %}
-              <div class="YY-STATUS_GRAY w-full mb-2">
-                {% trans "Обработка задачи отключена" %}
-              </div>
-              <button type="submit" name="action" value="toggle_processing" class="YY-BUTTON_MAIN w-full mb-5">
-                {% trans "Включить обработку задачи" %}
-              </button>
-            </form>
-          {% endif %}
 
           <form method="post" class="mb-5">
             {% csrf_token %}
@@ -169,152 +153,150 @@
             {% endif %}
           </form>
 
-          {% if edit_task.run_processing %}
-            <div data-yy-clar-items="1" data-ui-lang="{{ ui_lang }}" class="mt-10">
-              <div class="flex gap-3 mb-2">
-                <button
-                  type="button"
-                  data-tab="branches"
-                  data-active-class="YY-BUTTON_GREEN"
-                  data-idle-class="YY-BUTTON_MAIN"
-                  class="YY-BUTTON_GREEN">
-                  {% trans "Категории" %}
-                </button>
-                <button
-                  type="button"
-                  data-tab="cities"
-                  data-active-class="YY-BUTTON_GREEN"
-                  data-idle-class="YY-BUTTON_MAIN"
-                  class="YY-BUTTON_MAIN">
-                  {% trans "Города" %}
-                </button>
-              </div>
-
-              <!-- BRANCHES PANEL -->
-              <div data-panel="branches">
-                <form method="post" class="mb-0 flex gap-3 items-center" data-rate-form="branch">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="rate_branch">
-                  <input type="hidden" name="value_id" value="">
-
-                  <input
-                    type="text"
-                    class="YY-INPUT flex-1 mt-5"
-                    value=""
-                    readonly
-                    data-selected-label="branch"
-                  >
-                  <input
-                    name="rate"
-                    type="text"
-                    class="YY-INPUT mt-5"
-                    style="width:60px !Important;"
-                    value=""
-                  >
-
-                  <button type="submit" class="YY-BUTTON_MAIN py-2.5" disabled>
-                    OK
-                  </button>
-                </form>
-
-                {% if edit_branches %}
-                  <div class="YY-CARD_WHITE overflow-auto" style="max-height: 480px;">
-                    <div class="">
-                      {% for it in edit_branches %}
-                        <div
-                          class="cursor-pointer hover:bg-[#f8fdff]"
-                          data-clar-item="branch"
-                          data-value-id="{{ it.value_id }}"
-                          data-value-text="{{ it.value_text|escape }}"
-                          data-rate="{{ it.rate }}">
-                          <div class="flex justify-between gap-3">
-                            <div class="YY-TEXT">{{ it.value_text }}</div>
-                            <div class="YY-TEXT">{{ it.rate }}</div>
-                          </div>
-                        </div>
-                      {% endfor %}
-                    </div>
-                  </div>
-                {% else %}
-                  <div class="YY-TEXT">
-                    {% trans "Бизнес-категории не обработаны" %}
-                  </div>
-                {% endif %}
-
-                <div class="mt-3">
-                  <label class="YY-LABEL">{% trans "Поиск" %}</label>
-                  <input
-                    type="text"
-                    class="YY-INPUT w-full"
-                    placeholder="{% trans "Начните вводить." %}"
-                    data-clar-search="branch">
-                </div>
-              </div>
-
-              <!-- CITIES PANEL -->
-              <div data-panel="cities" class="hidden">
-                <form method="post" class="mb-0 flex gap-3 items-center" data-rate-form="city">
-                  {% csrf_token %}
-                  <input type="hidden" name="action" value="rate_city">
-                  <input type="hidden" name="value_id" value="">
-
-                  <input
-                    type="text"
-                    class="YY-INPUT flex-1 mt-5"
-                    value=""
-                    readonly
-                    data-selected-label="city"
-                  >
-
-                  <input
-                    name="rate"
-                    type="text"
-                    class="YY-INPUT mt-5"
-                    style="width:60px !Important;"
-                    value=""
-                  >
-
-                  <button type="submit" class="YY-BUTTON_MAIN py-2.5" disabled>
-                    OK
-                  </button>
-                </form>
-
-                {% if edit_cities %}
-                  <div class="YY-CARD_WHITE overflow-auto" style="max-height: 480px;">
-                    <div class="">
-                      {% for it in edit_cities %}
-                        <div
-                          class="cursor-pointer hover:bg-[#f8fdff]"
-                          data-clar-item="city"
-                          data-value-id="{{ it.value_id }}"
-                          data-value-text="{{ it.value_text|escape }}"
-                          data-rate="{{ it.rate }}">
-                          <div class="flex justify-between gap-3">
-                            <div class="YY-TEXT">{{ it.value_text }}</div>
-                            <div class="YY-TEXT">{{ it.rate }}</div>
-                          </div>
-                        </div>
-                      {% endfor %}
-                    </div>
-                  </div>
-                {% else %}
-                  <div class="YY-TEXT">
-                    {% trans "Города не обработаны" %}
-                  </div>
-                {% endif %}
-
-                <div class="mt-3">
-                  <label class="YY-LABEL">{% trans "Поиск" %}</label>
-                  <input
-                    type="text"
-                    class="YY-INPUT w-full"
-                    placeholder="{% trans "Начните вводить." %}"
-                    data-clar-search="city">
-                </div>
-              </div>
-
+          <div data-yy-clar-items="1" data-ui-lang="{{ ui_lang }}" class="mt-10">
+            <div class="flex gap-3 mb-2">
+              <button
+                type="button"
+                data-tab="branches"
+                data-active-class="YY-BUTTON_GREEN"
+                data-idle-class="YY-BUTTON_MAIN"
+                class="YY-BUTTON_GREEN">
+                {% trans "Категории" %}
+              </button>
+              <button
+                type="button"
+                data-tab="cities"
+                data-active-class="YY-BUTTON_GREEN"
+                data-idle-class="YY-BUTTON_MAIN"
+                class="YY-BUTTON_MAIN">
+                {% trans "Города" %}
+              </button>
             </div>
-          {% endif %}
+
+            <!-- BRANCHES PANEL -->
+            <div data-panel="branches">
+              <form method="post" class="mb-0 flex gap-3 items-center" data-rate-form="branch">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="rate_branch">
+                <input type="hidden" name="value_id" value="">
+
+                <input
+                  type="text"
+                  class="YY-INPUT flex-1 mt-5"
+                  value=""
+                  readonly
+                  data-selected-label="branch"
+                >
+                <input
+                  name="rate"
+                  type="text"
+                  class="YY-INPUT mt-5"
+                  style="width:60px !Important;"
+                  value=""
+                >
+
+                <button type="submit" class="YY-BUTTON_MAIN py-2.5" disabled>
+                  OK
+                </button>
+              </form>
+
+              {% if edit_branches %}
+                <div class="YY-CARD_WHITE overflow-auto" style="max-height: 615px;">
+                  <div class="">
+                    {% for it in edit_branches %}
+                      <div
+                        class="cursor-pointer hover:bg-[#f8fdff]"
+                        data-clar-item="branch"
+                        data-value-id="{{ it.value_id }}"
+                        data-value-text="{{ it.value_text|escape }}"
+                        data-rate="{{ it.rate }}">
+                        <div class="flex justify-between gap-3">
+                          <div class="YY-TEXT">{{ it.value_text }}</div>
+                          <div class="YY-TEXT">{{ it.rate }}</div>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% else %}
+                <div class="YY-TEXT">
+                  {% trans "Бизнес-категории не обработаны" %}
+                </div>
+              {% endif %}
+
+              <div class="mt-3">
+                <label class="YY-LABEL">{% trans "Поиск" %}</label>
+                <input
+                  type="text"
+                  class="YY-INPUT w-full"
+                  placeholder="{% trans "Начните вводить." %}"
+                  data-clar-search="branch">
+              </div>
+            </div>
+
+            <!-- CITIES PANEL -->
+            <div data-panel="cities" class="hidden">
+              <form method="post" class="mb-0 flex gap-3 items-center" data-rate-form="city">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="rate_city">
+                <input type="hidden" name="value_id" value="">
+
+                <input
+                  type="text"
+                  class="YY-INPUT flex-1 mt-5"
+                  value=""
+                  readonly
+                  data-selected-label="city"
+                >
+
+                <input
+                  name="rate"
+                  type="text"
+                  class="YY-INPUT mt-5"
+                  style="width:60px !Important;"
+                  value=""
+                >
+
+                <button type="submit" class="YY-BUTTON_MAIN py-2.5" disabled>
+                  OK
+                </button>
+              </form>
+
+              {% if edit_cities %}
+                <div class="YY-CARD_WHITE overflow-auto" style="max-height: 480px;">
+                  <div class="">
+                    {% for it in edit_cities %}
+                      <div
+                        class="cursor-pointer hover:bg-[#f8fdff]"
+                        data-clar-item="city"
+                        data-value-id="{{ it.value_id }}"
+                        data-value-text="{{ it.value_text|escape }}"
+                        data-rate="{{ it.rate }}">
+                        <div class="flex justify-between gap-3">
+                          <div class="YY-TEXT">{{ it.value_text }}</div>
+                          <div class="YY-TEXT">{{ it.rate }}</div>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% else %}
+                <div class="YY-TEXT">
+                  {% trans "Города не обработаны" %}
+                </div>
+              {% endif %}
+
+              <div class="mt-3">
+                <label class="YY-LABEL">{% trans "Поиск" %}</label>
+                <input
+                  type="text"
+                  class="YY-INPUT w-full"
+                  placeholder="{% trans "Начните вводить." %}"
+                  data-clar-search="city">
+              </div>
+            </div>
+
+          </div>
 
         </div>
       </td>
@@ -373,7 +355,7 @@
                             {% else %}
                               {% trans "Поставщик" %}
                             {% endif %}
-                        </button>                        
+                        </button>
                         <button type="button"
                           data-tab="branches"
                           data-active-class="YY-BUTTON_GREEN"
@@ -406,16 +388,6 @@
                        class="YY-BUTTON_TAB_MAIN w-full mb-6">
                       {% trans "Управлять" %}
                     </a>
-
-                    {% if t.run_processing %}
-                      <div class="YY-STATUS_GREEN w-full mb-6">
-                        {% trans "Обработка включена" %}
-                      </div>
-                    {% else %}
-                      <div class="YY-STATUS_GRAY w-full mb-6">
-                        {% trans "Обработка отключена" %}
-                      </div>
-                    {% endif %}
 
                     {% if t.rating.branches.running %}
                       <div class="YY-STATUS_YELLOW w-full mb-2">

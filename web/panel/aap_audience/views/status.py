@@ -1,16 +1,13 @@
 # FILE: web/panel/aap_audience/views/status.py
-# DATE: 2026-01-01
+# DATE: 2026-01-20
 # CHANGE:
-# - status list: добавлены
-#   * rating_active (есть активный __tasks_rating contacts/contacts_update)
-#   * contacts_rated (валидный hash_task) + buckets 1-30/31-70/71-100 + проценты
-#   * criteria_changed (есть rate_contacts.hash_task != current_hash для хоть одной записи)
-# - archived=false фильтр сохранён, остальная логика страницы сохранена
+# - Убрано фильтрование списка задач по run_processing.
+# - Добавлен POST action=toggle_processing для включения/отключения run_processing (сбор контактов) на странице статуса.
 
 from __future__ import annotations
 
 from django.db import connection
-from django.shortcuts import render
+from django.shortcuts import redirect, render
 
 from engine.common.utils import h64_text
 from mailer_web.access import encode_id
@@ -26,7 +23,6 @@ def _get_tasks(request):
         AudienceTask.objects.filter(
             workspace_id=ws_id,
             user=user,
-            run_processing=True,
             archived=False,
         ).order_by("-created_at")
     )
@@ -159,7 +155,32 @@ def _fetch_criteria_changed(pairs: list[tuple[int, int]]) -> set[int]:
         return {int(r[0]) for r in cur.fetchall()}
 
 
+def _toggle_processing(request) -> None:
+    ws_id = request.workspace_id
+    user = request.user
+    if not ws_id or not getattr(user, "is_authenticated", False):
+        return
+
+    task_id_s = (request.POST.get("task_id") or "").strip()
+    try:
+        task_id = int(task_id_s)
+    except Exception:
+        return
+
+    task = AudienceTask.objects.filter(id=task_id, workspace_id=ws_id, user=user).first()
+    if not task:
+        return
+
+    AudienceTask.objects.filter(id=task.id, workspace_id=ws_id, user=user).update(run_processing=not bool(task.run_processing))
+
+
 def status_view(request):
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "toggle_processing":
+            _toggle_processing(request)
+        return redirect(request.path)
+
     tasks = _get_tasks(request)
 
     task_ids = [int(t.id) for t in tasks]

@@ -53,7 +53,7 @@ YY-MAIN_BOTTOM_TD: pt-0 pb-10 px-8 align-top
 # MENU
 YY-MENU-CARD-BLUE: rounded-md bg-[#effbff] border border-[#71d0f4]
 YY-MENU-SUMMARY: flex items-center gap-2 pl-2 py-3 font-bold text-[#006991] hover:bg-[#f8fdff] hover:text-[#007c09] rounded-md cursor-pointer leading-none
-YY-MENU-DETAIL: flex rounded-md font-semibold text-[#006991] py-2 pl-8 hover:bg-[#f8fdff] hover:text-[#007c09]
+YY-MENU-DETAIL: flex rounded-md font-semibold text-[#006991] py-2 pl-9 hover:bg-[#f8fdff] hover:text-[#007c09]
 YY-MENU-DETAIL-ACTIVE: bg-[#f8fdff] text-[#007c09]
 
 #LINKS

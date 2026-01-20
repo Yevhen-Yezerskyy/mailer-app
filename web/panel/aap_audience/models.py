@@ -24,7 +24,7 @@ class AudienceTask(models.Model):
     archived = models.BooleanField(default=False)  # NEW
 
     run_processing = models.BooleanField(default=False)
-    subscribers_limit = models.IntegerField(default=1000)
+    subscribers_limit = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
