@@ -1,12 +1,19 @@
-// FILE: web/static/js/campaign_letters/tinymce_config.js
-// DATE: 2026-01-19
-// PURPOSE: TinyMCE config для письма кампании (редактируем только внутренний HTML).
-// CHANGE: (new) setup вызывает yyCampRuntimeOnEditorInit.
+// FILE: web/static/js/campaign_templates/campaign_letters/tinymce_config.js
+// DATE: 2026-01-20
+// PURPOSE: Tiny config для письма: грузим CSS из yyInitCss, Tiny содержит ВИЗУАЛЬНЫЙ HTML (template+content).
+// CHANGE: content_style берём из textarea yyInitCss.
 
 (function () {
   "use strict";
 
   if (!window.tinymce) return;
+
+  const $ = (s) => document.querySelector(s);
+
+  function readInitCss() {
+    const ta = $("#yyInitCss");
+    return ta ? String(ta.value || "") : "";
+  }
 
   function buildTinyConfig() {
     return {
@@ -29,7 +36,7 @@
       resize: false,
 
       content_css: false,
-      content_style: "",
+      content_style: readInitCss() || "",
       valid_elements: "*[*]",
 
       skin: "tinymce-5",

@@ -1,12 +1,24 @@
-// FILE: web/static/js/campaign_letters/mode_switch.js
-// DATE: 2026-01-19
-// PURPOSE: Переключение user<->advanced (TinyMCE <-> CodeMirror) без сервера.
-// CHANGE: (new) кнопки всегда работают даже при пустом HTML.
+// FILE: web/static/js/campaign_templates/campaign_letters/mode_switch.js
+// DATE: 2026-01-20
+// PURPOSE: Переключение user<->advanced ТОЛЬКО через python (как в templates).
+// CHANGE: switchToAdvanced: POST _extract-content (editor_html visual -> content_html).
+//         switchToUser:     POST _render-editor-html (content_html -> editor_html visual).
 
 (function () {
   "use strict";
 
   const $ = (s) => document.querySelector(s);
+
+  async function postJson(url, payload) {
+    const r = await fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload || {}),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  }
 
   function normalizeTabsTo2Spaces(s) {
     return (s || "").replace(/\t/g, "  ");
@@ -45,37 +57,53 @@
     setMode("advanced");
   }
 
+  function getCampaignId() {
+    const el = $("#yyCampaignId");
+    return el ? String(el.value || "").trim() : "";
+  }
+
   async function switchToAdvanced() {
     try {
-      const html = normalizeTabsTo2Spaces(
-        (window.YYCampaignLetterTiny && window.YYCampaignLetterTiny.getHtml)
-          ? window.YYCampaignLetterTiny.getHtml()
-          : ""
-      );
+      const ed = window.tinymce ? window.tinymce.get("yyTinyEditor") : null;
+      const editorHtml = ed ? (ed.getContent({ format: "html" }) || "") : "";
+
+      const data = await postJson("/panel/campaigns/campaigns/letter/_extract-content/", {
+        editor_html: editorHtml || "",
+      });
+      if (!data || !data.ok) return;
 
       showAdvancedMode();
 
       if (typeof window.yyCampEnsureCodeMirror === "function") window.yyCampEnsureCodeMirror();
-      if (typeof window.yyCampAdvSet === "function") window.yyCampAdvSet(html || "");
+      if (typeof window.yyCampAdvSet === "function") window.yyCampAdvSet(normalizeTabsTo2Spaces(data.content_html || ""));
 
-      if (typeof window.yyCampAdvRefresh === "function") setTimeout(() => window.yyCampAdvRefresh(), 0);
-    } catch (_) {}
+      if (typeof window.yyCampAdvRefresh === "function") {
+        setTimeout(() => window.yyCampAdvRefresh(), 0);
+      }
+    } catch (e) {}
   }
 
   async function switchToUser() {
     try {
       if (typeof window.yyCampEnsureCodeMirror === "function") window.yyCampEnsureCodeMirror();
-
-      const html = normalizeTabsTo2Spaces(
+      const content = normalizeTabsTo2Spaces(
         typeof window.yyCampAdvGetHtml === "function" ? window.yyCampAdvGetHtml() : ""
       );
 
-      if (window.YYCampaignLetterTiny && window.YYCampaignLetterTiny.setHtml) {
-        window.YYCampaignLetterTiny.setHtml(html || "");
-      }
+      const id = getCampaignId();
+      if (!id) return;
+
+      const data = await postJson("/panel/campaigns/campaigns/letter/_render-editor-html/", {
+        id: id,
+        content_html: content || "",
+      });
+      if (!data || !data.ok) return;
+
+      const ed = window.tinymce ? window.tinymce.get("yyTinyEditor") : null;
+      if (ed) ed.setContent(data.editor_html || "");
 
       showUserMode();
-    } catch (_) {}
+    } catch (e) {}
   }
 
   window.yyCampSwitchToAdvanced = switchToAdvanced;

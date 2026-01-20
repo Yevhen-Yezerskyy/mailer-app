@@ -1,6 +1,10 @@
 # FILE: web/panel/aap_campaigns/views/campaigns.py
-# DATE: 2026-01-19
-# PURPOSE: Fix campaigns add/edit: поддержка *close кнопок + attach letter к edit_obj для селекта template.
+# DATE: 2026-01-20
+# PURPOSE: Campaigns page: add/edit + нижняя таблица (select_related/active toggle) + letter-editor init ctx.
+# CHANGE:
+# - _qs(): select_related(mailing_list, mailbox, letter, letter__template)
+# - POST actions: activate/pause
+# - state=letter: готовим init_html/init_css/subjects/template_html (Tiny visual html собирается сервером)
 
 from __future__ import annotations
 
@@ -15,6 +19,11 @@ from django.shortcuts import redirect, render
 from engine.common.email_template import render_html, sanitize
 from mailer_web.access import decode_id, encode_id, resolve_pk_or_redirect
 from panel.aap_campaigns.models import Campaign, Letter, Templates
+from panel.aap_campaigns.template_editor import (  # NEW (дополняется тобой в template_editor.py)
+    find_demo_content_from_template,
+    letter_editor_render_html,
+    styles_json_to_css,
+)
 from panel.aap_lists.models import MailingList
 from panel.aap_settings.models import Mailbox, SendingSettings
 
@@ -28,7 +37,11 @@ def _guard(request) -> tuple[Optional[UUID], Optional[object]]:
 
 
 def _qs(ws_id: UUID):
-    return Campaign.objects.filter(workspace_id=ws_id).order_by("-updated_at")
+    return (
+        Campaign.objects.filter(workspace_id=ws_id)
+        .select_related("mailing_list", "mailbox", "letter", "letter__template")
+        .order_by("-updated_at")
+    )
 
 
 def _with_ui_ids(items):
@@ -86,13 +99,19 @@ def campaigns_view(request):
         return redirect("/")
 
     state = _get_state(request)
+
     edit_obj = _get_edit_obj(request, ws_id)
     if isinstance(edit_obj, HttpResponseRedirect):
         return edit_obj
 
-    # attach letter to edit_obj for template select (do NOT create on GET)
     if edit_obj:
-        edit_obj.letter = Letter.objects.filter(workspace_id=ws_id, campaign=edit_obj).first()
+        edit_obj.ui_id = encode_id(int(edit_obj.id))
+        edit_obj.letter = (
+            Letter.objects
+            .filter(workspace_id=ws_id, campaign=edit_obj)
+            .select_related("template")
+            .first()
+        )
 
     list_items = MailingList.objects.filter(workspace_id=ws_id, archived=False).order_by("-created_at")
     mb_items = Mailbox.objects.filter(workspace_id=ws_id, is_active=True).order_by("name")
@@ -113,16 +132,58 @@ def campaigns_view(request):
     )
     global_window_json = ss.value_json or {}
 
+    # ----- letter editor init ctx -----
     letter_obj = None
+    letter_init_html = ""
+    letter_init_css = ""
+    letter_init_subjects = "[]"
+    letter_template_html = ""
+
     if state == "letter" and edit_obj:
         letter_obj = _ensure_letter(ws_id, edit_obj)
         letter_obj.ui_id = encode_id(int(letter_obj.id))
 
+        tpl = letter_obj.template if letter_obj.template_id else None
+        if tpl:
+            letter_template_html = tpl.template_html or ""
+
+            content_html = (letter_obj.html_content or "").strip()
+            if not content_html:
+                content_html = find_demo_content_from_template(letter_template_html)
+
+            letter_init_html = letter_editor_render_html(letter_template_html, content_html)
+
+            styles_obj = _styles_pick_main(tpl.styles or {})
+            letter_init_css = styles_json_to_css(styles_obj) or ""
+
+        try:
+            letter_init_subjects = json.dumps(letter_obj.subjects or [], ensure_ascii=False)
+        except Exception:
+            letter_init_subjects = "[]"
+
+    # ---------------- POST ----------------
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
 
         if action == "close":
             return redirect(request.path)
+
+        if action in ("activate", "pause"):
+            post_id = (request.POST.get("id") or "").strip()
+            if not post_id:
+                return redirect(request.get_full_path())
+
+            try:
+                pk = int(decode_id(post_id))
+            except Exception:
+                return redirect(request.get_full_path())
+
+            camp = Campaign.objects.filter(id=pk, workspace_id=ws_id).first()
+            if camp:
+                camp.active = (action == "activate")
+                camp.save(update_fields=["active", "updated_at"])
+
+            return redirect(request.get_full_path())
 
         if action == "delete":
             post_id = (request.POST.get("id") or "").strip()
@@ -239,6 +300,7 @@ def campaigns_view(request):
 
             let = _ensure_letter(ws_id, edit_obj)
 
+            editor_mode = (request.POST.get("editor_mode") or "user").strip()
             editor_html = request.POST.get("editor_html") or ""
             subjects_json = request.POST.get("subjects_json") or "[]"
 
@@ -248,7 +310,12 @@ def campaigns_view(request):
             except Exception:
                 subs = []
 
-            let.html_content = sanitize(editor_html)
+            content_html = editor_html
+            if editor_mode != "advanced":
+                # user-mode => editor_html это template+content (visual), достаем только content
+                content_html = letter_editor_extract_content(editor_html or "")
+
+            let.html_content = sanitize(content_html or "")
             let.subjects = subs
             let.save(update_fields=["html_content", "subjects", "updated_at"])
 
@@ -268,13 +335,13 @@ def campaigns_view(request):
 
         return redirect(request.path)
 
+    # ---------------- GET ----------------
     items = _with_ui_ids(_qs(ws_id))
 
     edit_window_json_str = ""
     if edit_obj and isinstance(edit_obj.window, dict):
         edit_window_json_str = json.dumps(edit_obj.window or {}, ensure_ascii=False)
 
-    # --- ctx ---
     ctx = {
         "items": items,
         "state": state,
@@ -285,6 +352,12 @@ def campaigns_view(request):
         "tpl_items": tpl_items,
         "parent_items": parent_items,
         "global_window_json_str": json.dumps(global_window_json or {}, ensure_ascii=False),
-        "edit_window_json_str": edit_window_json_str,   # ← ВАЖНО
+        "edit_window_json_str": edit_window_json_str,
+
+        # letter init
+        "letter_init_html": letter_init_html,
+        "letter_init_css": letter_init_css,
+        "letter_init_subjects": letter_init_subjects,
+        "letter_template_html": letter_template_html,
     }
     return render(request, "panels/aap_campaigns/campaigns.html", ctx)

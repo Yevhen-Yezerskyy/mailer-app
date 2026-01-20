@@ -1,7 +1,7 @@
-// FILE: web/static/js/campaign_letters/preview.js
-// DATE: 2026-01-19
-// PURPOSE: Preview письма кампании через YYModal (POST from editor) или GET by id (из таблицы кампаний не нужно).
-// CHANGE: (new) endpoint /panel/campaigns/campaigns/preview/modal-from-editor/.
+// FILE: web/static/js/campaign_templates/campaign_letters/preview.js
+// DATE: 2026-01-20
+// PURPOSE: Preview: никаких extract на клиенте. Шлем {id, editor_mode, editor_html}.
+// CHANGE: campaigns_api сам extract'ит content в python, если mode=user.
 
 (function () {
   "use strict";
@@ -23,11 +23,10 @@
     return el ? String(el.value || "").trim() : "";
   }
 
-  function getUserHtml() {
+  function getUserEditorHtml() {
     try {
-      return (window.YYCampaignLetterTiny && window.YYCampaignLetterTiny.getHtml)
-        ? (window.YYCampaignLetterTiny.getHtml() || "")
-        : "";
+      const ed = window.tinymce ? window.tinymce.get("yyTinyEditor") : null;
+      return ed ? (ed.getContent({ format: "html" }) || "") : "";
     } catch (_) {
       return "";
     }
@@ -36,7 +35,7 @@
   function getAdvHtml() {
     try {
       if (typeof window.yyCampEnsureCodeMirror === "function") window.yyCampEnsureCodeMirror();
-      return (typeof window.yyCampAdvGetHtml === "function") ? (window.yyCampAdvGetHtml() || "") : "";
+      return typeof window.yyCampAdvGetHtml === "function" ? (window.yyCampAdvGetHtml() || "") : "";
     } catch (_) {
       return "";
     }
@@ -49,9 +48,11 @@
     if (!id) return;
 
     const mode = getMode();
-    const html = mode === "advanced" ? normalizeTabsTo2Spaces(getAdvHtml()) : (getUserHtml() || "");
+    const html = mode === "advanced" ? normalizeTabsTo2Spaces(getAdvHtml()) : (getUserEditorHtml() || "");
+
     window.YYModal.open("post=/panel/campaigns/campaigns/preview/modal-from-editor/", {
       id: id,
+      editor_mode: mode,
       editor_html: html || "",
     });
   }

@@ -1,7 +1,7 @@
 # FILE: web/panel/aap_campaigns/urls.py
-# DATE: 2026-01-19
-# PURPOSE: URLs для campaigns/templates + campaigns (одна страница, state в GET) + preview-modal для письма кампании.
-# CHANGE: Добавлены /campaigns/ + /campaigns/preview/modal(+from-editor).
+# DATE: 2026-01-20
+# PURPOSE: Добавить letter-editor API (extract/render) для campaigns (как в templates).
+# CHANGE: New paths: campaigns/letter/_extract-content/ + campaigns/letter/_render-editor-html/
 
 from __future__ import annotations
 
@@ -9,24 +9,25 @@ from django.urls import path
 
 from panel.aap_campaigns.views.campaigns import campaigns_view
 from panel.aap_campaigns.views.campaigns_api import (
+    campaigns__letter_extract_content_view,
+    campaigns__letter_render_editor_html_view,
     campaigns__preview_modal_by_id_view,
     campaigns__preview_modal_from_editor_view,
 )
 from panel.aap_campaigns.views.templates import templates_view
 from panel.aap_campaigns.views.templates_api import (
-    templates__render_user_html_view,
-    templates__render_user_css_view,
+    templates__global_style_css_view,
     templates__parse_editor_html_view,
-    templates__render_editor_html_view,
     templates__preview_modal_by_id_view,
     templates__preview_modal_from_editor_view,
-    templates__global_style_css_view,
+    templates__render_editor_html_view,
+    templates__render_user_css_view,
+    templates__render_user_html_view,
 )
 
 app_name = "campaigns"
 
 urlpatterns = [
-    # campaigns (one page)
     path("campaigns/", campaigns_view, name="campaigns"),
     path("campaigns/preview/modal/", campaigns__preview_modal_by_id_view, name="campaigns__preview_modal_by_id"),
     path(
@@ -34,7 +35,12 @@ urlpatterns = [
         campaigns__preview_modal_from_editor_view,
         name="campaigns__preview_modal_from_editor",
     ),
-    # templates (existing)
+
+    # NEW: letter editor API (python-only HTML ops)
+    path("campaigns/letter/_extract-content/", campaigns__letter_extract_content_view, name="campaigns__letter_extract_content"),
+    path("campaigns/letter/_render-editor-html/", campaigns__letter_render_editor_html_view, name="campaigns__letter_render_editor_html"),
+
+    # templates
     path("templates/", templates_view, name="templates"),
     path("templates/_render-user-html/", templates__render_user_html_view, name="templates__render_user_html"),
     path("templates/_render-user-css/", templates__render_user_css_view, name="templates__render_user_css"),

@@ -241,32 +241,246 @@
 
 
 {# ==================== C. РЕДАКТОР ПИСЬМА ==================== #}
-{% if state == "letter" %}
-  {{ block.super }}
+{% if state == "letter" and edit_obj %}
+
+<form method="post" id="yySendingForm">
+  {% csrf_token %}
+
+  <input type="hidden" id="yyCampaignId" value="{{ edit_obj.ui_id }}">
+  <input type="hidden" name="editor_mode" id="yyEditorMode" value="user">
+  <input type="hidden" name="editor_html" id="yyEditorHtml">
+  <input type="hidden" name="subjects_json" id="yySubjectsJson">
+
+  <textarea id="yyInitHtml" class="hidden">{{ letter_init_html }}</textarea>
+  <textarea id="yyInitCss" class="hidden">{{ letter_init_css }}</textarea>
+  <textarea id="yyInitSubjects" class="hidden">{{ letter_init_subjects }}</textarea>
+  <textarea id="yyTemplateHtml" class="hidden">{{ letter_template_html }}</textarea>
+
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD w-[70%]">
+        <div class="YY-CARD_WHITE">
+
+          <div id="yyUserModeLeft">
+            <textarea id="yyTinyEditor"
+                      class="border border-[#cbcbcb] bg-white w-full"
+                      style="height:800px;"
+                      spellcheck="false"></textarea>
+          </div>
+
+          <div id="yyAdvancedModeLeft" class="hidden">
+            <textarea id="yyAdvHtml"
+                      style="height:900px;"
+                      spellcheck="false"></textarea>
+          </div>
+
+        </div>
+      </td>
+
+      <td class="YY-MAIN_TOP_RIGHT_TD w-[30%]">
+        <div class="YY-CARD_WHITE">
+
+          <div id="yyUserModeRight">
+            <div class="grid grid-cols-2 gap-3 mb-10">
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampSwitchToAdvanced()">
+                {% trans "Экспертный режим" %}
+              </button>
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampPreviewCurrent()">
+                {% trans "Предпросмотр" %}
+              </button>
+            </div>
+
+            <div class="YY-STATUS_YELLOW mb-2">{% trans "Subjects" %}:</div>
+            <div id="yySubjectsWrap" class="grid gap-2 mb-3"></div>
+            <button type="button" id="yySubjectsAddBtn" class="YY-BUTTON_TAB_MAIN mb-10">+</button>
+          </div>
+
+          <div id="yyAdvancedModeRight" class="hidden">
+            <div class="grid grid-cols-2 gap-3 mb-10">
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampSwitchToUser()">
+                {% trans "Визуальный режим" %}
+              </button>
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampPreviewCurrent()">
+                {% trans "Предпросмотр" %}
+              </button>
+            </div>
+
+            <div class="YY-STATUS_YELLOW mb-2">{% trans "Subjects" %}:</div>
+            <div id="yySubjectsWrap2" class="grid gap-2 mb-3"></div>
+            <button type="button" id="yySubjectsAddBtn2" class="YY-BUTTON_TAB_MAIN mb-10">+</button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mt-5">
+            <button type="submit" name="action" value="save_letter" class="YY-BUTTON_MAIN">
+              {% trans "Сохранить" %}
+            </button>
+            <button type="submit" name="action" value="save_ready" class="YY-BUTTON_MAIN">
+              {% trans "Сохранить (ready)" %}
+            </button>
+          </div>
+
+          <div class="mt-3">
+            <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN w-full" formnovalidate>
+              {% trans "Закрыть" %}
+            </button>
+          </div>
+
+        </div>
+      </td>
+    </tr>
+  </table>
+</form>
+
 {% endif %}
 
 {# ==================== D. НИЖНЯЯ ТАБЛИЦА ==================== #}
-{% if items %}
-  <div class="YY-CARD_WHITE mt-10">
-    <table class="w-full text-left">
-      <tbody>
-        {% for it in items %}
-          <tr class="YY-TB_TR">
-            <td class="YY-TB_TD"><div class="YY-STATUS_BLUE">{{ it.title }}</div></td>
-            <td class="YY-TB_TD"><a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">{% trans "Изменить" %}</a></td>
-            <td class="YY-TB_TD"><a href="?state=letter&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">{% trans "Письмо" %}</a></td>
-          </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-{% endif %}
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      {% if items %}
+        <div class="YY-MAIN_BOTTOM_DIV">
+
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH w-[34%]">{% trans "Кампания" %}</th>
+                <th class="YY-TH_TH w-[18%]">{% trans "Даты" %}</th>
+                <th class="YY-TH_TH w-[18%]">{% trans "Письмо" %}</th>
+                <th class="YY-TH_TH w-[15%]">{% trans "Статус" %}</th>
+                <th class="YY-TH_TH w-[15%]">&nbsp;</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for it in items %}
+                <tr class="YY-TB_TR align-top">
+                  <!-- 1) title + list + mailbox -->
+                  <td class="YY-TB_TD">
+                    <div class="YY-STATUS_BLUE mb-2">{{ it.title }}</div>
+
+                    <div class="YY-STATUS_YELLOW mb-1">
+                      {% trans "Список" %}: {{ it.mailing_list.title }}
+                    </div>
+
+                    <div class="YY-STATUS_YELLOW">
+                      {% trans "Mailbox" %}: {{ it.mailbox.name }} &lt;{{ it.mailbox.email }}&gt;
+                    </div>
+                  </td>
+
+                  <!-- 2) dates -->
+                  <td class="YY-TB_TD">
+                    <div class="YY-STATUS_BLUE mb-2">
+                      {% trans "Старт" %}: {{ it.start_at|date:"d.m.Y" }}
+                    </div>
+                    <div class="YY-STATUS_BLUE">
+                      {% trans "Конец" %}:
+                      {% if it.end_at %}{{ it.end_at|date:"d.m.Y" }}{% else %}—{% endif %}
+                    </div>
+                  </td>
+
+                  <!-- 3) letter / template -->
+                  <td class="YY-TB_TD">
+                    <div class="YY-STATUS_BLUE mb-2">
+                      {% trans "Шаблон" %}:
+                      {% if it.letter and it.letter.template %}
+                        {{ it.letter.template.template_name }}
+                      {% else %}
+                        —
+                      {% endif %}
+                    </div>
+
+                    <a href="?state=letter&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
+                      {% trans "Изменить письмо" %}
+                    </a>
+                    <a href="#" class="YY-BUTTON_TAB_MAIN opacity-50 pointer-events-none">
+                      {% trans "Предпросмотр" %}
+                    </a>
+                  </td>
+
+                  <!-- 4) status + activate/pause -->
+                  <td class="YY-TB_TD">
+                    {% if it.active %}
+                      <div class="YY-STATUS_GREEN mb-2">{% trans "Активно" %}</div>
+                      <form method="post" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="pause">
+                        <input type="hidden" name="id" value="{{ it.ui_id }}">
+                        <button type="submit" class="YY-BUTTON_TAB_MAIN">
+                          {% trans "Пауза" %}
+                        </button>
+                      </form>
+                    {% else %}
+                      <div class="YY-STATUS_RED mb-2">{% trans "Не активно" %}</div>
+                      <form method="post" class="inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="activate">
+                        <input type="hidden" name="id" value="{{ it.ui_id }}">
+                        <button type="submit" class="YY-BUTTON_TAB_MAIN">
+                          {% trans "Включить" %}
+                        </button>
+                      </form>
+                    {% endif %}
+                  </td>
+
+                  <!-- 5) edit + delete -->
+                  <td class="YY-TB_TD">
+                    <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
+                      {% trans "Изменить" %}
+                    </a>
+
+                    <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete">
+                      <input type="hidden" name="id" value="{{ it.ui_id }}">
+                      <button type="submit" class="YY-BUTTON_TAB_RED">
+                        {% trans "Удалить" %}
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+        </div>
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
+      {% endif %}
+    </td>
+  </tr>
+</table>
 
 {% endblock %}
+
 
 {% block extra_js %}
   {{ block.super }}
   {% if state == "add" or state == "edit" %}
     <script src="/static/js/aap_settings/sending_campaign.js"></script>
+  {% endif %}
+
+  {% if state == "letter" %}
+    <!-- CodeMirror -->
+    <link rel="stylesheet" href="/static/vendor/codemirror/codemirror.css">
+    <link rel="stylesheet" href="/static/vendor/codemirror/theme/material-darker.css">
+    <script src="/static/vendor/codemirror/codemirror.js"></script>
+    <script src="/static/vendor/codemirror/mode/xml/xml.js"></script>
+    <script src="/static/vendor/codemirror/mode/javascript/javascript.js"></script>
+    <script src="/static/vendor/codemirror/mode/css/css.js"></script>
+    <script src="/static/vendor/codemirror/mode/htmlmixed/htmlmixed.js"></script>
+
+    <!-- Tiny -->
+    <script src="/static/vendor/tinymce/tinymce.min.js"></script>
+    <script src="/static/js/campaign_templates/campaign_letters/tinymce_config.js"></script>
+
+    <!-- Campaign Letter Editor -->
+    <script src="/static/js/campaign_templates/campaign_letters/tinymce.js"></script>
+    <script src="/static/js/campaign_templates/campaign_letters/codemirror.js"></script>
+    <script src="/static/js/campaign_templates/campaign_letters/mode_switch.js"></script>
+    <script src="/static/js/campaign_templates/campaign_letters/subjects.js"></script>
+    <script src="/static/js/campaign_templates/campaign_letters/preview.js"></script>
+    <script src="/static/js/campaign_templates/campaign_letters/submit.js"></script>
   {% endif %}
 {% endblock %}

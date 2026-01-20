@@ -1,7 +1,7 @@
-// FILE: web/static/js/campaign_letters/submit.js
-// DATE: 2026-01-19
-// PURPOSE: Перед submit заполняет hidden editor_html + subjects_json.
-// CHANGE: (new) работает для save_letter/save_ready.
+// FILE: web/static/js/campaign_templates/campaign_letters/submit.js
+// DATE: 2026-01-20
+// PURPOSE: Submit: никаких разборов HTML на клиенте. В user-mode шлем visual editor_html, python достанет content.
+// CHANGE: editor_mode + editor_html (visual или content) кладем в hidden.
 
 (function () {
   "use strict";
@@ -18,11 +18,10 @@
     return v === "advanced" ? "advanced" : "user";
   }
 
-  function getUserHtml() {
+  function getUserEditorHtml() {
     try {
-      return (window.YYCampaignLetterTiny && window.YYCampaignLetterTiny.getHtml)
-        ? (window.YYCampaignLetterTiny.getHtml() || "")
-        : "";
+      const ed = window.tinymce ? window.tinymce.get("yyTinyEditor") : null;
+      return ed ? (ed.getContent({ format: "html" }) || "") : "";
     } catch (_) {
       return "";
     }
@@ -31,14 +30,14 @@
   function getAdvHtml() {
     try {
       if (typeof window.yyCampEnsureCodeMirror === "function") window.yyCampEnsureCodeMirror();
-      return (typeof window.yyCampAdvGetHtml === "function") ? (window.yyCampAdvGetHtml() || "") : "";
+      return typeof window.yyCampAdvGetHtml === "function" ? (window.yyCampAdvGetHtml() || "") : "";
     } catch (_) {
       return "";
     }
   }
 
-  function collectSubjects() {
-    const wrap = $("#yySubjectsWrap");
+  function collectSubjects(wrapId) {
+    const wrap = $(wrapId);
     if (!wrap) return [];
     const inputs = wrap.querySelectorAll('input[data-yy-subject="1"]');
     const out = [];
@@ -60,13 +59,13 @@
     form.addEventListener("submit", function (e) {
       const btn = e.submitter || document.activeElement;
       const action = btn && btn.value ? String(btn.value).trim() : "";
-
-      // only for letter save actions
       if (action !== "save_letter" && action !== "save_ready") return;
 
       const mode = getMode();
-      hiddenHtml.value = (mode === "advanced") ? normalizeTabsTo2Spaces(getAdvHtml()) : (getUserHtml() || "");
-      hiddenSubs.value = JSON.stringify(collectSubjects());
+      hiddenHtml.value = mode === "advanced" ? normalizeTabsTo2Spaces(getAdvHtml()) : (getUserEditorHtml() || "");
+
+      // subjects берем из user-wrap (он у тебя один и тот же набор инпутов)
+      hiddenSubs.value = JSON.stringify(collectSubjects("#yySubjectsWrap"));
     });
   }
 
