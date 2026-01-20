@@ -230,7 +230,7 @@ def render_html(
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width, initial-scale=1.0">'
         "</head>"
-        "<body>"
+        '<body style="margin:0;padding:0;">'
         + body0 +
         "</body>"
         "</html>"

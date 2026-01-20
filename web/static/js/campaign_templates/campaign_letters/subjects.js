@@ -1,7 +1,6 @@
-// FILE: web/static/js/campaign_letters/subjects.js
-// DATE: 2026-01-19
-// PURPOSE: Subjects UI: 1..3 инпута + кнопка "+"; initial from JSON.
-// CHANGE: (new) сбор и валидация в submit.js.
+// FILE: web/static/js/campaign_templates/campaign_letters/subjects.js
+// DATE: 2026-01-20
+// PURPOSE: Campaign Letter Subjects: 3 фиксированных инпута (ротация), initial из yyInitSubjects.
 
 (function () {
   "use strict";
@@ -9,37 +8,34 @@
   const $ = (s) => document.querySelector(s);
 
   function safeParseJson(s) {
-    try { return JSON.parse(s || "[]"); } catch (_) { return []; }
+    try {
+      const v = JSON.parse(s || "[]");
+      return Array.isArray(v) ? v : [];
+    } catch (_) {
+      return [];
+    }
   }
 
-  function mkInput(val) {
-    const inp = document.createElement("input");
-    inp.type = "text";
-    inp.className = "YY-INPUT !mb-0";
-    inp.placeholder = "Subject";
-    inp.value = val || "";
-    inp.dataset.yySubject = "1";
-    return inp;
+  function setVal(id, v) {
+    const el = $(id);
+    if (!el) return;
+    el.value = v || "";
   }
 
   function init() {
-    const wrap = $("#yySubjectsWrap");
-    const addBtn = $("#yySubjectsAddBtn");
+    const s1 = $("#yySubject1");
+    const s2 = $("#yySubject2");
+    const s3 = $("#yySubject3");
     const src = $("#yyInitSubjects");
-    if (!wrap || !addBtn || !src) return;
+    if (!s1 || !s2 || !s3 || !src) return;
 
-    const arr = safeParseJson(src.value || "[]");
-    const vals = Array.isArray(arr) ? arr.slice(0, 3).map((x) => String(x || "").trim()) : [];
-    const nonEmpty = vals.filter((x) => x);
+    const arr = safeParseJson(src.value || "[]")
+      .map((x) => String(x == null ? "" : x).trim())
+      .filter((x) => x);
 
-    const start = nonEmpty.length ? nonEmpty : [""];
-    start.forEach((v) => wrap.appendChild(mkInput(v)));
-
-    addBtn.addEventListener("click", function () {
-      const current = wrap.querySelectorAll('input[data-yy-subject="1"]').length;
-      if (current >= 3) return;
-      wrap.appendChild(mkInput(""));
-    });
+    setVal("#yySubject1", arr[0] || "");
+    setVal("#yySubject2", arr[1] || "");
+    setVal("#yySubject3", arr[2] || "");
   }
 
   if (document.readyState === "loading") {

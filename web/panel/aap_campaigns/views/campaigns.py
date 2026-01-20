@@ -2,9 +2,8 @@
 # DATE: 2026-01-20
 # PURPOSE: Campaigns page: add/edit + нижняя таблица (select_related/active toggle) + letter-editor init ctx.
 # CHANGE:
-# - _qs(): select_related(mailing_list, mailbox, letter, letter__template)
-# - POST actions: activate/pause
-# - state=letter: готовим init_html/init_css/subjects/template_html (Tiny visual html собирается сервером)
+# - letter editor: headers init/save (Letter.headers)
+# - save_letter: всегда пересчитывает ready_content через engine.common.email_template.render_html без vars_json (placeholders не трогаем)
 
 from __future__ import annotations
 
@@ -19,8 +18,9 @@ from django.shortcuts import redirect, render
 from engine.common.email_template import render_html, sanitize
 from mailer_web.access import decode_id, encode_id, resolve_pk_or_redirect
 from panel.aap_campaigns.models import Campaign, Letter, Templates
-from panel.aap_campaigns.template_editor import (  # NEW (дополняется тобой в template_editor.py)
+from panel.aap_campaigns.template_editor import (
     find_demo_content_from_template,
+    letter_editor_extract_content,
     letter_editor_render_html,
     styles_json_to_css,
 )
@@ -107,8 +107,7 @@ def campaigns_view(request):
     if edit_obj:
         edit_obj.ui_id = encode_id(int(edit_obj.id))
         edit_obj.letter = (
-            Letter.objects
-            .filter(workspace_id=ws_id, campaign=edit_obj)
+            Letter.objects.filter(workspace_id=ws_id, campaign=edit_obj)
             .select_related("template")
             .first()
         )
@@ -137,6 +136,7 @@ def campaigns_view(request):
     letter_init_html = ""
     letter_init_css = ""
     letter_init_subjects = "[]"
+    letter_init_headers = "{}"
     letter_template_html = ""
 
     if state == "letter" and edit_obj:
@@ -160,6 +160,11 @@ def campaigns_view(request):
             letter_init_subjects = json.dumps(letter_obj.subjects or [], ensure_ascii=False)
         except Exception:
             letter_init_subjects = "[]"
+
+        try:
+            letter_init_headers = json.dumps(letter_obj.headers or {}, ensure_ascii=False, indent=2)
+        except Exception:
+            letter_init_headers = "{}"
 
     # ---------------- POST ----------------
     if request.method == "POST":
@@ -303,12 +308,19 @@ def campaigns_view(request):
             editor_mode = (request.POST.get("editor_mode") or "user").strip()
             editor_html = request.POST.get("editor_html") or ""
             subjects_json = request.POST.get("subjects_json") or "[]"
+            headers_json = request.POST.get("headers_json") or "{}"
 
             try:
                 subs = json.loads(subjects_json)
                 subs = [str(x).strip() for x in subs if str(x).strip()] if isinstance(subs, list) else []
             except Exception:
                 subs = []
+
+            try:
+                hdrs = json.loads(headers_json) if headers_json else {}
+                hdrs = hdrs if isinstance(hdrs, dict) else {}
+            except Exception:
+                hdrs = {}
 
             content_html = editor_html
             if editor_mode != "advanced":
@@ -317,19 +329,20 @@ def campaigns_view(request):
 
             let.html_content = sanitize(content_html or "")
             let.subjects = subs
-            let.save(update_fields=["html_content", "subjects", "updated_at"])
+            let.headers = hdrs
+            let.save(update_fields=["html_content", "subjects", "headers", "updated_at"])
 
-            if action == "save_ready":
-                tpl = let.template if let.template_id else None
-                if tpl:
-                    ready = render_html(
-                        template_html=tpl.template_html or "",
-                        content_html=sanitize(let.html_content or ""),
-                        styles=_styles_pick_main(tpl.styles or {}),
-                        vars_json={},
-                    )
-                    let.ready_content = ready or ""
-                    let.save(update_fields=["ready_content", "updated_at"])
+            # ready_content пересчитываем ВСЕГДА (без vars_json => плейсхолдеры остаются)
+            tpl = let.template if let.template_id else None
+            if tpl:
+                ready = render_html(
+                    template_html=tpl.template_html or "",
+                    content_html=sanitize(let.html_content or ""),
+                    styles=_styles_pick_main(tpl.styles or {}),
+                    vars_json=None,
+                )
+                let.ready_content = ready or ""
+                let.save(update_fields=["ready_content", "updated_at"])
 
             return redirect(f"{request.path}?state=letter&id={encode_id(int(edit_obj.id))}")
 
@@ -353,11 +366,11 @@ def campaigns_view(request):
         "parent_items": parent_items,
         "global_window_json_str": json.dumps(global_window_json or {}, ensure_ascii=False),
         "edit_window_json_str": edit_window_json_str,
-
         # letter init
         "letter_init_html": letter_init_html,
         "letter_init_css": letter_init_css,
         "letter_init_subjects": letter_init_subjects,
+        "letter_init_headers": letter_init_headers,
         "letter_template_html": letter_template_html,
     }
     return render(request, "panels/aap_campaigns/campaigns.html", ctx)
