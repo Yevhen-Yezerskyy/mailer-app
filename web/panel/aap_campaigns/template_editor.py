@@ -2,9 +2,9 @@
 # DATE: 2026-01-21
 # PURPOSE: Единый центр HTML-операций для editors (Templates + Letters).
 # CHANGE:
-# - date_time добавлен в default vars (фиксированная строка) для обратной подстановки.
-# - Добавлен reverse-vars в editor_template_parse_html: demo-значения -> {{ var }}.
-# - Экспортированы default_template_vars() для preview (Templates).
+# - Расширен _DEFAULT_TEMPLATE_VARS (company_name/city_land/date_time/city/UTM) для demo-подстановки.
+# - FIX: letter_editor_extract_content теперь делает reverse-vars: demo-значения -> {{ var }} (как в шаблонах),
+#        чтобы при сохранении не терялись переменные.
 
 from __future__ import annotations
 
@@ -25,6 +25,8 @@ _DEFAULT_TEMPLATE_VARS: Dict[str, str] = {
     "company_name": "Unternehmen Adressat GmbH",
     "city_land": "Köln, Nordrhein-Westfalen",
     "date_time": "12:00 21.01.2028",
+    "city": "Hauptstadt",
+    "UTM": "smrel=132246897659",
 }
 
 
@@ -400,6 +402,10 @@ def letter_editor_render_html(template_html: str, content_html: str) -> str:
 
 
 def letter_editor_extract_content(editor_html: str) -> str:
-    raw = _strip_tiny_edit_classes(editor_html or "")
-    inner = unwrap_editor_content(raw)
-    return sanitize(inner or "")
+    raw0 = _strip_tiny_edit_classes(editor_html or "")
+    inner0 = unwrap_editor_content(raw0) or ""
+
+    # FIX: reverse demo-vars обратно в {{ var }} (как в templates)
+    inner1 = _unapply_template_vars(inner0, _DEFAULT_TEMPLATE_VARS)
+
+    return sanitize(inner1 or "")

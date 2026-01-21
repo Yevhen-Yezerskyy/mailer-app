@@ -1,9 +1,11 @@
 # FILE: web/panel/aap_campaigns/views/campaigns_api.py
-# DATE: 2026-01-20
+# DATE: 2026-01-21
 # PURPOSE: Letter editor API (как в templates): extract content / render editor_html + preview (user/advanced).
 # CHANGE:
-# - preview/from-editor: принимает {id, editor_mode, editor_html}; если mode=user => extract content через python.
-# - NEW: /campaigns/letter/_extract-content/ и /campaigns/letter/_render-editor-html/
+# - Campaigns preview: отдельная модалка modal_full_preview.html (VIEW / HTML / HTML EMAIL).
+# - HTML tab: 3 блока (внутренний content_html, CSS, внешний template_html).
+# - VIEW: render_html + demo vars (default_template_vars()) в iframe srcdoc (изоляция стилей).
+# - HTML EMAIL: render_html без vars_json ({}).
 
 from __future__ import annotations
 
@@ -19,8 +21,10 @@ from engine.common.email_template import render_html, sanitize
 from mailer_web.access import decode_id, resolve_pk_or_redirect
 from panel.aap_campaigns.models import Campaign, Letter
 from panel.aap_campaigns.template_editor import (
+    default_template_vars,
     letter_editor_extract_content,
     letter_editor_render_html,
+    styles_json_to_css,
 )
 
 
@@ -63,6 +67,38 @@ def _read_json_body(request: HttpRequest) -> Dict[str, Any]:
         return {}
 
 
+def _build_preview_bundle(template_html: str, styles_obj: Any, content_html: str) -> Dict[str, str]:
+    styles_main = _styles_pick_main(styles_obj or {})
+    content_used = sanitize(content_html or "")
+    tpl_html = template_html or ""
+
+    # VIEW — с demo vars (реалистичное превью)
+    view_html = render_html(
+        template_html=tpl_html,
+        content_html=content_used,
+        styles=styles_main,
+        vars_json=default_template_vars(),
+    ) or ""
+
+    # HTML EMAIL — без vars
+    email_html = render_html(
+        template_html=tpl_html,
+        content_html=content_used,
+        styles=styles_main,
+        vars_json={},
+    ) or ""
+
+    return {
+        "view_html": view_html,
+        "content_html": content_used,
+        "raw_css": styles_json_to_css(styles_main) or "",
+        "template_html": tpl_html,
+        "email_html": email_html,
+    }
+
+
+# ==================== LETTER EDITOR (python-only HTML ops) ====================
+
 @require_POST
 @csrf_exempt
 def campaigns__letter_extract_content_view(request: HttpRequest) -> JsonResponse:
@@ -100,33 +136,37 @@ def campaigns__letter_render_editor_html_view(request: HttpRequest) -> JsonRespo
     return JsonResponse({"ok": True, "editor_html": editor_html or ""})
 
 
+# ==================== PREVIEW (Campaigns / Letter) ====================
+
+_EMPTY_CTX = {"status": "empty", "view_html": "", "content_html": "", "raw_css": "", "template_html": "", "email_html": ""}
+
+
 @require_GET
 @csrf_exempt
 def campaigns__preview_modal_by_id_view(request: HttpRequest) -> HttpResponse:
     ws_id = _guard_ws(request)
     if not ws_id:
-        return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "empty", "email_html": ""})
+        return render(request, "panels/aap_campaigns/modal_full_preview.html", _EMPTY_CTX)
 
     res = resolve_pk_or_redirect(request, Campaign, param="id")
     if not isinstance(res, int):
-        return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "empty", "email_html": ""})
+        return render(request, "panels/aap_campaigns/modal_full_preview.html", _EMPTY_CTX)
 
     camp = Campaign.objects.filter(id=int(res), workspace_id=ws_id).first()
     if not camp:
-        return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "empty", "email_html": ""})
+        return render(request, "panels/aap_campaigns/modal_full_preview.html", _EMPTY_CTX)
 
     let = _ensure_letter(ws_id, camp)
     tpl = let.template if let and let.template_id else None
     if not tpl:
-        return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "empty", "email_html": ""})
+        return render(request, "panels/aap_campaigns/modal_full_preview.html", _EMPTY_CTX)
 
-    email_html = render_html(
+    bundle = _build_preview_bundle(
         template_html=tpl.template_html or "",
-        content_html=sanitize(let.html_content or ""),
-        styles=_styles_pick_main(tpl.styles or {}),
-        vars_json={},
+        styles_obj=tpl.styles or {},
+        content_html=(let.html_content or ""),
     )
-    return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "done", "email_html": email_html or ""})
+    return render(request, "panels/aap_campaigns/modal_full_preview.html", {"status": "done", **bundle})
 
 
 @require_POST
@@ -134,7 +174,7 @@ def campaigns__preview_modal_by_id_view(request: HttpRequest) -> HttpResponse:
 def campaigns__preview_modal_from_editor_view(request: HttpRequest) -> HttpResponse:
     ws_id = _guard_ws(request)
     if not ws_id:
-        return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "empty", "email_html": ""})
+        return render(request, "panels/aap_campaigns/modal_full_preview.html", _EMPTY_CTX)
 
     data = _read_json_body(request)
     ui_id = (data.get("id") or "").strip()
@@ -143,22 +183,21 @@ def campaigns__preview_modal_from_editor_view(request: HttpRequest) -> HttpRespo
 
     camp = _load_campaign_by_ui_id(ws_id, ui_id)
     if not camp:
-        return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "empty", "email_html": ""})
+        return render(request, "panels/aap_campaigns/modal_full_preview.html", _EMPTY_CTX)
 
     let = _ensure_letter(ws_id, camp)
     tpl = let.template if let and let.template_id else None
     if not tpl:
-        return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "empty", "email_html": ""})
+        return render(request, "panels/aap_campaigns/modal_full_preview.html", _EMPTY_CTX)
 
-    # user => editor_html == visual => extract content in python
+    # user => visual editor => extract content in python
     content_html = editor_html or ""
     if editor_mode != "advanced":
         content_html = letter_editor_extract_content(editor_html or "")
 
-    email_html = render_html(
+    bundle = _build_preview_bundle(
         template_html=tpl.template_html or "",
-        content_html=sanitize(content_html or ""),
-        styles=_styles_pick_main(tpl.styles or {}),
-        vars_json={},
+        styles_obj=tpl.styles or {},
+        content_html=content_html or "",
     )
-    return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "done", "email_html": email_html or ""})
+    return render(request, "panels/aap_campaigns/modal_full_preview.html", {"status": "done", **bundle})

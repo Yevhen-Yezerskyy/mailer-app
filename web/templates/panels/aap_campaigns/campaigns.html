@@ -57,7 +57,10 @@
             <input type="text" name="title" class="YY-INPUT mb-3" value="{{ edit_obj.title|default:'' }}">
 
             <label class="YY-LABEL">{% trans "Список рассылки" %}:</label>
-            <select name="mailing_list" class="YY-INPUT mb-3">
+            {% if form_error_msg %}
+              <div class="YY-STATUS_RED mb-3 !py-1">{{ form_error_msg }}</div>
+            {% endif %}
+            <select name="mailing_list" class="YY-INPUT mb-3 {% if form_error_field == 'mailing_list' %}!border-red-500{% endif %}">
               <option value="">{% trans "— не выбран —" %}</option>
               {% for it in list_items %}
                 <option value="{{ it.ui_id }}"
@@ -150,6 +153,10 @@
                 <button type="submit" name="action" value="save_campaign" class="YY-BUTTON_MAIN w-full">
                   {% trans "Сохранить изменения" %}
                 </button>
+                <a href="?state=letter&id={{ edit_obj.ui_id }}"
+                  class="YY-BUTTON_MAIN w-full text-center">
+                    {% trans "Изменить письмо" %}
+                </a>
               {% endif %}
               <button type="submit" name="action" value="close" formnovalidate class="YY-BUTTON_MAIN w-full">
                 {% trans "Закрыть" %}
@@ -381,9 +388,9 @@
                       </div>
                   </td>
                   <td class="YY-TB_TD">
-                    <a href="#" class="YY-BUTTON_TAB_MAIN mb-2">
+                    <button type="button" class="YY-BUTTON_TAB_MAIN mb-2" onclick="yyCampPreviewById('{{ it.ui_id }}')">
                       {% trans "Предпросмотр" %}
-                    </a>
+                    </button>
                     <a href="?state=letter&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN whitespace-nowrap">
                       {% trans "Изменить письмо" %}
                     </a>
@@ -409,7 +416,11 @@
                   <td class="YY-TB_TD">
                     {% if it.active %}
                       <div class="YY-STATUS_GREEN mb-2 !py-1">{% trans "Кампания включена" %}</div>
-                      <div class="YY-STATUS_YELLOW !py-1 mb-2">Ждем окно отправки</div>
+                      {% if it.is_in_window %}
+                        <div class="YY-STATUS_GREEN !py-1 mb-2">{% trans "Идет рассылка" %}</div>
+                      {% else %}
+                        <div class="YY-STATUS_YELLOW !py-1 mb-2">{% trans "Ждем окно отправки" %}</div>
+                      {% endif %}
                       <form method="post" class="inline">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="pause">
@@ -463,7 +474,8 @@
 
 {% block extra_js %}
   {{ block.super }}
-
+  <script src="/static/js/campaign_templates/campaigns_preview.js"></script>
+  <script src="/static/js/campaign_templates/modal_preview.js"></script>
   {% if state == "add" or state == "edit" %}
     <script src="/static/js/aap_settings/sending_campaign.js"></script>
   {% endif %}

@@ -2,23 +2,24 @@
 # DATE: 2026-01-21
 # PURPOSE: Campaigns page: add/edit + letter-editor init ctx + bottom table.
 # CHANGE:
-# - Sender label everywhere:  "Имя отправителя" <мыло>
-#   берём из MailboxConnection(kind=SMTP).extra_json: from_name/from_email
-#   fallback: from_name -> Mailbox.name, from_email -> Mailbox.email
-# - tpl select: только Templates.archived=False; если выбран archived/нет — опция "Шаблон удален"
-# - bottom table: it.letter_tpl_label через gettext; it.sender_label подготовлен в python
-# - FIX: не затираем gettext "_" (get_or_create created)
+# - UI status for active кампаний: "Ждем окно отправки" vs "Идет рассылка" по окну отправки.
+# - Окно: campaign.window (если не пустое) иначе глобальное SendingSettings.value_json.
+# - Время: сравнение всегда в Europe/Berlin (не зависит от TZ сервера).
+# - Праздники: используем пакет `holidays` (python-holidays) для Germany-wide; если пакет не установлен — fallback на вычисление основных DE-wide праздников.
+# - FIX: парсим window-слоты в формате JS ({from,to}) и в формате пар [from,to].
 
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from types import SimpleNamespace
-from typing import Optional, Union
+from typing import Any, Dict, Iterable, Optional, Tuple, Union
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
+from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from engine.common.email_template import render_html, sanitize
@@ -32,6 +33,8 @@ from panel.aap_campaigns.template_editor import (
 )
 from panel.aap_lists.models import MailingList
 from panel.aap_settings.models import ConnKind, Mailbox, MailboxConnection, SendingSettings
+
+_TZ_BERLIN = ZoneInfo("Europe/Berlin")
 
 
 def _guard(request) -> tuple[Optional[UUID], Optional[object]]:
@@ -132,6 +135,230 @@ def _build_sender_labels(mailboxes: list[Mailbox]) -> dict[int, str]:
     return out
 
 
+def _mailing_list_is_taken(ws_id: UUID, mailing_list_id: int, exclude_campaign_id: Optional[int]) -> bool:
+    q = Campaign.objects.filter(workspace_id=ws_id, mailing_list_id=int(mailing_list_id))
+    if exclude_campaign_id:
+        q = q.exclude(id=int(exclude_campaign_id))
+    return q.exists()
+
+
+def _now_berlin() -> datetime:
+    dt = timezone.now()
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone=ZoneInfo("UTC"))
+    return dt.astimezone(_TZ_BERLIN)
+
+
+# -------- Holidays: prefer python-holidays, fallback if not installed --------
+
+_HOL_DE_CACHE: dict[int, set[date]] = {}
+
+
+def _easter_sunday_gregorian(y: int) -> date:
+    # Anonymous Gregorian algorithm
+    a = y % 19
+    b = y // 100
+    c = y % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = ((h + l - 7 * m + 114) % 31) + 1
+    return date(y, month, day)
+
+
+def _fallback_de_wide_holidays(y: int) -> set[date]:
+    fixed = {
+        date(y, 1, 1),    # Neujahr
+        date(y, 5, 1),    # Tag der Arbeit
+        date(y, 10, 3),   # Tag der Deutschen Einheit
+        date(y, 12, 25),  # 1. Weihnachtstag
+        date(y, 12, 26),  # 2. Weihnachtstag
+    }
+    easter = _easter_sunday_gregorian(y)
+    movable = {
+        easter - timedelta(days=2),   # Karfreitag
+        easter + timedelta(days=1),   # Ostermontag
+        easter + timedelta(days=39),  # Christi Himmelfahrt
+        easter + timedelta(days=50),  # Pfingstmontag
+    }
+    return set(fixed | movable)
+
+
+def _get_de_wide_holidays_for_year(y: int) -> set[date]:
+    if y in _HOL_DE_CACHE:
+        return _HOL_DE_CACHE[y]
+
+    try:
+        import holidays  # type: ignore
+
+        h = holidays.country_holidays("DE", years=[y])  # Germany-wide by default
+        out = {d for d in h.keys() if isinstance(d, date)}
+    except Exception:
+        out = _fallback_de_wide_holidays(y)
+
+    _HOL_DE_CACHE[y] = set(out)
+    return _HOL_DE_CACHE[y]
+
+
+def _is_de_public_holiday(d: date) -> bool:
+    return d in _get_de_wide_holidays_for_year(d.year)
+
+
+# -------- Window evaluation --------
+
+def _parse_hhmm_to_minutes(s: str) -> Optional[int]:
+    try:
+        s = (s or "").strip()
+        if not s or ":" not in s:
+            return None
+        h, m = s.split(":", 1)
+        hh = int(h)
+        mm = int(m)
+        if hh < 0 or hh > 23 or mm < 0 or mm > 59:
+            return None
+        return hh * 60 + mm
+    except Exception:
+        return None
+
+
+def _window_is_nonempty(win: object) -> bool:
+    if not isinstance(win, dict):
+        return False
+    for v in win.values():
+        if isinstance(v, list) and len(v) > 0:
+            return True
+    return False
+
+
+def _iter_slots(slots_obj: Any) -> Iterable[Tuple[str, str]]:
+    """
+    Accept formats:
+      A) [{"from":"09:00","to":"12:00"}, ...]   (JS current)
+      B) [["09:00","12:00"], ...] or [("09:00","12:00"), ...]
+    """
+    if not isinstance(slots_obj, list):
+        return []
+    out: list[Tuple[str, str]] = []
+    for it in slots_obj:
+        if isinstance(it, dict):
+            a = str(it.get("from") or "").strip()
+            b = str(it.get("to") or "").strip()
+            if a and b:
+                out.append((a, b))
+            continue
+        if isinstance(it, (list, tuple)) and len(it) == 2:
+            a = str(it[0] or "").strip()
+            b = str(it[1] or "").strip()
+            if a and b:
+                out.append((a, b))
+    return out
+
+
+def _is_now_in_send_window(now_de: datetime, camp_window: object, global_window: object) -> bool:
+    win = camp_window if _window_is_nonempty(camp_window) else (global_window if isinstance(global_window, dict) else {})
+    if not isinstance(win, dict):
+        return False
+
+    today = now_de.date()
+    if _is_de_public_holiday(today):
+        key = "hol"
+    else:
+        wd = now_de.weekday()  # mon=0..sun=6
+        key = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")[wd]
+
+    cur = now_de.hour * 60 + now_de.minute
+
+    for a_str, b_str in _iter_slots(win.get(key, [])):
+        a = _parse_hhmm_to_minutes(a_str)
+        b = _parse_hhmm_to_minutes(b_str)
+        if a is None or b is None:
+            continue
+        if b <= a:
+            continue
+        if a <= cur < b:
+            return True
+
+    return False
+
+
+def _ctx_build(
+    ws_id: UUID,
+    state: str,
+    edit_obj,
+    list_items,
+    mb_items,
+    tpl_items,
+    parent_items,
+    global_window_json,
+    letter_obj,
+    letter_init_html: str,
+    letter_init_css: str,
+    letter_init_subjects: str,
+    letter_init_headers: str,
+    letter_template_html: str,
+    deleted_tpl_ui,
+    deleted_tpl_id,
+    *,
+    form_error_msg: str = "",
+    form_error_field: str = "",
+):
+    items = _with_ui_ids(_qs(ws_id))
+
+    sender_label_by_mb_id = _build_sender_labels(list(mb_items))
+    now_de = _now_berlin()
+
+    for it in items:
+        it.sender_label = sender_label_by_mb_id.get(int(it.mailbox_id), f"{it.mailbox.name} <{it.mailbox.email}>")
+
+        tpl = None
+        if getattr(it, "letter", None):
+            tpl = it.letter.template if it.letter and it.letter.template_id else None
+
+        if tpl and not getattr(tpl, "archived", False):
+            it.letter_tpl_label = tpl.template_name
+        else:
+            it.letter_tpl_label = _("Шаблон удален")
+
+        it.is_in_window = False
+        if getattr(it, "active", False):
+            it.is_in_window = _is_now_in_send_window(now_de, getattr(it, "window", None), global_window_json)
+
+    edit_window_json_str = ""
+    if edit_obj and isinstance(edit_obj.window, dict):
+        edit_window_json_str = json.dumps(edit_obj.window or {}, ensure_ascii=False)
+
+    return {
+        "items": items,
+        "state": state,
+        "edit_obj": edit_obj,
+        "letter_obj": letter_obj,
+        "list_items": list_items,
+        "mb_items": mb_items,
+        "tpl_items": tpl_items,
+        "parent_items": parent_items,
+        "global_window_json_str": json.dumps(global_window_json or {}, ensure_ascii=False),
+        "edit_window_json_str": edit_window_json_str,
+        "deleted_tpl_ui": deleted_tpl_ui,
+        "deleted_tpl_id": deleted_tpl_id,
+        # letter init
+        "letter_init_html": letter_init_html,
+        "letter_init_css": letter_init_css,
+        "letter_init_subjects": letter_init_subjects,
+        "letter_init_headers": letter_init_headers,
+        "letter_template_html": letter_template_html,
+        # form errors
+        "form_error_msg": form_error_msg,
+        "form_error_field": form_error_field,
+    }
+
+
 def campaigns_view(request):
     ws_id, _user = _guard(request)
     if not ws_id:
@@ -154,7 +381,6 @@ def campaigns_view(request):
     list_items = MailingList.objects.filter(workspace_id=ws_id, archived=False).order_by("-created_at")
     mb_items = Mailbox.objects.filter(workspace_id=ws_id, is_active=True).order_by("name")
 
-    # templates in select: только не archived
     tpl_items = Templates.objects.filter(
         workspace_id=ws_id,
         is_active=True,
@@ -164,9 +390,7 @@ def campaigns_view(request):
     for it in list_items:
         it.ui_id = encode_id(int(it.id))
 
-    # sender labels map (для селекта и для таблицы кампаний)
     sender_label_by_mb_id = _build_sender_labels(list(mb_items))
-
     for it in mb_items:
         it.ui_id = encode_id(int(it.id))
         it.sender_label = sender_label_by_mb_id.get(int(it.id), f"{it.name} <{it.email}>")
@@ -174,7 +398,6 @@ def campaigns_view(request):
     for it in tpl_items:
         it.ui_id = encode_id(int(it.id))
 
-    # edit: если выбран archived/отсутствующий шаблон — добавляем спец-опцию "Шаблон удален"
     deleted_tpl_ui = None
     deleted_tpl_id = None
     if state in ("edit", "add") and edit_obj and getattr(edit_obj, "letter", None) and edit_obj.letter:
@@ -284,21 +507,80 @@ def campaigns_view(request):
             mailbox_ui = (request.POST.get("mailbox") or "").strip()
             template_ui = (request.POST.get("template") or "").strip()
 
-            if not (title and mailing_list_ui and mailbox_ui):
-                return redirect(request.path)
+            # required (py-level)
+            if not (title and mailing_list_ui and mailbox_ui and template_ui):
+                ctx = _ctx_build(
+                    ws_id,
+                    state,
+                    edit_obj,
+                    list_items,
+                    mb_items,
+                    tpl_items,
+                    parent_items,
+                    global_window_json,
+                    letter_obj,
+                    letter_init_html,
+                    letter_init_css,
+                    letter_init_subjects,
+                    letter_init_headers,
+                    letter_template_html,
+                    deleted_tpl_ui,
+                    deleted_tpl_id,
+                    form_error_msg=_("Пожалуйста, заполните все обязательные поля"),
+                    form_error_field="template" if (title and mailing_list_ui and mailbox_ui and not template_ui) else "",
+                )
+                return render(request, "panels/aap_campaigns/campaigns.html", ctx)
 
             try:
                 mailing_list_pk = int(decode_id(mailing_list_ui))
                 mailbox_pk = int(decode_id(mailbox_ui))
+                template_pk = int(decode_id(template_ui))
             except Exception:
-                return redirect(request.path)
+                ctx = _ctx_build(
+                    ws_id,
+                    state,
+                    edit_obj,
+                    list_items,
+                    mb_items,
+                    tpl_items,
+                    parent_items,
+                    global_window_json,
+                    letter_obj,
+                    letter_init_html,
+                    letter_init_css,
+                    letter_init_subjects,
+                    letter_init_headers,
+                    letter_template_html,
+                    deleted_tpl_ui,
+                    deleted_tpl_id,
+                    form_error_msg=_("Некорректные значения формы"),
+                    form_error_field="",
+                )
+                return render(request, "panels/aap_campaigns/campaigns.html", ctx)
 
-            template_pk = None
-            if template_ui:
-                try:
-                    template_pk = int(decode_id(template_ui))
-                except Exception:
-                    template_pk = None
+            exclude_id = int(edit_obj.id) if (edit_obj and action in ("save_campaign", "save_campaign_close")) else None
+            if _mailing_list_is_taken(ws_id, mailing_list_pk, exclude_id):
+                ctx = _ctx_build(
+                    ws_id,
+                    state,
+                    edit_obj,
+                    list_items,
+                    mb_items,
+                    tpl_items,
+                    parent_items,
+                    global_window_json,
+                    letter_obj,
+                    letter_init_html,
+                    letter_init_css,
+                    letter_init_subjects,
+                    letter_init_headers,
+                    letter_template_html,
+                    deleted_tpl_ui,
+                    deleted_tpl_id,
+                    form_error_msg=_("Этот список рассылки уже используется в другой кампании"),
+                    form_error_field="mailing_list",
+                )
+                return render(request, "panels/aap_campaigns/campaigns.html", ctx)
 
             start_at = _parse_date_from_post(request, "start") or date.today()
             end_at = _parse_date_from_post(request, "end") or (start_at + timedelta(days=90))
@@ -314,7 +596,7 @@ def campaigns_view(request):
 
             use_global_window = True if request.POST.get("use_global_window") else False
             window_raw = (request.POST.get("window") or "").strip()
-            window_obj = {}
+            window_obj: dict = {}
             if not use_global_window:
                 try:
                     parsed = json.loads(window_raw) if window_raw else {}
@@ -419,43 +701,22 @@ def campaigns_view(request):
         return redirect(request.path)
 
     # ---------------- GET ----------------
-    items = _with_ui_ids(_qs(ws_id))
-    for it in items:
-        # sender label for bottom table
-        it.sender_label = sender_label_by_mb_id.get(int(it.mailbox_id), f"{it.mailbox.name} <{it.mailbox.email}>")
-
-        # template label for bottom table
-        tpl = None
-        if getattr(it, "letter", None):
-            tpl = it.letter.template if it.letter and it.letter.template_id else None
-
-        if tpl and not getattr(tpl, "archived", False):
-            it.letter_tpl_label = tpl.template_name
-        else:
-            it.letter_tpl_label = _("Шаблон удален")
-
-    edit_window_json_str = ""
-    if edit_obj and isinstance(edit_obj.window, dict):
-        edit_window_json_str = json.dumps(edit_obj.window or {}, ensure_ascii=False)
-
-    ctx = {
-        "items": items,
-        "state": state,
-        "edit_obj": edit_obj,
-        "letter_obj": letter_obj,
-        "list_items": list_items,
-        "mb_items": mb_items,
-        "tpl_items": tpl_items,
-        "parent_items": parent_items,
-        "global_window_json_str": json.dumps(global_window_json or {}, ensure_ascii=False),
-        "edit_window_json_str": edit_window_json_str,
-        "deleted_tpl_ui": deleted_tpl_ui,
-        "deleted_tpl_id": deleted_tpl_id,
-        # letter init
-        "letter_init_html": letter_init_html,
-        "letter_init_css": letter_init_css,
-        "letter_init_subjects": letter_init_subjects,
-        "letter_init_headers": letter_init_headers,
-        "letter_template_html": letter_template_html,
-    }
+    ctx = _ctx_build(
+        ws_id,
+        state,
+        edit_obj,
+        list_items,
+        mb_items,
+        tpl_items,
+        parent_items,
+        global_window_json,
+        letter_obj,
+        letter_init_html,
+        letter_init_css,
+        letter_init_subjects,
+        letter_init_headers,
+        letter_template_html,
+        deleted_tpl_ui,
+        deleted_tpl_id,
+    )
     return render(request, "panels/aap_campaigns/campaigns.html", ctx)

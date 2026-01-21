@@ -1,7 +1,9 @@
 // FILE: web/static/js/aap_settings/sending_campaign.js
-// DATE: 2026-01-19
+// DATE: 2026-01-21
 // PURPOSE: Campaigns add/edit: окно отправки + валидация формы на submit.
-// CHANGE: Fix submit without button-click (Enter/etc) -> всегда определяем action и сериализуем window.
+// CHANGE:
+// - Добавлена проверка обязательности select[name="template"] + подсветка (как mailing_list/mailbox).
+// - Ничего в логике окон/дропдаунов/сериализации не менялось.
 
 (function () {
   const form = document.getElementById("yyCampaignForm");
@@ -634,6 +636,7 @@
     ok = validateRequiredText("title") && ok;
     ok = validateRequiredSelect("mailing_list") && ok;
     ok = validateRequiredSelect("mailbox") && ok;
+    ok = validateRequiredSelect("template") && ok; // NEW
 
     ok = validateStartDate() && ok;
     ok = validateEndDateAndOrder() && ok;
