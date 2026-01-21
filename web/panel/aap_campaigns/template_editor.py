@@ -1,21 +1,16 @@
 # FILE: web/panel/aap_campaigns/template_editor.py
-# DATE: 2026-01-20
-# PURPOSE: Единый центр HTML-операций для editors:
-#   - Templates: editor_html <-> template_html (PLACEHOLDER + wrapper)
-#   - Letters:   editor_html(визуальный template+content) -> content_html (inner wrapper),
-#               content_html -> editor_html (визуальный, с Tiny editability rules для письма)
+# DATE: 2026-01-21
+# PURPOSE: Единый центр HTML-операций для editors (Templates + Letters).
 # CHANGE:
-#   - unwrap_editor_content(): больше НЕ regex по <td>...</td>, а поиск парного </td> по depth (вложенные таблицы ок).
-#   - Добавлены: letter_editor_render_html / letter_editor_extract_content / find_demo_content_from_template.
-#   - Для letter: TemplateEdit игнорируем; editable только wrapper-content, остальное mceNonEditable.
+# - date_time добавлен в default vars (фиксированная строка) для обратной подстановки.
+# - Добавлен reverse-vars в editor_template_parse_html: demo-значения -> {{ var }}.
+# - Экспортированы default_template_vars() для preview (Templates).
 
 from __future__ import annotations
 
 import json
 import re
-from datetime import datetime
 from typing import Any, Dict, Optional, Tuple
-from zoneinfo import ZoneInfo
 
 from engine.common.email_template import PLACEHOLDER, StylesJSON, sanitize
 from panel.models import GlobalTemplate
@@ -26,12 +21,16 @@ _EDITOR_WRAP_CLASS = "yy_content_wrap"
 
 # ---- Default vars (for {{ var }}) ----
 
-_BERLIN_TZ = ZoneInfo("Europe/Berlin")
-
 _DEFAULT_TEMPLATE_VARS: Dict[str, str] = {
     "company_name": "Unternehmen Adressat GmbH",
     "city_land": "Köln, Nordrhein-Westfalen",
+    "date_time": "12:00 21.01.2028",
 }
+
+
+def default_template_vars() -> Dict[str, str]:
+    return dict(_DEFAULT_TEMPLATE_VARS)
+
 
 _TINY_CLASS_STRIP_RE = re.compile(r'(?is)\bclass\s*=\s*(?P<q>["\'])(?P<v>.*?)(?P=q)')
 
@@ -51,8 +50,21 @@ def _strip_tiny_edit_classes(html: str) -> str:
     return _TINY_CLASS_STRIP_RE.sub(repl, html)
 
 
-def _default_date_time_berlin() -> str:
-    return datetime.now(_BERLIN_TZ).strftime("%H:%M %d.%m.%Y")
+def _unapply_template_vars(html: str, vars_dict: Dict[str, str]) -> str:
+    """
+    Reverse: demo-строки -> {{ var }}.
+    Делает простые replace, длинные значения — первыми.
+    """
+    s = html or ""
+    if not s or not isinstance(vars_dict, dict) or not vars_dict:
+        return s
+
+    pairs = [(k, str(v)) for k, v in vars_dict.items() if k and v is not None and str(v)]
+    pairs.sort(key=lambda kv: len(kv[1]), reverse=True)
+
+    for key, val in pairs:
+        s = s.replace(val, f"{{{{ {key} }}}}")
+    return s
 
 
 def wrap_editor_content(inner_html: str) -> str:
@@ -98,11 +110,6 @@ def _find_wrapper_table_span(html_text: str) -> Optional[Tuple[int, int]]:
 
 
 def _find_first_td_inner(wrapper_html: str) -> str:
-    """
-    wrapper_html == <table class="yy_content_wrap"> ... </table>
-    Возвращает содержимое ВНЕШНЕГО <td>...</td> этой wrapper-таблицы.
-    Вложенные <td> внутри inner (вложенные таблицы) не ломают, потому что считаем depth td-тегов.
-    """
     s = wrapper_html or ""
     if not s:
         return ""
@@ -219,7 +226,6 @@ _VOID_TAGS = {"br", "hr", "meta"}
 
 
 def _apply_tiny_editability(html: str) -> str:
-    # Templates-mode: TemplateEdit => editable, остальное non-editable
     if not html:
         return ""
 
@@ -268,7 +274,6 @@ def _apply_tiny_editability(html: str) -> str:
 
 
 def _apply_tiny_force(html: str, mode: str) -> str:
-    # Letter-mode: forced editability (ignore TemplateEdit completely)
     if not html:
         return ""
 
@@ -288,7 +293,6 @@ def _apply_tiny_force(html: str, mode: str) -> str:
         if m_class:
             classes = [c for c in (m_class.group("v") or "").split() if c]
 
-        # drop both, add want
         classes = [c for c in classes if c not in (drop, want)]
         classes.append(want)
 
@@ -313,7 +317,6 @@ def editor_template_render_html(template_html: str, content_html: str) -> str:
     html1 = (template_html or "").replace(PLACEHOLDER, wrapped, 1)
 
     vars_dict = dict(_DEFAULT_TEMPLATE_VARS)
-    vars_dict["date_time"] = _default_date_time_berlin()
     html2 = _apply_template_vars(html1, vars_dict)
 
     html3 = sanitize(html2)
@@ -321,7 +324,8 @@ def editor_template_render_html(template_html: str, content_html: str) -> str:
 
 
 def editor_template_parse_html(editor_html: str) -> str:
-    raw = _strip_tiny_edit_classes(editor_html or "")
+    raw0 = _strip_tiny_edit_classes(editor_html or "")
+    raw = _unapply_template_vars(raw0, _DEFAULT_TEMPLATE_VARS)
 
     span = _find_wrapper_table_span(raw)
     if not span:
@@ -376,20 +380,10 @@ def find_demo_content_from_template(template_html: str) -> str:
 
 
 def letter_editor_render_html(template_html: str, content_html: str) -> str:
-    """
-    Letter визуалка для Tiny:
-      - template + wrapped(content) в PLACEHOLDER
-      - vars {{ var }}
-      - sanitize
-      - forced editability:
-          outside wrapper => mceNonEditable
-          wrapper (включая внутренности) => mceEditable
-    """
     wrapped = wrap_editor_content(content_html or "")
     html1 = (template_html or "").replace(PLACEHOLDER, wrapped, 1)
 
     vars_dict = dict(_DEFAULT_TEMPLATE_VARS)
-    vars_dict["date_time"] = _default_date_time_berlin()
     html2 = _apply_template_vars(html1, vars_dict)
 
     raw = sanitize(html2)
@@ -406,9 +400,6 @@ def letter_editor_render_html(template_html: str, content_html: str) -> str:
 
 
 def letter_editor_extract_content(editor_html: str) -> str:
-    """
-    Из visual-editor-html достаём только content (inner wrapper td) и sanitize.
-    """
     raw = _strip_tiny_edit_classes(editor_html or "")
     inner = unwrap_editor_content(raw)
     return sanitize(inner or "")

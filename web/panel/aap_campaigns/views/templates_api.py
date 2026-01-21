@@ -1,9 +1,10 @@
 # FILE: web/panel/aap_campaigns/views/templates_api.py
-# DATE: 2026-01-18
-# PURPOSE: API для TinyMCE/advanced switch + preview + overlays.
+# DATE: 2026-01-21
+# PURPOSE: API для TinyMCE/advanced switch + preview + overlays (Templates).
 # CHANGE:
-#   - render-user-html/css: поддержка state=add через ?gl_tpl=<id> (GlobalTemplate.html_template + styles.main).
-#   - styles.main: если styles = {"main": {...}, ...} -> берём только main для базового CSS/preview.
+# - Новая превью-модалка для Templates: 3 вкладки VIEW / HTML / HTML EMAIL.
+# - Единый пайплайн превью для GET(by id) и POST(from editor): нормализация -> render.
+# - VIEW: render_html + demo vars; HTML: raw template_html + formatted CSS; HTML EMAIL: render_html без vars.
 
 from __future__ import annotations
 
@@ -19,6 +20,7 @@ from engine.common.email_template import render_html
 from mailer_web.access import decode_id
 from panel.aap_campaigns.models import Templates
 from panel.aap_campaigns.template_editor import (
+    default_template_vars,
     editor_template_parse_html,
     editor_template_render_html,
     styles_css_to_json,
@@ -81,7 +83,7 @@ def _extract_global_template_id_from_first_tag(template_html: str) -> int | None
 
 
 def _find_demo_content(template_html: str) -> str:
-    pk = _extract_global_template_id_from_first_tag(template_html)
+    pk = _extract_global_template_id_from_first_tag(template_html or "")
     if not pk:
         return _DEMO_FALLBACK_HTML
 
@@ -94,7 +96,8 @@ def _find_demo_content(template_html: str) -> str:
 
 
 def _build_demo_vars(template_html: str) -> dict:
-    return {}
+    # пока только дефолты (company_name/city_land/date_time)
+    return default_template_vars()
 
 
 def _read_json(request: HttpRequest) -> dict:
@@ -104,6 +107,40 @@ def _read_json(request: HttpRequest) -> dict:
         return obj if isinstance(obj, dict) else {}
     except Exception:
         return {}
+
+
+def _build_preview_bundle(template_html: str, styles_obj, content_html: str) -> dict:
+    """
+    Возвращает:
+      - view_html: render_html + demo vars
+      - raw_html: template_html (сырой код)
+      - raw_css:  formatted css (styles_json_to_css)
+      - email_html: render_html без vars (т.е. {{ var }} остаются)
+    """
+    tpl = template_html or ""
+    styles_main = _styles_pick_main(styles_obj or {})
+    raw_css = styles_json_to_css(styles_main) or ""
+
+    view_html = render_html(
+        template_html=tpl,
+        content_html=content_html or "",
+        styles=styles_main,
+        vars_json=_build_demo_vars(tpl),
+    ) or ""
+
+    email_html = render_html(
+        template_html=tpl,
+        content_html=content_html or "",
+        styles=styles_main,
+        vars_json={},  # без подстановки переменных
+    ) or ""
+
+    return {
+        "view_html": view_html,
+        "raw_html": tpl,
+        "raw_css": raw_css,
+        "email_html": email_html,
+    }
 
 
 @require_GET
@@ -164,25 +201,28 @@ def templates__render_editor_html_view(request: HttpRequest) -> JsonResponse:
     return JsonResponse({"ok": True, "editor_html": editor_html})
 
 
+# ==================== PREVIEW (Templates) ====================
+
 @require_GET
 @csrf_exempt
 def templates__preview_modal_by_id_view(request: HttpRequest) -> HttpResponse:
     obj = _load_obj_by_ui_id(request.GET.get("id") or "")
     if not obj:
-        return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "empty", "email_html": ""})
+        return render(
+            request,
+            "panels/aap_campaigns/modal_preview.html",
+            {"status": "empty", "view_html": "", "raw_html": "", "raw_css": "", "email_html": ""},
+        )
 
     tpl = obj.template_html or ""
     content = _find_demo_content(tpl)
-    vars_json = _build_demo_vars(tpl)
+    bundle = _build_preview_bundle(template_html=tpl, styles_obj=obj.styles or {}, content_html=content)
 
-    email_html = render_html(
-        template_html=tpl,
-        content_html=content,
-        styles=_styles_pick_main(obj.styles or {}),
-        vars_json=vars_json,
+    return render(
+        request,
+        "panels/aap_campaigns/modal_preview.html",
+        {"status": "done", **bundle},
     )
-
-    return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "done", "email_html": email_html or ""})
 
 
 @require_POST
@@ -201,17 +241,16 @@ def templates__preview_modal_from_editor_view(request: HttpRequest) -> HttpRespo
         tpl = editor_template_parse_html(editor_html)
 
     content = _find_demo_content(tpl)
-    vars_json = _build_demo_vars(tpl)
+    bundle = _build_preview_bundle(template_html=tpl, styles_obj=styles_obj, content_html=content)
 
-    email_html = render_html(
-        template_html=tpl,
-        content_html=content,
-        styles=styles_obj,
-        vars_json=vars_json,
+    return render(
+        request,
+        "panels/aap_campaigns/modal_preview.html",
+        {"status": "done", **bundle},
     )
 
-    return render(request, "panels/aap_campaigns/modal_preview.html", {"status": "done", "email_html": email_html or ""})
 
+# ==================== OVERLAYS (global colors/fonts) ====================
 
 @require_GET
 @csrf_exempt

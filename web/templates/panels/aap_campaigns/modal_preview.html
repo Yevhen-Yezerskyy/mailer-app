@@ -1,20 +1,54 @@
 {% load i18n %}
-<!-- FILE: web/templates/panels/aap_campaigns/modal_preview.html  (новое — 2026-01-17) -->
-<!-- PURPOSE: Модалка предпросмотра письма (как принято: HTML-фрагмент, без JS). -->
+<!-- FILE: web/templates/panels/aap_campaigns/modal_preview.html -->
+<!-- DATE: 2026-01-21 -->
+<!-- PURPOSE: Превью-модалка (Templates): VIEW (iframe) / HTML / HTML EMAIL. -->
+<!-- CHANGE:
+  - VIEW переведён на iframe (полная изоляция стилей).
+  - iframe получает готовый email HTML через srcdoc.
+-->
 
-<div class="YY-CARD_WHITE overflow-hidden" style="height:95vh;width:1300px;">
+<div class="YY-CARD_WHITE overflow-hidden yy-preview-root" style="height:95vh;width:1300px; position:relative;">
 
   <button type="button" class="YY-BUTTON_MAIN" data-yy-modal-close
-          style="position:absolute;top:10px;right:20px;">✕</button>
+          style="position:absolute;top:20px;right:20px; z-index:10;">✕</button>
 
-   <div class="overflow-auto mt-8 !mb-0 max-h-[calc(95vh-2rem)] border border-[#d3d3d3]">
+  <div class="flex items-center gap-3">
+    <button type="button" class="YY-BUTTON_MAIN yyPrevTab" data-tab="view">{% trans "VIEW" %}</button>
+    <button type="button" class="YY-BUTTON_MAIN yyPrevTab" data-tab="html">{% trans "HTML" %}</button>
+    <button type="button" class="YY-BUTTON_MAIN yyPrevTab" data-tab="email">{% trans "HTML EMAIL" %}</button>
+  </div>
+
+  <div class="overflow-auto mt-4 px-4 pb-4 !mb-0 max-h-[calc(95vh-5rem)] border border-[#d3d3d3]">
+
     {% if status == "done" %}
-      <div class="bg-white">
-        {{ email_html|safe }}
+
+      <!-- VIEW (iframe, изолированный рендер письма) -->
+      <div class="yyPrevPane" data-pane="view">
+        <iframe
+          style="width:100%; min-height:80vh; border:0; background:#ffffff;"
+          sandbox="allow-same-origin"
+          srcdoc="{{ view_html|escape }}">
+        </iframe>
       </div>
+
+      <!-- HTML -->
+      <div class="yyPrevPane hidden" data-pane="html">
+        <div class="YY-STATUS_YELLOW mb-2 mt-4">{% trans "CSS" %}:</div>
+        <pre class="bg-black text-gray-300 border border-[#2a2a2a] p-4 overflow-auto text-sm font-mono whitespace-pre-wrap">{{ raw_css }}</pre>
+
+        <div class="YY-STATUS_YELLOW mt-4 mb-2">{% trans "HTML" %}:</div>
+        <pre class="bg-black text-gray-300 border border-[#2a2a2a] p-4 overflow-auto text-sm font-mono whitespace-pre-wrap">{{ raw_html }}</pre>
+      </div>
+
+      <!-- HTML EMAIL -->
+      <div class="yyPrevPane hidden" data-pane="email">
+        <div class="YY-STATUS_YELLOW mb-2 mt-4">{% trans "HTML EMAIL (no vars)" %}:</div>
+        <pre class="bg-black text-gray-300 border border-[#2a2a2a] p-4 overflow-auto text-sm font-mono whitespace-pre-wrap">{{ email_html }}</pre>
+      </div>
+
     {% else %}
       <div class="YY-STATUS_GRAY w-full">{% trans "Здесь пока нет данных" %}</div>
     {% endif %}
-  </div>
 
+  </div>
 </div>
