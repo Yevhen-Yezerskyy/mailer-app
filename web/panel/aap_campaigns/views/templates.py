@@ -1,10 +1,9 @@
 # FILE: web/panel/aap_campaigns/views/templates.py
-# DATE: 2026-01-18
+# DATE: 2026-01-21
 # PURPOSE: /panel/campaigns/templates/ — CRUD шаблонов писем (user + advanced mode).
 # CHANGE:
-#   - Подсветка активного GlobalTemplate: приоритет у ?gl_tpl=..., иначе берём id-<N> из template_html (edit).
-#   - add-mode: если state=add и нет ?gl_tpl=... — редирект на случайный активный GlobalTemplate.
-#   - Контекст НЕ меняем: global_style_gid/global_colors/global_fonts/global_tpl_items.
+#   - list/edit: показываем/редактируем только Templates.archived=False
+#   - delete: вместо удаления — архивирование (archived=True, is_active=False)
 
 from __future__ import annotations
 
@@ -32,7 +31,10 @@ def _guard(request) -> tuple[Optional[UUID], Optional[object]]:
 
 
 def _qs(ws_id: UUID):
-    return Templates.objects.filter(workspace_id=ws_id).order_by("-updated_at")
+    return (
+        Templates.objects.filter(workspace_id=ws_id, archived=False)
+        .order_by("-updated_at")
+    )
 
 
 def _with_ui_ids(items):
@@ -56,7 +58,11 @@ def _get_edit_obj(request, ws_id: UUID) -> Union[None, Templates, HttpResponseRe
     if isinstance(res, HttpResponseRedirect):
         return res
 
-    return Templates.objects.filter(id=int(res), workspace_id=ws_id).first()
+    return (
+        Templates.objects
+        .filter(id=int(res), workspace_id=ws_id, archived=False)
+        .first()
+    )
 
 
 def _get_gl_tpl_from_query(request) -> int | None:
@@ -126,7 +132,7 @@ def _build_global_tpl_items(current_gid: int | None):
 
 
 def templates_view(request):
-    ws_id, user = _guard(request)
+    ws_id, _user = _guard(request)
     if not ws_id:
         return redirect("/")
 
@@ -135,7 +141,7 @@ def templates_view(request):
     if isinstance(edit_obj, HttpResponseRedirect):
         return edit_obj
 
-    # --- ADD: если state=add и нет gl_tpl в URL — редирект на случайный активный GlobalTemplate ---
+    # ADD: если state=add и нет gl_tpl в URL — редирект на случайный активный GlobalTemplate
     if request.method == "GET" and state == "add":
         if not _get_gl_tpl_from_query(request):
             rid = _pick_random_active_gl_tpl_id()
@@ -160,7 +166,14 @@ def templates_view(request):
             if isinstance(res, HttpResponseRedirect):
                 return res
 
-            Templates.objects.filter(id=int(res), workspace_id=ws_id).delete()
+            Templates.objects.filter(
+                id=int(res),
+                workspace_id=ws_id,
+                archived=False,
+            ).update(
+                archived=True,
+                is_active=False,
+            )
             return redirect(request.path)
 
         template_name = (request.POST.get("template_name") or "").strip()
@@ -193,7 +206,11 @@ def templates_view(request):
             if isinstance(res, HttpResponseRedirect):
                 return res
 
-            obj = Templates.objects.filter(id=int(res), workspace_id=ws_id).first()
+            obj = Templates.objects.filter(
+                id=int(res),
+                workspace_id=ws_id,
+                archived=False,
+            ).first()
             if obj:
                 obj.template_name = template_name
                 obj.template_html = clean_html
@@ -205,8 +222,7 @@ def templates_view(request):
 
         return redirect(request.path)
 
-    # --- active GlobalTemplate (подсветка + keys) ---
-    # приоритет: ?gl_tpl=... (в любом state), иначе: edit -> id-<N> из HTML
+    # active GlobalTemplate: приоритет ?gl_tpl=..., иначе edit -> id-<N> из HTML
     current_gid = _get_gl_tpl_from_query(request)
     if not current_gid and state == "edit" and edit_obj:
         current_gid = _extract_global_template_id_from_first_tag(edit_obj.template_html or "")

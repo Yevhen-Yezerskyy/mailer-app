@@ -1,19 +1,25 @@
 # FILE: web/panel/aap_campaigns/views/campaigns.py
-# DATE: 2026-01-20
-# PURPOSE: Campaigns page: add/edit + нижняя таблица (select_related/active toggle) + letter-editor init ctx.
+# DATE: 2026-01-21
+# PURPOSE: Campaigns page: add/edit + letter-editor init ctx + bottom table.
 # CHANGE:
-# - letter editor: headers init/save (Letter.headers)
-# - save_letter: всегда пересчитывает ready_content через engine.common.email_template.render_html без vars_json (placeholders не трогаем)
+# - Sender label everywhere:  "Имя отправителя" <мыло>
+#   берём из MailboxConnection(kind=SMTP).extra_json: from_name/from_email
+#   fallback: from_name -> Mailbox.name, from_email -> Mailbox.email
+# - tpl select: только Templates.archived=False; если выбран archived/нет — опция "Шаблон удален"
+# - bottom table: it.letter_tpl_label через gettext; it.sender_label подготовлен в python
+# - FIX: не затираем gettext "_" (get_or_create created)
 
 from __future__ import annotations
 
 import json
 from datetime import date, timedelta
+from types import SimpleNamespace
 from typing import Optional, Union
 from uuid import UUID
 
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
+from django.utils.translation import gettext as _
 
 from engine.common.email_template import render_html, sanitize
 from mailer_web.access import decode_id, encode_id, resolve_pk_or_redirect
@@ -25,7 +31,7 @@ from panel.aap_campaigns.template_editor import (
     styles_json_to_css,
 )
 from panel.aap_lists.models import MailingList
-from panel.aap_settings.models import Mailbox, SendingSettings
+from panel.aap_settings.models import ConnKind, Mailbox, MailboxConnection, SendingSettings
 
 
 def _guard(request) -> tuple[Optional[UUID], Optional[object]]:
@@ -93,6 +99,39 @@ def _parse_date_from_post(request, prefix: str) -> Optional[date]:
         return None
 
 
+def _build_sender_labels(mailboxes: list[Mailbox]) -> dict[int, str]:
+    """
+    label = "from_name" <from_email>
+    from extra_json of latest SMTP connection per mailbox
+    """
+    if not mailboxes:
+        return {}
+
+    mb_by_id = {int(m.id): m for m in mailboxes}
+    mb_ids = list(mb_by_id.keys())
+
+    smtp_conns = (
+        MailboxConnection.objects.filter(mailbox_id__in=mb_ids, kind=ConnKind.SMTP)
+        .only("id", "mailbox_id", "extra_json")
+        .order_by("mailbox_id", "-id")
+    )
+
+    latest_smtp_by_mb: dict[int, MailboxConnection] = {}
+    for c in smtp_conns:
+        mid = int(c.mailbox_id)
+        if mid not in latest_smtp_by_mb:
+            latest_smtp_by_mb[mid] = c
+
+    out: dict[int, str] = {}
+    for mid, mb in mb_by_id.items():
+        c = latest_smtp_by_mb.get(mid)
+        extra = c.extra_json if (c and isinstance(c.extra_json, dict)) else {}
+        from_name = (extra.get("from_name") or "").strip() or (mb.name or "").strip() or "—"
+        from_email = (extra.get("from_email") or "").strip() or (mb.email or "").strip() or "—"
+        out[mid] = f'{from_name} <{from_email}>'
+    return out
+
+
 def campaigns_view(request):
     ws_id, _user = _guard(request)
     if not ws_id:
@@ -114,18 +153,51 @@ def campaigns_view(request):
 
     list_items = MailingList.objects.filter(workspace_id=ws_id, archived=False).order_by("-created_at")
     mb_items = Mailbox.objects.filter(workspace_id=ws_id, is_active=True).order_by("name")
-    tpl_items = Templates.objects.filter(workspace_id=ws_id, is_active=True).order_by("order", "template_name")
+
+    # templates in select: только не archived
+    tpl_items = Templates.objects.filter(
+        workspace_id=ws_id,
+        is_active=True,
+        archived=False,
+    ).order_by("order", "template_name")
 
     for it in list_items:
         it.ui_id = encode_id(int(it.id))
+
+    # sender labels map (для селекта и для таблицы кампаний)
+    sender_label_by_mb_id = _build_sender_labels(list(mb_items))
+
     for it in mb_items:
         it.ui_id = encode_id(int(it.id))
+        it.sender_label = sender_label_by_mb_id.get(int(it.id), f"{it.name} <{it.email}>")
+
     for it in tpl_items:
         it.ui_id = encode_id(int(it.id))
 
+    # edit: если выбран archived/отсутствующий шаблон — добавляем спец-опцию "Шаблон удален"
+    deleted_tpl_ui = None
+    deleted_tpl_id = None
+    if state in ("edit", "add") and edit_obj and getattr(edit_obj, "letter", None) and edit_obj.letter:
+        t_id = int(edit_obj.letter.template_id) if edit_obj.letter.template_id else None
+        if t_id:
+            t = edit_obj.letter.template
+            if (not t) or getattr(t, "archived", False):
+                deleted_tpl_id = int(t_id)
+                deleted_tpl_ui = encode_id(int(t_id))
+                tpl_items = list(tpl_items)
+                tpl_items.insert(
+                    0,
+                    SimpleNamespace(
+                        id=int(t_id),
+                        ui_id=deleted_tpl_ui,
+                        template_name=_("Шаблон удален"),
+                        is_deleted_option=True,
+                    ),
+                )
+
     parent_items = _with_ui_ids(Campaign.objects.filter(workspace_id=ws_id))
 
-    ss, _ = SendingSettings.objects.get_or_create(
+    ss, created = SendingSettings.objects.get_or_create(
         workspace_id=ws_id,
         defaults={"value_json": {}},
     )
@@ -240,7 +312,7 @@ def campaigns_view(request):
                 if send_after_days < 0:
                     send_after_days = 0
 
-            use_global_window = bool(request.POST.get("use_global_window"))
+            use_global_window = True if request.POST.get("use_global_window") else False
             window_raw = (request.POST.get("window") or "").strip()
             window_obj = {}
             if not use_global_window:
@@ -308,7 +380,7 @@ def campaigns_view(request):
             editor_mode = (request.POST.get("editor_mode") or "user").strip()
             editor_html = request.POST.get("editor_html") or ""
             subjects_json = request.POST.get("subjects_json") or "[]"
-            headers_json = request.POST.get("headers_json") or "{}"
+            headers_json = (request.POST.get("headers_json") or "").strip() or "{}"
 
             try:
                 subs = json.loads(subjects_json)
@@ -324,7 +396,6 @@ def campaigns_view(request):
 
             content_html = editor_html
             if editor_mode != "advanced":
-                # user-mode => editor_html это template+content (visual), достаем только content
                 content_html = letter_editor_extract_content(editor_html or "")
 
             let.html_content = sanitize(content_html or "")
@@ -332,7 +403,6 @@ def campaigns_view(request):
             let.headers = hdrs
             let.save(update_fields=["html_content", "subjects", "headers", "updated_at"])
 
-            # ready_content пересчитываем ВСЕГДА (без vars_json => плейсхолдеры остаются)
             tpl = let.template if let.template_id else None
             if tpl:
                 ready = render_html(
@@ -350,6 +420,19 @@ def campaigns_view(request):
 
     # ---------------- GET ----------------
     items = _with_ui_ids(_qs(ws_id))
+    for it in items:
+        # sender label for bottom table
+        it.sender_label = sender_label_by_mb_id.get(int(it.mailbox_id), f"{it.mailbox.name} <{it.mailbox.email}>")
+
+        # template label for bottom table
+        tpl = None
+        if getattr(it, "letter", None):
+            tpl = it.letter.template if it.letter and it.letter.template_id else None
+
+        if tpl and not getattr(tpl, "archived", False):
+            it.letter_tpl_label = tpl.template_name
+        else:
+            it.letter_tpl_label = _("Шаблон удален")
 
     edit_window_json_str = ""
     if edit_obj and isinstance(edit_obj.window, dict):
@@ -366,6 +449,8 @@ def campaigns_view(request):
         "parent_items": parent_items,
         "global_window_json_str": json.dumps(global_window_json or {}, ensure_ascii=False),
         "edit_window_json_str": edit_window_json_str,
+        "deleted_tpl_ui": deleted_tpl_ui,
+        "deleted_tpl_id": deleted_tpl_id,
         # letter init
         "letter_init_html": letter_init_html,
         "letter_init_css": letter_init_css,

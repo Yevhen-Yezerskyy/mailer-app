@@ -17,6 +17,7 @@ class Templates(models.Model):
     styles = models.JSONField(default=dict, blank=True, help_text="Стили (JSON)")
 
     is_active = models.BooleanField(default=True)
+    archived = models.BooleanField(default=False)  # NEW
     order = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
