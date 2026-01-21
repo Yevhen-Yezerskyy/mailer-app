@@ -1,7 +1,6 @@
-# FILE: web/panel/models.py
-# DATE: 2026-01-14
+# FILE: web/panel/models.py  (обновлено — 2026-01-21)
 # PURPOSE: Модели "глобальных справочников" (редактируются через Django admin).
-# CHANGE: GlobalTemplate: template_name (<=255) + html_template/html_content (Text) + styles (JSON) + служебные поля.
+# CHANGE: GlobalTemplate: добавлено поле buttons (JSON).
 
 from __future__ import annotations
 
@@ -15,6 +14,7 @@ class GlobalTemplate(models.Model):
     html_content = models.TextField(blank=True, default="", help_text="HTML-контент (большой)")
 
     styles = models.JSONField(default=dict, blank=True, help_text="Стили/настройки (JSON)")
+    buttons = models.JSONField(default=dict, blank=True, help_text="Кнопки/настройки (JSON)")
 
     is_active = models.BooleanField(default=True)
     order = models.IntegerField(default=0)

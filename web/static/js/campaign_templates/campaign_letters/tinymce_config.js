@@ -1,7 +1,13 @@
 // FILE: web/static/js/campaign_templates/campaign_letters/tinymce_config.js
-// DATE: 2026-01-20
-// PURPOSE: Tiny config для письма: грузим CSS из yyInitCss, Tiny содержит ВИЗУАЛЬНЫЙ HTML (template+content).
-// CHANGE: content_style берём из textarea yyInitCss.
+// DATE: 2026-01-21
+// PURPOSE: Tiny config для письма: исходный конфиг + детерминированное поведение Enter/Paste.
+// CHANGE:
+// - Paste: только plain text; каждая строка -> <p>...</p>.
+// - После Enter: глобально по DOM меняем <br><br> внутри <p> на split <p> -> <p></p><p></p>.
+//   Каретка ставится в начало ПОСЛЕДНЕГО созданного <p>.
+// - Если split не было: каретка ставится ПЕРЕД последним <br> в текущем <p>.
+// - После программного перемещения каретки: дергаем Tiny (mceInsertContent пустым) чтобы сбросить caret-state,
+//   иначе второй <br> может не разрешаться до ручного движения курсора.
 
 (function () {
   "use strict";
@@ -45,7 +51,176 @@
       icons: "default",
       icons_url: "/static/vendor/tinymce/icons/default/icons.min.js",
 
-      setup: function (editor) {
+      setup(editor) {
+        let enterArmed = false;
+        let postScheduled = false;
+
+        /* ===== helpers ===== */
+
+        const isRealBR = (n) =>
+          n &&
+          n.nodeType === 1 &&
+          n.nodeName === "BR" &&
+          !n.hasAttribute("data-mce-bogus");
+
+        const isEmptyText = (n) =>
+          n && n.nodeType === 3 && !String(n.nodeValue || "").trim();
+
+        function nextMeaningful(n) {
+          let x = n ? n.nextSibling : null;
+          while (x && isEmptyText(x)) x = x.nextSibling;
+          return x;
+        }
+
+        function findDoubleBr(p) {
+          // Ищем паттерн: <br> [пустые text]* <br>
+          for (let n = p.firstChild; n; n = n.nextSibling) {
+            if (!isRealBR(n)) continue;
+            const n2 = nextMeaningful(n);
+            if (isRealBR(n2)) return { br1: n, br2: n2 };
+          }
+          return null;
+        }
+
+        function splitP(p) {
+          const hit = findDoubleBr(p);
+          if (!hit) return null;
+
+          const { br1, br2 } = hit;
+          const newP = editor.dom.create("p");
+
+          // Переносим всё после второго <br> в новый <p>
+          let n = br2.nextSibling;
+          while (n) {
+            const next = n.nextSibling;
+            newP.appendChild(n);
+            n = next;
+          }
+
+          // Удаляем br1, пустые text между, br2
+          let x = br1;
+          while (x && x !== br2) {
+            const next = x.nextSibling;
+            if (x === br1 || isEmptyText(x)) x.remove();
+            x = next;
+          }
+          if (br2.parentNode === p) br2.remove();
+
+          if (!newP.firstChild) newP.innerHTML = "&nbsp;";
+
+          editor.dom.insertAfter(newP, p);
+          return newP;
+        }
+
+        function normalizeAllP() {
+          const body = editor.getBody();
+          if (!body) return null;
+
+          const ps = Array.from(body.querySelectorAll("p"));
+          let lastCreated = null;
+
+          // Обрабатываем все <p>, и зацикливаемся, т.к. может быть <br><br><br>
+          for (let i = 0; i < ps.length; i++) {
+            let p = ps[i];
+            while (true) {
+              const created = splitP(p);
+              if (!created) break;
+              lastCreated = created;
+              // новый <p> тоже может содержать двойные <br> — добавляем в очередь
+              ps.splice(i + 1, 0, created);
+              p = created;
+            }
+          }
+
+          return lastCreated;
+        }
+
+        function pokeTinyCaretState() {
+          // важно: сбрасывает внутреннее caret-состояние Tiny, иначе второй <br> может блокироваться
+          editor.execCommand("mceInsertContent", false, "");
+        }
+
+        function setCaretToStart(el) {
+          editor.selection.select(el, true);
+          editor.selection.collapse(true);
+          pokeTinyCaretState();
+        }
+
+        function moveCaretBeforeLastBR() {
+          const p = editor.dom.getParent(editor.selection.getNode(), "p");
+          if (!p) return false;
+
+          for (let i = p.childNodes.length - 1; i >= 0; i--) {
+            const n = p.childNodes[i];
+            if (isRealBR(n)) {
+              const r = editor.dom.createRng();
+              r.setStartBefore(n);
+              r.collapse(true);
+              editor.selection.setRng(r);
+              pokeTinyCaretState();
+              return true;
+            }
+          }
+          return false;
+        }
+
+        function postProcessAfterEnter() {
+          if (postScheduled) return;
+          postScheduled = true;
+
+          setTimeout(() => {
+            postScheduled = false;
+            if (!enterArmed) return;
+            enterArmed = false;
+
+            editor.undoManager.transact(() => {
+              const lastP = normalizeAllP();
+              if (lastP) {
+                setCaretToStart(lastP);
+              } else {
+                moveCaretBeforeLastBR();
+              }
+            });
+          }, 0);
+        }
+
+        /* ===== paste: text -> <p> ===== */
+
+        editor.on("paste", function (e) {
+          e.preventDefault();
+          const cd = e.clipboardData || window.clipboardData;
+          const text = cd ? String(cd.getData("text/plain") || "") : "";
+          if (!text) return;
+
+          const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+          const html = lines
+            .map((l) => {
+              const safe = editor.dom.encode(l);
+              return safe ? `<p>${safe}</p>` : "<p>&nbsp;</p>";
+            })
+            .join("");
+
+          editor.undoManager.transact(() => editor.insertContent(html));
+        });
+
+        /* ===== enter tracking ===== */
+
+        editor.on("keydown", function (e) {
+          if (
+            e.key === "Enter" &&
+            !e.shiftKey &&
+            !e.altKey &&
+            !e.ctrlKey &&
+            !e.metaKey
+          ) {
+            enterArmed = true;
+          }
+        });
+
+        // Tiny сначала сам вставляет <br>, потом мы в post-tick нормализуем DOM
+        editor.on("input", postProcessAfterEnter);
+        editor.on("keyup", postProcessAfterEnter);
+
         editor.on("init", function () {
           if (typeof window.yyCampRuntimeOnEditorInit === "function") {
             window.yyCampRuntimeOnEditorInit(editor);
