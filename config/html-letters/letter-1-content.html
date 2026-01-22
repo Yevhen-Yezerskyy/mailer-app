@@ -1,12 +1,12 @@
-<p class="font-st color-1">Lorem ipsum dolor,</p>
-<p class="font-st color-1">lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
-<p class="font-st color-1">Sed non risus. <strong>Suspendisse</strong> lectus tortor, dignissim sit amet, adipiscing nec, ultricies sed, 
+<p>Lorem ipsum dolor,</p>
+<p>lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+<p>Sed non risus. <strong>Suspendisse</strong> lectus tortor, dignissim sit amet, adipiscing nec, ultricies sed, 
 dolor. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi. Proin porttitor, orci nec nonummy molestie, enim est eleifend mi, non fermentum diam 
 nisl sit amet erat.</p>
-<table class="table_important">
+<table class="table-main">
     <tr>
-        <td class="td_important bg-1">
-            <p class="font-st color-1 padding-0">Maecenas ligula massa, varius a, semper congue, euismod non, mi. Proin porttitor, orci nec nonummy molestie. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi.</p>
+        <td class="td-important bg-1">
+            <p class="p-important">Maecenas ligula massa, varius a, semper congue, euismod non, mi. Proin porttitor, orci nec nonummy molestie. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi.</p>
         </td>
     </tr>
     <tr>
@@ -14,62 +14,71 @@ nisl sit amet erat.</p>
     </tr>
 </table>
 
-<p class="font-st color-1"><strong>Suspendisse</strong> lectus tortor, dignissim sit amet, adipiscing nec, ultricies sed, 
+<p><strong>Suspendisse</strong> lectus tortor, dignissim sit amet, adipiscing nec, ultricies sed, 
 dolor. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi. </p>
-<p class="font-st color-1">Duis semper. Duis arcu massa, scelerisque vitae, consequat in, pretium a, enim. 
+<p>Duis semper. Duis arcu massa, scelerisque vitae, consequat in, pretium a, enim. 
 Pellentesque congue. Ut in risus volutpat libero pharetra tempor. Cras vestibulum bibendum augue. Praesent egestas leo in pede. Praesent blandit odio eu enim. Pellentesque sed dui ut augue blandit sodales.</p>
-<p class="font-st color-1">Mit freundlichen Grüßen<br>
-<strong>Ihr Team der Mein Unternehmen GmbH</strong></p>
+<p class="spacer">&nbsp;</p>
+<p>Mit freundlichen Grüßen<br>
+Ihr Team der Mein Unternehmen GmbH</p>
 
 
 
-<table class="table_main">
+<table class="table-main id-1">
     <tr>
-        <td class="td_main">
-            <table class="table-600">
+        <td class="td-main" align="left">
+<table class="table-600" align="left">
+    <tr>
+        <td>
+
+            <table class="table-main">
                 <tr>
-                    <td class="td-header-tl bg-2">
-                        <p class="header-tl font-st color-2">&nbsp;</p>
+                    <td class="bg-2">
+                        <p class="header-tl color-2 TemplateEdit">&nbsp;</p>
                     </td>
-                    <td class="td-header-tr bg-2">
-                        <p class="header-tr font-st color-2">Mein Unternehmen GmbH</p>
+                    <td class="bg-2">
+                        <p class="header-tr color-2 TemplateEdit">Mein Unternehmen GmbH</p>
                     </td>
                 </tr>
                 <tr>
-                    <td class="td-header-bl bg-2 border-bottom-1">
-                        <p class="header-bl font-st color-2">Dienstleistung, Produkt</p>
+                    <td class="bg-2 border-bottom">
+                        <p class="header-bl color-2 TemplateEdit">Dienstleistung, Produkt</p>
                     </td>
-                    <td class="td-header-br bg-2 border-bottom-1">
-                        <p class="header-br font-st color-2">Dienstleistungen, Produkte</p>
+                    <td class="bg-2 border-bottom">
+                        <p class="header-br color-2 TemplateEdit">Dienstleistungen, Produkte</p>
                     </td>
                 </tr>
             </table>
-            <table class="table-600">
+            <table class="table-main">
                 <tr>
-                    <td class="td-body border-bottom-1">
-                        <p class="font-st color-1"><strong>Unternehmen Adressat GmbH</strong><br>
-                        Köln, Nordrhein-Westfalen</p>
+                    <td class="td-body">
+                        <p><strong>{{ company_name }}</strong><br>
+                        {{ city_land }}</p>
+                        <p class="spacer">&nbsp;</p>
+                        
                         {{ ..content.. }}
+
+
                     </td>
                 </tr>
             </table>
-            <table class="table-600 bg-1">
+            <table class="table-main bg-1">
                 <tr>
-                    <td class="td-body border-bottom-1">
-                        <p class="font-st color-1 footer">
+                    <td class="border-top border-bottom">
+                        <p class="footer TemplateEdit">
                             <strong>Mein Unternehmen GmbH</strong><br>
                             Meine-Straße 24, 12345 Mein-Stadt<br>
-                            +49 345 67 345 780<br>
-                            <a href="#" class="color-1">myemail@mysite.de</a><br>
-                            <a href="#" class="color-1">www.mysite.de</a>
+                            <a href="tel:+4934567345780">+49 345 67 345 780</a><br>
+                            <a href="mailto:myemail@mysite.de">myemail@mysite.de</a><br>
+                            <a href="https://www.mysite.de">www.mysite.de</a>
                         </p>
                     </td>
                 </tr>
             </table>
-            <table class="table-600">
+            <table class="table-main">
                 <tr>
-                    <td class="td-body">
-                        <p class="font-st color-1 footer-sm">
+                    <td>
+                        <p class="footer-sm">
                             <em>Kontaktaufnahme für mögliche Zusammenarbeit. Bei Nichtinteresse bitte kurz antworten.</em>
                         </p>
                     </td>
@@ -78,3 +87,278 @@ Pellentesque congue. Ut in risus volutpat libero pharetra tempor. Cras vestibulu
         </td>
     </tr>
 </table>
+        </td>
+    </tr>
+</table>
+
+
+
+<script>
+{
+  "main": {
+    "p": {
+      "font-family": "Verdana, Arial, sans-serif",
+      "font-size": "15px",
+      "line-height": "21px",
+      "padding": "0 0 10px 7px",
+      "color": "#2f4f3f"
+    },
+    ".footer": {
+      "font-size": "13px",
+      "line-height": "20px",
+      "padding": "15px 0 15px 7px"
+    },
+    ".footer-sm": {
+      "font-size": "10px",
+      "line-height": "10px",
+      "padding": "7px 0 30px 7px"
+    },
+    "strong": { "font-weight": "700" },
+    "em": { "font-style": "italic" },
+    "a": {
+      "text-decoration": "underline",
+      "color": "#2f4f3f"
+    },
+    ".table-main": {
+      "width": "100%",
+      "border-collapse": "collapse",
+      "border-spacing": "0"
+    },
+    ".td-main": { "text-align": "left" },
+    ".table-600": {
+      "width": "600px",
+      "border-collapse": "collapse",
+      "border-spacing": "0",
+      "text-align": "left"
+    },
+    ".td-body": { "padding": "20px 0 10px 0" },
+    ".color-1": { "color": "#2f4f3f" },
+    ".color-2": { "color": "#ffffff" },
+    ".bg-1": { "background": "#f7fef7" },
+    ".bg-2": { "background": "#16974B" },
+    ".border-top": { "border-top": "2px solid #005522" },
+    ".border-bottom": { "border-bottom": "2px solid #005522" },
+    ".header-tl": {
+      "font-size": "18px",
+      "line-height": "18px",
+      "font-weight": "700",
+      "text-align": "left",
+      "margin": "0",
+      "padding": "18px 0 0 7px"
+    },
+    ".header-tr": {
+      "font-size": "18px",
+      "line-height": "18px",
+      "font-weight": "700",
+      "text-align": "right",
+      "padding": "18px 7px 0 0"
+    },
+    ".header-bl": {
+      "font-size": "15px",
+      "line-height": "15px",
+      "font-weight": "400",
+      "text-align": "left",
+      "padding": "15px 0 7px 7px"
+    },
+    ".header-br": {
+      "font-size": "15px",
+      "line-height": "15px",
+      "font-weight": "400",
+      "text-align": "right",
+      "padding": "15px 7px 7px 0"
+    },
+    ".td-important": {
+      "border-left": "5px solid #16974B"
+    },
+    ".p-important": {
+      "padding": "10px 5px 10px 14px"
+    },
+    ".spacer": {
+      "height": "8px",
+      "line-height": "8px",
+      "font-size": "1px"
+    }
+  },
+  "fonts": {
+    "ARIAL": {
+      "p": {
+        "font-family": "Arial, Helvetica, sans-serif",
+        "font-size": "15px",
+        "line-height": "21px"
+      },
+      ".footer": { "font-size": "13px", "line-height": "20px" },
+      ".header-tl": { "font-size": "18px", "line-height": "18px" },
+      ".header-tr": { "font-size": "18px", "line-height": "18px" },
+      ".header-bl": { "font-size": "15px", "line-height": "15px" },
+      ".header-br": { "font-size": "15px", "line-height": "15px" }
+    },
+
+    "VERDANA": {
+      "p": {
+        "font-family": "Verdana, Arial, sans-serif",
+        "font-size": "15px",
+        "line-height": "21px"
+      },
+      ".footer": { "font-size": "13px", "line-height": "20px" },
+      ".header-tl": { "font-size": "18px", "line-height": "18px" },
+      ".header-tr": { "font-size": "18px", "line-height": "18px" },
+      ".header-bl": { "font-size": "15px", "line-height": "15px" },
+      ".header-br": { "font-size": "15px", "line-height": "15px" }
+    },
+
+    "TIMES": {
+      "p": {
+        "font-family": "Times New Roman, Times, serif",
+        "font-size": "15px",
+        "line-height": "21px"
+      },
+      ".footer": { "font-size": "13px", "line-height": "20px" },
+      ".header-tl": { "font-size": "18px", "line-height": "18px" },
+      ".header-tr": { "font-size": "18px", "line-height": "18px" },
+      ".header-bl": { "font-size": "15px", "line-height": "15px" },
+      ".header-br": { "font-size": "15px", "line-height": "15px" }
+    },
+
+    "HELVETICA": {
+      "p": {
+        "font-family": "Helvetica, Arial, sans-serif",
+        "font-size": "15px",
+        "line-height": "21px"
+      },
+      ".footer": { "font-size": "13px", "line-height": "20px" },
+      ".header-tl": { "font-size": "18px", "line-height": "18px" },
+      ".header-tr": { "font-size": "18px", "line-height": "18px" },
+      ".header-bl": { "font-size": "15px", "line-height": "15px" },
+      ".header-br": { "font-size": "15px", "line-height": "15px" }
+    },    
+
+    "TREBUCHET": {
+      "p": {
+        "font-family": "Trebuchet MS, Arial, sans-serif",
+        "font-size": "15px",
+        "line-height": "21px"
+      },
+      ".footer": { "font-size": "13px", "line-height": "20px" },
+      ".header-tl": { "font-size": "18px", "line-height": "18px" },
+      ".header-tr": { "font-size": "18px", "line-height": "18px" },
+      ".header-bl": { "font-size": "15px", "line-height": "15px" },
+      ".header-br": { "font-size": "15px", "line-height": "15px" }
+    },    
+    
+
+    "TAHOMA": {
+      "p": {
+        "font-family": "Tahoma, Verdana, sans-serif",
+        "font-size": "15px",
+        "line-height": "21px"
+      },
+      ".footer": { "font-size": "13px", "line-height": "20px" },
+      ".header-tl": { "font-size": "18px", "line-height": "18px" },
+      ".header-tr": { "font-size": "18px", "line-height": "18px" },
+      ".header-bl": { "font-size": "15px", "line-height": "15px" },
+      ".header-br": { "font-size": "15px", "line-height": "15px" }
+    },
+    
+
+    "VERDANA": {
+      "p": {
+        "font-family": "Verdana, Arial, sans-serif",
+        "font-size": "15px",
+        "line-height": "21px"
+      },
+      ".footer": { "font-size": "13px", "line-height": "20px" },
+      ".header-tl": { "font-size": "18px", "line-height": "18px" },
+      ".header-tr": { "font-size": "18px", "line-height": "18px" },
+      ".header-bl": { "font-size": "15px", "line-height": "15px" },
+      ".header-br": { "font-size": "15px", "line-height": "15px" }
+    },
+
+
+    
+    "GEORGIA": {
+      "p": {
+        "font-family": "Georgia, Times New Roman, serif",
+        "font-size": "15px",
+        "line-height": "21px"
+      },
+      ".footer": { "font-size": "13px", "line-height": "20px" },
+      ".header-tl": { "font-size": "18px", "line-height": "18px" },
+      ".header-tr": { "font-size": "18px", "line-height": "18px" },
+      ".header-bl": { "font-size": "15px", "line-height": "15px" },
+      ".header-br": { "font-size": "15px", "line-height": "15px" }
+    }
+  },
+  "colors": {
+    "GREEN": {
+      "a": { "color": "#2f4f3f" },
+      ".color-1": { "color": "#2f4f3f" },
+      ".color-2": { "color": "#ffffff" },
+      ".bg-1": { "background": "#f7fef7" },
+      ".bg-2": { "background": "#16974B" },
+      ".td-important": { "border-left": "5px solid #16974B" },
+      ".border-top": { "border-top": "2px solid #005522" },
+      ".border-bottom": { "border-bottom": "2px solid #005522" }
+    },
+
+    "RED": {
+      "a": { "color": "#5a3a3a" },
+      ".color-1": { "color": "#5a3a3a" },
+      ".color-2": { "color": "#ffffff" },
+      ".bg-1": { "background": "#fff1f1" },
+      ".bg-2": { "background": "#c92a2a" },
+      ".td-important": { "border-left": "5px solid #c92a2a" },
+      ".border-top": { "border-top": "2px solid #7a1414" },
+      ".border-bottom": { "border-bottom": "2px solid #7a1414" }
+    },
+
+    "BLUE": {
+      "a": { "color": "#3a4a66" },
+      ".color-1": { "color": "#3a4a66" },
+      ".color-2": { "color": "#ffffff" },
+      ".bg-1": { "background": "#f1f6ff" },
+      ".bg-2": { "background": "#2563eb" },
+      ".td-important": { "border-left": "5px solid #2563eb" },
+      ".border-top": { "border-top": "2px solid #1e3a8a" },
+      ".border-bottom": { "border-bottom": "2px solid #1e3a8a" }
+    },
+
+    "ORANGE": {
+      "a": { "color": "#5a4034" },
+      ".color-1": { "color": "#5a4034" },
+      ".color-2": { "color": "#ffffff" },
+      ".bg-1": { "background": "#fff2ea" },
+      ".bg-2": { "background": "#e0662b" },
+      ".td-important": { "border-left": "5px solid #e0662b" },
+      ".border-top": { "border-top": "2px solid #9a3b10" },
+      ".border-bottom": { "border-bottom": "2px solid #9a3b10" }
+    },
+
+    "VIOLET": {
+      "a": { "color": "#4a425f" },
+      ".color-1": { "color": "#4a425f" },
+      ".color-2": { "color": "#ffffff" },
+      ".bg-1": { "background": "#f6f2ff" },
+      ".bg-2": { "background": "#6d28d9" },
+      ".td-important": { "border-left": "5px solid #6d28d9" },
+      ".border-top": { "border-top": "2px solid #3f1d88" },
+      ".border-bottom": { "border-bottom": "2px solid #3f1d88" }
+    },
+
+    "YELLOW": {
+      "a": { "color": "#5a5438" },
+      ".color-1": { "color": "#5a5438" },
+      ".color-2": { "color": "#ffffff" },
+      ".bg-1": { "background": "#fffbe9" },
+      ".bg-2": { "background": "#d6a500" },
+      ".td-important": { "border-left": "5px solid #d6a500" },
+      ".border-top": { "border-top": "2px solid #8c6a00" },
+      ".border-bottom": { "border-bottom": "2px solid #8c6a00" }
+    }
+  }
+}
+
+{
+  "IMPORTANT": "<table class=\"table-main\"><tr><td class=\"td-important bg-1\"><p class=\"p-important\">Maecenas ligula massa, varius a, semper congue, euismod non, mi. Proin porttitor, orci nec nonummy molestie. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi.</p></td></tr><tr><td class=\"spacer\">&nbsp;</td></tr></table>"
+}
+
+</script>

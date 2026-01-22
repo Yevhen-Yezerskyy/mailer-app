@@ -184,16 +184,34 @@ def styles_json_to_css(styles: StylesJSON) -> str:
 def styles_css_to_json(css_text: str) -> Dict[str, Dict[str, str]]:
     css_text = (css_text or "").strip()
     out: Dict[str, Dict[str, str]] = {}
+
     for m in re.finditer(r"(?s)([^{}]+)\{([^}]*)\}", css_text):
-        sel = m.group(1).strip()
-        body = m.group(2).strip()
+        sel = (m.group(1) or "").strip()
+        body = (m.group(2) or "").strip()
+        if not sel or not body:
+            continue
+
         rules: Dict[str, str] = {}
         for part in body.split(";"):
-            if ":" in part:
-                k, v = part.split(":", 1)
-                rules[k.strip()] = v.strip()
-        if rules:
+            part = part.strip()
+            if not part or ":" not in part:
+                continue
+            k, v = part.split(":", 1)
+            k = k.strip()
+            v = v.strip()
+            if not k:
+                continue
+            rules[k] = v
+
+        if not rules:
+            continue
+
+        # IMPORTANT: merge — не затираем весь селектор целиком
+        if sel in out:
+            out[sel].update(rules)  # новые ключи перекрывают только совпавшие свойства
+        else:
             out[sel] = rules
+
     return out
 
 
