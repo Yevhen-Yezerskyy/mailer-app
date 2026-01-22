@@ -1,6 +1,9 @@
 # FILE: web/panel/aap_settings/admin.py
-# DATE: 2026-01-13
+# DATE: 2026-01-22
 # PURPOSE: Регистрация моделей почтовых настроек в Django Admin.
+# CHANGE:
+# - Удалены обращения к Mailbox.name
+# - ordering/search/display переведены на email
 
 from django.contrib import admin
 
@@ -9,10 +12,10 @@ from .models import Mailbox, MailboxConnection, ProviderPreset
 
 @admin.register(Mailbox)
 class MailboxAdmin(admin.ModelAdmin):
-    list_display = ("id", "workspace_id", "name", "email", "domain", "is_active")
+    list_display = ("id", "workspace_id", "email", "domain", "is_active")
     list_filter = ("is_active",)
-    search_fields = ("name", "email", "domain")
-    ordering = ("name",)
+    search_fields = ("email", "domain")
+    ordering = ("email",)
 
 
 @admin.register(MailboxConnection)

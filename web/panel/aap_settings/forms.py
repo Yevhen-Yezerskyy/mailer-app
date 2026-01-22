@@ -1,7 +1,10 @@
 # FILE: web/panel/aap_settings/forms.py
-# DATE: 2026-01-18
+# DATE: 2026-01-22
 # PURPOSE: Form "Почтовые серверы".
-# CHANGE: Добавлен limit_hour_sent (обяз., default=50, max=300) + серверная проверка лимита как non-field error.
+# CHANGE:
+# - Убрано поле name (Mailbox.name удалён)
+# - from_name сделан обязательным
+# - Удалена проверка уникальности name в рамках workspace; осталась только уникальность email
 
 from __future__ import annotations
 
@@ -26,12 +29,6 @@ AUTH_CHOICES = [
 
 
 class MailServerForm(forms.Form):
-    name = forms.CharField(
-        label=_("Название"),
-        required=True,
-        widget=forms.TextInput(attrs={"class": "YY-INPUT", "placeholder": _("Для какой рассылки, компании?")}),
-    )
-
     email = forms.EmailField(
         label=_("Email"),
         required=True,
@@ -62,9 +59,15 @@ class MailServerForm(forms.Form):
     )
 
     smtp_host = forms.CharField(label="SMTP host", required=True, widget=forms.TextInput(attrs={"class": "YY-INPUT"}))
-    smtp_port = forms.IntegerField(label="SMTP port", required=True, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-24"}))
-    smtp_security = forms.ChoiceField(label="SMTP security", choices=SECURITY_CHOICES, required=True, widget=forms.Select(attrs={"class": "YY-INPUT !px-1"}))
-    smtp_auth_type = forms.ChoiceField(label="SMTP auth", choices=AUTH_CHOICES, required=True, widget=forms.Select(attrs={"class": "YY-INPUT !px-1"}))
+    smtp_port = forms.IntegerField(
+        label="SMTP port", required=True, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-24"})
+    )
+    smtp_security = forms.ChoiceField(
+        label="SMTP security", choices=SECURITY_CHOICES, required=True, widget=forms.Select(attrs={"class": "YY-INPUT !px-1"})
+    )
+    smtp_auth_type = forms.ChoiceField(
+        label="SMTP auth", choices=AUTH_CHOICES, required=True, widget=forms.Select(attrs={"class": "YY-INPUT !px-1"})
+    )
     smtp_username = forms.CharField(label="SMTP username", required=True, widget=forms.TextInput(attrs={"class": "YY-INPUT"}))
     smtp_secret = forms.CharField(
         label="SMTP password / token",
@@ -74,14 +77,18 @@ class MailServerForm(forms.Form):
 
     from_name = forms.CharField(
         label=_("Отправитель:"),
-        required=False,
+        required=True,
         widget=forms.TextInput(attrs={"class": "YY-INPUT", "placeholder": _("Отправитель")}),
     )
 
     imap_host = forms.CharField(label="IMAP host", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT"}))
     imap_port = forms.IntegerField(label="IMAP port", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-24"}))
-    imap_security = forms.ChoiceField(label="IMAP security", choices=SECURITY_CHOICES, required=False, widget=forms.Select(attrs={"class": "YY-INPUT !px-1"}))
-    imap_auth_type = forms.ChoiceField(label="IMAP auth", choices=AUTH_CHOICES, required=False, widget=forms.Select(attrs={"class": "YY-INPUT !px-1"}))
+    imap_security = forms.ChoiceField(
+        label="IMAP security", choices=SECURITY_CHOICES, required=False, widget=forms.Select(attrs={"class": "YY-INPUT !px-1"})
+    )
+    imap_auth_type = forms.ChoiceField(
+        label="IMAP auth", choices=AUTH_CHOICES, required=False, widget=forms.Select(attrs={"class": "YY-INPUT !px-1"})
+    )
     imap_username = forms.CharField(label="IMAP username", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT"}))
     imap_secret = forms.CharField(
         label="IMAP password / token",
@@ -130,7 +137,6 @@ class MailServerForm(forms.Form):
 
         missing = []
         required_fields = [
-            "name",
             "email",
             "limit_hour_sent",
             "smtp_host",
@@ -138,6 +144,7 @@ class MailServerForm(forms.Form):
             "smtp_security",
             "smtp_auth_type",
             "smtp_username",
+            "from_name",
         ]
         if self.require_smtp_secret:
             required_fields.append("smtp_secret")
@@ -163,26 +170,14 @@ class MailServerForm(forms.Form):
             self.add_error(None, _("Максимум 300 писем в час."))
             return cleaned
 
-        # UI-уникальность (только non-field error)
-        name = (cleaned.get("name") or "").strip()
+        # email — глобально уникален (только non-field error)
         email = (cleaned.get("email") or "").strip().lower()
-
-        # email — глобально уникален
         if email:
             q = Mailbox.objects.filter(email=email)
             if self.mailbox_id is not None:
                 q = q.exclude(id=self.mailbox_id)
             if q.exists():
                 self.add_error(None, _("Этот Email уже используется."))
-                return cleaned
-
-        # name — уникален в рамках workspace
-        if name and self.workspace_id:
-            q = Mailbox.objects.filter(workspace_id=self.workspace_id, name=name)
-            if self.mailbox_id is not None:
-                q = q.exclude(id=self.mailbox_id)
-            if q.exists():
-                self.add_error(None, _("Это название уже используется."))
                 return cleaned
 
         return cleaned

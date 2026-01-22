@@ -47,11 +47,10 @@
               </div>
             {% endif %}
 
-            <div class="grid grid-cols-[2fr_2fr_2fr_1fr] gap-4 mb-7">
-
+            <div class="grid grid-cols-[2fr_2fr_1fr] gap-4 mb-7">
               <div>
-                <label class="YY-LABEL">{% trans "Название сервера" %}:</label>
-                {{ form.name }}
+                <label class="YY-LABEL">{% trans "Отправитель" %}:</label>
+                {{ form.from_name }}
               </div>
 
               <div>
@@ -59,10 +58,6 @@
                 {{ form.email }}
               </div>
 
-              <div>
-                <label class="YY-LABEL">{% trans "Отправитель" %}:</label>
-                {{ form.from_name }}
-              </div>
               <div>
                 <label class="YY-LABEL">{% trans "Лимит/час" %}:</label>
                 {{ form.limit_hour_sent }}
@@ -327,9 +322,9 @@
           <table class="w-full text-left">
             <thead>
               <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[30%]">{% trans "Название" %}</th>
-                <th class="YY-TH_TH w-[30%]">{% trans "Email" %}</th>
-                <th class="YY-TH_TH w-[20%]">{% trans "Лимит/час" %}</th>
+                <th class="YY-TH_TH w-[50%]">{% trans "Отправитель" %}</th>
+                <th class="YY-TH_TH w-[50%]">{% trans "Email" %}</th>
+                <th class="YY-TH_TH whitespace-nowrap">{% trans "Лимит/час" %}</th>
                 <th class="YY-TH_TH">&nbsp;</th>
                 <th class="YY-TH_TH">&nbsp;</th>
               </tr>
@@ -338,13 +333,13 @@
               {% for it in items %}
                 <tr class="YY-TB_TR align-top">
                   <td class="YY-TB_TD">
-                    <div class="YY-STATUS_BLUE">{{ it.name }}</div>
+                    <div class="YY-STATUS_BLUE">{{ it.sender_name }}</div>
                     {% if not it.is_active %}
                       <div class="YY-STATUS_GRAY">{% trans "Выключен" %}</div>
                     {% endif %}
                   </td>
                   <td class="YY-TB_TD">
-                    <div class="YY-STATUS_YELLOW">{{ it.email }}</div>
+                    <div class="YY-STATUS_BLUE">{{ it.sender_label }}</div>
                   </td>
                   <td class="YY-TB_TD">
                     <div class="YY-STATUS_BLUE">{{ it.limit_hour_sent }}</div>

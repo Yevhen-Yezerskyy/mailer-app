@@ -1,7 +1,10 @@
 # FILE: web/panel/aap_settings/views/mail_servers.py
-# DATE: 2026-01-18
+# DATE: 2026-01-22
 # PURPOSE: /panel/settings/mail-servers/ — SMTP обяз., IMAP опц.; apply preset без валидации; reveal secret по кнопке "глаз" через AJAX + confirm modal.
-# CHANGE: Добавлен Mailbox.limit_hour_sent: init + сохранение + вывод в списке.
+# CHANGE:
+# - Убрано использование Mailbox.name (поле удалено)
+# - items сортируются по email
+# - В items добавлены sender_name/sender_label (берём from_name/from_email из SMTP extra_json)
 
 from __future__ import annotations
 
@@ -125,6 +128,42 @@ def _norm_secret_from_cleaned(v: str) -> str:
     return s
 
 
+def _attach_sender_fields(items: list[Mailbox]) -> list[Mailbox]:
+    """
+    Adds:
+      - it.sender_name (from SMTP extra_json.from_name)
+      - it.sender_label (from_name <from_email>)
+    Uses latest SMTP connection per mailbox (by max id).
+    """
+    if not items:
+        return items
+
+    mb_by_id = {int(m.id): m for m in items}
+    mb_ids = list(mb_by_id.keys())
+
+    smtp_conns = (
+        MailboxConnection.objects.filter(mailbox_id__in=mb_ids, kind="smtp")
+        .only("id", "mailbox_id", "extra_json")
+        .order_by("mailbox_id", "-id")
+    )
+
+    latest_by_mb: dict[int, MailboxConnection] = {}
+    for c in smtp_conns:
+        mid = int(c.mailbox_id)
+        if mid not in latest_by_mb:
+            latest_by_mb[mid] = c
+
+    for mid, mb in mb_by_id.items():
+        c = latest_by_mb.get(mid)
+        extra = c.extra_json if (c and isinstance(c.extra_json, dict)) else {}
+        fn = (extra.get("from_name") or "").strip()
+        fe = (extra.get("from_email") or "").strip() or (mb.email or "").strip()
+        mb.sender_name = fn
+        mb.sender_label = f"{fn} <{fe}>" if fn else f"<{fe}>"
+
+    return items
+
+
 def mail_server_secret_view(request):
     ws_id = _guard(request)
     if not ws_id:
@@ -176,22 +215,22 @@ def mail_servers_view(request):
         state = "edit"
         edit_obj.ui_id = encode_id(int(edit_obj.id))
 
-    items = list(Mailbox.objects.filter(workspace_id=ws_id).order_by("name"))
+    items = list(Mailbox.objects.filter(workspace_id=ws_id).order_by("email"))
+    _attach_sender_fields(items)
     for it in items:
         it.ui_id = encode_id(int(it.id))
 
     init = {
-        "name": "",
         "email": "",
         "limit_hour_sent": 50,
         "preset_code": "",  # после save — пусто (не "липнет")
+        "from_name": "",
     }
 
     smtp_has_secret = False
     imap_has_secret = False
 
     if edit_obj:
-        init["name"] = edit_obj.name or ""
         init["email"] = edit_obj.email or ""
         init["limit_hour_sent"] = int(getattr(edit_obj, "limit_hour_sent", 50) or 50)
 
@@ -285,22 +324,19 @@ def mail_servers_view(request):
                 {"state": state or "add", "form": form, "edit_obj": edit_obj, "items": items},
             )
 
-        name = (form.cleaned_data["name"] or "").strip()
         email = (form.cleaned_data["email"] or "").strip()
         domain = (email.split("@", 1)[1] if "@" in email else "").strip().lower()
         limit_hour_sent = int(form.cleaned_data.get("limit_hour_sent") or 50)
 
         if edit_obj:
             mb = edit_obj
-            mb.name = name
             mb.email = email
             mb.domain = domain
             mb.limit_hour_sent = limit_hour_sent
-            mb.save(update_fields=["name", "email", "domain", "limit_hour_sent", "updated_at"])
+            mb.save(update_fields=["email", "domain", "limit_hour_sent", "updated_at"])
         else:
             mb = Mailbox.objects.create(
                 workspace_id=ws_id,
-                name=name,
                 email=email,
                 domain=domain,
                 limit_hour_sent=limit_hour_sent,
@@ -312,8 +348,8 @@ def mail_servers_view(request):
 
         smtp_extra = {}
         fn = (form.cleaned_data.get("from_name") or "").strip()
-        if fn:
-            smtp_extra["from_name"] = fn
+        smtp_extra["from_name"] = fn
+        smtp_extra["from_email"] = email
 
         smtp_secret_new = _norm_secret_from_cleaned(form.cleaned_data.get("smtp_secret") or "")
         smtp_secret_to_store = smtp_secret_new

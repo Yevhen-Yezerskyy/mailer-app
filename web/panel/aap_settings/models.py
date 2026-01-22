@@ -1,7 +1,10 @@
 # FILE: web/panel/aap_settings/models.py
-# DATE: 2026-01-19
-# PURPOSE: Приведение нейминга workspace к единому формату.
-# CHANGE: SendingSettings.workspace -> SendingSettings.workspace_id.
+# DATE: 2026-01-22
+# PURPOSE: Приведение нейминга workspace к единому формату, упрощение Mailbox.
+# CHANGE:
+# - Удалено поле Mailbox.name
+# - Удалён constraint workspace_id + name
+# - ordering Mailbox переведён на email
 
 from __future__ import annotations
 
@@ -26,7 +29,6 @@ class AuthType(models.TextChoices):
 
 class Mailbox(models.Model):
     workspace_id = models.UUIDField(db_index=True, help_text="UUID воркспейса")
-    name = models.CharField(max_length=255, help_text="Название ящика (для UI)")
     email = models.EmailField(max_length=254, help_text="Полный email адрес")
     domain = models.CharField(max_length=255, help_text="Домен email (для DNS-проверок)")
     is_active = models.BooleanField(default=True, help_text="Если false — ящик полностью выключен")
@@ -39,9 +41,8 @@ class Mailbox(models.Model):
     class Meta:
         app_label = "aap_settings"
         db_table = "aap_settings_mailboxes"
-        ordering = ["name"]
+        ordering = ["email"]
         constraints = [
-            models.UniqueConstraint(fields=["workspace_id", "name"], name="aap_settings_mailbox_ws_name_uniq"),
             models.UniqueConstraint(fields=["email"], name="aap_settings_mailbox_email_uniq"),
         ]
         indexes = [
@@ -50,7 +51,7 @@ class Mailbox(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.name} <{self.email}>"
+        return f"<{self.email}>"
 
 
 class MailboxConnection(models.Model):

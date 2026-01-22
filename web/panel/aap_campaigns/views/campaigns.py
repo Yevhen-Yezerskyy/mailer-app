@@ -1,12 +1,10 @@
 # FILE: web/panel/aap_campaigns/views/campaigns.py
-# DATE: 2026-01-21
+# DATE: 2026-01-22
 # PURPOSE: Campaigns page: add/edit + letter-editor init ctx + bottom table.
 # CHANGE:
-# - UI status for active кампаний: "Ждем окно отправки" vs "Идет рассылка" по окну отправки.
-# - Окно: campaign.window (если не пустое) иначе глобальное SendingSettings.value_json.
-# - Время: сравнение всегда в Europe/Berlin (не зависит от TZ сервера).
-# - Праздники: используем пакет `holidays` (python-holidays) для Germany-wide; если пакет не установлен — fallback на вычисление основных DE-wide праздников.
-# - FIX: парсим window-слоты в формате JS ({from,to}) и в формате пар [from,to].
+# - Убрана зависимость от Mailbox.name (поле удалено)
+# - Mailbox сортируется по email
+# - sender_label fallback теперь только через extra_json/from_email и mb.email
 
 from __future__ import annotations
 
@@ -104,7 +102,7 @@ def _parse_date_from_post(request, prefix: str) -> Optional[date]:
 
 def _build_sender_labels(mailboxes: list[Mailbox]) -> dict[int, str]:
     """
-    label = "from_name" <from_email>
+    label = from_name <from_email>
     from extra_json of latest SMTP connection per mailbox
     """
     if not mailboxes:
@@ -129,9 +127,9 @@ def _build_sender_labels(mailboxes: list[Mailbox]) -> dict[int, str]:
     for mid, mb in mb_by_id.items():
         c = latest_smtp_by_mb.get(mid)
         extra = c.extra_json if (c and isinstance(c.extra_json, dict)) else {}
-        from_name = (extra.get("from_name") or "").strip() or (mb.name or "").strip() or "—"
+        from_name = (extra.get("from_name") or "").strip() or "—"
         from_email = (extra.get("from_email") or "").strip() or (mb.email or "").strip() or "—"
-        out[mid] = f'{from_name} <{from_email}>'
+        out[mid] = f"{from_name} <{from_email}>"
     return out
 
 
@@ -175,16 +173,16 @@ def _easter_sunday_gregorian(y: int) -> date:
 
 def _fallback_de_wide_holidays(y: int) -> set[date]:
     fixed = {
-        date(y, 1, 1),    # Neujahr
-        date(y, 5, 1),    # Tag der Arbeit
-        date(y, 10, 3),   # Tag der Deutschen Einheit
+        date(y, 1, 1),  # Neujahr
+        date(y, 5, 1),  # Tag der Arbeit
+        date(y, 10, 3),  # Tag der Deutschen Einheit
         date(y, 12, 25),  # 1. Weihnachtstag
         date(y, 12, 26),  # 2. Weihnachtstag
     }
     easter = _easter_sunday_gregorian(y)
     movable = {
-        easter - timedelta(days=2),   # Karfreitag
-        easter + timedelta(days=1),   # Ostermontag
+        easter - timedelta(days=2),  # Karfreitag
+        easter + timedelta(days=1),  # Ostermontag
         easter + timedelta(days=39),  # Christi Himmelfahrt
         easter + timedelta(days=50),  # Pfingstmontag
     }
@@ -212,6 +210,7 @@ def _is_de_public_holiday(d: date) -> bool:
 
 
 # -------- Window evaluation --------
+
 
 def _parse_hhmm_to_minutes(s: str) -> Optional[int]:
     try:
@@ -315,7 +314,7 @@ def _ctx_build(
     now_de = _now_berlin()
 
     for it in items:
-        it.sender_label = sender_label_by_mb_id.get(int(it.mailbox_id), f"{it.mailbox.name} <{it.mailbox.email}>")
+        it.sender_label = sender_label_by_mb_id.get(int(it.mailbox_id), f"<{it.mailbox.email}>")
 
         tpl = None
         if getattr(it, "letter", None):
@@ -373,13 +372,11 @@ def campaigns_view(request):
     if edit_obj:
         edit_obj.ui_id = encode_id(int(edit_obj.id))
         edit_obj.letter = (
-            Letter.objects.filter(workspace_id=ws_id, campaign=edit_obj)
-            .select_related("template")
-            .first()
+            Letter.objects.filter(workspace_id=ws_id, campaign=edit_obj).select_related("template").first()
         )
 
     list_items = MailingList.objects.filter(workspace_id=ws_id, archived=False).order_by("-created_at")
-    mb_items = Mailbox.objects.filter(workspace_id=ws_id, is_active=True).order_by("name")
+    mb_items = Mailbox.objects.filter(workspace_id=ws_id, is_active=True).order_by("email")
 
     tpl_items = Templates.objects.filter(
         workspace_id=ws_id,
@@ -393,7 +390,7 @@ def campaigns_view(request):
     sender_label_by_mb_id = _build_sender_labels(list(mb_items))
     for it in mb_items:
         it.ui_id = encode_id(int(it.id))
-        it.sender_label = sender_label_by_mb_id.get(int(it.id), f"{it.name} <{it.email}>")
+        it.sender_label = sender_label_by_mb_id.get(int(it.id), f"<{it.email}>")
 
     for it in tpl_items:
         it.ui_id = encode_id(int(it.id))
@@ -420,7 +417,7 @@ def campaigns_view(request):
 
     parent_items = _with_ui_ids(Campaign.objects.filter(workspace_id=ws_id))
 
-    ss, created = SendingSettings.objects.get_or_create(
+    ss, _created = SendingSettings.objects.get_or_create(
         workspace_id=ws_id,
         defaults={"value_json": {}},
     )
@@ -480,7 +477,7 @@ def campaigns_view(request):
 
             camp = Campaign.objects.filter(id=pk, workspace_id=ws_id).first()
             if camp:
-                camp.active = (action == "activate")
+                camp.active = action == "activate"
                 camp.save(update_fields=["active", "updated_at"])
 
             return redirect(request.get_full_path())
