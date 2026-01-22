@@ -1,7 +1,9 @@
 # FILE: engine/common/mail/types.py
 # DATE: 2026-01-22
 # PURPOSE: Mail domain types: runtime dataclasses + logging specs (MAIL_SPECS).
-# CHANGE: Add MailUiResult: compact return for UI (STATUS + user_message + data).
+# CHANGE:
+# - Add DOMAIN_TECH_CHECK (GOOD/BAD) and DOMAIN_REPUTATION_CHECK (NORMAL/QUESTIONABLE).
+# - Make MailUiResult.status generic (str) to support non-OK/FAIL statuses.
 
 from __future__ import annotations
 
@@ -17,6 +19,14 @@ MAIL_SPECS: Dict[str, Dict[str, Any]] = {
     "SMTP_CHECK": {
         "statuses": ["OK", "FAIL"],
         "comment": "Binary SMTP connectivity/auth check.",
+    },
+    "DOMAIN_TECH_CHECK": {
+        "statuses": ["GOOD", "BAD"],
+        "comment": "Domain DNS technical check (SPF + DMARC).",
+    },
+    "DOMAIN_REPUTATION_CHECK": {
+        "statuses": ["NORMAL", "QUESTIONABLE"],
+        "comment": "Domain reputation check via Spamhaus DBL (DQS).",
     },
 }
 
@@ -72,6 +82,6 @@ class MailResult:
 class MailUiResult:
     """Compact result ready to show to user (no parsing needed)."""
 
-    status: Literal["OK", "FAIL"]
+    status: str
     user_message: str = ""
     data: Dict[str, Any] = field(default_factory=dict)
