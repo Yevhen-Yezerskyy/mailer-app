@@ -1,14 +1,16 @@
 # FILE: web/panel/aap_settings/views/mail_servers_api.py
 # DATE: 2026-01-22
 # PURPOSE: AJAX API для "Проверок" в Settings → Mail servers.
-# CHANGE: Инфраструктура без реальных проверок: POST action=check_domain (пока один) -> ответ через 1 секунду.
+# CHANGE: Fix import path to avoid duplicate model registration (use panel.*).
 
 from __future__ import annotations
 
-import time
-
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+
+from engine.common.mail.smtp_test import smtp_check_and_log
+from web.mailer_web.access import decode_id
+from panel.aap_settings.models import Mailbox  # <-- FIX (was web.panel.aap_settings.models)
 
 
 def _guard(request):
@@ -26,18 +28,35 @@ def mail_servers_api_view(request):
         return JsonResponse({"ok": False, "error": "auth"}, status=403)
 
     action = (request.POST.get("action") or "").strip()
-
-    # Пока делаем одну кнопку/действие. Остальные добавим позже.
-    if action != "check_domain":
+    if action != "check_smtp":
         return JsonResponse({"ok": False, "error": "bad_action"}, status=400)
 
-    # demo delay, чтобы увидеть "крутилку"
-    time.sleep(1.0)
+    tok = (request.POST.get("id") or "").strip()
+    if not tok:
+        return JsonResponse({"ok": False, "error": "missing_id"}, status=400)
 
-    return JsonResponse(
-        {
-            "ok": True,
-            "action": action,
-            "message": "DEMO: domain check finished (no real checks yet).",
-        }
-    )
+    try:
+        mailbox_id = decode_id(tok)
+    except Exception:
+        return JsonResponse({"ok": False, "error": "bad_id"}, status=400)
+
+    if not Mailbox.objects.filter(id=mailbox_id, workspace_id=ws_id).exists():
+        return JsonResponse({"ok": False, "error": "not_found"}, status=404)
+
+    r = smtp_check_and_log(int(mailbox_id))
+
+    # UI contract: always compact
+    out = {
+        "ok": True,
+        "action": "SMTP_CHECK",
+        "status": r.status,                        # OK / FAIL
+        "message": r.user_message or "OK",          # human friendly
+        "latency_ms": (r.data or {}).get("latency_ms"),
+        "stage": (r.data or {}).get("stage"),
+    }
+
+    # Optional verbose dump (for debug button later)
+    if (request.POST.get("verbose") or "").strip() == "1":
+        out["data"] = r.data
+
+    return JsonResponse(out)

@@ -1,13 +1,29 @@
 # FILE: engine/common/mail/types.py
 # DATE: 2026-01-22
-# PURPOSE: Shared datatypes/contracts for engine/common/mail actions.
-# CHANGE: (new) Minimal stable result + SMTP config types.
+# PURPOSE: Mail domain types: runtime dataclasses + logging specs (MAIL_SPECS).
+# CHANGE: Add MailUiResult: compact return for UI (STATUS + user_message + data).
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, Literal, Optional
 
+
+# =========================
+# Logging contract (ACTIONS / STATUSES)
+# =========================
+
+MAIL_SPECS: Dict[str, Dict[str, Any]] = {
+    "SMTP_CHECK": {
+        "statuses": ["OK", "FAIL"],
+        "comment": "Binary SMTP connectivity/auth check.",
+    },
+}
+
+
+# =========================
+# Runtime types (used by smtp.py)
+# =========================
 
 ConnSecurity = Literal["none", "ssl", "starttls"]
 AuthType = Literal["login", "oauth2"]
@@ -33,10 +49,7 @@ class SmtpCfg:
 
 @dataclass
 class MailResult:
-    """Generic result for mail actions (smtp/imap/dns/send/read).
-
-    NOTE: mail-layer does not log anywhere; callers decide how/where to persist.
-    """
+    """Generic raw result for mail actions (smtp/imap/dns/send/read)."""
 
     ok: bool
     action: str
@@ -48,5 +61,17 @@ class MailResult:
     details: Dict[str, Any] = field(default_factory=dict)
     latency_ms: Optional[int] = None
 
-    # optionally populated by send
     message_id: str = ""
+
+
+# =========================
+# UI-level compact result
+# =========================
+
+@dataclass
+class MailUiResult:
+    """Compact result ready to show to user (no parsing needed)."""
+
+    status: Literal["OK", "FAIL"]
+    user_message: str = ""
+    data: Dict[str, Any] = field(default_factory=dict)

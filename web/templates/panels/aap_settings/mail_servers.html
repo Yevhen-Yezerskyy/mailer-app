@@ -221,14 +221,13 @@
 
           <div id="yyMailChecksPanel">
             <div class="flex gap-3 flex-wrap">
-              <button
-                id="yyChkDomain"
-                type="button"
-                class="YY-BUTTON_MAIN"
-                onclick="yyMailServersCheck('check_domain','yyChkDomain')"
-              >
-                {% trans "Проверить домен" %}
-              </button>
+                  <button
+                      id="yyChkSmtp"
+                      type="button"
+                      class="YY-BUTTON_MAIN"
+                      onclick="yyMailServersCheck('check_smtp','yyChkSmtp')">
+                      {% trans "Проверить SMTP" %}
+                    </button>
             </div>
 
             <div class="mt-6">
@@ -240,7 +239,7 @@
           </div>
 
         {% elif state == "add" %}
-        <p class="YY-STATUS_BLUE"> {% trans "Добавление почтового сервера" %}</p>
+            <p class="YY-STATUS_BLUE"> {% trans "Добавление почтового сервера" %}</p>
         {% else %}
           <a href="?state=add" class="YY-BUTTON_MAIN">
             {% trans "Добавить почтовый сервер" %}

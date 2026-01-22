@@ -1,7 +1,7 @@
 // FILE: web/static/js/aap_settings/mail_servers_checks.js
 // DATE: 2026-01-22
-// PURPOSE: Settings → Mail servers: "Проверки" (инфраструктура).
-// CHANGE: Одна кнопка: клик -> disable + spinner -> POST в api/ -> показать результат.
+// PURPOSE: Settings → Mail servers: "Проверки".
+// CHANGE: Send mailbox id(ui) with request; show status/message + pretty JSON.
 
 (function () {
   function yyCsrftoken() {
@@ -32,9 +32,18 @@
     ta.value = text || "";
   }
 
+  function yyGetMailboxToken() {
+    const form = document.getElementById("yyMailServerForm");
+    if (!form) return "";
+    const el = form.querySelector('input[name="id"]');
+    return el ? (el.value || "").trim() : "";
+  }
+
   async function yyPostCheck(action) {
     const fd = new FormData();
     fd.append("action", action);
+    const tok = yyGetMailboxToken();
+    if (tok) fd.append("id", tok);
 
     const resp = await fetch("api/", {
       method: "POST",
@@ -64,6 +73,11 @@
       return;
     }
 
-    yySetOut((data.message || "OK") + (data.action ? " [" + data.action + "]" : ""));
+    const head =
+      (data.status ? data.status + ": " : "") +
+      (data.message || "OK") +
+      (data.action ? " [" + data.action + "]" : "");
+    const tail = data.data ? "\n\n" + JSON.stringify(data.data, null, 2) : "";
+    yySetOut(head + tail);
   };
 })();
