@@ -1,7 +1,9 @@
 # FILE: web/panel/aap_campaigns/urls.py
-# DATE: 2026-01-20
+# DATE: 2026-01-22
 # PURPOSE: Добавить letter-editor API (extract/render) для campaigns (как в templates).
-# CHANGE: New paths: campaigns/letter/_extract-content/ + campaigns/letter/_render-editor-html/
+# CHANGE:
+# - New paths: campaigns/letter/_extract-content/ + campaigns/letter/_render-editor-html/
+# - New path: campaigns/letter/_buttons-by-template/ (GlobalTemplate.buttons)
 
 from __future__ import annotations
 
@@ -10,6 +12,7 @@ from django.urls import path
 from panel.aap_campaigns.views.campaigns import campaigns_view
 from panel.aap_campaigns.views.campaigns_api import (
     campaigns__letter_extract_content_view,
+    campaigns__letter_buttons_by_template_view,
     campaigns__letter_render_editor_html_view,
     campaigns__preview_modal_by_id_view,
     campaigns__preview_modal_from_editor_view,
@@ -39,6 +42,7 @@ urlpatterns = [
     # NEW: letter editor API (python-only HTML ops)
     path("campaigns/letter/_extract-content/", campaigns__letter_extract_content_view, name="campaigns__letter_extract_content"),
     path("campaigns/letter/_render-editor-html/", campaigns__letter_render_editor_html_view, name="campaigns__letter_render_editor_html"),
+    path("campaigns/letter/_buttons-by-template/", campaigns__letter_buttons_by_template_view, name="campaigns__letter_buttons_by_template"),
 
     # templates
     path("templates/", templates_view, name="templates"),

@@ -1,14 +1,16 @@
 # FILE: web/panel/aap_campaigns/views/campaigns_api.py
-# DATE: 2026-01-21
+# DATE: 2026-01-22
 # PURPOSE: Letter editor API (как в templates): extract content / render editor_html + preview (user/advanced).
 # CHANGE:
 # - Campaigns preview: отдельная модалка modal_full_preview.html (VIEW / HTML / HTML EMAIL).
 # - HTML tab: 3 блока (внутренний content_html, CSS, внешний template_html).
 # - VIEW: render_html + demo vars (default_template_vars()) в iframe srcdoc (изоляция стилей).
 # - HTML EMAIL: render_html без vars_json ({}).
+# - NEW: buttons-by-template: вытащить GlobalTemplate.buttons по id-<N> из первого тега template_html.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict
 from uuid import UUID
 
@@ -26,6 +28,37 @@ from panel.aap_campaigns.template_editor import (
     letter_editor_render_html,
     styles_json_to_css,
 )
+from panel.models import GlobalTemplate
+
+
+def _extract_global_template_id_from_first_tag(template_html: str) -> int | None:
+    s = (template_html or "").lstrip()
+    if not s:
+        return None
+
+    m_tag = re.search(r"(?is)<\s*([a-zA-Z][a-zA-Z0-9:_-]*)([^>]*)>", s)
+    if not m_tag:
+        return None
+
+    attrs = m_tag.group(2) or ""
+    m_class = re.search(
+        r"""\bclass\s*=\s*(?P<q>["'])(?P<v>.*?)(?P=q)""",
+        attrs,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if not m_class:
+        return None
+
+    class_value = (m_class.group("v") or "").strip()
+    if not class_value:
+        return None
+
+    for token in class_value.split():
+        if token.startswith("id-"):
+            tail = token[3:]
+            if tail.isdigit():
+                return int(tail)
+    return None
 
 
 def _guard_ws(request: HttpRequest) -> UUID | None:
@@ -134,6 +167,40 @@ def campaigns__letter_render_editor_html_view(request: HttpRequest) -> JsonRespo
 
     editor_html = letter_editor_render_html(tpl.template_html or "", sanitize(content_html or ""))
     return JsonResponse({"ok": True, "editor_html": editor_html or ""})
+
+
+@require_POST
+@csrf_exempt
+def campaigns__letter_buttons_by_template_view(request: HttpRequest) -> JsonResponse:
+    """Return buttons dict for current template_html (via id-<N> in first tag class).
+
+    Payload: {"template_html": "<...>"}
+    Response: {"ok": true, "buttons": {"NAME": "<html>"}}
+    """
+    ws_id = _guard_ws(request)
+    if not ws_id:
+        return JsonResponse({"ok": False})
+
+    data = _read_json_body(request)
+    template_html = data.get("template_html") or ""
+
+    pk = _extract_global_template_id_from_first_tag(template_html or "")
+    if not pk:
+        return JsonResponse({"ok": True, "buttons": {}})
+
+    gt = GlobalTemplate.objects.filter(id=int(pk), is_active=True).first()
+    if not gt:
+        return JsonResponse({"ok": True, "buttons": {}})
+
+    btn = gt.buttons if isinstance(gt.buttons, dict) else {}
+    out: Dict[str, str] = {}
+    for k, v in btn.items():
+        key = str(k).strip()
+        if not key:
+            continue
+        out[key] = str(v or "")
+
+    return JsonResponse({"ok": True, "buttons": out})
 
 
 # ==================== PREVIEW (Campaigns / Letter) ====================

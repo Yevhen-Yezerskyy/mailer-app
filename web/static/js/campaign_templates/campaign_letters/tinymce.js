@@ -1,7 +1,8 @@
 // FILE: web/static/js/campaign_templates/campaign_letters/tinymce.js
-// DATE: 2026-01-20
+// DATE: 2026-01-22
 // PURPOSE: Tiny runtime: init html (visual template+content) + helpers extract/compose content.
-// CHANGE: YYCampaignLetterTiny.getContentHtml() возвращает ТОЛЬКО content (inner wrapper).
+// CHANGE:
+// - Before Tiny init: fetch GlobalTemplate.buttons by template_html (id-<N> in first tag) and expose as window.yyCampInitButtons.
 
 (function () {
   "use strict";
@@ -150,7 +151,36 @@
     const ta = $("#yyTinyEditor");
     if (!ta) return;
     if (!window.tinymce || typeof window.yyCampTinyBuildConfig !== "function") return;
-    window.tinymce.init(window.yyCampTinyBuildConfig());
+    (async () => {
+      try {
+        const taTpl = $("#yyTemplateHtml");
+        const tpl = taTpl ? String(taTpl.value || "") : "";
+
+        // by default: no buttons
+        window.yyCampInitButtons = {};
+
+        if (tpl) {
+          const r = await fetch("/panel/campaigns/campaigns/letter/_buttons-by-template/", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ template_html: tpl }),
+          });
+          if (r.ok) {
+            const data = await r.json();
+            if (data && data.ok && data.buttons && typeof data.buttons === "object") {
+              window.yyCampInitButtons = data.buttons;
+            }
+          }
+        }
+      } catch (_) {
+        window.yyCampInitButtons = {};
+      }
+
+      try {
+        window.tinymce.init(window.yyCampTinyBuildConfig());
+      } catch (_) {}
+    })();
   }
 
   if (document.readyState === "loading") {

@@ -1,5 +1,5 @@
 // FILE: web/static/js/campaign_templates/campaign_letters/tinymce_config.js
-// DATE: 2026-01-21
+// DATE: 2026-01-22
 // PURPOSE: Tiny config для письма: исходный конфиг + детерминированное поведение Enter/Paste.
 // CHANGE:
 // - Paste: только plain text; каждая строка -> <p>...</p>.
@@ -8,6 +8,7 @@
 // - Если split не было: каретка ставится ПЕРЕД последним <br> в текущем <p>.
 // - После программного перемещения каретки: дергаем Tiny (mceInsertContent пустым) чтобы сбросить caret-state,
 //   иначе второй <br> может не разрешаться до ручного движения курсора.
+// - NEW: динамические кнопки вставки HTML из window.yyCampInitButtons (ключ=название, значение=HTML).
 
 (function () {
   "use strict";
@@ -21,7 +22,26 @@
     return ta ? String(ta.value || "") : "";
   }
 
+  function readInitButtons() {
+    const obj = window.yyCampInitButtons;
+    if (!obj || typeof obj !== "object") return [];
+
+    const out = [];
+    let i = 0;
+    for (const k of Object.keys(obj)) {
+      if (i >= 24) break; // safety
+      const text = String(k || "").trim();
+      if (!text) continue;
+      out.push({ id: "yyInsBtn" + String(i + 1), text, html: String(obj[k] || "") });
+      i += 1;
+    }
+    return out;
+  }
+
   function buildTinyConfig() {
+    const insButtons = readInitButtons();
+    const extraToolbar = insButtons.length ? " | " + insButtons.map((b) => b.id).join(" ") : "";
+
     return {
       selector: "#yyTinyEditor",
       inline: false,
@@ -31,7 +51,7 @@
       statusbar: false,
 
       plugins: "link",
-      toolbar: "undo redo | bold italic | link",
+      toolbar: "undo redo | bold italic | link" + extraToolbar,
       link_default_target: "_blank",
 
       newline_behavior: "linebreak",
@@ -52,6 +72,20 @@
       icons_url: "/static/vendor/tinymce/icons/default/icons.min.js",
 
       setup(editor) {
+        // dynamic "insert HTML" buttons from GlobalTemplate.buttons
+        try {
+          (insButtons || []).forEach((b) => {
+            editor.ui.registry.addButton(b.id, {
+              text: b.text,
+              onAction: () => {
+                try {
+                  editor.insertContent(String(b.html || ""));
+                } catch (_) {}
+              },
+            });
+          });
+        } catch (_) {}
+
         let enterArmed = false;
         let postScheduled = false;
 
