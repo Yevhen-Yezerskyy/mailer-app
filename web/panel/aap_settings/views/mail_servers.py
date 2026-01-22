@@ -2,15 +2,16 @@
 # DATE: 2026-01-22
 # PURPOSE: /panel/settings/mail-servers/ — SMTP обяз., IMAP опц.; apply preset без валидации; reveal secret по кнопке "глаз" через AJAX + confirm modal.
 # CHANGE:
-# - Убрано использование Mailbox.name (поле удалено)
-# - items сортируются по email
-# - В items добавлены sender_name/sender_label (берём from_name/from_email из SMTP extra_json)
+# - secret_enc теперь хранится ЗАШИФРОВАННЫМ (encrypt_secret/decrypt_secret из engine.common.mail.logs)
+# - secret_view возвращает расшифрованный secret
+# - при сохранении: новый секрет шифруется; если секрет не меняли (маска) — сохраняем старый secret_enc как есть
 
 from __future__ import annotations
 
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect, render
 
+from engine.common.mail.logs import decrypt_secret, encrypt_secret
 from mailer_web.access import decode_id, encode_id, resolve_pk_or_redirect
 from panel.aap_settings.forms import MailServerForm
 from panel.aap_settings.models import Mailbox, MailboxConnection, ProviderPreset
@@ -192,9 +193,12 @@ def mail_server_secret_view(request):
     if not conn or not (conn.secret_enc or "").strip():
         return JsonResponse({"ok": False, "error": "no_secret"}, status=404)
 
-    # NOTE: пока "нормального key management" нет — secret_enc хранится обратимо.
-    # Позже: заменить на encrypt/decrypt и тут возвращать decrypt().
-    return JsonResponse({"ok": True, "secret": str(conn.secret_enc)})
+    try:
+        plain = decrypt_secret(str(conn.secret_enc))
+    except Exception:
+        return JsonResponse({"ok": False, "error": "decrypt_failed"}, status=500)
+
+    return JsonResponse({"ok": True, "secret": plain})
 
 
 def mail_servers_view(request):
@@ -352,9 +356,10 @@ def mail_servers_view(request):
         smtp_extra["from_email"] = email
 
         smtp_secret_new = _norm_secret_from_cleaned(form.cleaned_data.get("smtp_secret") or "")
-        smtp_secret_to_store = smtp_secret_new
-        if not smtp_secret_new and smtp_now:
-            smtp_secret_to_store = (smtp_now.secret_enc or "").strip()
+        if smtp_secret_new:
+            smtp_secret_enc_to_store = encrypt_secret(smtp_secret_new)
+        else:
+            smtp_secret_enc_to_store = (smtp_now.secret_enc or "").strip() if smtp_now else ""
 
         MailboxConnection.objects.update_or_create(
             mailbox_id=int(mb.id),
@@ -365,16 +370,17 @@ def mail_servers_view(request):
                 "security": form.cleaned_data["smtp_security"],
                 "auth_type": form.cleaned_data["smtp_auth_type"],
                 "username": (form.cleaned_data["smtp_username"] or "").strip(),
-                "secret_enc": smtp_secret_to_store,  # TODO: encrypt later
+                "secret_enc": smtp_secret_enc_to_store,
                 "extra_json": smtp_extra,
             },
         )
 
         if _imap_any(post):
             imap_secret_new = _norm_secret_from_cleaned(form.cleaned_data.get("imap_secret") or "")
-            imap_secret_to_store = imap_secret_new
-            if not imap_secret_new and imap_now:
-                imap_secret_to_store = (imap_now.secret_enc or "").strip()
+            if imap_secret_new:
+                imap_secret_enc_to_store = encrypt_secret(imap_secret_new)
+            else:
+                imap_secret_enc_to_store = (imap_now.secret_enc or "").strip() if imap_now else ""
 
             MailboxConnection.objects.update_or_create(
                 mailbox_id=int(mb.id),
@@ -387,7 +393,7 @@ def mail_servers_view(request):
                     "security": (form.cleaned_data.get("imap_security") or "none"),
                     "auth_type": (form.cleaned_data.get("imap_auth_type") or "login"),
                     "username": (form.cleaned_data.get("imap_username") or "").strip(),
-                    "secret_enc": imap_secret_to_store,
+                    "secret_enc": imap_secret_enc_to_store,
                     "extra_json": {},
                 },
             )

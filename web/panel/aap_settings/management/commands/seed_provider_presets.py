@@ -1,6 +1,11 @@
 # FILE: web/panel/aap_settings/management/commands/seed_provider_presets.py
-# DATE: 2026-01-13
+# DATE: 2026-01-22
 # PURPOSE: Засеять (upsert) базовые provider_presets (SMTP/IMAP) для Германии + популярные провайдеры.
+# CHANGE:
+# - IONOS SMTP: default 587 STARTTLS, alt 465 SSL
+# - GMX SMTP: add alt 465 SSL
+# - WEB.DE SMTP: add alt 465 SSL
+# - Telekom SMTP host: securesmtp.t-online.de + ports [587,465] + alt 465 SSL
 
 from __future__ import annotations
 
@@ -70,10 +75,10 @@ class Command(BaseCommand):
                 name="IONOS",
                 kind="smtp",
                 host="smtp.ionos.com",
-                ports_json=[465, 587],
-                security="ssl",
+                ports_json=[587, 465],
+                security="starttls",
                 auth_type="login",
-                extra_json={"alt": {"port": 587, "security": "starttls"}},
+                extra_json={"alt": {"port": 465, "security": "ssl"}},
                 is_active=True,
                 order=30,
             ),
@@ -95,10 +100,10 @@ class Command(BaseCommand):
                 name="GMX",
                 kind="smtp",
                 host="mail.gmx.net",
-                ports_json=[587],
+                ports_json=[587, 465],
                 security="starttls",
                 auth_type="login",
-                extra_json={},
+                extra_json={"alt": {"port": 465, "security": "ssl"}},
                 is_active=True,
                 order=40,
             ),
@@ -120,10 +125,10 @@ class Command(BaseCommand):
                 name="WEB.DE",
                 kind="smtp",
                 host="smtp.web.de",
-                ports_json=[587],
+                ports_json=[587, 465],
                 security="starttls",
                 auth_type="login",
-                extra_json={},
+                extra_json={"alt": {"port": 465, "security": "ssl"}},
                 is_active=True,
                 order=50,
             ),
@@ -144,11 +149,11 @@ class Command(BaseCommand):
                 code="t-online",
                 name="Telekom (t-online.de / magenta.de)",
                 kind="smtp",
-                host="smtp.mail.t-online.de",
-                ports_json=[587],
+                host="securesmtp.t-online.de",
+                ports_json=[587, 465],
                 security="starttls",
                 auth_type="login",
-                extra_json={},
+                extra_json={"alt": {"port": 465, "security": "ssl"}},
                 is_active=True,
                 order=60,
             ),
