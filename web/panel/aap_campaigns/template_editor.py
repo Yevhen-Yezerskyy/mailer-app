@@ -249,48 +249,64 @@ def _apply_tiny_editability(html: str) -> str:
     if not html:
         return ""
 
-    def update_tag(m: re.Match) -> str:
-        tag = m.group(0)
-        name = (m.group(1) or "").lower()
-        attrs = m.group(2) or ""
+    # Ловим и <tag ...>, и </tag>
+    tag_re = re.compile(r"(?is)<\s*(/)?\s*([a-zA-Z][a-zA-Z0-9:_-]*)([^<>]*?)>")
+
+    out: list[str] = []
+    pos = 0
+
+    # стек: для каждого открытого тега флаг "это TemplateEdit"
+    stack: list[bool] = []
+
+    for m in tag_re.finditer(html):
+        out.append(html[pos : m.start()])
+        pos = m.end()
+
+        is_close = bool(m.group(1))
+        name_raw = m.group(2) or ""
+        name = name_raw.lower()
+        attrs = m.group(3) or ""
+        full_tag = m.group(0)
+
+        if is_close:
+            if stack:
+                stack.pop()
+            out.append(full_tag)
+            continue
+
+        # self-closing или void-теги — не пушим в стек
+        is_self_closing = full_tag.rstrip().endswith("/>") or name in _VOID_TAGS
 
         if name in ("script", "style") or name in _VOID_TAGS:
-            return tag
+            out.append(full_tag)
+            continue
 
         m_class = re.search(r'(?is)\bclass\s*=\s*(?P<q>["\'])(?P<v>.*?)(?P=q)', attrs)
         classes: list[str] = []
         if m_class:
             classes = [c for c in (m_class.group("v") or "").split() if c]
 
-        want_edit = _TEMPLATE_EDIT_CLASS in classes
+        is_template_edit = _TEMPLATE_EDIT_CLASS in classes
+        in_edit = is_template_edit or any(stack)
 
-        def ensure(cls: str):
-            if cls not in classes:
-                classes.append(cls)
-
-        def drop(cls: str):
-            while cls in classes:
-                classes.remove(cls)
-
-        if want_edit:
-            ensure(_TINY_EDIT)
-            drop(_TINY_NONEDIT)
-        else:
-            ensure(_TINY_NONEDIT)
-            drop(_TINY_EDIT)
-
+        classes = [c for c in classes if c not in (_TINY_EDIT, _TINY_NONEDIT)]
+        classes.append(_TINY_EDIT if in_edit else _TINY_NONEDIT)
         new_class_value = " ".join(classes).strip()
 
         if m_class:
             q = m_class.group("q")
             new_attrs = attrs[: m_class.start()] + f'class={q}{new_class_value}{q}' + attrs[m_class.end() :]
         else:
-            new_attrs = attrs if (attrs or "").startswith(" ") else (" " + (attrs or ""))
-            new_attrs = f' class="{new_class_value}"' + new_attrs
+            base = attrs if (attrs or "").startswith(" ") else (" " + (attrs or ""))
+            new_attrs = f' class="{new_class_value}"' + base
 
-        return f"<{m.group(1)}{new_attrs}>"
+        out.append(f"<{name_raw}{new_attrs}>")
 
-    return _TAG_RE.sub(update_tag, html)
+        if not is_self_closing:
+            stack.append(is_template_edit)
+
+    out.append(html[pos:])
+    return "".join(out)
 
 
 def _apply_tiny_force(html: str, mode: str) -> str:

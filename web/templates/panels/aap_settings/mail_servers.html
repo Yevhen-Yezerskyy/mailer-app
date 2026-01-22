@@ -1,8 +1,12 @@
 {% extends "panels/base.html" %}
 {% load i18n %}
-<!-- FILE: web/templates/panels/aap_settings/mail_servers.html  (обновлено — 2026-01-18) -->
+{% load static %}
+<!-- FILE: web/templates/panels/aap_settings/mail_servers.html  (обновлено — 2026-01-22) -->
 <!-- PURPOSE: Settings → Mail servers: список ящиков + add/edit форма (SMTP обяз., IMAP опц.) + apply preset. -->
-<!-- CHANGE: добавлен лимит отправки (писем/час) в форме (1-я строка) и в таблице (3-я колонка). -->
+<!-- CHANGE:
+- Вынесен inline JS (secret reveal + modal) в static js/aap_settings/mail_servers_secret.js
+- Добавлен dirty-watch формы: если есть изменения — вместо блока проверок показываем предупреждение "Сохраните изменения".
+- Добавлены id для формы и блоков справа (для переключения). -->
 
 {% block content %}
 
@@ -34,7 +38,7 @@
       <div class="YY-CARD_WHITE">
 
         {% if state == "add" or state == "edit" %}
-          <form method="post">
+          <form id="yyMailServerForm" method="post">
             {% csrf_token %}
 
             {% if state == "edit" and edit_obj %}
@@ -62,7 +66,6 @@
                 <label class="YY-LABEL">{% trans "Лимит/час" %}:</label>
                 {{ form.limit_hour_sent }}
               </div>
-
             </div>
 
             <div class="grid grid-cols-[1fr_2fr_auto] gap-4 mb-12">
@@ -187,78 +190,6 @@
               </div>
             </div>
 
-            <script>
-              let yySecretModalState = null;
-
-              function yySecretModalOpen(state) {
-                yySecretModalState = state;
-                const el = document.getElementById("yy-secret-modal");
-                if (el) el.classList.remove("hidden");
-              }
-
-              function yySecretModalClose() {
-                yySecretModalState = null;
-                const el = document.getElementById("yy-secret-modal");
-                if (el) el.classList.add("hidden");
-              }
-
-              async function yySecretModalConfirm() {
-                const st = yySecretModalState;
-                yySecretModalClose();
-                if (!st) return;
-                await yyRevealSecret(st.kind, st.inputId);
-              }
-
-              function yyGetMailboxToken() {
-                const hidden = document.querySelector('input[name="id"]');
-                if (!hidden) return "";
-                return (hidden.value || "").trim();
-              }
-
-              async function yyRevealSecret(kind, inputId) {
-                const token = yyGetMailboxToken();
-                if (!token) return;
-
-                const url = `secret/?id=${encodeURIComponent(token)}&kind=${encodeURIComponent(kind)}`;
-
-                let data = null;
-                try {
-                  const resp = await fetch(url, { method: "GET", credentials: "same-origin" });
-                  data = await resp.json();
-                } catch (e) {
-                  alert("Error");
-                  return;
-                }
-
-                if (!data || !data.ok) {
-                  alert("Error");
-                  return;
-                }
-
-                const el = document.getElementById(inputId);
-                if (!el) return;
-
-                el.value = data.secret || "";
-                el.removeAttribute("readonly");
-                el.removeAttribute("data-yy-masked");
-                el.type = "text";
-                el.focus();
-              }
-
-              function yyTogglePasswordOrReveal(kind, inputId) {
-                const el = document.getElementById(inputId);
-                if (!el) return;
-
-                const masked = (el.getAttribute("data-yy-masked") || "") === "1";
-                if (masked) {
-                  yySecretModalOpen({ kind: kind, inputId: inputId });
-                  return;
-                }
-
-                el.type = (el.type === "password") ? "text" : "password";
-              }
-            </script>
-
             <div class="flex gap-3 mt-6">
               <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">
                 {% trans "Сохранить" %}
@@ -282,26 +213,34 @@
     <td class="YY-MAIN_TOP_RIGHT_TD w-[40%]">
       <div class="YY-CARD_WHITE">
 
-        {% if state == "add" or state == "edit" %}
-          <div class="YY-STATUS_BLUE mb-5">
-            {% trans "Проверки" %}
+        {% if state == "edit" %}
+
+          <div id="yyMailChecksDirtyHint" class="YY-STATUS_YELLOW hidden">
+            {% trans "Есть несохранённые изменения. Для проверки почтовых серверов сохраните изменения." %}
           </div>
 
-          <div class="flex gap-3 flex-wrap">
-            <button class="YY-BUTTON_MAIN" disabled>
-              {% trans "Проверить домен" %}
-            </button>
-            <button class="YY-BUTTON_MAIN" disabled>
-              {% trans "Проверить SMTP" %}
-            </button>
-            <button class="YY-BUTTON_MAIN" disabled>
-              {% trans "Проверить IMAP" %}
-            </button>
+          <div id="yyMailChecksPanel">
+            <div class="flex gap-3 flex-wrap">
+              <button
+                id="yyChkDomain"
+                type="button"
+                class="YY-BUTTON_MAIN"
+                onclick="yyMailServersCheck('check_domain','yyChkDomain')"
+              >
+                {% trans "Проверить домен" %}
+              </button>
+            </div>
+
+            <div class="mt-6">
+              <textarea
+                id="yyMailChecksOut"
+                class="YY-INPUT w-full min-h-[120px]"
+                readonly></textarea>
+            </div>
           </div>
 
-          <div class="YY-STATUS_YELLOW mt-6">
-            {% trans "Пока не реализовано" %}
-          </div>
+        {% elif state == "add" %}
+        <p class="YY-STATUS_BLUE"> {% trans "Добавление почтового сервера" %}</p>
         {% else %}
           <a href="?state=add" class="YY-BUTTON_MAIN">
             {% trans "Добавить почтовый сервер" %}
@@ -374,4 +313,9 @@
   </tr>
 </table>
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/aap_settings/mail_servers_secret.js' %}"></script>
+<script src="{% static 'js/aap_settings/mail_servers_checks.js' %}"></script>
 {% endblock %}
