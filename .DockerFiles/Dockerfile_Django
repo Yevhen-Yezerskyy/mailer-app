@@ -1,13 +1,15 @@
-# FILE: Dockerfile_Django  (новое — 2025-12-18)
-# PURPOSE: Django image with system deps (gettext) for i18n
+# FILE: .DockerFiles/Dockerfile_Django
+# DATE: 2026-01-23
+# PURPOSE: DEV Django image with system deps (gettext) for i18n; code is mounted via volume.
+# CHANGE: + dnsutils (dig) for domain checks in dev too.
 
 FROM python:3.12
 
-# system deps for Django i18n
 RUN apt-get update \
- && apt-get install -y gettext \
+ && apt-get install -y --no-install-recommends \
+      gettext \
+      dnsutils \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 
-# ничего не копируем — код монтируется volume’ом
 WORKDIR /app

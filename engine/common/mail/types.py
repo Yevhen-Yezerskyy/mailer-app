@@ -1,9 +1,10 @@
 # FILE: engine/common/mail/types.py
-# DATE: 2026-01-22
+# DATE: 2026-01-23
 # PURPOSE: Mail domain types: runtime dataclasses + logging specs (MAIL_SPECS).
 # CHANGE:
-# - Add DOMAIN_TECH_CHECK (GOOD/BAD) and DOMAIN_REPUTATION_CHECK (NORMAL/QUESTIONABLE).
-# - Make MailUiResult.status generic (str) to support non-OK/FAIL statuses.
+# - Add ImapCfg (required by engine.common.mail.imap).
+# - Add IMAP_CHECK / IMAP_LIST_FOLDERS to MAIL_SPECS.
+# - Mark CHECK_FAILED as valid status for DOMAIN_TECH_CHECK and DOMAIN_REPUTATION_CHECK.
 
 from __future__ import annotations
 
@@ -20,19 +21,27 @@ MAIL_SPECS: Dict[str, Dict[str, Any]] = {
         "statuses": ["OK", "FAIL"],
         "comment": "Binary SMTP connectivity/auth check.",
     },
+    "IMAP_CHECK": {
+        "statuses": ["OK", "FAIL"],
+        "comment": "Binary IMAP connectivity/auth check.",
+    },
+    "IMAP_LIST_FOLDERS": {
+        "statuses": ["OK", "FAIL"],
+        "comment": "IMAP folders list (LIST).",
+    },
     "DOMAIN_TECH_CHECK": {
-        "statuses": ["GOOD", "BAD"],
+        "statuses": ["GOOD", "BAD", "CHECK_FAILED"],
         "comment": "Domain DNS technical check (SPF + DMARC).",
     },
     "DOMAIN_REPUTATION_CHECK": {
-        "statuses": ["NORMAL", "QUESTIONABLE"],
+        "statuses": ["NORMAL", "QUESTIONABLE", "CHECK_FAILED"],
         "comment": "Domain reputation check via Spamhaus DBL (DQS).",
     },
 }
 
 
 # =========================
-# Runtime types (used by smtp.py)
+# Runtime types (used by smtp.py / imap.py)
 # =========================
 
 ConnSecurity = Literal["none", "ssl", "starttls"]
@@ -41,6 +50,24 @@ AuthType = Literal["login", "oauth2"]
 
 @dataclass(frozen=True)
 class SmtpCfg:
+    mailbox_id: int
+    email: str
+    domain: str
+
+    host: str
+    port: int
+    security: ConnSecurity
+    auth_type: AuthType
+
+    username: str
+    secret: str
+    extra: Dict[str, Any] = field(default_factory=dict)
+
+    timeout_sec: float = 10.0
+
+
+@dataclass(frozen=True)
+class ImapCfg:
     mailbox_id: int
     email: str
     domain: str

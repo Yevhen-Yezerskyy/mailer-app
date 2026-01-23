@@ -1,16 +1,25 @@
 # FILE: web/panel/aap_settings/views/mail_servers_api.py
-# DATE: 2026-01-22
-# PURPOSE: AJAX API для "Проверок" в Settings → Mail servers.
-# CHANGE: Fix import path to avoid duplicate model registration (use panel.*).
+# DATE: 2026-01-23
+# PURPOSE: AJAX API для "Проверок" в Settings → Mail servers (SMTP/IMAP/DOMAIN).
+# CHANGE:
+# - Добавлены actions: check_imap, check_domain.
+# - В textarea отдаём ЧИТАЕМЫЙ отчёт в message + снизу "Технические данные ..." (pretty JSON).
+# - JS не трогаем: НЕ отдаём поле data, чтобы не печатался мусор автоматически.
 
 from __future__ import annotations
+
+import json
+from typing import Any, Dict, List, Tuple
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
 from engine.common.mail.smtp_test import smtp_check_and_log
+from engine.common.mail.imap_test import imap_check_and_log, imap_list_folders_and_log
+from engine.common.mail.domain_checks_test import domain_tech_check_and_log, domain_reputation_check_and_log
+
 from web.mailer_web.access import decode_id
-from panel.aap_settings.models import Mailbox  # <-- FIX (was web.panel.aap_settings.models)
+from panel.aap_settings.models import Mailbox  # IMPORTANT: panel.* (no duplicate model registration)
 
 
 def _guard(request):
@@ -21,6 +30,139 @@ def _guard(request):
     return ws_id
 
 
+def _pp(data: Any) -> str:
+    try:
+        return json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True)
+    except Exception:
+        return str(data)
+
+
+def _first_err(*vals: str) -> str:
+    for v in vals:
+        if v:
+            return str(v)
+    return ""
+
+
+def _explain_dns_err(code: str) -> str:
+    code = (code or "").strip()
+    if code == "dig_failed":
+        return "DNS-запрос не выполнен (утилита dig отсутствует или не запускается в контейнере)."
+    if code == "dig_error":
+        return "DNS-запрос завершился ошибкой (dig вернул ненулевой код)."
+    if code == "domain_not_found":
+        return "Домен для ящика не найден."
+    if code:
+        return f"DNS-ошибка: {code}"
+    return "DNS-ошибка."
+
+
+def _smtp_report(r) -> str:
+    # r: MailUiResult
+    lines: List[str] = []
+    lines.append("Проверка SMTP")
+    lines.append(f"Статус: {r.status}")
+    if r.user_message:
+        lines.append(f"Сообщение: {r.user_message}")
+
+    lines.append("")
+    lines.append("Технические данные проверки SMTP:")
+    lines.append(_pp(r.data or {}))
+    return "\n".join(lines)
+
+
+def _imap_report(r_check, r_list) -> str:
+    lines: List[str] = []
+    lines.append("Проверка IMAP")
+    lines.append(f"Статус: {r_check.status}")
+    if r_check.user_message:
+        lines.append(f"Сообщение: {r_check.user_message}")
+
+    folders = []
+    if r_list and isinstance(r_list.data, dict):
+        folders = r_list.data.get("folders") or []
+    if folders:
+        lines.append("")
+        lines.append(f"Папки ({len(folders)}):")
+        # печатаем списком строками
+        for f in folders[:200]:
+            lines.append(f"- {f}")
+        if len(folders) > 200:
+            lines.append(f"... ещё {len(folders) - 200}")
+
+    lines.append("")
+    lines.append("Технические данные проверки IMAP:")
+    lines.append(_pp(r_check.data or {}))
+
+    if r_list:
+        lines.append("")
+        lines.append("Технические данные списка папок IMAP:")
+        lines.append(_pp(r_list.data or {}))
+
+    return "\n".join(lines)
+
+
+def _domain_report(r_tech, r_rep) -> str:
+    tech = r_tech.data or {}
+    rep = r_rep.data or {}
+
+    domain = (tech.get("domain") or rep.get("domain") or "").strip()
+    lines: List[str] = []
+    lines.append("Проверка домена" + (f": {domain}" if domain else ""))
+
+    # TECH
+    tech_status = r_tech.status
+    lines.append(f"Техническая часть: {tech_status}")
+
+    if tech_status == "CHECK_FAILED":
+        spf_err = str(tech.get("spf_err") or "")
+        dmarc_err = str(tech.get("dmarc_err") or "")
+        err = _first_err(spf_err, dmarc_err, str(tech.get("error") or ""))
+        lines.append(_explain_dns_err(err))
+        if spf_err or dmarc_err:
+            lines.append(f"SPF: {spf_err or 'ok'}; DMARC: {dmarc_err or 'ok'}")
+    elif tech_status in ("GOOD", "BAD"):
+        spf = tech.get("spf") or {}
+        dmarc = tech.get("dmarc") or {}
+        if isinstance(spf, dict) and isinstance(dmarc, dict):
+            lines.append(f"SPF: {'OK' if spf.get('ok') else 'нет/ошибка'}")
+            lines.append(f"DMARC: {'OK' if dmarc.get('ok') else 'нет/ошибка'}")
+
+    # REP
+    rep_status = r_rep.status
+    lines.append("")
+    lines.append(f"Репутация (Spamhaus DBL/DQS): {rep_status}")
+
+    if rep_status == "CHECK_FAILED":
+        err = str(rep.get("error") or "")
+        lines.append(_explain_dns_err(err))
+    elif rep_status == "QUESTIONABLE":
+        lines.append("Домен выглядит подозрительно (возможные листинги/ограничения).")
+    elif rep_status == "NORMAL":
+        lines.append("Репутация выглядит нормально.")
+
+    # LINKS (если есть)
+    links = []
+    if isinstance(rep, dict):
+        links = rep.get("links") or []
+    if links:
+        lines.append("")
+        lines.append("Ссылки для проверки:")
+        for u in links:
+            lines.append(f"- {u}")
+
+    # TECH JSON blocks
+    lines.append("")
+    lines.append("Технические данные запроса DNS (SPF/DMARC):")
+    lines.append(_pp(tech))
+
+    lines.append("")
+    lines.append("Технические данные проверки Spamhaus DBL/DQS:")
+    lines.append(_pp(rep))
+
+    return "\n".join(lines)
+
+
 @require_POST
 def mail_servers_api_view(request):
     ws_id = _guard(request)
@@ -28,7 +170,7 @@ def mail_servers_api_view(request):
         return JsonResponse({"ok": False, "error": "auth"}, status=403)
 
     action = (request.POST.get("action") or "").strip()
-    if action != "check_smtp":
+    if action not in ("check_smtp", "check_imap", "check_domain"):
         return JsonResponse({"ok": False, "error": "bad_action"}, status=400)
 
     tok = (request.POST.get("id") or "").strip()
@@ -36,27 +178,48 @@ def mail_servers_api_view(request):
         return JsonResponse({"ok": False, "error": "missing_id"}, status=400)
 
     try:
-        mailbox_id = decode_id(tok)
+        mailbox_id = int(decode_id(tok))
     except Exception:
         return JsonResponse({"ok": False, "error": "bad_id"}, status=400)
 
     if not Mailbox.objects.filter(id=mailbox_id, workspace_id=ws_id).exists():
         return JsonResponse({"ok": False, "error": "not_found"}, status=404)
 
-    r = smtp_check_and_log(int(mailbox_id))
+    if action == "check_smtp":
+        r = smtp_check_and_log(mailbox_id)
+        return JsonResponse(
+            {
+                "ok": True,
+                "action": "SMTP_CHECK",
+                "status": "",
+                "message": _smtp_report(r),
+            }
+        )
 
-    # UI contract: always compact
-    out = {
-        "ok": True,
-        "action": "SMTP_CHECK",
-        "status": r.status,                        # OK / FAIL
-        "message": r.user_message or "OK",          # human friendly
-        "latency_ms": (r.data or {}).get("latency_ms"),
-        "stage": (r.data or {}).get("stage"),
-    }
+    if action == "check_imap":
+        r_check = imap_check_and_log(mailbox_id)
+        r_list = None
+        if r_check.status == "OK":
+            r_list = imap_list_folders_and_log(mailbox_id)
 
-    # Optional verbose dump (for debug button later)
-    if (request.POST.get("verbose") or "").strip() == "1":
-        out["data"] = r.data
+        return JsonResponse(
+            {
+                "ok": True,
+                "action": "IMAP_CHECK",
+                "status": "",
+                "message": _imap_report(r_check, r_list),
+            }
+        )
 
-    return JsonResponse(out)
+    # check_domain
+    r_tech = domain_tech_check_and_log(mailbox_id)
+    r_rep = domain_reputation_check_and_log(mailbox_id)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "action": "DOMAIN_CHECK",
+            "status": "",
+            "message": _domain_report(r_tech, r_rep),
+        }
+    )

@@ -1,7 +1,7 @@
 // FILE: web/static/js/aap_settings/mail_servers_checks.js
 // DATE: 2026-01-22
-// PURPOSE: Settings → Mail servers: "Проверки".
-// CHANGE: Send mailbox id(ui) with request; show status/message + pretty JSON.
+// PURPOSE: Settings → Mail servers: "Проверки" (SMTP/IMAP/DOMAIN).
+// CHANGE: Keep same UI contract; allow new actions check_imap/check_domain.
 
 (function () {
   function yyCsrftoken() {

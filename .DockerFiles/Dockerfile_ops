@@ -1,5 +1,7 @@
-# FILE: .DockerFiles/Dockerfile_ops  (новое — 2026-01-06)
-# PURPOSE: Always-on lightweight toolbox for prod volume: git + basic utils; no app deps.
+# FILE: .DockerFiles/Dockerfile_ops
+# DATE: 2026-01-23
+# PURPOSE: PROD always-on toolbox for prod volume: git + basic utils; no app deps.
+# CHANGE: + dnsutils (dig) for diagnostics / domain checks.
 
 FROM debian:bookworm-slim
 
@@ -17,6 +19,7 @@ RUN apt-get update \
       openssh-client \
       tzdata \
       postgresql-client \
+      dnsutils \
  && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
