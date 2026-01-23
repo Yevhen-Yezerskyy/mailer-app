@@ -1,19 +1,22 @@
-# FILE: .DockerFiles/Dockerfile_prod_engine
+# FILE: .DockerFiles/Dockerfile_prod_web
 # DATE: 2026-01-23
-# PURPOSE: PROD workers base image: python deps from requirements/engine.lock.txt; shared by all engine-* services.
-# CHANGE: + dnsutils (dig) so domain checks work if triggered from workers.
+# PURPOSE: PROD web/init image: Django + gunicorn deps from requirements/web.lock.txt; includes gettext for compilemessages; includes dnsutils for dig checks.
+# CHANGE:
+# - FIX: was incorrectly копией Dockerfile_prod_engine (engine.lock вместо web.lock)
+# - ADD: gettext (msgfmt) required by web/translate.py -> compilemessages
 
 FROM python:3.12-slim
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
+      gettext \
       dnsutils \
  && rm -rf /var/lib/apt/lists/*
 
-COPY requirements/engine.lock.txt /tmp/requirements/engine.lock.txt
+COPY requirements/web.lock.txt /tmp/requirements/web.lock.txt
 
 RUN python -m pip install --no-cache-dir -U pip \
- && pip install --no-cache-dir -r /tmp/requirements/engine.lock.txt \
+ && pip install --no-cache-dir -r /tmp/requirements/web.lock.txt \
  && rm -rf /tmp/requirements
 
 WORKDIR /app
