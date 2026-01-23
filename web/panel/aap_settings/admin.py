@@ -1,13 +1,21 @@
 # FILE: web/panel/aap_settings/admin.py
-# DATE: 2026-01-22
-# PURPOSE: Регистрация моделей почтовых настроек в Django Admin.
+# DATE: 2026-01-23
+# PURPOSE: Django Admin for mail settings (updated models).
 # CHANGE:
-# - Удалены обращения к Mailbox.name
-# - ordering/search/display переведены на email
+# - Убран MailboxConnection.
+# - Добавлены SmtpMailbox и ImapMailbox.
+# - ProviderPreset упрощён (name + preset_json).
+# - Никаких ссылок на удалённые поля.
 
 from django.contrib import admin
 
-from .models import Mailbox, MailboxConnection, ProviderPreset
+from .models import (
+    Mailbox,
+    SmtpMailbox,
+    ImapMailbox,
+    ProviderPreset,
+    MailboxOAuthApp,
+)
 
 
 @admin.register(Mailbox)
@@ -18,17 +26,33 @@ class MailboxAdmin(admin.ModelAdmin):
     ordering = ("email",)
 
 
-@admin.register(MailboxConnection)
-class MailboxConnectionAdmin(admin.ModelAdmin):
-    list_display = ("id", "mailbox", "kind", "host", "port", "security", "auth_type")
-    list_filter = ("kind", "security", "auth_type")
-    search_fields = ("host", "username", "mailbox__email")
-    ordering = ("mailbox", "kind")
+@admin.register(SmtpMailbox)
+class SmtpMailboxAdmin(admin.ModelAdmin):
+    list_display = ("id", "mailbox", "auth_type", "from_email", "limit_hour_sent", "is_active")
+    list_filter = ("auth_type", "is_active")
+    search_fields = ("mailbox__email", "from_email")
+    ordering = ("mailbox",)
+
+
+@admin.register(ImapMailbox)
+class ImapMailboxAdmin(admin.ModelAdmin):
+    list_display = ("id", "mailbox", "auth_type", "is_active")
+    list_filter = ("auth_type", "is_active")
+    search_fields = ("mailbox__email",)
+    ordering = ("mailbox",)
+
+
+@admin.register(MailboxOAuthApp)
+class MailboxOAuthAppAdmin(admin.ModelAdmin):
+    list_display = ("id", "workspace_id", "provider", "is_active")
+    list_filter = ("provider", "is_active")
+    search_fields = ("workspace_id", "provider")
+    ordering = ("workspace_id", "provider")
 
 
 @admin.register(ProviderPreset)
 class ProviderPresetAdmin(admin.ModelAdmin):
-    list_display = ("id", "code", "name", "kind", "host", "is_active", "order")
-    list_filter = ("kind", "is_active")
-    search_fields = ("code", "name", "host")
+    list_display = ("id", "name", "is_active", "order")
+    list_filter = ("is_active",)
+    search_fields = ("name",)
     ordering = ("order", "name")
