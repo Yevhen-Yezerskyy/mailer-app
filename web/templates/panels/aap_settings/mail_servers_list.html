@@ -1,0 +1,83 @@
+{% extends "panels/base.html" %}<!-- -->
+{% load i18n %}<!-- -->
+{% load static %}<!-- -->
+<!-- FILE: web/templates/panels/aap_settings/mail_servers_list.html  (обновлено — 2026-01-23) -->
+<!-- PURPOSE: Settings → Mail servers: список ящиков + добавление mailbox (только email). -->
+
+{% block content %}
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-[60%]">
+      <div class="YY-CARD_WHITE">
+
+        {% if form.non_field_errors %}
+          <div class="YY-CARD_IN_FORM_ERROR mb-3">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <form method="post" class="mb-6">
+          {% csrf_token %}
+          <div class="grid grid-cols-[2fr_auto] gap-3 items-end">
+            <div>
+              <label class="YY-LABEL">Email:</label>
+              {{ form.email }}
+            </div>
+            <div>
+              <button type="submit" name="action" value="add" class="YY-BUTTON_MAIN">
+                {% trans "Добавить" %}
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <div class="YY-STATUS_BLUE mb-3">{% trans "Ваши почтовые серверы:" %}</div>
+
+        <div class="overflow-x-auto">
+          <table class="YY-TABLE w-full">
+            <thead>
+              <tr>
+                <th class="text-left py-2">{% trans "Email" %}</th>
+                <th class="text-left py-2">{% trans "Отправитель" %}</th>
+                <th class="text-left py-2">{% trans "Лимит/час" %}</th>
+                <th class="text-right py-2">{% trans "Действия" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for it in items %}
+                <tr class="border-t">
+                  <td class="py-2">{{ it.email }}</td>
+                  <td class="py-2">{{ it.sender_label }}</td>
+                  <td class="py-2">{{ it.limit_hour_sent }}</td>
+                  <td class="py-2 text-right">
+                    <a class="YY-BUTTON_MAIN !py-2 !px-3" href="{% url 'settings:mail_servers_smtp' it.ui_id %}">SMTP</a>
+                    <a class="YY-BUTTON_MAIN !py-2 !px-3" href="{% url 'settings:mail_servers_imap' it.ui_id %}">IMAP</a>
+                    <form method="post" class="inline">
+                      {% csrf_token %}
+                      <input type="hidden" name="id" value="{{ it.ui_id }}">
+                      <button type="submit" name="action" value="delete" class="YY-BUTTON_TAB_RED !py-2 !px-3">
+                        {% trans "Удалить" %}
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr class="border-t">
+                  <td class="py-3 text-gray-500" colspan="4">{% trans "Пока нет ящиков." %}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-[40%]">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-STATUS_BLUE">{% trans "Проверка домена будет на шаге добавления SMTP/IMAP." %}</div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+{% endblock %}

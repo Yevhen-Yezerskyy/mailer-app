@@ -1,10 +1,7 @@
 # FILE: web/panel/aap_settings/models.py
-# DATE: 2026-01-22
-# PURPOSE: Приведение нейминга workspace к единому формату, упрощение Mailbox.
-# CHANGE:
-# - Удалено поле Mailbox.name
-# - Удалён constraint workspace_id + name
-# - ordering Mailbox переведён на email
+# DATE: 2026-01-23
+# PURPOSE: aap_settings models.
+# CHANGE: Add MailboxOAuthApp (workspace-scoped OAuth client credentials for Google/Microsoft).
 
 from __future__ import annotations
 
@@ -26,6 +23,11 @@ class AuthType(models.TextChoices):
     LOGIN = "login", "Login"
     GOOGLE_OAUTH2 = "google_oauth2", "Google OAuth2"
     MICROSOFT_OAUTH2 = "microsoft_oauth2", "Microsoft OAuth2"
+
+
+class OAuthProvider(models.TextChoices):
+    GOOGLE = "google", "Google"
+    MICROSOFT = "microsoft", "Microsoft"
 
 
 class Mailbox(models.Model):
@@ -89,6 +91,36 @@ class MailboxConnection(models.Model):
 
     def __str__(self) -> str:
         return f"{self.mailbox.email} [{self.kind}]"
+
+
+class MailboxOAuthApp(models.Model):
+    """
+    Workspace-scoped OAuth client credentials for SMTP/IMAP OAuth2 (XOAUTH2).
+    Stores client_secret in *obfuscated* form (encrypt_secret), like other secrets.
+    """
+    workspace_id = models.UUIDField(db_index=True, help_text="UUID воркспейса")
+    provider = models.CharField(max_length=16, choices=OAuthProvider.choices)
+
+    client_id = models.CharField(max_length=255)
+    client_secret_enc = models.TextField(help_text="Зашифрованный client_secret")
+
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = "aap_settings"
+        db_table = "aap_settings_mailbox_oauth_apps"
+        constraints = [
+            models.UniqueConstraint(fields=["workspace_id", "provider"], name="aap_settings_oauth_app_ws_provider_uniq"),
+        ]
+        indexes = [
+            models.Index(fields=["workspace_id", "provider", "is_active"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"OAuthApp[{self.workspace_id}/{self.provider}]"
 
 
 class ProviderPreset(models.Model):

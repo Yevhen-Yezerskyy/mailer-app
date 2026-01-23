@@ -1,7 +1,9 @@
 // FILE: web/static/js/aap_settings/mail_servers_checks.js
 // DATE: 2026-01-23
 // PURPOSE: Settings → Mail servers: "Проверки" (SMTP/IMAP/DOMAIN) через textarea.
-// CHANGE: Кнопка после клика блокируется минимум на 5 секунд (крутилка), чтобы не спамить провайдера.
+// CHANGE:
+// - API URL берём из form[data-api-url], чтобы работало на /mail-servers/<id>/smtp/ и /imap/.
+// - Кнопка после клика блокируется минимум на 5 секунд (крутилка), чтобы не спамить провайдера.
 
 (function () {
   const HOLD_MS = 5000;
@@ -41,13 +43,20 @@
     return el ? (el.value || "").trim() : "";
   }
 
+  function yyApiUrl() {
+    const form = document.getElementById("yyMailServerForm");
+    if (!form) return "api/";
+    const u = (form.dataset.apiUrl || "").trim();
+    return u || "api/";
+  }
+
   async function yyPostCheck(action) {
     const fd = new FormData();
     fd.append("action", action);
     const tok = yyGetMailboxToken();
     if (tok) fd.append("id", tok);
 
-    const resp = await fetch("api/", {
+    const resp = await fetch(yyApiUrl(), {
       method: "POST",
       body: fd,
       credentials: "same-origin",
@@ -82,7 +91,6 @@
         return;
       }
 
-      // server already builds human message for textarea
       yySetOut(data.message || "OK");
     }, wait);
   };

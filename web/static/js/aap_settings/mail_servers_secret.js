@@ -1,9 +1,8 @@
 // FILE: web/static/js/aap_settings/mail_servers_secret.js
-// DATE: 2026-01-22
+// DATE: 2026-01-23
 // PURPOSE: Settings → Mail servers: secret reveal (modal + fetch) + dirty-watch формы.
 // CHANGE:
-// - Перенесён inline JS из mail_servers.html.
-// - Dirty-watch: если форма изменена — показываем yyMailChecksDirtyHint и скрываем yyMailChecksPanel.
+// - Secret URL берём из form[data-secret-url], чтобы работало на /mail-servers/<id>/smtp/ и /imap/.
 
 (function () {
   const SECRET_MASK = "********";
@@ -35,11 +34,18 @@
     return (hidden.value || "").trim();
   }
 
+  function yySecretUrl(kind, token) {
+    const form = document.getElementById("yyMailServerForm");
+    const base = form ? (form.dataset.secretUrl || "").trim() : "";
+    const u = base || "secret/";
+    return `${u}?id=${encodeURIComponent(token)}&kind=${encodeURIComponent(kind)}`;
+  }
+
   async function yyRevealSecret(kind, inputId) {
     const token = yyGetMailboxToken();
     if (!token) return;
 
-    const url = `secret/?id=${encodeURIComponent(token)}&kind=${encodeURIComponent(kind)}`;
+    const url = yySecretUrl(kind, token);
 
     let data = null;
     try {
@@ -117,7 +123,6 @@
 
       let v = (el.value || "");
 
-      // masked secrets: "********" считаем как "не меняли"
       if (type === "password" || name.endsWith("_secret")) {
         if ((el.getAttribute("data-yy-masked") || "") === "1" && v === SECRET_MASK) {
           v = "";
@@ -151,13 +156,11 @@
       yyDirtyToggle(dirty);
     }
 
-    // стартовое состояние
     yyDirtyToggle(false);
 
     form.addEventListener("input", recompute, true);
     form.addEventListener("change", recompute, true);
 
-    // если что-то прогрузилось поздно (autofill)
     setTimeout(recompute, 0);
     setTimeout(recompute, 250);
   }
@@ -166,7 +169,6 @@
     yyInitDirtyWatch();
   });
 
-  // export for onclick in HTML
   window.yySecretModalOpen = yySecretModalOpen;
   window.yySecretModalClose = yySecretModalClose;
   window.yySecretModalConfirm = yySecretModalConfirm;

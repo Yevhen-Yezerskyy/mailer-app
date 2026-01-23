@@ -1,0 +1,162 @@
+{% extends "panels/base.html" %}<!-- -->
+{% load i18n %}<!-- -->
+{% load static %}<!-- -->
+<!-- FILE: web/templates/panels/aap_settings/mail_servers_smtp.html  (обновлено — 2026-01-23) -->
+<!-- PURPOSE: Settings → Mail servers: SMTP форма (ручная настройка или OAuth2). -->
+<!-- CHANGE:
+- Checks panel: domain only if not whitelisted; SMTP check only in login mode (JS hides in OAuth).
+- Fix absolute URLs for checks/secret via data-* on form.
+- Connect href set via data-oauth-* (JS). -->
+
+{% block content %}
+
+{% include "panels/aap_settings/partials/mail_secret_modal.html" %}
+
+{{ presets|json_script:"yyPresets" }}
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-[60%]">
+      <div class="YY-CARD_WHITE">
+
+        <div class="YY-STATUS_BLUE mb-4">SMTP: {{ mb.email }}</div>
+
+        <form id="yyMailServerForm"
+              method="post"
+              data-api-url="{% url 'settings:mail_servers_api' %}"
+              data-secret-url="{% url 'settings:mail_server_secret' %}"
+              data-oauth-google-url="{% url 'settings:mail_oauth_start' provider='google' kind='smtp' mailbox_id=mb.id %}"
+              data-oauth-microsoft-url="{% url 'settings:mail_oauth_start' provider='microsoft' kind='smtp' mailbox_id=mb.id %}"
+              data-next-url="{% url 'settings:mail_servers_smtp' mb_token %}">
+          {% csrf_token %}
+          <input type="hidden" name="id" value="{{ mb_token }}">
+
+          {% if form.non_field_errors %}
+            <div class="YY-CARD_IN_FORM_ERROR mb-3">{{ form.non_field_errors }}</div>
+          {% endif %}
+
+          <div class="grid grid-cols-[2fr_1fr] gap-4 mb-6">
+            <div>
+              <label class="YY-LABEL">{% trans "Пресет провайдера" %}:</label>
+              {{ form.preset_code }}
+            </div>
+            <div>
+              <label class="YY-LABEL">Auth:</label>
+              <div class="max-w-[220px]">
+                {{ form.auth_type }}
+              </div>
+            </div>
+          </div>
+
+          <div id="yyManualBlock">
+            <div class="grid grid-cols-2 gap-4 mb-2">
+              <div>
+                <label class="YY-LABEL">Host:</label>
+                {{ form.host }}
+              </div>
+              <div>
+                <label class="YY-LABEL">Port:</label>
+                {{ form.port }}
+              </div>
+            </div>
+
+            <div class="grid grid-cols-[1fr_3fr] gap-4 mb-4">
+              <div>
+                <label class="YY-LABEL">Security:</label>
+                <div class="max-w-[220px]">
+                  {{ form.security }}
+                </div>
+              </div>
+              <div>
+                <label class="YY-LABEL">Username:</label>
+                {{ form.username }}
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label class="YY-LABEL">{% trans "Отправитель" %}:</label>
+                {{ form.from_name }}
+              </div>
+              <div>
+                <label class="YY-LABEL">{% trans "Лимит/час" %}:</label>
+                {{ form.limit_hour_sent }}
+              </div>
+            </div>
+
+            <div class="mb-6">
+              <label class="YY-LABEL">Password / Token:</label>
+              <div class="relative">
+                {{ form.secret }}
+                <button type="button"
+                        class="absolute right-2 top-1 text-[#006991] text-xl"
+                        onclick="yyTogglePasswordOrReveal('smtp', 'yySecret')">👁︎</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="yyOauthBlock" class="hidden">
+            <div class="YY-STATUS_YELLOW mb-4">
+              {% trans "OAuth2 режим: нажмите Connect. Ручные поля скрыты." %}
+            </div>
+            <a id="yyConnectBtn" class="YY-BUTTON_MAIN inline-block" href="#">{% trans "Connect" %}</a>
+          </div>
+
+          <div class="flex gap-3 mt-6">
+            <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">{% trans "Сохранить" %}</button>
+            <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN" formnovalidate>{% trans "Назад" %}</button>
+          </div>
+
+        </form>
+
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-[40%]">
+      <div class="YY-CARD_WHITE">
+
+        <div id="yyMailChecksDirtyHint" class="YY-STATUS_YELLOW hidden mb-4">
+          {% trans "Сохраните изменения, чтобы выполнить проверку." %}
+        </div>
+
+        <div id="yyMailChecksPanel">
+          <div class="YY-STATUS_BLUE mb-3">{% trans "Проверки" %}</div>
+
+          <div id="yyProtoChecksOauthHint" class="YY-STATUS_YELLOW hidden mb-3">
+            {% trans "OAuth2: проверка SMTP не требуется." %}
+          </div>
+
+          <div id="yyProtoChecksWrap" class="flex gap-3 flex-wrap mb-3">
+            <button id="yyChkSmtp" type="button" class="YY-BUTTON_MAIN" onclick="yyMailServersCheck('check_smtp','yyChkSmtp')">
+              {% trans "Проверить SMTP" %}
+            </button>
+          </div>
+
+          {% if domain_whitelisted %}
+            <div class="YY-STATUS_GREEN mb-3">
+              TRUSTED SERVICE PROVIDER — CHECK IS NOT NEEDED
+            </div>
+          {% else %}
+            <div class="flex gap-3 flex-wrap mb-3">
+              <button id="yyChkDomain" type="button" class="YY-BUTTON_MAIN" onclick="yyMailServersCheck('check_domain','yyChkDomain')">
+                {% trans "Проверить домен" %}
+              </button>
+            </div>
+          {% endif %}
+
+          <div class="mt-4">
+            <textarea id="yyMailChecksOut" class="YY-INPUT w-full min-h-[350px]" readonly></textarea>
+          </div>
+        </div>
+
+      </div>
+    </td>
+  </tr>
+</table>
+
+<script src="{% static 'js/aap_settings/mail_servers_secret.js' %}"></script>
+<script src="{% static 'js/aap_settings/mail_servers_checks.js' %}"></script>
+<script src="{% static 'js/aap_settings/mail_servers_presets.js' %}"></script>
+<script src="{% static 'js/aap_settings/mail_servers_auth.js' %}"></script>
+
+{% endblock %}
