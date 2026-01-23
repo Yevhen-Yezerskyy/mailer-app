@@ -1,7 +1,9 @@
 # FILE: engine/common/mail/imap.py
-# DATE: 2026-01-22
-# PURPOSE: IMAP helpers: build cfg from DB by mailbox_id (optional cache), check connectivity/auth, list folders, yield next email.
-# CHANGE: (new) Introduce IMAP build/check/list/yield with explicit opt-in caching by external cache_key.
+# DATE: 2026-01-23
+# PURPOSE: IMAP helpers: build cfg, connect/auth, list folders, yield next email.
+# CHANGE:
+# - Added imap_check_and_list_folders(): one connection + one auth, then LIST, then logout.
+# - Keep old imap_check / imap_list_folders for backward compatibility.
 
 from __future__ import annotations
 
@@ -19,17 +21,10 @@ from engine.common.mail.logs import decrypt_secret
 from .types import ImapCfg, MailResult
 
 
-# Opt-in caching TTL (only used when caller provides cache_key)
 IMAP_CFG_CACHE_TTL_SEC = 60 * 10
 
 
 def imap_build_cfg(mailbox_id: int, *, cache_key: Optional[str] = None) -> Tuple[Optional[ImapCfg], MailResult]:
-    """Build normalized IMAP config for mailbox.
-
-    Caching rules:
-      - cache is used ONLY if cache_key is provided by caller
-      - on cache hit, DB is not touched
-    """
     t0 = time.perf_counter()
 
     mid = _to_int(mailbox_id)
@@ -56,7 +51,6 @@ def imap_build_cfg(mailbox_id: int, *, cache_key: Optional[str] = None) -> Tuple
         """,
         (mid,),
     )
-
     if not mb_row:
         res = MailResult(ok=False, action="imap_build_cfg", stage="db", code="mailbox_not_found")
         res.latency_ms = _ms(t0)
@@ -78,13 +72,13 @@ def imap_build_cfg(mailbox_id: int, *, cache_key: Optional[str] = None) -> Tuple
         """,
         (mid,),
     )
-
     if not conn_row:
         res = MailResult(ok=False, action="imap_build_cfg", stage="db", code="imap_connection_not_found")
         res.latency_ms = _ms(t0)
         return None, res
 
     host, port, security, auth_type, username, secret_enc, extra_json = conn_row
+
     host_s = (str(host) if host is not None else "").strip()
     if not host_s:
         res = MailResult(ok=False, action="imap_build_cfg", stage="cfg", code="imap_host_empty")
@@ -144,23 +138,19 @@ def imap_build_cfg(mailbox_id: int, *, cache_key: Optional[str] = None) -> Tuple
 
 
 def imap_check(mailbox_id: int, *, cache_key: Optional[str] = None) -> MailResult:
-    """Check TCP/TLS/AUTH for mailbox IMAP."""
     t0 = time.perf_counter()
 
     cfg, r0 = imap_build_cfg(mailbox_id, cache_key=cache_key)
     if not cfg:
         return r0
 
+    conn = None
     try:
         conn = _imap_connect_and_auth(cfg)
         try:
-            try:
-                conn.noop()
-            except Exception:
-                # best-effort
-                pass
-        finally:
-            _imap_logout_quiet(conn)
+            conn.noop()
+        except Exception:
+            pass
 
         res = MailResult(ok=True, action="imap_check", stage="done", code="ok")
         res.details = {"host": cfg.host, "port": cfg.port, "security": cfg.security, "auth_type": cfg.auth_type}
@@ -171,22 +161,22 @@ def imap_check(mailbox_id: int, *, cache_key: Optional[str] = None) -> MailResul
         res.details.update({"host": cfg.host, "port": cfg.port, "security": cfg.security, "auth_type": cfg.auth_type})
         res.latency_ms = _ms(t0)
         return res
+    finally:
+        if conn is not None:
+            _imap_logout_quiet(conn)
 
 
 def imap_list_folders(mailbox_id: int, *, cache_key: Optional[str] = None) -> Tuple[List[str], MailResult]:
-    """Return IMAP folders list (best-effort parsing)."""
     t0 = time.perf_counter()
 
     cfg, r0 = imap_build_cfg(mailbox_id, cache_key=cache_key)
     if not cfg:
         return [], r0
 
+    conn = None
     try:
         conn = _imap_connect_and_auth(cfg)
-        try:
-            typ, data = conn.list()
-        finally:
-            _imap_logout_quiet(conn)
+        typ, data = conn.list()
 
         if str(typ).upper() != "OK":
             res = MailResult(ok=False, action="imap_list_folders", stage="protocol", code="list_failed")
@@ -202,6 +192,57 @@ def imap_list_folders(mailbox_id: int, *, cache_key: Optional[str] = None) -> Tu
         res = _err("imap_list_folders", _stage_from_exc(e), e)
         res.latency_ms = _ms(t0)
         return [], res
+    finally:
+        if conn is not None:
+            _imap_logout_quiet(conn)
+
+
+def imap_check_and_list_folders(
+    mailbox_id: int, *, cache_key: Optional[str] = None
+) -> Tuple[List[str], MailResult]:
+    """ONE connection + ONE auth: check(noop) + list folders."""
+    t0 = time.perf_counter()
+
+    cfg, r0 = imap_build_cfg(mailbox_id, cache_key=cache_key)
+    if not cfg:
+        return [], r0
+
+    conn = None
+    try:
+        conn = _imap_connect_and_auth(cfg)
+
+        try:
+            conn.noop()
+        except Exception:
+            pass
+
+        typ, data = conn.list()
+        if str(typ).upper() != "OK":
+            res = MailResult(ok=False, action="imap_check_and_list_folders", stage="protocol", code="list_failed")
+            res.details = {"host": cfg.host, "port": cfg.port, "security": cfg.security, "auth_type": cfg.auth_type}
+            res.latency_ms = _ms(t0)
+            return [], res
+
+        folders = _parse_list_folders(data)
+
+        res = MailResult(ok=True, action="imap_check_and_list_folders", stage="done", code="ok")
+        res.details = {
+            "host": cfg.host,
+            "port": cfg.port,
+            "security": cfg.security,
+            "auth_type": cfg.auth_type,
+            "count": len(folders),
+        }
+        res.latency_ms = _ms(t0)
+        return folders, res
+    except Exception as e:
+        res = _err("imap_check_and_list_folders", _stage_from_exc(e), e)
+        res.details.update({"host": cfg.host, "port": cfg.port, "security": cfg.security, "auth_type": cfg.auth_type})
+        res.latency_ms = _ms(t0)
+        return [], res
+    finally:
+        if conn is not None:
+            _imap_logout_quiet(conn)
 
 
 def imap_yield_next(
@@ -212,16 +253,6 @@ def imap_yield_next(
     include_raw: bool = False,
     cache_key: Optional[str] = None,
 ) -> Generator[Dict[str, Any], None, MailResult]:
-    """Yield ONE next email (minimal headers) and finish.
-
-    Yields dict:
-      - uid: str
-      - subject/from/date/message_id: str
-      - raw: bytes (only if include_raw=True)
-
-    Returns MailResult at generator end (PEP 380 style): `gen.close()` doesn't give it,
-    but callers can use `try/except StopIteration as e: result=e.value`.
-    """
     t0 = time.perf_counter()
 
     cfg, r0 = imap_build_cfg(mailbox_id, cache_key=cache_key)
@@ -258,7 +289,6 @@ def imap_yield_next(
 
         uid = uids[0].decode("ascii", errors="ignore")
 
-        # minimal headers first
         typ, fdata = conn.uid("FETCH", uid, "(BODY.PEEK[HEADER.FIELDS (FROM SUBJECT DATE MESSAGE-ID)])")
         if str(typ).upper() != "OK" or not fdata:
             res = MailResult(ok=False, action="imap_yield_next", stage="protocol", code="fetch_headers_failed")
@@ -304,7 +334,6 @@ def imap_yield_next(
 
 
 def _imap_connect_and_auth(cfg: ImapCfg) -> imaplib.IMAP4:
-    # imaplib uses global socket default timeout; set temporarily
     old = socket.getdefaulttimeout()
     socket.setdefaulttimeout(float(cfg.timeout_sec or 10.0))
     try:
@@ -316,8 +345,6 @@ def _imap_connect_and_auth(cfg: ImapCfg) -> imaplib.IMAP4:
                 conn.starttls()
 
         if cfg.auth_type == "oauth2":
-            # minimal XOAUTH2 support: secret must already be full bearer line
-            # e.g. "user=...\\x01auth=Bearer ...\\x01\\x01"
             xoauth2 = (cfg.secret or "").encode("utf-8", errors="ignore")
 
             def _auth_cb(_: bytes) -> bytes:
@@ -350,16 +377,13 @@ def _parse_list_folders(lines: Any) -> List[str]:
         s = s.strip()
         if not s:
             continue
-        # best-effort: folder name is last quoted token
         parts = s.split('"')
         if len(parts) >= 2:
             name = parts[-2].strip()
             if name:
                 out.append(name)
                 continue
-        # fallback: last token
         out.append(s.split()[-1].strip())
-    # unique, keep order
     seen = set()
     uniq: List[str] = []
     for f in out:
@@ -370,7 +394,6 @@ def _parse_list_folders(lines: Any) -> List[str]:
 
 
 def _extract_fetch_bytes(fetch_data: Any) -> bytes:
-    # imaplib returns list like: [(b'1 (BODY[...] {123}', b'...bytes...'), b')']
     if not isinstance(fetch_data, list):
         return b""
     for it in fetch_data:
@@ -391,7 +414,6 @@ def _decode_mime_header(v: str) -> str:
 
 
 def _imap_quote(folder: str) -> str:
-    # keep simple: quote if spaces
     f = (folder or "").strip()
     if not f:
         return "INBOX"
@@ -410,7 +432,6 @@ def _decrypt_secret(secret_enc: str) -> str:
 
 
 def _dumps_cfg(cfg: ImapCfg) -> str:
-    # small & explicit, no json module import to keep file minimal
     return repr(
         {
             "mailbox_id": cfg.mailbox_id,
@@ -429,12 +450,11 @@ def _dumps_cfg(cfg: ImapCfg) -> str:
 
 
 def _loads_cfg(payload: str) -> Optional[ImapCfg]:
-    # safe-ish: only eval dict literal from our own repr
     s = (payload or "").strip()
     if not s:
         return None
     try:
-        x = eval(s, {"__builtins__": {}}, {})  # noqa: S307  (trusted cache only)
+        x = eval(s, {"__builtins__": {}}, {})  # noqa: S307
         if not isinstance(x, dict):
             return None
         return ImapCfg(
@@ -460,7 +480,6 @@ def _stage_from_exc(e: Exception) -> str:
     if isinstance(e, imaplib.IMAP4.abort):
         return "disconnect"
     if isinstance(e, imaplib.IMAP4.error):
-        # login/auth and many protocol errors land here
         return "auth"
     if isinstance(e, OSError):
         return "connect"

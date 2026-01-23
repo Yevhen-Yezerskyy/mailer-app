@@ -1,25 +1,22 @@
 # FILE: web/panel/aap_settings/views/mail_servers_api.py
 # DATE: 2026-01-23
 # PURPOSE: AJAX API для "Проверок" в Settings → Mail servers (SMTP/IMAP/DOMAIN).
-# CHANGE:
-# - Добавлены actions: check_imap, check_domain.
-# - В textarea отдаём ЧИТАЕМЫЙ отчёт в message + снизу "Технические данные ..." (pretty JSON).
-# - JS не трогаем: НЕ отдаём поле data, чтобы не печатался мусор автоматически.
+# CHANGE: check_imap теперь делает ОДИН логин и сразу отдаёт папки (imap_check_and_log).
 
 from __future__ import annotations
 
 import json
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
 from engine.common.mail.smtp_test import smtp_check_and_log
-from engine.common.mail.imap_test import imap_check_and_log, imap_list_folders_and_log
+from engine.common.mail.imap_test import imap_check_and_log
 from engine.common.mail.domain_checks_test import domain_tech_check_and_log, domain_reputation_check_and_log
 
 from web.mailer_web.access import decode_id
-from panel.aap_settings.models import Mailbox  # IMPORTANT: panel.* (no duplicate model registration)
+from panel.aap_settings.models import Mailbox
 
 
 def _guard(request):
@@ -58,33 +55,31 @@ def _explain_dns_err(code: str) -> str:
 
 
 def _smtp_report(r) -> str:
-    # r: MailUiResult
     lines: List[str] = []
     lines.append("Проверка SMTP")
     lines.append(f"Статус: {r.status}")
     if r.user_message:
         lines.append(f"Сообщение: {r.user_message}")
-
     lines.append("")
     lines.append("Технические данные проверки SMTP:")
     lines.append(_pp(r.data or {}))
     return "\n".join(lines)
 
 
-def _imap_report(r_check, r_list) -> str:
+def _imap_report(r) -> str:
     lines: List[str] = []
     lines.append("Проверка IMAP")
-    lines.append(f"Статус: {r_check.status}")
-    if r_check.user_message:
-        lines.append(f"Сообщение: {r_check.user_message}")
+    lines.append(f"Статус: {r.status}")
+    if r.user_message:
+        lines.append(f"Сообщение: {r.user_message}")
 
     folders = []
-    if r_list and isinstance(r_list.data, dict):
-        folders = r_list.data.get("folders") or []
+    if isinstance(r.data, dict):
+        folders = r.data.get("folders") or []
+
     if folders:
         lines.append("")
         lines.append(f"Папки ({len(folders)}):")
-        # печатаем списком строками
         for f in folders[:200]:
             lines.append(f"- {f}")
         if len(folders) > 200:
@@ -92,13 +87,7 @@ def _imap_report(r_check, r_list) -> str:
 
     lines.append("")
     lines.append("Технические данные проверки IMAP:")
-    lines.append(_pp(r_check.data or {}))
-
-    if r_list:
-        lines.append("")
-        lines.append("Технические данные списка папок IMAP:")
-        lines.append(_pp(r_list.data or {}))
-
+    lines.append(_pp(r.data or {}))
     return "\n".join(lines)
 
 
@@ -110,10 +99,8 @@ def _domain_report(r_tech, r_rep) -> str:
     lines: List[str] = []
     lines.append("Проверка домена" + (f": {domain}" if domain else ""))
 
-    # TECH
     tech_status = r_tech.status
     lines.append(f"Техническая часть: {tech_status}")
-
     if tech_status == "CHECK_FAILED":
         spf_err = str(tech.get("spf_err") or "")
         dmarc_err = str(tech.get("dmarc_err") or "")
@@ -121,37 +108,20 @@ def _domain_report(r_tech, r_rep) -> str:
         lines.append(_explain_dns_err(err))
         if spf_err or dmarc_err:
             lines.append(f"SPF: {spf_err or 'ok'}; DMARC: {dmarc_err or 'ok'}")
-    elif tech_status in ("GOOD", "BAD"):
-        spf = tech.get("spf") or {}
-        dmarc = tech.get("dmarc") or {}
-        if isinstance(spf, dict) and isinstance(dmarc, dict):
-            lines.append(f"SPF: {'OK' if spf.get('ok') else 'нет/ошибка'}")
-            lines.append(f"DMARC: {'OK' if dmarc.get('ok') else 'нет/ошибка'}")
 
-    # REP
     rep_status = r_rep.status
     lines.append("")
     lines.append(f"Репутация (Spamhaus DBL/DQS): {rep_status}")
-
     if rep_status == "CHECK_FAILED":
-        err = str(rep.get("error") or "")
-        lines.append(_explain_dns_err(err))
-    elif rep_status == "QUESTIONABLE":
-        lines.append("Домен выглядит подозрительно (возможные листинги/ограничения).")
-    elif rep_status == "NORMAL":
-        lines.append("Репутация выглядит нормально.")
+        lines.append(_explain_dns_err(str(rep.get("error") or "")))
 
-    # LINKS (если есть)
-    links = []
-    if isinstance(rep, dict):
-        links = rep.get("links") or []
+    links = rep.get("links") or []
     if links:
         lines.append("")
         lines.append("Ссылки для проверки:")
         for u in links:
             lines.append(f"- {u}")
 
-    # TECH JSON blocks
     lines.append("")
     lines.append("Технические данные запроса DNS (SPF/DMARC):")
     lines.append(_pp(tech))
@@ -187,39 +157,12 @@ def mail_servers_api_view(request):
 
     if action == "check_smtp":
         r = smtp_check_and_log(mailbox_id)
-        return JsonResponse(
-            {
-                "ok": True,
-                "action": "SMTP_CHECK",
-                "status": "",
-                "message": _smtp_report(r),
-            }
-        )
+        return JsonResponse({"ok": True, "action": "SMTP_CHECK", "status": "", "message": _smtp_report(r)})
 
     if action == "check_imap":
-        r_check = imap_check_and_log(mailbox_id)
-        r_list = None
-        if r_check.status == "OK":
-            r_list = imap_list_folders_and_log(mailbox_id)
+        r = imap_check_and_log(mailbox_id)
+        return JsonResponse({"ok": True, "action": "IMAP_CHECK", "status": "", "message": _imap_report(r)})
 
-        return JsonResponse(
-            {
-                "ok": True,
-                "action": "IMAP_CHECK",
-                "status": "",
-                "message": _imap_report(r_check, r_list),
-            }
-        )
-
-    # check_domain
     r_tech = domain_tech_check_and_log(mailbox_id)
     r_rep = domain_reputation_check_and_log(mailbox_id)
-
-    return JsonResponse(
-        {
-            "ok": True,
-            "action": "DOMAIN_CHECK",
-            "status": "",
-            "message": _domain_report(r_tech, r_rep),
-        }
-    )
+    return JsonResponse({"ok": True, "action": "DOMAIN_CHECK", "status": "", "message": _domain_report(r_tech, r_rep)})
