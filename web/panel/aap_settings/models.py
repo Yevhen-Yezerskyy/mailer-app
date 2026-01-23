@@ -24,7 +24,8 @@ class Security(models.TextChoices):
 
 class AuthType(models.TextChoices):
     LOGIN = "login", "Login"
-    OAUTH2 = "oauth2", "OAuth2"
+    GOOGLE_OAUTH2 = "google_oauth2", "Google OAuth2"
+    MICROSOFT_OAUTH2 = "microsoft_oauth2", "Microsoft OAuth2"
 
 
 class Mailbox(models.Model):
