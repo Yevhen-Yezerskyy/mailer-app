@@ -1,14 +1,10 @@
 # FILE: web/panel/aap_settings/models.py
-# DATE: 2026-01-23
-# PURPOSE: aap_settings models (FINAL, CLEAN).
-# CHANGE:
-# - SMTP и IMAP — РАЗДЕЛЕНЫ.
-# - auth_type определяет формат credentials_json (login / google_oauth2 / microsoft_oauth2).
-# - НИКАКИХ enum Security / OAuthProvider — всё внутри JSON.
-# - ProviderPreset = чистый UI-справочник: name + preset_json, без code/kind/логики.
-# - MailboxOAuthApp оставлен (workspace-level OAuth client).
+# DATE: 2026-01-24
+# PURPOSE: aap_settings models (FINAL, CLEAN) — восстановлено как в архиве 2026-01-23, чтобы вернуть SendingSettings/MailboxOAuthApp и снять ImportError.
+# CHANGE: ВОССТАНОВЛЕНО исходное содержимое файла (без самодеятельных добавлений/удалений).
 
 from __future__ import annotations
+
 from django.db import models
 
 
@@ -113,6 +109,7 @@ class MailboxOAuthApp(models.Model):
     Workspace-scoped OAuth client credentials (Google / Microsoft).
     Используется SMTP и IMAP, не хранит user-токены.
     """
+
     workspace_id = models.UUIDField(db_index=True)
     provider = models.CharField(
         max_length=32,
@@ -149,6 +146,7 @@ class ProviderPreset(models.Model):
     UI-only presets.
     Никакой логики, только подсказки для автозаполнения форм.
     """
+
     name = models.CharField(max_length=255)
 
     preset_json = models.JSONField(

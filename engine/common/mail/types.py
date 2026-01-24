@@ -1,15 +1,100 @@
 # FILE: engine/common/mail/types.py
-# DATE: 2026-01-23
-# PURPOSE: Mail domain types: runtime dataclasses + logging specs (MAIL_SPECS).
+# DATE: 2026-01-24
+# PURPOSE: Mail domain types: runtime dataclasses + logging specs (MAIL_SPECS) + JSON contracts for SMTP/IMAP credentials_json.
 # CHANGE:
-# - Add ImapCfg (required by engine.common.mail.imap).
-# - Add IMAP_CHECK / IMAP_LIST_FOLDERS to MAIL_SPECS.
-# - Mark CHECK_FAILED as valid status for DOMAIN_TECH_CHECK and DOMAIN_REPUTATION_CHECK.
+# - Add single source of truth for connection auth_type values (ConnAuthType).
+# - Add explicit TypedDict contracts for credentials_json (SMTP/IMAP × LOGIN/GOOGLE_OAUTH_2_0/MICROSOFT_OAUTH_2_0).
+# - Keep existing runtime dataclasses + MAIL_SPECS unchanged (only moved below the auth_type section).
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, Literal, Optional, TypedDict, Union
+
+
+# =========================
+# Connection JSON: source of truth (AAP Settings credentials_json)
+# =========================
+
+ConnSecurity = Literal["none", "ssl", "starttls"]
+
+ConnAuthType = Literal[
+    "LOGIN",
+    "GOOGLE_OAUTH_2_0",
+    "MICROSOFT_OAUTH_2_0",
+]
+
+# SMTP credentials_json (3 variants)
+
+class SmtpCredsLogin(TypedDict):
+    auth_type: Literal["LOGIN"]
+    host: str
+    port: int
+    security: ConnSecurity
+    username: str
+    password: str
+
+
+class SmtpCredsGoogleOAuth2(TypedDict):
+    auth_type: Literal["GOOGLE_OAUTH_2_0"]
+    host: str
+    port: int
+    security: ConnSecurity
+    email: str
+    access_token: str
+    refresh_token_enc: str
+    expires_at: int  # unix epoch seconds
+
+
+class SmtpCredsMicrosoftOAuth2(TypedDict):
+    auth_type: Literal["MICROSOFT_OAUTH_2_0"]
+    host: str
+    port: int
+    security: ConnSecurity
+    email: str
+    tenant: str
+    access_token: str
+    refresh_token_enc: str
+    expires_at: int  # unix epoch seconds
+
+
+SmtpCredentialsJson = Union[SmtpCredsLogin, SmtpCredsGoogleOAuth2, SmtpCredsMicrosoftOAuth2]
+
+# IMAP credentials_json (3 variants)
+
+class ImapCredsLogin(TypedDict):
+    auth_type: Literal["LOGIN"]
+    host: str
+    port: int
+    security: ConnSecurity
+    username: str
+    password: str
+
+
+class ImapCredsGoogleOAuth2(TypedDict):
+    auth_type: Literal["GOOGLE_OAUTH_2_0"]
+    host: str
+    port: int
+    security: ConnSecurity
+    email: str
+    access_token: str
+    refresh_token_enc: str
+    expires_at: int  # unix epoch seconds
+
+
+class ImapCredsMicrosoftOAuth2(TypedDict):
+    auth_type: Literal["MICROSOFT_OAUTH_2_0"]
+    host: str
+    port: int
+    security: ConnSecurity
+    email: str
+    tenant: str
+    access_token: str
+    refresh_token_enc: str
+    expires_at: int  # unix epoch seconds
+
+
+ImapCredentialsJson = Union[ImapCredsLogin, ImapCredsGoogleOAuth2, ImapCredsMicrosoftOAuth2]
 
 
 # =========================
@@ -44,7 +129,6 @@ MAIL_SPECS: Dict[str, Dict[str, Any]] = {
 # Runtime types (used by smtp.py / imap.py)
 # =========================
 
-ConnSecurity = Literal["none", "ssl", "starttls"]
 AuthType = Literal["login", "oauth2"]
 
 

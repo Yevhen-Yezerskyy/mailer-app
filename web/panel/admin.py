@@ -9,7 +9,6 @@ from django.contrib import admin
 
 from panel.models import GlobalTemplate
 
-
 @admin.register(GlobalTemplate)
 class GlobalTemplateAdmin(admin.ModelAdmin):
     list_display = ("id", "template_name", "is_active", "order", "updated_at")

@@ -1,10 +1,9 @@
 # FILE: web/panel/aap_settings/forms.py
-# DATE: 2026-01-23
-# PURPOSE: Settings → Mail servers: разнесено на 3 изолированные формы (Mailbox / SMTP / IMAP).
+# DATE: 2026-01-24
+# PURPOSE: Settings → Mail servers: формы для Mailbox / SMTP / IMAP + отдельная страница SMTP.
 # CHANGE:
-# - MailboxAddForm: только email
-# - SmtpConnForm: ручная SMTP настройка + preset авто-подстановка (JS) + OAuth2 режим (скрытие полей)
-# - ImapConnForm: ручная IMAP настройка + preset авто-подстановка (JS) + OAuth2 режим (скрытие полей)
+# - Сохранены существующие формы: MailboxAddForm / SmtpConnForm / ImapConnForm.
+# - Добавлена SmtpServerForm: отдельная страница SMTP (LOGIN + OAuth2-заглушки) + пресеты (только host/port/security).
 
 from __future__ import annotations
 
@@ -245,5 +244,117 @@ class ImapConnForm(forms.Form):
         if missing:
             self.add_error(None, _("Заполните все поля IMAP."))
             return cleaned
+
+        return cleaned
+
+
+class SmtpServerForm(forms.Form):
+    """
+    Отдельная страница SMTP (как ты описал).
+    Пресеты: только host/port/security; sender_name/limit — всегда ручные; username по умолчанию = mailbox email (если пусто).
+    """
+
+    preset_code = forms.ChoiceField(
+        label=_("Пресет провайдера"),
+        required=False,
+        widget=forms.Select(attrs={"class": "YY-INPUT !mb-0", "id": "yyPresetSelect"}),
+    )
+
+    auth_type = forms.ChoiceField(
+        label="Auth",
+        choices=AUTH_CHOICES,
+        required=True,
+        widget=forms.HiddenInput(attrs={"id": "yyAuthType"}),
+    )
+
+    sender_name = forms.CharField(
+        label=_("Отправитель"),
+        required=True,
+        widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yySenderName"}),
+    )
+
+    limit_hour_sent = forms.IntegerField(
+        label=_("Лимит/час"),
+        required=True,
+        initial=50,
+        widget=forms.TextInput(
+            attrs={
+                "class": "YY-INPUT",
+                "inputmode": "numeric",
+                "pattern": r"[0-9]*",
+                "maxlength": "3",
+                "min": "1",
+                "max": "300",
+                "autocomplete": "off",
+                "id": "yyLimitHour",
+            }
+        ),
+    )
+
+    host = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yyHost"}))
+    port = forms.IntegerField(required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-28", "id": "yyPort"}))
+    security = forms.ChoiceField(
+        choices=SECURITY_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={"class": "YY-INPUT !px-1", "id": "yySecurity"}),
+    )
+    username = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yyUsername"}))
+    password = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(attrs={"class": "YY-INPUT", "autocomplete": "off", "id": "yyPassword"}, render_value=True),
+    )
+
+    def __init__(
+        self,
+        *args,
+        preset_choices: List[Tuple[str, str]] | None = None,
+        require_password: bool = True,
+        mailbox_email: str = "",
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self.fields["preset_code"].choices = [("", "—")] + (preset_choices or [])
+        self.require_password = bool(require_password)
+        self.mailbox_email = (mailbox_email or "").strip().lower()
+
+    def clean(self):
+        cleaned = super().clean()
+
+        # лимит 1..300 (non-field)
+        try:
+            lim = int(cleaned.get("limit_hour_sent") or 0)
+        except Exception:
+            lim = 0
+        if lim < 1:
+            self.add_error(None, _("Лимит должен быть не меньше 1 письма в час."))
+            return cleaned
+        if lim > 300:
+            self.add_error(None, _("Максимум 300 писем в час."))
+            return cleaned
+
+        auth_type = (cleaned.get("auth_type") or "").strip()
+        if auth_type in ("google_oauth2", "microsoft_oauth2"):
+            # OAuth режим: поля коннекта не валидируем (там кнопка "Авторизоваться")
+            return cleaned
+
+        # LOGIN режим: требуем поля
+        required = ["host", "port", "security", "sender_name", "limit_hour_sent"]
+        if self.require_password:
+            required.append("password")
+
+        for f in required:
+            v = cleaned.get(f)
+            if v is None or (isinstance(v, str) and not v.strip()):
+                self.add_error(None, _("Заполните все поля SMTP (LOGIN)."))
+                return cleaned
+
+        # username: если пустой — подставляем email ящика (как ты просил)
+        u = (cleaned.get("username") or "").strip()
+        if not u:
+            if self.mailbox_email:
+                cleaned["username"] = self.mailbox_email
+            else:
+                self.add_error(None, _("Заполните логин SMTP."))
+                return cleaned
 
         return cleaned
