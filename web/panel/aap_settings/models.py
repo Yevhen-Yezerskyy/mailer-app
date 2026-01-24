@@ -104,42 +104,6 @@ class ImapMailbox(models.Model):
         db_table = "aap_settings_imap_mailboxes"
 
 
-class MailboxOAuthApp(models.Model):
-    """
-    Workspace-scoped OAuth client credentials (Google / Microsoft).
-    Используется SMTP и IMAP, не хранит user-токены.
-    """
-
-    workspace_id = models.UUIDField(db_index=True)
-    provider = models.CharField(
-        max_length=32,
-        choices=[
-            ("google", "Google"),
-            ("microsoft", "Microsoft"),
-        ],
-    )
-
-    client_id = models.CharField(max_length=255)
-    client_secret_enc = models.TextField()
-
-    is_active = models.BooleanField(default=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        app_label = "aap_settings"
-        db_table = "aap_settings_mailbox_oauth_apps"
-        constraints = [
-            models.UniqueConstraint(
-                fields=["workspace_id", "provider"],
-                name="aap_settings_oauth_app_ws_provider_uniq",
-            ),
-        ]
-        indexes = [
-            models.Index(fields=["workspace_id", "provider", "is_active"]),
-        ]
-
 
 class ProviderPreset(models.Model):
     """
