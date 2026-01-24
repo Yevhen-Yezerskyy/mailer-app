@@ -3,6 +3,11 @@
 {% load static %}
 <!-- FILE: web/templates/panels/aap_settings/smtp_server.html  (обновлено — 2026-01-24) -->
 <!-- PURPOSE: Settings → SMTP server: отдельная страница настройки SMTP (LOGIN + OAuth2-заглушки) + пресеты + проверка. -->
+<!-- CHANGE:
+- Сверху 3 поля в одну строку: Отправитель / Email (редакт.) / Лимит/час.
+- В SMTP блоке: Шифрование / Сервер / Порт в одну строку.
+- Кнопки Сохранить/Закрыть перенесены вниз формы.
+-->
 
 {% block content %}
 
@@ -10,97 +15,64 @@
 
 <table class="YY-MAIN_TABLE">
   <tr>
-    <td class="YY-MAIN_TOP_LEFT_TD w-[60%]">
+    <td class="YY-MAIN_TOP_LEFT_TD w-[65%]">
       <div class="YY-CARD_WHITE">
-
-        {% if form.non_field_errors %}
-          <div class="YY-CARD_IN_FORM_ERROR mb-3">{{ form.non_field_errors }}</div>
-        {% endif %}
-
         <form id="yyMailServerForm" method="post" data-api-url="{% url 'settings:mail_servers_api' %}">
           {% csrf_token %}
           <input type="hidden" name="id" value="{{ mailbox_ui_id }}">
           {{ form.auth_type }}
 
-          <div class="flex items-center justify-between gap-3 mb-4">
-            <div class="YY-STATUS_BLUE">SMTP — {{ mailbox.email }}</div>
+          <div class="YY-STATUS_BLUE mb-4">SMTP {% trans "сервер (отправка)" %}</div>
 
-            <div class="flex items-center gap-2">
-              <div id="yySaveWrap">
-                <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">
-                  {% trans "Сохранить" %}
-                </button>
-              </div>
-
-              <button type="submit" name="action" value="close" class="YY-BUTTON_TAB_MAIN">
-                {% trans "Закрыть" %}
-              </button>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 gap-4 mb-5">
-            <div class="grid grid-cols-[180px_1fr] gap-3 items-center">
-              <div class="YY-LABEL !mb-0">{% trans "Отправитель" %}</div>
+            <div class="grid grid-cols-[2fr_2fr_1fr] gap-4 mb-7">
               <div>
+                <label class="YY-LABEL">{% trans "Отправитель" %}:</label>
                 {{ form.sender_name }}
-                {% if form.sender_name.errors %}
-                  <div class="YY-FORM_ERROR mt-1">{{ form.sender_name.errors }}</div>
-                {% endif %}
               </div>
-            </div>
 
-            <div class="grid grid-cols-[180px_1fr] gap-3 items-center">
-              <div class="YY-LABEL !mb-0">{% trans "Email" %}</div>
-              <div class="YY-STATUS_BLUE text-sm">{{ mailbox.email }}</div>
-            </div>
-
-            <div class="grid grid-cols-[180px_1fr] gap-3 items-center">
-              <div class="YY-LABEL !mb-0">{% trans "Лимит/час" %}</div>
               <div>
+                <label class="YY-LABEL">Email:</label>
+                {{ form.email }}
+              </div>
+
+              <div>
+                <label class="YY-LABEL">{% trans "Лимит / час" %}:</label>
                 {{ form.limit_hour_sent }}
-                {% if form.limit_hour_sent.errors %}
-                  <div class="YY-FORM_ERROR mt-1">{{ form.limit_hour_sent.errors }}</div>
-                {% endif %}
               </div>
             </div>
-          </div>
-
-          <div class="YY-STATUS_BLUE mb-2">{% trans "Авторизация" %}</div>
 
           <div class="flex items-center gap-2 mb-4">
-            <button type="button" id="yyAuthBtnLogin" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "ЛОГИН" %}</button>
+            <button type="button" id="yyAuthBtnLogin" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "ЛОГИН (Стандарт)" %}</button>
             <button type="button" id="yyAuthBtnGoogle" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "Google авторизация (OAuth 2.0)" %}</button>
             <button type="button" id="yyAuthBtnMicrosoft" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "Microsoft авторизация (OAuth 2.0)" %}</button>
           </div>
 
           <div id="yyLoginBlock">
-            <div class="YY-CARD_WHITE border border-[#022a39] mt-[30px]">
-              <div class="YY-STATUS_BLUE mb-3">{% trans "SMTP (LOGIN)" %}</div>
+              <div class="YY-STATUS_GREEN mb-3">{% trans "ЛОГИН (Стандарт)" %}</div>
 
               <div class="grid grid-cols-[180px_1fr] gap-3 items-center mb-3">
                 <div class="YY-LABEL !mb-0">{% trans "Пресет" %}</div>
-                <div>
-                  {{ form.preset_code }}
-                </div>
+                <div>{{ form.preset_code }}</div>
               </div>
 
-              <div class="grid grid-cols-[180px_1fr] gap-3 items-center mb-3">
-                <div class="YY-LABEL !mb-0">Host</div>
+              <div class="grid grid-cols-[2fr_3fr_1fr] gap-4 mb-3">
                 <div>
+                  <label class="YY-LABEL">{% trans "Шифрование" %}:</label>
+                  {{ form.security }}
+                  {% if form.security.errors %}<div class="YY-FORM_ERROR mt-1">{{ form.security.errors }}</div>{% endif %}
+                </div>
+
+                <div>
+                  <label class="YY-LABEL">{% trans "Сервер" %}:</label>
                   {{ form.host }}
                   {% if form.host.errors %}<div class="YY-FORM_ERROR mt-1">{{ form.host.errors }}</div>{% endif %}
                 </div>
-              </div>
 
-              <div class="grid grid-cols-[180px_1fr] gap-3 items-center mb-3">
-                <div class="YY-LABEL !mb-0">Port</div>
-                <div class="flex items-center gap-3">
+                <div>
+                  <label class="YY-LABEL">{% trans "Порт" %}:</label>
                   {{ form.port }}
-                  <div class="w-[220px]">
-                    {{ form.security }}
-                  </div>
+                  {% if form.port.errors %}<div class="YY-FORM_ERROR mt-1">{{ form.port.errors }}</div>{% endif %}
                 </div>
-                {% if form.port.errors %}<div></div><div class="YY-FORM_ERROR -mt-2">{{ form.port.errors }}</div>{% endif %}
               </div>
 
               <div class="grid grid-cols-[180px_1fr] gap-3 items-center mb-3">
@@ -118,7 +90,6 @@
                   {% if form.password.errors %}<div class="YY-FORM_ERROR mt-1">{{ form.password.errors }}</div>{% endif %}
                 </div>
               </div>
-            </div>
           </div>
 
           <div id="yyOauthBlock" class="hidden">
@@ -131,12 +102,28 @@
             </div>
           </div>
 
+          {% if form.non_field_errors %}
+              <div class="YY-CARD_IN_FORM_ERROR mb-3">{{ form.non_field_errors }}</div>
+          {% endif %}
+
+            <div class="flex gap-3 mt-6">
+              <div id="yySaveWrap" class="w-full">
+                <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN w-full">
+                  {% trans "Сохранить" %}
+                </button>
+              </div>
+
+              <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN w-full" formnovalidate>
+                {% trans "Закрыть" %}
+              </button>
+            </div>
+
         </form>
 
       </div>
     </td>
 
-    <td class="YY-MAIN_TOP_RIGHT_TD w-[40%]">
+    <td class="YY-MAIN_TOP_RIGHT_TD w-[35%]">
       <div class="YY-CARD_WHITE">
 
         {% if state == "add" %}

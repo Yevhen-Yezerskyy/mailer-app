@@ -1,6 +1,7 @@
 // FILE: web/static/js/aap_settings/smtp_server.js
 // DATE: 2026-01-24
 // PURPOSE: Settings → SMTP server: переключение LOGIN/Google/Microsoft, пресеты (overwrite host/port/security), скрытие Save в OAuth.
+// CHANGE: удалено автозаполнение логина из email/пресета (логин задаётся сервер-сайд).
 
 (function () {
   function byId(id) { return document.getElementById(id); }
@@ -51,7 +52,6 @@
     const p = getPresets()[code];
     if (!p) return;
 
-    // overwrite (как ты просил): перезаписываем то, что юзер навводил
     const host = byId("yyHost");
     const port = byId("yyPort");
     const sec  = byId("yySecurity");
@@ -59,20 +59,12 @@
     if (host) host.value = p.host || "";
     if (port) port.value = p.port != null ? String(p.port) : "";
     if (sec)  sec.value  = p.security || (sec.value || "starttls");
-
-    // username по умолчанию = email ящика, если поле пустое
-    const u = byId("yyUsername");
-    const form = byId("yyMailServerForm");
-    const mbEmail = (form && form.dataset && form.dataset.mailboxEmail) ? String(form.dataset.mailboxEmail) : "";
-    if (u && !u.value) u.value = mbEmail || u.value;
   }
 
   window.addEventListener("DOMContentLoaded", () => {
-    // init auth
     const auth = byId("yyAuthType");
     setAuth(auth ? (auth.value || "login") : "login");
 
-    // buttons
     const btnL = byId("yyAuthBtnLogin");
     const btnG = byId("yyAuthBtnGoogle");
     const btnM = byId("yyAuthBtnMicrosoft");
@@ -81,20 +73,7 @@
     if (btnG) btnG.addEventListener("click", () => setAuth("google_oauth2"));
     if (btnM) btnM.addEventListener("click", () => setAuth("microsoft_oauth2"));
 
-    // presets
     const sel = byId("yyPresetSelect");
-    if (sel) {
-      sel.addEventListener("change", () => {
-        applyPreset((sel.value || "").trim());
-      });
-    }
-
-    // username default: email mailbox (если пусто)
-    const u = byId("yyUsername");
-    const hiddenId = document.querySelector('#yyMailServerForm input[name="id"]');
-    if (u && !u.value && hiddenId && hiddenId.value) {
-      // email приходит с сервера в шаблон как mailbox.email; тут уже не тащим — просто оставляем пустым,
-      // автозаполнение делаем через preset apply (как основной кейс)
-    }
+    if (sel) sel.addEventListener("change", () => applyPreset((sel.value || "").trim()));
   });
 })();

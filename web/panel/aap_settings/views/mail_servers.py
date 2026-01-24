@@ -191,7 +191,3 @@ def mail_servers_view(request):
             "edit_obj": edit_obj,
         },
     )
-
-
-# backward-compat (если где-то импортируют старое имя)
-mail_servers_list_view = mail_servers_view

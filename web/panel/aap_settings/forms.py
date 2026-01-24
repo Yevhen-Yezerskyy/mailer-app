@@ -4,6 +4,7 @@
 # CHANGE:
 # - Сохранены существующие формы: MailboxAddForm / SmtpConnForm / ImapConnForm.
 # - Добавлена SmtpServerForm: отдельная страница SMTP (LOGIN + OAuth2-заглушки) + пресеты (только host/port/security).
+# - Убрано дублирование AUTH_CHOICES: берём choices из модели AuthType.
 
 from __future__ import annotations
 
@@ -12,7 +13,7 @@ from typing import List, Tuple
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
-from panel.aap_settings.models import Mailbox
+from panel.aap_settings.models import Mailbox, AuthType
 
 
 SECURITY_CHOICES = [
@@ -21,11 +22,7 @@ SECURITY_CHOICES = [
     ("none", "None"),
 ]
 
-AUTH_CHOICES = [
-    ("login", "LOGIN"),
-    ("google_oauth2", "Google OAuth2"),
-    ("microsoft_oauth2", "Microsoft OAuth2"),
-]
+AUTH_CHOICES = AuthType.choices
 
 
 class MailboxAddForm(forms.Form):
@@ -72,7 +69,7 @@ class SmtpConnForm(forms.Form):
     )
 
     host = forms.CharField(label="SMTP host", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yyHost"}))
-    port = forms.IntegerField(label="SMTP port", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-24", "id": "yyPort"}))
+    port = forms.IntegerField(label="SMTP port", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-28", "id": "yyPort"}))
     security = forms.ChoiceField(
         label="SMTP security",
         choices=SECURITY_CHOICES,
@@ -133,10 +130,8 @@ class SmtpConnForm(forms.Form):
 
         auth_type = (cleaned.get("auth_type") or "").strip()
         if auth_type in ("google_oauth2", "microsoft_oauth2"):
-            # OAuth режим: ручные поля не требуем
             return cleaned
 
-        # login режим: требуем ручные поля
         required = ["host", "port", "security", "username", "from_name", "limit_hour_sent"]
         if self.require_secret:
             required.append("secret")
@@ -151,7 +146,6 @@ class SmtpConnForm(forms.Form):
             self.add_error(None, _("Заполните все поля SMTP."))
             return cleaned
 
-        # лимит 1..300 (non-field)
         try:
             lim = int(cleaned.get("limit_hour_sent") or 0)
         except Exception:
@@ -181,7 +175,7 @@ class ImapConnForm(forms.Form):
     )
 
     host = forms.CharField(label="IMAP host", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yyHost"}))
-    port = forms.IntegerField(label="IMAP port", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-24", "id": "yyPort"}))
+    port = forms.IntegerField(label="IMAP port", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-28", "id": "yyPort"}))
     security = forms.ChoiceField(
         label="IMAP security",
         choices=SECURITY_CHOICES,
@@ -220,7 +214,6 @@ class ImapConnForm(forms.Form):
         if auth_type in ("google_oauth2", "microsoft_oauth2"):
             return cleaned
 
-        # login режим: поля либо все пустые (IMAP не настраиваем), либо все заполнены
         any_val = False
         for k in ("host", "port", "security", "username", "secret"):
             v = cleaned.get(k)
@@ -229,7 +222,6 @@ class ImapConnForm(forms.Form):
                 break
 
         if not any_val:
-            # IMAP не задан — это ок, но на отдельной странице обычно ожидаем save как "delete"
             return cleaned
 
         missing = []
@@ -249,11 +241,6 @@ class ImapConnForm(forms.Form):
 
 
 class SmtpServerForm(forms.Form):
-    """
-    Отдельная страница SMTP (как ты описал).
-    Пресеты: только host/port/security; sender_name/limit — всегда ручные; username по умолчанию = mailbox email (если пусто).
-    """
-
     preset_code = forms.ChoiceField(
         label=_("Пресет провайдера"),
         required=False,
@@ -271,6 +258,12 @@ class SmtpServerForm(forms.Form):
         label=_("Отправитель"),
         required=True,
         widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yySenderName"}),
+    )
+
+    email = forms.EmailField(
+        label=_("Email"),
+        required=True,
+        widget=forms.EmailInput(attrs={"class": "YY-INPUT", "autocomplete": "off", "id": "yyEmail"}),
     )
 
     limit_hour_sent = forms.IntegerField(
@@ -292,7 +285,7 @@ class SmtpServerForm(forms.Form):
     )
 
     host = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yyHost"}))
-    port = forms.IntegerField(required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-28", "id": "yyPort"}))
+    port = forms.IntegerField(required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-24", "id": "yyPort"}))
     security = forms.ChoiceField(
         choices=SECURITY_CHOICES,
         required=False,
@@ -320,7 +313,6 @@ class SmtpServerForm(forms.Form):
     def clean(self):
         cleaned = super().clean()
 
-        # лимит 1..300 (non-field)
         try:
             lim = int(cleaned.get("limit_hour_sent") or 0)
         except Exception:
@@ -334,11 +326,9 @@ class SmtpServerForm(forms.Form):
 
         auth_type = (cleaned.get("auth_type") or "").strip()
         if auth_type in ("google_oauth2", "microsoft_oauth2"):
-            # OAuth режим: поля коннекта не валидируем (там кнопка "Авторизоваться")
             return cleaned
 
-        # LOGIN режим: требуем поля
-        required = ["host", "port", "security", "sender_name", "limit_hour_sent"]
+        required = ["email", "host", "port", "security", "sender_name", "limit_hour_sent"]
         if self.require_password:
             required.append("password")
 
@@ -348,13 +338,12 @@ class SmtpServerForm(forms.Form):
                 self.add_error(None, _("Заполните все поля SMTP (LOGIN)."))
                 return cleaned
 
-        # username: если пустой — подставляем email ящика (как ты просил)
         u = (cleaned.get("username") or "").strip()
         if not u:
-            if self.mailbox_email:
-                cleaned["username"] = self.mailbox_email
-            else:
-                self.add_error(None, _("Заполните логин SMTP."))
-                return cleaned
+            cleaned["username"] = (cleaned.get("email") or "").strip()
+
+        if not (cleaned.get("username") or "").strip():
+            self.add_error(None, _("Заполните логин SMTP."))
+            return cleaned
 
         return cleaned
