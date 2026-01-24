@@ -1,97 +1,69 @@
 // FILE: web/static/js/aap_settings/mail_servers_checks.js
-// DATE: 2026-01-23
-// PURPOSE: Settings → Mail servers: "Проверки" (SMTP/IMAP/DOMAIN) через textarea.
-// CHANGE:
-// - API URL берём из form[data-api-url], чтобы работало на /mail-servers/<id>/smtp/ и /imap/.
-// - Кнопка после клика блокируется минимум на 5 секунд (крутилка), чтобы не спамить провайдера.
+// DATE: 2026-01-24
+// PURPOSE: SMTP/IMAP check helper for settings pages.
+// CHANGE: simple POST to form.dataset.apiUrl with action + mailbox id; writes result into #yyMailChecksOut.
 
 (function () {
-  const HOLD_MS = 5000;
+  function byId(id) { return document.getElementById(id); }
 
-  function yyCsrftoken() {
-    const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
-    return m ? decodeURIComponent(m[1]) : "";
+  function getCsrfToken() {
+    const el = document.querySelector('input[name="csrfmiddlewaretoken"]');
+    return el ? el.value : "";
   }
 
-  function yyBtnSpin(btn, on) {
+  function setBtnLoading(btn, on) {
     if (!btn) return;
-    if (on) {
-      btn.dataset.yyText = btn.textContent || "";
-      btn.disabled = true;
-      btn.innerHTML =
-        '<span class="inline-flex items-center gap-2">' +
-        '<span class="inline-block animate-spin">⏳</span>' +
-        "<span>...</span>" +
-        "</span>";
-    } else {
-      btn.disabled = false;
-      btn.textContent = btn.dataset.yyText || btn.textContent || "";
-      delete btn.dataset.yyText;
-    }
+    btn.disabled = !!on;
+    btn.classList.toggle("opacity-60", !!on);
+    btn.classList.toggle("cursor-not-allowed", !!on);
   }
 
-  function yySetOut(text) {
-    const ta = document.getElementById("yyMailChecksOut");
-    if (!ta) return;
-    ta.value = text || "";
-  }
-
-  function yyGetMailboxToken() {
-    const form = document.getElementById("yyMailServerForm");
-    if (!form) return "";
-    const el = form.querySelector('input[name="id"]');
-    return el ? (el.value || "").trim() : "";
-  }
-
-  function yyApiUrl() {
-    const form = document.getElementById("yyMailServerForm");
-    if (!form) return "api/";
-    const u = (form.dataset.apiUrl || "").trim();
-    return u || "api/";
-  }
-
-  async function yyPostCheck(action) {
-    const fd = new FormData();
-    fd.append("action", action);
-    const tok = yyGetMailboxToken();
-    if (tok) fd.append("id", tok);
-
-    const resp = await fetch(yyApiUrl(), {
+  async function postJson(url, payload) {
+    const r = await fetch(url, {
       method: "POST",
-      body: fd,
-      credentials: "same-origin",
-      headers: { "X-CSRFToken": yyCsrftoken() },
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCsrfToken(),
+      },
+      body: JSON.stringify(payload),
     });
 
-    return await resp.json();
+    const ct = (r.headers.get("content-type") || "").toLowerCase();
+    if (ct.includes("application/json")) return await r.json();
+    return { ok: r.ok, text: await r.text() };
   }
 
-  window.yyMailServersCheck = async function yyMailServersCheck(action, btnId) {
-    const btn = document.getElementById(btnId);
-    if (!btn || btn.disabled) return;
+  window.yyMailServersCheck = async function (action, btnId) {
+    const form = byId("yySmtpForm") || document.querySelector("form[data-api-url]");
+    const out = byId("yyMailChecksOut");
+    const btn = byId(btnId);
 
-    const tStart = Date.now();
-    yyBtnSpin(btn, true);
+    if (!form) return;
+    const url = form.getAttribute("data-api-url") || "";
+    if (!url) return;
 
-    let data = null;
+    const mbIdEl = form.querySelector('input[name="id"]');
+    const mailbox_ui_id = mbIdEl ? (mbIdEl.value || "") : "";
+
+    if (out) out.value = "…";
+
+    setBtnLoading(btn, true);
     try {
-      data = await yyPostCheck(action);
-    } catch (e) {
-      data = { ok: false, error: "network" };
-    }
+      const res = await postJson(url, { action: action, id: mailbox_ui_id });
 
-    const elapsed = Date.now() - tStart;
-    const wait = Math.max(0, HOLD_MS - elapsed);
-
-    window.setTimeout(() => {
-      yyBtnSpin(btn, false);
-
-      if (!data || !data.ok) {
-        yySetOut("ERROR: " + (data && (data.error || data.message) ? (data.error || data.message) : "unknown"));
-        return;
+      if (out) {
+        if (res && typeof res === "object") {
+          if (res.user_message) out.value = String(res.user_message);
+          else if (res.text) out.value = String(res.text);
+          else out.value = JSON.stringify(res, null, 2);
+        } else {
+          out.value = String(res || "");
+        }
       }
-
-      yySetOut(data.message || "OK");
-    }, wait);
+    } catch (e) {
+      if (out) out.value = "ERROR: " + (e && e.message ? e.message : String(e));
+    } finally {
+      setBtnLoading(btn, false);
+    }
   };
 })();
