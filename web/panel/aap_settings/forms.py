@@ -1,28 +1,85 @@
 # FILE: web/panel/aap_settings/forms.py
 # DATE: 2026-01-24
-# PURPOSE: Settings → Mail servers: формы для Mailbox / SMTP / IMAP + отдельная страница SMTP.
+# PURPOSE: Settings → Mail servers: формы для Mailbox / SMTP / IMAP + отдельная SMTP-страница.
 # CHANGE:
-# - Сохранены существующие формы: MailboxAddForm / SmtpConnForm / ImapConnForm.
-# - Добавлена SmtpServerForm: отдельная страница SMTP (LOGIN + OAuth2-заглушки) + пресеты (только host/port/security).
-# - Убрано дублирование AUTH_CHOICES: берём choices из модели AuthType.
+# - LOGIN-поля (host/port/security/username/password) строятся по ключам TypedDict из engine/common/mail/types.py.
+# - ConnSecurity choices/validation берутся из ConnSecurity (single source of truth).
+# - НИКАКИХ JS id / legacy hooks в формах. Это зона HTML/JS.
+# - Формы НЕ знают ничего про OAuth и auth_type (кроме «поле существует как строка»).
 
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import Any, Callable, Dict, List, Tuple, get_args
 
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
-from panel.aap_settings.models import Mailbox, AuthType
+from engine.common.mail.types import ConnSecurity, ImapCredsLogin, SmtpCredsLogin
+from panel.aap_settings.models import Mailbox
 
 
-SECURITY_CHOICES = [
-    ("starttls", "STARTTLS"),
-    ("ssl", "SSL / TLS"),
-    ("none", "None"),
-]
+def _typed_dict_keys(td: Any) -> List[str]:
+    ann = getattr(td, "__annotations__", {}) or {}
+    return list(ann.keys())
 
-AUTH_CHOICES = AuthType.choices
+
+SMTP_LOGIN_KEYS = _typed_dict_keys(SmtpCredsLogin)  # canonical keys
+IMAP_LOGIN_KEYS = _typed_dict_keys(ImapCredsLogin)  # canonical keys (alias today)
+
+
+SECURITY_VALUES = list(get_args(ConnSecurity))
+SECURITY_SET = set(SECURITY_VALUES)
+
+SECURITY_LABELS: Dict[str, str] = {
+    "ssl": "SSL / TLS",
+    "starttls": "STARTTLS",
+    "none": "None",
+}
+SECURITY_CHOICES = [(v, SECURITY_LABELS[v]) for v in SECURITY_VALUES]  # KeyError -> fail fast if drift
+
+
+def _any_filled(cleaned: Dict[str, Any], keys: List[str]) -> bool:
+    for k in keys:
+        v = cleaned.get(k)
+        if v is None:
+            continue
+        if isinstance(v, str):
+            if v.strip():
+                return True
+        else:
+            if str(v).strip():
+                return True
+    return False
+
+
+def _require_all_or_error(form: forms.Form, cleaned: Dict[str, Any], keys: List[str], msg: str) -> bool:
+    for k in keys:
+        v = cleaned.get(k)
+        if v is None or (isinstance(v, str) and not v.strip()):
+            form.add_error(None, msg)
+            return False
+    return True
+
+
+# ============
+# Canonical LOGIN field builders (strict dict map)
+# Missing key => KeyError => fail fast (desired)
+# ============
+
+LOGIN_FIELD_BUILDERS: Dict[str, Callable[[], forms.Field]] = {
+    "host": lambda: forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT"})),
+    "port": lambda: forms.IntegerField(required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-28"})),
+    "security": lambda: forms.ChoiceField(
+        required=False,
+        choices=SECURITY_CHOICES,
+        widget=forms.Select(attrs={"class": "YY-INPUT !px-1"}),
+    ),
+    "username": lambda: forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT"})),
+    "password": lambda: forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(attrs={"class": "YY-INPUT", "autocomplete": "off"}, render_value=True),
+    ),
+}
 
 
 class MailboxAddForm(forms.Form):
@@ -54,39 +111,30 @@ class MailboxAddForm(forms.Form):
         return cleaned
 
 
-class SmtpConnForm(forms.Form):
-    preset_code = forms.ChoiceField(
-        label=_("Пресет провайдера"),
-        required=False,
-        widget=forms.Select(attrs={"class": "YY-INPUT !mb-0", "id": "yyPresetSelect"}),
-    )
+class _LoginFieldsFromTypesMixin:
+    login_keys: List[str] = []
 
-    auth_type = forms.ChoiceField(
-        label=_("Auth"),
-        choices=AUTH_CHOICES,
-        required=True,
-        widget=forms.Select(attrs={"class": "YY-INPUT !px-1", "id": "yyAuthType"}),
-    )
+    def _attach_login_fields(self) -> None:
+        for k in self.login_keys:
+            builder = LOGIN_FIELD_BUILDERS[k]  # KeyError is desired
+            self.fields[k] = builder()
 
-    host = forms.CharField(label="SMTP host", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yyHost"}))
-    port = forms.IntegerField(label="SMTP port", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-28", "id": "yyPort"}))
-    security = forms.ChoiceField(
-        label="SMTP security",
-        choices=SECURITY_CHOICES,
-        required=False,
-        widget=forms.Select(attrs={"class": "YY-INPUT !px-1", "id": "yySecurity"}),
-    )
-    username = forms.CharField(label="SMTP username", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yyUsername"}))
-    secret = forms.CharField(
-        label="SMTP password / token",
-        required=False,
-        widget=forms.PasswordInput(attrs={"class": "YY-INPUT", "autocomplete": "off", "id": "yySecret"}, render_value=True),
-    )
+
+class SmtpConnForm(forms.Form, _LoginFieldsFromTypesMixin):
+    """
+    Combined mail_servers page: SMTP block.
+    Contains SMTP identity fields + canonical LOGIN creds fields.
+    """
+
+    login_keys = SMTP_LOGIN_KEYS
+
+    # exists, but not interpreted here
+    auth_type = forms.CharField(required=False, widget=forms.HiddenInput())
 
     from_name = forms.CharField(
         label=_("Отправитель:"),
         required=False,
-        widget=forms.TextInput(attrs={"class": "YY-INPUT", "placeholder": _("Отправитель"), "id": "yyFromName"}),
+        widget=forms.TextInput(attrs={"class": "YY-INPUT", "placeholder": _("Отправитель")}),
     )
 
     limit_hour_sent = forms.IntegerField(
@@ -102,48 +150,33 @@ class SmtpConnForm(forms.Form):
                 "min": "1",
                 "max": "300",
                 "autocomplete": "off",
-                "id": "yyLimitHour",
             }
         ),
     )
 
-    def __init__(
-        self,
-        *args,
-        preset_choices: List[Tuple[str, str]] | None = None,
-        require_secret: bool = True,
-        secret_masked: bool = False,
-        **kwargs,
-    ):
+    def __init__(self, *args, require_password: bool = True, password_masked: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["preset_code"].choices = [("", "—")] + (preset_choices or [])
+        self.require_password = bool(require_password)
+        self._attach_login_fields()
 
-        self.require_secret = bool(require_secret)
-        if not self.require_secret:
-            self.fields["secret"].required = False
+        if not self.require_password:
+            self.fields["password"].required = False
 
-        if secret_masked:
-            self.fields["secret"].widget.attrs.update({"readonly": "readonly", "data-yy-masked": "1", "oncopy": "return false;"})
+        if password_masked:
+            self.fields["password"].widget.attrs.update({"readonly": "readonly", "data-yy-masked": "1", "oncopy": "return false;"})
 
     def clean(self):
         cleaned = super().clean()
 
-        auth_type = (cleaned.get("auth_type") or "").strip()
-        if auth_type in ("google_oauth2", "microsoft_oauth2"):
+        touched = _any_filled(cleaned, ["from_name", "limit_hour_sent"] + self.login_keys)
+        if not touched:
             return cleaned
 
-        required = ["host", "port", "security", "username", "from_name", "limit_hour_sent"]
-        if self.require_secret:
-            required.append("secret")
+        required = ["from_name", "limit_hour_sent", "host", "port", "security", "username"]
+        if self.require_password:
+            required.append("password")
 
-        missing = []
-        for f in required:
-            v = cleaned.get(f)
-            if v is None or (isinstance(v, str) and not v.strip()):
-                missing.append(f)
-
-        if missing:
-            self.add_error(None, _("Заполните все поля SMTP."))
+        if not _require_all_or_error(self, cleaned, required, _("Заполните все поля SMTP.")):
             return cleaned
 
         try:
@@ -157,113 +190,76 @@ class SmtpConnForm(forms.Form):
             self.add_error(None, _("Максимум 300 писем в час."))
             return cleaned
 
+        sec = (cleaned.get("security") or "").strip()
+        if sec not in SECURITY_SET:
+            self.add_error("security", _("Некорректное значение шифрования."))
+            return cleaned
+
         return cleaned
 
 
-class ImapConnForm(forms.Form):
-    preset_code = forms.ChoiceField(
-        label=_("Пресет провайдера"),
-        required=False,
-        widget=forms.Select(attrs={"class": "YY-INPUT !mb-0", "id": "yyPresetSelect"}),
-    )
+class ImapConnForm(forms.Form, _LoginFieldsFromTypesMixin):
+    """
+    Combined mail_servers page: IMAP block.
+    Contains canonical LOGIN creds fields.
+    """
 
-    auth_type = forms.ChoiceField(
-        label=_("Auth"),
-        choices=AUTH_CHOICES,
-        required=True,
-        widget=forms.Select(attrs={"class": "YY-INPUT !px-1", "id": "yyAuthType"}),
-    )
+    login_keys = IMAP_LOGIN_KEYS
 
-    host = forms.CharField(label="IMAP host", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yyHost"}))
-    port = forms.IntegerField(label="IMAP port", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-28", "id": "yyPort"}))
-    security = forms.ChoiceField(
-        label="IMAP security",
-        choices=SECURITY_CHOICES,
-        required=False,
-        widget=forms.Select(attrs={"class": "YY-INPUT !px-1", "id": "yySecurity"}),
-    )
-    username = forms.CharField(label="IMAP username", required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yyUsername"}))
-    secret = forms.CharField(
-        label="IMAP password / token",
-        required=False,
-        widget=forms.PasswordInput(attrs={"class": "YY-INPUT", "autocomplete": "off", "id": "yySecret"}, render_value=True),
-    )
+    auth_type = forms.CharField(required=False, widget=forms.HiddenInput())
 
-    def __init__(
-        self,
-        *args,
-        preset_choices: List[Tuple[str, str]] | None = None,
-        require_secret: bool = False,
-        secret_masked: bool = False,
-        **kwargs,
-    ):
+    def __init__(self, *args, require_password: bool = False, password_masked: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["preset_code"].choices = [("", "—")] + (preset_choices or [])
+        self.require_password = bool(require_password)
+        self._attach_login_fields()
 
-        self.require_secret = bool(require_secret)
-        if not self.require_secret:
-            self.fields["secret"].required = False
+        if not self.require_password:
+            self.fields["password"].required = False
 
-        if secret_masked:
-            self.fields["secret"].widget.attrs.update({"readonly": "readonly", "data-yy-masked": "1", "oncopy": "return false;"})
+        if password_masked:
+            self.fields["password"].widget.attrs.update({"readonly": "readonly", "data-yy-masked": "1", "oncopy": "return false;"})
 
     def clean(self):
         cleaned = super().clean()
 
-        auth_type = (cleaned.get("auth_type") or "").strip()
-        if auth_type in ("google_oauth2", "microsoft_oauth2"):
+        if not _any_filled(cleaned, self.login_keys):
             return cleaned
 
-        any_val = False
-        for k in ("host", "port", "security", "username", "secret"):
-            v = cleaned.get(k)
-            if v is not None and str(v).strip():
-                any_val = True
-                break
-
-        if not any_val:
-            return cleaned
-
-        missing = []
         required = ["host", "port", "security", "username"]
-        if self.require_secret:
-            required.append("secret")
-        for f in required:
-            v = cleaned.get(f)
-            if v is None or (isinstance(v, str) and not v.strip()):
-                missing.append(f)
+        if self.require_password:
+            required.append("password")
 
-        if missing:
-            self.add_error(None, _("Заполните все поля IMAP."))
+        if not _require_all_or_error(self, cleaned, required, _("Заполните все поля IMAP.")):
+            return cleaned
+
+        sec = (cleaned.get("security") or "").strip()
+        if sec not in SECURITY_SET:
+            self.add_error("security", _("Некорректное значение шифрования."))
             return cleaned
 
         return cleaned
 
 
-class SmtpServerForm(forms.Form):
-    preset_code = forms.ChoiceField(
-        label=_("Пресет провайдера"),
-        required=False,
-        widget=forms.Select(attrs={"class": "YY-INPUT !mb-0", "id": "yyPresetSelect"}),
-    )
+class SmtpServerForm(forms.Form, _LoginFieldsFromTypesMixin):
+    """
+    Separate SMTP server page.
+    Contains mailbox identity fields + canonical LOGIN creds fields.
+    """
 
-    auth_type = forms.ChoiceField(
-        label="Auth",
-        choices=AUTH_CHOICES,
-        required=True,
-        widget=forms.HiddenInput(attrs={"id": "yyAuthType"}),
-    )
+    login_keys = SMTP_LOGIN_KEYS
+
+    auth_type = forms.CharField(required=False, widget=forms.HiddenInput())
 
     sender_name = forms.CharField(
         label=_("Отправитель"),
         required=True,
-        widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yySenderName"}),
+        widget=forms.TextInput(attrs={"class": "YY-INPUT"}),
     )
 
     email = forms.EmailField(
         label=_("Email"),
         required=True,
-        widget=forms.EmailInput(attrs={"class": "YY-INPUT", "autocomplete": "off", "id": "yyEmail"}),
+        widget=forms.EmailInput(attrs={"class": "YY-INPUT", "autocomplete": "off"}),
     )
 
     limit_hour_sent = forms.IntegerField(
@@ -279,36 +275,17 @@ class SmtpServerForm(forms.Form):
                 "min": "1",
                 "max": "300",
                 "autocomplete": "off",
-                "id": "yyLimitHour",
             }
         ),
     )
 
-    host = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yyHost"}))
-    port = forms.IntegerField(required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT !w-24", "id": "yyPort"}))
-    security = forms.ChoiceField(
-        choices=SECURITY_CHOICES,
-        required=False,
-        widget=forms.Select(attrs={"class": "YY-INPUT !px-1", "id": "yySecurity"}),
-    )
-    username = forms.CharField(required=False, widget=forms.TextInput(attrs={"class": "YY-INPUT", "id": "yyUsername"}))
-    password = forms.CharField(
-        required=False,
-        widget=forms.PasswordInput(attrs={"class": "YY-INPUT", "autocomplete": "off", "id": "yyPassword"}, render_value=True),
-    )
-
-    def __init__(
-        self,
-        *args,
-        preset_choices: List[Tuple[str, str]] | None = None,
-        require_password: bool = True,
-        mailbox_email: str = "",
-        **kwargs,
-    ):
+    def __init__(self, *args, require_password: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["preset_code"].choices = [("", "—")] + (preset_choices or [])
         self.require_password = bool(require_password)
-        self.mailbox_email = (mailbox_email or "").strip().lower()
+        self._attach_login_fields()
+
+        if not self.require_password:
+            self.fields["password"].required = False
 
     def clean(self):
         cleaned = super().clean()
@@ -324,26 +301,19 @@ class SmtpServerForm(forms.Form):
             self.add_error(None, _("Максимум 300 писем в час."))
             return cleaned
 
-        auth_type = (cleaned.get("auth_type") or "").strip()
-        if auth_type in ("google_oauth2", "microsoft_oauth2"):
+        if not _any_filled(cleaned, self.login_keys):
             return cleaned
 
-        required = ["email", "host", "port", "security", "sender_name", "limit_hour_sent"]
+        required = ["host", "port", "security", "username"]
         if self.require_password:
             required.append("password")
 
-        for f in required:
-            v = cleaned.get(f)
-            if v is None or (isinstance(v, str) and not v.strip()):
-                self.add_error(None, _("Заполните все поля SMTP (LOGIN)."))
-                return cleaned
+        if not _require_all_or_error(self, cleaned, required, _("Заполните все поля SMTP (LOGIN).")):
+            return cleaned
 
-        u = (cleaned.get("username") or "").strip()
-        if not u:
-            cleaned["username"] = (cleaned.get("email") or "").strip()
-
-        if not (cleaned.get("username") or "").strip():
-            self.add_error(None, _("Заполните логин SMTP."))
+        sec = (cleaned.get("security") or "").strip()
+        if sec not in SECURITY_SET:
+            self.add_error("security", _("Некорректное значение шифрования."))
             return cleaned
 
         return cleaned

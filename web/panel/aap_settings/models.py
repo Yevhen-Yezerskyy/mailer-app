@@ -1,17 +1,19 @@
 # FILE: web/panel/aap_settings/models.py
 # DATE: 2026-01-24
-# PURPOSE: aap_settings models (FINAL, CLEAN) — восстановлено как в архиве 2026-01-23, чтобы вернуть SendingSettings/MailboxOAuthApp и снять ImportError.
-# CHANGE: ВОССТАНОВЛЕНО исходное содержимое файла (без самодеятельных добавлений/удалений).
+# PURPOSE: aap_settings models: bind auth_type values to engine/common/mail/types.py canonical list.
+# CHANGE:
+# - auth_type choices now come from SMTP_CREDENTIALS_FORMAT keys (LOGIN/GOOGLE_OAUTH_2_0/MICROSOFT_OAUTH_2_0).
+# - DB fields unchanged.
 
 from __future__ import annotations
 
 from django.db import models
 
+from engine.common.mail.types import IMAP_CREDENTIALS_FORMAT, SMTP_CREDENTIALS_FORMAT
 
-class AuthType(models.TextChoices):
-    LOGIN = "login", "Login"
-    GOOGLE_OAUTH2 = "google_oauth2", "Google OAuth2"
-    MICROSOFT_OAUTH2 = "microsoft_oauth2", "Microsoft OAuth2"
+
+AUTH_TYPE_CHOICES = [(k, k) for k in SMTP_CREDENTIALS_FORMAT.keys()]
+AUTH_TYPE_DEFAULT = "LOGIN"
 
 
 class Mailbox(models.Model):
@@ -51,21 +53,17 @@ class SmtpMailbox(models.Model):
 
     auth_type = models.CharField(
         max_length=32,
-        choices=AuthType.choices,
-        default=AuthType.LOGIN,
+        choices=AUTH_TYPE_CHOICES,
+        default=AUTH_TYPE_DEFAULT,
     )
 
-    # ВСЕ данные логина / OAuth (host/port/tls/user/secret или oauth-поля)
+    # credentials_json строго соответствует engine/common/mail/types.py (SMTP_* formats)
     credentials_json = models.JSONField(default=dict)
 
-    # Отправитель (НЕ логин)
     sender_name = models.CharField(max_length=255, blank=True, default="")
     from_email = models.EmailField()
 
-    # Лимиты
     limit_hour_sent = models.PositiveIntegerField(default=50)
-
-    # Доп. заголовки писем (BCC, Reply-To, etc.)
     extra_headers_json = models.JSONField(default=dict, blank=True)
 
     is_active = models.BooleanField(default=True)
@@ -87,11 +85,11 @@ class ImapMailbox(models.Model):
 
     auth_type = models.CharField(
         max_length=32,
-        choices=AuthType.choices,
-        default=AuthType.LOGIN,
+        choices=[(k, k) for k in IMAP_CREDENTIALS_FORMAT.keys()],
+        default=AUTH_TYPE_DEFAULT,
     )
 
-    # ВСЕ данные логина / OAuth
+    # credentials_json строго соответствует engine/common/mail/types.py (IMAP_* formats)
     credentials_json = models.JSONField(default=dict)
 
     is_active = models.BooleanField(default=True)
@@ -104,18 +102,19 @@ class ImapMailbox(models.Model):
         db_table = "aap_settings_imap_mailboxes"
 
 
-
 class ProviderPreset(models.Model):
     """
-    UI-only presets.
-    Никакой логики, только подсказки для автозаполнения форм.
+    UI-only presets. preset_json может содержать:
+    {
+      "smtp": {"login": {"host": "...", "port": 587, "security": "starttls"}, "auth_type": "LOGIN", ...},
+      "imap": {"login": {"host": "...", "port": 993, "security": "ssl"}, "auth_type": "LOGIN", ...},
+    }
     """
 
     name = models.CharField(max_length=255)
-
     preset_json = models.JSONField(
         default=dict,
-        help_text="Произвольные подсказки для UI (host/ports/tls/oauth_hint/etc.)",
+        help_text="Произвольные подсказки для UI (smtp/imap host/ports/security/auth_type/oauth_hint/etc.)",
     )
 
     is_active = models.BooleanField(default=True)
