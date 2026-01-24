@@ -2,9 +2,10 @@
 # DATE: 2026-01-24
 # PURPOSE: Settings → Mail servers: mailbox list/add/edit/delete (legacy state UX) + domain test.
 # CHANGE:
-# - Убран MailboxConnection и весь мусор SMTP/IMAP из этого файла.
-# - smtp/imap “настроен/не настроен” определяется по наличию SmtpMailbox/ImapMailbox.
-# - Оставлены только нужные импорты/хелперы и mail_servers_list_view.
+# - Шаблон: mail_servers.html (вместо mail_servers_list.html)
+# - Роуты/redirect/reverse: имя страницы 'settings:mail_servers' (а не mail_servers_list)
+# - SMTP/IMAP “настроен/не настроен” по наличию SmtpMailbox/ImapMailbox.
+# - Статусы проверок берём из mailbox_events (SMTP_CHECK/IMAP_CHECK/DOMAIN_*).
 
 from __future__ import annotations
 
@@ -35,7 +36,7 @@ def _domain_from_mailbox(mb: Mailbox) -> str:
     return ""
 
 
-def mail_servers_list_view(request):
+def mail_servers_view(request):
     """
     (1) Список mailbox + add/edit mailbox (только email) + delete mailbox.
     UX: ?state=add / ?state=edit&id=...
@@ -107,11 +108,11 @@ def mail_servers_list_view(request):
         try:
             mailbox_id = int(decode_id(token))
         except Exception:
-            return redirect(reverse("settings:mail_servers_list"))
+            return redirect(reverse("settings:mail_servers"))
 
         edit_obj = Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).first()
         if not edit_obj:
-            return redirect(reverse("settings:mail_servers_list"))
+            return redirect(reverse("settings:mail_servers"))
 
         _apply_ui_fields(edit_obj)
 
@@ -119,34 +120,34 @@ def mail_servers_list_view(request):
         action = (request.POST.get("action") or "").strip()
 
         if action == "close":
-            return redirect(reverse("settings:mail_servers_list"))
+            return redirect(reverse("settings:mail_servers"))
 
         if action == "delete":
             token = (request.POST.get("id") or "").strip()
             try:
                 mailbox_id = int(decode_id(token))
             except Exception:
-                return redirect(reverse("settings:mail_servers_list"))
+                return redirect(reverse("settings:mail_servers"))
 
             Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).delete()
-            return redirect(reverse("settings:mail_servers_list"))
+            return redirect(reverse("settings:mail_servers"))
 
         if action == "test_domain":
             token = (request.POST.get("id") or "").strip()
             try:
                 mailbox_id = int(decode_id(token))
             except Exception:
-                return redirect(reverse("settings:mail_servers_list"))
+                return redirect(reverse("settings:mail_servers"))
 
             mb = Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).first()
             if not mb:
-                return redirect(reverse("settings:mail_servers_list"))
+                return redirect(reverse("settings:mail_servers"))
 
             if not is_domain_whitelisted(_domain_from_mailbox(mb)):
                 domain_tech_check_and_log(int(mb.id))
                 domain_reputation_check_and_log(int(mb.id))
 
-            return redirect(reverse("settings:mail_servers_list"))
+            return redirect(reverse("settings:mail_servers"))
 
         # save (add/edit)
         mailbox_id = int(edit_obj.id) if (state == "edit" and edit_obj) else None
@@ -155,7 +156,7 @@ def mail_servers_list_view(request):
         if not form.is_valid():
             return render(
                 request,
-                "panels/aap_settings/mail_servers_list.html",
+                "panels/aap_settings/mail_servers.html",
                 {
                     "state": state or "add",
                     "form": form,
@@ -170,10 +171,10 @@ def mail_servers_list_view(request):
         if mailbox_id is not None:
             Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).update(email=email, domain=domain)
             tok = encode_id(int(mailbox_id))
-            return redirect(reverse("settings:mail_servers_list") + f"?state=edit&id={tok}")
+            return redirect(reverse("settings:mail_servers") + f"?state=edit&id={tok}")
 
         mb = Mailbox.objects.create(workspace_id=ws_id, email=email, domain=domain)
-        return redirect(reverse("settings:mail_servers_list") + f"?state=edit&id={encode_id(int(mb.id))}")
+        return redirect(reverse("settings:mail_servers") + f"?state=edit&id={encode_id(int(mb.id))}")
 
     if state == "edit" and edit_obj:
         form = MailboxAddForm(initial={"email": edit_obj.email}, workspace_id=ws_id, mailbox_id=int(edit_obj.id))
@@ -182,7 +183,7 @@ def mail_servers_list_view(request):
 
     return render(
         request,
-        "panels/aap_settings/mail_servers_list.html",
+        "panels/aap_settings/mail_servers.html",
         {
             "state": state,
             "form": form,
@@ -190,3 +191,7 @@ def mail_servers_list_view(request):
             "edit_obj": edit_obj,
         },
     )
+
+
+# backward-compat (если где-то импортируют старое имя)
+mail_servers_list_view = mail_servers_view

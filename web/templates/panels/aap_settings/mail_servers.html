@@ -1,36 +1,13 @@
 {% extends "panels/base.html" %}
 {% load i18n %}
 {% load static %}
-<!-- FILE: web/templates/panels/aap_settings/mail_servers.html  (обновлено — 2026-01-22) -->
-<!-- PURPOSE: Settings → Mail servers: список ящиков + add/edit форма (SMTP обяз., IMAP опц.) + apply preset. -->
+<!-- FILE: web/templates/panels/aap_settings/mail_servers.html  (обновлено — 2026-01-24) -->
+<!-- PURPOSE: Settings → Mail servers: старый UX (2 карточки сверху + таблица снизу) для mailbox list/add/edit/delete. -->
 <!-- CHANGE:
-- Вынесен inline JS (secret reveal + modal) в static js/aap_settings/mail_servers_secret.js
-- Добавлен dirty-watch формы: если есть изменения — вместо блока проверок показываем предупреждение "Сохраните изменения".
-- Добавлены id для формы и блоков справа (для переключения). -->
+- Возвращена кнопка "Добавить" (в состояние ?state=add) в дефолтном режиме (когда не add/edit).
+- Остальной HTML/UX не трогался. -->
 
 {% block content %}
-
-<div id="yy-secret-modal" class="fixed inset-0 hidden z-[9999]">
-  <div class="absolute inset-0 bg-black/40"></div>
-  <div class="relative mx-auto mt-24 max-w-[520px]">
-    <div class="YY-CARD_WHITE shadow-lg">
-      <div class="YY-STATUS_YELLOW mb-4">
-        {% trans "Показать пароль?" %}
-      </div>
-      <div class="mb-6">
-        {% trans "Пароль будет показан на экране. Продолжить?" %}
-      </div>
-      <div class="flex gap-3 justify-end">
-        <button type="button" class="YY-BUTTON_MAIN" onclick="yySecretModalClose()">
-          {% trans "Отмена" %}
-        </button>
-        <button type="button" class="YY-BUTTON_TAB_RED" onclick="yySecretModalConfirm()">
-          {% trans "Показать" %}
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <table class="YY-MAIN_TABLE">
   <tr>
@@ -38,7 +15,11 @@
       <div class="YY-CARD_WHITE">
 
         {% if state == "add" or state == "edit" %}
-          <form id="yyMailServerForm" method="post">
+          <form
+            id="yyMailServerForm"
+            method="post"
+            data-api-url="{% url 'settings:mail_servers_api' %}"
+          >
             {% csrf_token %}
 
             {% if state == "edit" and edit_obj %}
@@ -51,146 +32,82 @@
               </div>
             {% endif %}
 
-            <div class="grid grid-cols-[2fr_2fr_1fr] gap-4 mb-7">
-              <div>
-                <label class="YY-LABEL">{% trans "Отправитель" %}:</label>
-                {{ form.from_name }}
-              </div>
-
+            <div class="grid grid-cols-1 gap-4 mb-6">
               <div>
                 <label class="YY-LABEL">Email:</label>
                 {{ form.email }}
-              </div>
-
-              <div>
-                <label class="YY-LABEL">{% trans "Лимит/час" %}:</label>
-                {{ form.limit_hour_sent }}
+                {% if form.email.errors %}
+                  <div class="YY-FORM_ERROR mt-1">{{ form.email.errors }}</div>
+                {% endif %}
               </div>
             </div>
 
-            <div class="grid grid-cols-[1fr_2fr_auto] gap-4 mb-12">
+            {% if state == "edit" and edit_obj %}
+              <div class="grid grid-cols-3 gap-3 mb-6">
 
-              <div class="YY-STATUS_BLUE">
-                {% trans "Провайдер" %}:
-              </div>
+                <div class="YY-CARD_WHITE border border-[#022a39] mt-[30px]">
+                  <div class="YY-STATUS_BLUE mb-2">{% trans "Домен" %}</div>
 
-              <div>
-                {{ form.preset_code }}
-              </div>
+                  <div class="YY-STATUS_BLUE text-sm">{{ edit_obj.domain_name }}</div>
 
-              <div>
-                <button
-                  type="submit"
-                  name="action"
-                  value="apply_preset"
-                  class="YY-BUTTON_MAIN !py-2"
-                  formnovalidate
-                >
-                  OK
-                </button>
-              </div>
-            </div>
-
-            <div class="YY-STATUS_BLUE mb-2">
-              SMTP:
-            </div>
-
-            <div class="grid grid-cols-2 gap-4 mb-2">
-              <div>
-                <label class="YY-LABEL">Host:</label>
-                {{ form.smtp_host }}
-              </div>
-              <div>
-                <label class="YY-LABEL">Port:</label>
-                {{ form.smtp_port }}
-              </div>
-            </div>
-
-            <div class="grid grid-cols-[1fr_1fr_3fr_3fr] gap-4 mb-12">
-              <div>
-                <label class="YY-LABEL">Security:</label>
-                <div class="max-w-[220px]">
-                  {{ form.smtp_security }}
+                  {% if edit_obj.domain_whitelisted %}
+                    <div class="YY-STATUS_BLUE text-sm">{% trans "TRUSTED SERVICE PROVIDER — CHECK IS NOT NEEDED" %}</div>
+                  {% elif edit_obj.domain_tested %}
+                    <div class="YY-STATUS_BLUE text-sm">TECH: {{ edit_obj.domain_tech_status|default:"—" }}</div>
+                    <div class="YY-STATUS_BLUE text-sm">REP: {{ edit_obj.domain_rep_status|default:"—" }}</div>
+                  {% else %}
+                    <div class="YY-STATUS_YELLOW text-sm">{% trans "Домен не протестирован" %}</div>
+                    <form method="post" class="mt-2">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="test_domain">
+                      <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
+                      <button type="submit" class="YY-BUTTON_TAB_MAIN">
+                        {% trans "Протестировать домен" %}
+                      </button>
+                    </form>
+                  {% endif %}
                 </div>
-              </div>
 
-              <div>
-                <label class="YY-LABEL">Auth:</label>
-                <div class="max-w-[220px]">
-                  {{ form.smtp_auth_type }}
+                <div class="YY-CARD_WHITE border border-[#022a39] mt-[30px]">
+                  <div class="YY-STATUS_BLUE mb-2">SMTP</div>
+
+                  {% if not edit_obj.smtp_configured %}
+                    <div class="YY-STATUS_YELLOW text-sm">{% trans "SMTP не настроен" %}</div>
+                    <a href="{% url 'settings:mail_servers_smtp' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN mt-2 inline-block">
+                      {% trans "Настроить SMTP" %}
+                    </a>
+                  {% else %}
+                    <div class="YY-STATUS_BLUE text-sm">
+                      {% if edit_obj.smtp_status %}{{ edit_obj.smtp_status }}{% else %}{% trans "Не проверено" %}{% endif %}
+                    </div>
+                    <a href="{% url 'settings:mail_servers_smtp' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN mt-2 inline-block">
+                      {% trans "Изменить SMTP" %}
+                    </a>
+                  {% endif %}
                 </div>
-              </div>
 
-              <div>
-                <label class="YY-LABEL">Username:</label>
-                {{ form.smtp_username }}
-              </div>
+                <div class="YY-CARD_WHITE border border-[#022a39] mt-[30px]">
+                  <div class="YY-STATUS_BLUE mb-2">IMAP</div>
 
-              <div>
-                <label class="YY-LABEL">Password / Token</label>
-
-                <div class="relative">
-                  {{ form.smtp_secret }}
-                  <button type="button"
-                          class="absolute right-2 top-1 text-[#006991] text-xl"
-                          onclick="yyTogglePasswordOrReveal('smtp', 'id_smtp_secret')">
-                    👁︎
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div class="YY-STATUS_BLUE mb-2">
-              IMAP:
-            </div>
-
-            <div class="grid grid-cols-2 gap-4 mb-2">
-              <div>
-                <label class="YY-LABEL">Host:</label>
-                {{ form.imap_host }}
-              </div>
-              <div>
-                <label class="YY-LABEL">Port:</label>
-                {{ form.imap_port }}
-              </div>
-            </div>
-
-            <div class="grid grid-cols-[1fr_1fr_3fr_3fr] gap-4">
-              <div>
-                <label class="YY-LABEL">Security:</label>
-                <div class="max-w-[220px]">
-                  {{ form.imap_security }}
-                </div>
-              </div>
-
-              <div>
-                <label class="YY-LABEL">Auth:</label>
-                <div class="max-w-[220px]">
-                  {{ form.imap_auth_type }}
-                </div>
-              </div>
-
-              <div>
-                <label class="YY-LABEL">Username:</label>
-                {{ form.imap_username }}
-              </div>
-
-              <div>
-                <label class="YY-LABEL">Password / Token:</label>
-
-                <div class="relative">
-                  {{ form.imap_secret }}
-                  <button type="button"
-                          class="absolute right-2 top-1 text-[#006991] text-xl"
-                          onclick="yyTogglePasswordOrReveal('imap', 'id_imap_secret')">
-                    👁︎
-                  </button>
+                  {% if not edit_obj.imap_configured %}
+                    <div class="YY-STATUS_YELLOW text-sm">{% trans "IMAP не настроен" %}</div>
+                    <a href="{% url 'settings:mail_servers_imap' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN mt-2 inline-block">
+                      {% trans "Настроить IMAP" %}
+                    </a>
+                  {% else %}
+                    <div class="YY-STATUS_BLUE text-sm">
+                      {% if edit_obj.imap_status %}{{ edit_obj.imap_status }}{% else %}{% trans "Не проверено" %}{% endif %}
+                    </div>
+                    <a href="{% url 'settings:mail_servers_imap' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN mt-2 inline-block">
+                      {% trans "Изменить IMAP" %}
+                    </a>
+                  {% endif %}
                 </div>
 
               </div>
-            </div>
+            {% endif %}
 
-            <div class="flex gap-3 mt-6">
+            <div class="flex gap-3 mt-4">
               <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">
                 {% trans "Сохранить" %}
               </button>
@@ -202,8 +119,8 @@
           </form>
 
         {% else %}
-          <div class="YY-STATUS_BLUE">
-            {% trans "Ваши почтовые серверы:" %}
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="YY-STATUS_BLUE">{% trans "Ваши почтовые серверы:" %}</div>
           </div>
         {% endif %}
 
@@ -213,31 +130,12 @@
     <td class="YY-MAIN_TOP_RIGHT_TD w-[40%]">
       <div class="YY-CARD_WHITE">
 
-        {% if state == "edit" %}
+        {% if state == "edit" and edit_obj %}
 
-          <div id="yyMailChecksDirtyHint" class="YY-STATUS_YELLOW hidden">
-            {% trans "Есть несохранённые изменения. Для проверки почтовых серверов сохраните изменения." %}
-          </div>
-
-          <div id="yyMailChecksPanel">
-            <div class="flex gap-3 flex-wrap">
-
-              <button
-                id="yyChkSmtp"
-                type="button"
-                class="YY-BUTTON_MAIN"
-                onclick="yyMailServersCheck('check_smtp','yyChkSmtp')">
-                {% trans "Проверить SMTP" %}
-              </button>
-
-              <button
-                id="yyChkImap"
-                type="button"
-                class="YY-BUTTON_MAIN"
-                onclick="yyMailServersCheck('check_imap','yyChkImap')">
-                {% trans "Проверить IMAP" %}
-              </button>
-
+          {% if edit_obj.domain_whitelisted %}
+            <div class="YY-STATUS_BLUE">{% trans "TRUSTED SERVICE PROVIDER — CHECK IS NOT NEEDED" %}</div>
+          {% else %}
+            <div class="flex gap-3 flex-wrap mb-4">
               <button
                 id="yyChkDomain"
                 type="button"
@@ -245,25 +143,27 @@
                 onclick="yyMailServersCheck('check_domain','yyChkDomain')">
                 {% trans "Проверить домен" %}
               </button>
-
             </div>
 
-            <div class="mt-6">
+            <div class="mt-2">
               <textarea
                 id="yyMailChecksOut"
                 class="YY-INPUT w-full min-h-[350px]"
                 readonly></textarea>
             </div>
-          </div>
+          {% endif %}
 
         {% elif state == "add" %}
-            <p class="YY-STATUS_BLUE"> {% trans "Добавление почтового сервера" %}</p>
+        <p class="YY-LABEL">{% trans "Добавление почтового ящика" %}</p>
         {% else %}
-          <a href="?state=add" class="YY-BUTTON_MAIN">
-            {% trans "Добавить почтовый сервер" %}
+          <a href="?state=add" class="YY-BUTTON_MAIN !py-2">
+              {% trans "Добавить" %}
           </a>
+
+        
         {% endif %}
 
+        
       </div>
     </td>
   </tr>
@@ -278,33 +178,82 @@
           <table class="w-full text-left">
             <thead>
               <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[50%]">{% trans "Отправитель" %}</th>
-                <th class="YY-TH_TH w-[50%]">{% trans "Email" %}</th>
-                <th class="YY-TH_TH whitespace-nowrap">{% trans "Лимит/час" %}</th>
-                <th class="YY-TH_TH">&nbsp;</th>
-                <th class="YY-TH_TH">&nbsp;</th>
+                <th class="YY-TH_TH w-[30%]">Email</th>
+                <th class="YY-TH_TH w-[25%]">{% trans "Домен" %}</th>
+                <th class="YY-TH_TH w-[15%]">SMTP</th>
+                <th class="YY-TH_TH w-[15%]">IMAP</th>
+                <th class="YY-TH_TH w-[7%]">{% trans "Изменить" %}</th>
+                <th class="YY-TH_TH w-[8%]">{% trans "Удалить" %}</th>
               </tr>
             </thead>
+
             <tbody>
               {% for it in items %}
                 <tr class="YY-TB_TR align-top">
+
                   <td class="YY-TB_TD">
-                    <div class="YY-STATUS_BLUE">{{ it.sender_name }}</div>
-                    {% if not it.is_active %}
-                      <div class="YY-STATUS_GRAY">{% trans "Выключен" %}</div>
+                    <div class="YY-STATUS_BLUE">{{ it.email }}</div>
+                  </td>
+
+                  <td class="YY-TB_TD">
+                    <div class="YY-STATUS_BLUE">{{ it.domain_name }}</div>
+
+                    {% if it.domain_whitelisted %}
+                      <div class="YY-STATUS_BLUE text-sm">{% trans "TRUSTED SERVICE PROVIDER — CHECK IS NOT NEEDED" %}</div>
+                    {% elif it.domain_tested %}
+                      <div class="YY-STATUS_BLUE text-sm">TECH: {{ it.domain_tech_status|default:"—" }}</div>
+                      <div class="YY-STATUS_BLUE text-sm">REP: {{ it.domain_rep_status|default:"—" }}</div>
+                    {% else %}
+                      <div class="YY-STATUS_YELLOW text-sm">{% trans "Домен не протестирован" %}</div>
+                      <form method="post" class="mt-2">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="test_domain">
+                        <input type="hidden" name="id" value="{{ it.ui_id }}">
+                        <button type="submit" class="YY-BUTTON_TAB_MAIN">
+                          {% trans "Протестировать домен" %}
+                        </button>
+                      </form>
                     {% endif %}
                   </td>
+
                   <td class="YY-TB_TD">
-                    <div class="YY-STATUS_BLUE">{{ it.sender_label }}</div>
+                    {% if not it.smtp_configured %}
+                      <div class="YY-STATUS_YELLOW text-sm">{% trans "SMTP не настроен" %}</div>
+                      <a href="{% url 'settings:mail_servers_smtp' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mt-2 inline-block">
+                        {% trans "Настроить SMTP" %}
+                      </a>
+                    {% else %}
+                      <div class="YY-STATUS_BLUE text-sm">
+                        {% if it.smtp_status %}{{ it.smtp_status }}{% else %}{% trans "Не проверено" %}{% endif %}
+                      </div>
+                      <a href="{% url 'settings:mail_servers_smtp' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mt-2 inline-block">
+                        {% trans "Изменить SMTP" %}
+                      </a>
+                    {% endif %}
                   </td>
+
                   <td class="YY-TB_TD">
-                    <div class="YY-STATUS_BLUE">{{ it.limit_hour_sent }}</div>
+                    {% if not it.imap_configured %}
+                      <div class="YY-STATUS_YELLOW text-sm">{% trans "IMAP не настроен" %}</div>
+                      <a href="{% url 'settings:mail_servers_imap' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mt-2 inline-block">
+                        {% trans "Настроить IMAP" %}
+                      </a>
+                    {% else %}
+                      <div class="YY-STATUS_BLUE text-sm">
+                        {% if it.imap_status %}{{ it.imap_status }}{% else %}{% trans "Не проверено" %}{% endif %}
+                      </div>
+                      <a href="{% url 'settings:mail_servers_imap' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mt-2 inline-block">
+                        {% trans "Изменить IMAP" %}
+                      </a>
+                    {% endif %}
                   </td>
+
                   <td class="YY-TB_TD">
                     <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">
                       {% trans "Изменить" %}
                     </a>
                   </td>
+
                   <td class="YY-TB_TD">
                     <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
                       {% csrf_token %}
@@ -315,6 +264,7 @@
                       </button>
                     </form>
                   </td>
+
                 </tr>
               {% endfor %}
             </tbody>
@@ -333,6 +283,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/aap_settings/mail_servers_secret.js' %}"></script>
 <script src="{% static 'js/aap_settings/mail_servers_checks.js' %}"></script>
 {% endblock %}

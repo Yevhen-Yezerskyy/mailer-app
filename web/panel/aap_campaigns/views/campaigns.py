@@ -1,19 +1,20 @@
 # FILE: web/panel/aap_campaigns/views/campaigns.py
-# DATE: 2026-01-22
+# DATE: 2026-01-24
 # PURPOSE: Campaigns page: add/edit + letter-editor init ctx + bottom table.
 # CHANGE:
-# - Убрана зависимость от Mailbox.name (поле удалено)
-# - Mailbox сортируется по email
-# - sender_label fallback теперь только через extra_json/from_email и mb.email
+# - sender_label теперь показывает ТОЛЬКО email (SmtpMailbox.from_email, fallback -> Mailbox.email)
+# - удалены ConnKind/MailboxConnection и весь fallback по праздникам (требуется пакет holidays)
 
 from __future__ import annotations
 
 import json
 from datetime import date, datetime, timedelta
 from types import SimpleNamespace
-from typing import Any, Dict, Iterable, Optional, Tuple, Union
+from typing import Any, Iterable, Optional, Tuple, Union
 from uuid import UUID
 from zoneinfo import ZoneInfo
+
+import holidays
 
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
@@ -30,7 +31,7 @@ from panel.aap_campaigns.template_editor import (
     styles_json_to_css,
 )
 from panel.aap_lists.models import MailingList
-from panel.aap_settings.models import ConnKind, Mailbox, MailboxConnection, SendingSettings
+from panel.aap_settings.models import Mailbox, SendingSettings, SmtpMailbox
 
 _TZ_BERLIN = ZoneInfo("Europe/Berlin")
 
@@ -102,8 +103,8 @@ def _parse_date_from_post(request, prefix: str) -> Optional[date]:
 
 def _build_sender_labels(mailboxes: list[Mailbox]) -> dict[int, str]:
     """
-    label = from_name <from_email>
-    from extra_json of latest SMTP connection per mailbox
+    sender_label = from_email (только email)
+    берём из SmtpMailbox.from_email (если есть), fallback -> Mailbox.email
     """
     if not mailboxes:
         return {}
@@ -111,25 +112,19 @@ def _build_sender_labels(mailboxes: list[Mailbox]) -> dict[int, str]:
     mb_by_id = {int(m.id): m for m in mailboxes}
     mb_ids = list(mb_by_id.keys())
 
-    smtp_conns = (
-        MailboxConnection.objects.filter(mailbox_id__in=mb_ids, kind=ConnKind.SMTP)
-        .only("id", "mailbox_id", "extra_json")
-        .order_by("mailbox_id", "-id")
-    )
-
-    latest_smtp_by_mb: dict[int, MailboxConnection] = {}
-    for c in smtp_conns:
-        mid = int(c.mailbox_id)
-        if mid not in latest_smtp_by_mb:
-            latest_smtp_by_mb[mid] = c
+    smtp_by_mb: dict[int, SmtpMailbox] = {}
+    for s in (
+        SmtpMailbox.objects.filter(mailbox_id__in=mb_ids, is_active=True)
+        .only("id", "mailbox_id", "from_email")
+        .order_by("mailbox_id")
+    ):
+        smtp_by_mb[int(s.mailbox_id)] = s
 
     out: dict[int, str] = {}
     for mid, mb in mb_by_id.items():
-        c = latest_smtp_by_mb.get(mid)
-        extra = c.extra_json if (c and isinstance(c.extra_json, dict)) else {}
-        from_name = (extra.get("from_name") or "").strip() or "—"
-        from_email = (extra.get("from_email") or "").strip() or (mb.email or "").strip() or "—"
-        out[mid] = f"{from_name} <{from_email}>"
+        s = smtp_by_mb.get(mid)
+        from_email = ((getattr(s, "from_email", "") or "").strip() if s else "") or (mb.email or "").strip() or "—"
+        out[mid] = from_email
     return out
 
 
@@ -147,60 +142,17 @@ def _now_berlin() -> datetime:
     return dt.astimezone(_TZ_BERLIN)
 
 
-# -------- Holidays: prefer python-holidays, fallback if not installed --------
+# -------- Holidays (requires python-holidays) --------
 
 _HOL_DE_CACHE: dict[int, set[date]] = {}
-
-
-def _easter_sunday_gregorian(y: int) -> date:
-    # Anonymous Gregorian algorithm
-    a = y % 19
-    b = y // 100
-    c = y % 100
-    d = b // 4
-    e = b % 4
-    f = (b + 8) // 25
-    g = (b - f + 1) // 3
-    h = (19 * a + b - d - g + 15) % 30
-    i = c // 4
-    k = c % 4
-    l = (32 + 2 * e + 2 * i - h - k) % 7
-    m = (a + 11 * h + 22 * l) // 451
-    month = (h + l - 7 * m + 114) // 31
-    day = ((h + l - 7 * m + 114) % 31) + 1
-    return date(y, month, day)
-
-
-def _fallback_de_wide_holidays(y: int) -> set[date]:
-    fixed = {
-        date(y, 1, 1),  # Neujahr
-        date(y, 5, 1),  # Tag der Arbeit
-        date(y, 10, 3),  # Tag der Deutschen Einheit
-        date(y, 12, 25),  # 1. Weihnachtstag
-        date(y, 12, 26),  # 2. Weihnachtstag
-    }
-    easter = _easter_sunday_gregorian(y)
-    movable = {
-        easter - timedelta(days=2),  # Karfreitag
-        easter + timedelta(days=1),  # Ostermontag
-        easter + timedelta(days=39),  # Christi Himmelfahrt
-        easter + timedelta(days=50),  # Pfingstmontag
-    }
-    return set(fixed | movable)
 
 
 def _get_de_wide_holidays_for_year(y: int) -> set[date]:
     if y in _HOL_DE_CACHE:
         return _HOL_DE_CACHE[y]
 
-    try:
-        import holidays  # type: ignore
-
-        h = holidays.country_holidays("DE", years=[y])  # Germany-wide by default
-        out = {d for d in h.keys() if isinstance(d, date)}
-    except Exception:
-        out = _fallback_de_wide_holidays(y)
-
+    h = holidays.country_holidays("DE", years=[y])  # Germany-wide by default
+    out = {d for d in h.keys() if isinstance(d, date)}
     _HOL_DE_CACHE[y] = set(out)
     return _HOL_DE_CACHE[y]
 
@@ -314,7 +266,7 @@ def _ctx_build(
     now_de = _now_berlin()
 
     for it in items:
-        it.sender_label = sender_label_by_mb_id.get(int(it.mailbox_id), f"<{it.mailbox.email}>")
+        it.sender_label = sender_label_by_mb_id.get(int(it.mailbox_id), f"{it.mailbox.email}")
 
         tpl = None
         if getattr(it, "letter", None):
@@ -390,7 +342,7 @@ def campaigns_view(request):
     sender_label_by_mb_id = _build_sender_labels(list(mb_items))
     for it in mb_items:
         it.ui_id = encode_id(int(it.id))
-        it.sender_label = sender_label_by_mb_id.get(int(it.id), f"<{it.email}>")
+        it.sender_label = sender_label_by_mb_id.get(int(it.id), f"{it.email}")
 
     for it in tpl_items:
         it.ui_id = encode_id(int(it.id))
