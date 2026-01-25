@@ -109,12 +109,11 @@ WSGI_APPLICATION = "mailer_web.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("DB_NAME", "mailersys"),
-        "USER": os.environ.get("DB_USER", "mailersys_user"),
-        "PASSWORD": os.environ.get("DB_PASSWORD", "secret"),
-        # defaults = host-mode (same as engine/common/db.py)
-        "HOST": os.environ.get("DB_HOST", "localhost"),
-        "PORT": os.environ.get("DB_PORT", "5433"),
+        "HOST": os.environ["DB_HOST"],
+        "PORT": os.environ["DB_PORT"],
+        "NAME": os.environ["DB_NAME"],
+        "USER": os.environ["DB_USER"],
+        "PASSWORD": os.environ["DB_PASSWORD"],
     }
 }
 
