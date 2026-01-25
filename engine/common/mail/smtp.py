@@ -2,9 +2,9 @@
 # PATH: engine/common/mail/smtp.py
 # DATE: 2026-01-25
 # SUMMARY:
-# - SMTPConn(mailbox_id): stateful object with .conn(), .close(), .send_mail(), ._send_mail()
+# - SMTPConn(mailbox_id, cache_key=None): stateful object with .conn(), .close(), .send_mail(), ._send_mail()
 # - Actions list at top: CONNECT/AUTH/SEND/DISCONNECT. Status: OK/FAILED only.
-# - Reads auth_type + credentials_json from DB and validates+decrypts via engine.common.mail.types.get(fmt).
+# - Reads auth_type + credentials_json from DB (optional cache if cache_key provided) and validates+decrypts via engine.common.mail.types.get(fmt).
 # - LOGIN works; OAUTH types -> FAILED (not_supported) with log.
 # - Log/trace always include timestamp + server replies/diagnostics in data.
 
@@ -18,6 +18,7 @@ from email.message import EmailMessage
 from typing import Any, Dict, Optional, Tuple, cast
 
 from engine.common import db
+from engine.common.cache.client import memo as cache_memo
 from engine.common.mail import types
 from engine.common.mail.types import SMTP_CREDENTIALS_FORMAT
 
@@ -25,10 +26,44 @@ SMTP_ACTIONS = ("CONNECT", "AUTH", "SEND", "DISCONNECT")
 STATUS_OK = "OK"
 STATUS_FAILED = "FAILED"
 
+# Small TTL: changes in UI should be visible quickly.
+_DB_CACHE_TTL_SEC = 60
+_DB_CACHE_VERSION = "mailbox_creds_v1"
+
+
+def _smtp_load_from_db_uncached(q: Tuple[Optional[str], int]) -> Tuple[str, Dict[str, Any]]:
+    _cache_key, mailbox_id = q
+
+    r = db.fetch_one(
+        """
+        SELECT auth_type, credentials_json
+        FROM aap_settings_smtp_mailboxes
+        WHERE mailbox_id=%s
+        LIMIT 1
+        """,
+        (int(mailbox_id),),
+    )
+    if not r:
+        raise RuntimeError("smtp_mailbox_not_found")
+
+    auth_type = r[0]
+    creds = r[1]
+
+    if not isinstance(auth_type, str) or not auth_type:
+        raise RuntimeError("bad_auth_type")
+    if not isinstance(creds, dict):
+        raise RuntimeError("bad_credentials_json")
+
+    if auth_type not in SMTP_CREDENTIALS_FORMAT:
+        raise RuntimeError(f"unknown_auth_type: {auth_type}")
+
+    return auth_type, cast(Dict[str, Any], creds)
+
 
 class SMTPConn:
-    def __init__(self, mailbox_id: int) -> None:
+    def __init__(self, mailbox_id: int, cache_key: Optional[str] = None) -> None:
         self.mailbox_id = int(mailbox_id)
+        self.cache_key = (cache_key or "").strip() or None
         self.auth_type: Optional[str] = None
         self.creds: Optional[Dict[str, Any]] = None
         self.conn_obj: Optional[smtplib.SMTP] = None
@@ -175,30 +210,17 @@ class SMTPConn:
     # -------------------------
 
     def _load_from_db(self) -> Tuple[str, Dict[str, Any]]:
-        r = db.fetch_one(
-            """
-            SELECT auth_type, credentials_json
-            FROM aap_settings_smtp_mailboxes
-            WHERE mailbox_id=%s
-            LIMIT 1
-            """,
-            (int(self.mailbox_id),),
+        q: Tuple[Optional[str], int] = (self.cache_key, int(self.mailbox_id))
+
+        if not self.cache_key:
+            return _smtp_load_from_db_uncached(q)
+
+        return cache_memo(
+            q,
+            _smtp_load_from_db_uncached,
+            ttl=_DB_CACHE_TTL_SEC,
+            version=_DB_CACHE_VERSION,
         )
-        if not r:
-            raise RuntimeError("smtp_mailbox_not_found")
-
-        auth_type = r[0]
-        creds = r[1]
-
-        if not isinstance(auth_type, str) or not auth_type:
-            raise RuntimeError("bad_auth_type")
-        if not isinstance(creds, dict):
-            raise RuntimeError("bad_credentials_json")
-
-        if auth_type not in SMTP_CREDENTIALS_FORMAT:
-            raise RuntimeError(f"unknown_auth_type: {auth_type}")
-
-        return auth_type, cast(Dict[str, Any], creds)
 
     # -------------------------
     # Internal: connect handlers

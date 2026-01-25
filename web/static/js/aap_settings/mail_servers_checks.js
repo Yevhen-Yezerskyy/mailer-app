@@ -1,7 +1,7 @@
 // FILE: web/static/js/aap_settings/mail_servers_checks.js
-// DATE: 2026-01-24
-// PURPOSE: SMTP/IMAP check helper for settings pages.
-// CHANGE: simple POST to form.dataset.apiUrl with action + mailbox id; writes result into #yyMailChecksOut.
+// DATE: 2026-01-25
+// PURPOSE: Settings → Mail servers: теперь только DOMAIN check через API.
+// CHANGE: ожидает JSON {ok, action, tech:{...}, reputation:{...}} и пишет его в textarea.
 
 (function () {
   function byId(id) { return document.getElementById(id); }
@@ -34,6 +34,7 @@
   }
 
   window.yyMailServersCheck = async function (action, btnId) {
+    // action expected: "check_domain"
     const form = byId("yySmtpForm") || document.querySelector("form[data-api-url]");
     const out = byId("yyMailChecksOut");
     const btn = byId(btnId);
@@ -53,9 +54,7 @@
 
       if (out) {
         if (res && typeof res === "object") {
-          if (res.user_message) out.value = String(res.user_message);
-          else if (res.text) out.value = String(res.text);
-          else out.value = JSON.stringify(res, null, 2);
+          out.value = JSON.stringify(res, null, 2);
         } else {
           out.value = String(res || "");
         }

@@ -1,11 +1,7 @@
 # FILE: web/panel/aap_settings/views/mail_servers.py
-# DATE: 2026-01-24
-# PURPOSE: Settings → Mail servers: mailbox list/add/edit/delete (legacy state UX) + domain test.
-# CHANGE:
-# - Шаблон: mail_servers.html (вместо mail_servers_list.html)
-# - Роуты/redirect/reverse: имя страницы 'settings:mail_servers' (а не mail_servers_list)
-# - SMTP/IMAP “настроен/не настроен” по наличию SmtpMailbox/ImapMailbox.
-# - Статусы проверок берём из mailbox_events (SMTP_CHECK/IMAP_CHECK/DOMAIN_*).
+# DATE: 2026-01-25
+# PURPOSE: Patch — убрать выполнение domain-check из view (только сбор статусов).
+# CHANGE: action=="test_domain" теперь просто редирект (без проверок).
 
 from __future__ import annotations
 
@@ -43,7 +39,6 @@ def mail_servers_view(request):
     + нижняя таблица: Domain/SMTP/IMAP со статусами последних проверок и кнопками.
     """
     from engine.common import db as engine_db
-    from engine.common.mail.domain_checks_test import domain_reputation_check_and_log, domain_tech_check_and_log
 
     ws_id = _guard(request)
     if not ws_id:
@@ -132,21 +127,8 @@ def mail_servers_view(request):
             Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).delete()
             return redirect(reverse("settings:mail_servers"))
 
+        # domain checks должны ездить только через AJAX API — тут ничего не выполняем
         if action == "test_domain":
-            token = (request.POST.get("id") or "").strip()
-            try:
-                mailbox_id = int(decode_id(token))
-            except Exception:
-                return redirect(reverse("settings:mail_servers"))
-
-            mb = Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).first()
-            if not mb:
-                return redirect(reverse("settings:mail_servers"))
-
-            if not is_domain_whitelisted(_domain_from_mailbox(mb)):
-                domain_tech_check_and_log(int(mb.id))
-                domain_reputation_check_and_log(int(mb.id))
-
             return redirect(reverse("settings:mail_servers"))
 
         # save (add/edit)
