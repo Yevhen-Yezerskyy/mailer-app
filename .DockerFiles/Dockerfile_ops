@@ -1,26 +1,23 @@
 # FILE: .DockerFiles/Dockerfile_ops
-# DATE: 2026-01-23
-# PURPOSE: PROD always-on toolbox for prod volume: git + basic utils; no app deps.
-# CHANGE: + dnsutils (dig) for diagnostics / domain checks.
+# DATE: 2026-01-25
+# PURPOSE: Ops/toolbox container with Python runtime (needed for config.load_keys and admin scripts).
 
 FROM debian:bookworm-slim
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      git \
-      ca-certificates \
-      curl \
-      wget \
-      nano \
-      vim-tiny \
-      less \
-      procps \
-      iproute2 \
-      openssh-client \
-      tzdata \
-      postgresql-client \
-      dnsutils \
+    python3 \
+    python3-venv \
+    python3-pip \
+    ca-certificates \
+    curl \
+    git \
+    openssh-client \
  && rm -rf /var/lib/apt/lists/*
 
+# make `python` available (your compose uses "python", not "python3")
+RUN ln -s /usr/bin/python3 /usr/bin/python
+
 WORKDIR /app
-ENV LANG=C.UTF-8

@@ -11,9 +11,9 @@ from typing import Any, Dict, List
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
-from engine.common.mail.smtp_test import smtp_check_and_log
-from engine.common.mail.imap_test import imap_check_and_log
-from engine.common.mail.domain_checks_test import domain_tech_check_and_log, domain_reputation_check_and_log
+#from engine.common.mail.smtp_test import smtp_check_and_log
+#from engine.common.mail.imap_test import imap_check_and_log
+#from engine.common.mail.domain_checks_test import domain_tech_check_and_log, domain_reputation_check_and_log
 
 from web.mailer_web.access import decode_id
 from panel.aap_settings.models import Mailbox

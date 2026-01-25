@@ -1,13 +1,10 @@
 # FILE: docker-compose.yml
-# DATE: 2026-01-20
+# DATE: 2026-01-25
 # PURPOSE:
-# - DEV: лимит CPU для Django (0.5)
-# - PROD: init-этап (translate.py + collectstatic) выполняется ТОЛЬКО при compose up,
-#         после успеха стартует gunicorn (PID 1, чистый старт воркеров).
-# - PROD воркеры engine: CPU cap как было.
+# - Switch secrets to config/load_keys.py (decrypt into process env at startup via SERENITY_KEYS_MASTER_KEY).
+# - Remove plaintext DB_* / OPENAI_API_KEY from compose; services exec real process (gunicorn/python) as PID 1 after key-load.
 # NOTE:
-# - docker restart mailer-web-prod НЕ запускает init (без translate/collectstatic).
-# - gunicorn без shell: корректные сигналы/остановка/рестарт.
+# - Provide SERENITY_KEYS_MASTER_KEY in host env (or .env) for containers that need secrets.
 
 services:
   # -------- DEV --------
@@ -50,19 +47,19 @@ services:
     environment:
       PYTHONPATH: /app
       DEBUG: "1"
-      DB_HOST: mailer-db
-      DB_PORT: "5432"
-      DB_NAME: mailersys
-      DB_USER: mailersys_user
-      DB_PASSWORD: secret
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
+      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - ./:/app
     ports:
       - "8000:8000"
     cpus: "0.5"
-    command: >
-      /app/.venv/bin/python manage.py runserver 0.0.0.0:8000
+    command:
+      [
+        "/app/.venv/bin/python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('/app/.venv/bin/python',['/app/.venv/bin/python','manage.py','runserver','0.0.0.0:8000'])",
+      ]
     networks: [webnet]
 
   # -------- PROD --------
@@ -90,18 +87,15 @@ services:
     environment:
       PYTHONPATH: /app
       DEBUG: "0"
-      DB_HOST: mailer-db
-      DB_PORT: "5432"
-      DB_NAME: mailersys
-      DB_USER: mailersys_user
-      DB_PASSWORD: secret
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
+      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
       - mailer-static:/app/web/staticfiles
       - mailer-redis-prod-run:/app/run/redis
     command: >
       /bin/sh -lc "
+        eval \"$(python -m config.load_keys --print-export)\" &&
         python translate.py &&
         python manage.py collectstatic --noinput
       "
@@ -125,20 +119,20 @@ services:
     environment:
       PYTHONPATH: /app
       DEBUG: "0"
-      DB_HOST: mailer-db
-      DB_PORT: "5432"
-      DB_NAME: mailersys
-      DB_USER: mailersys_user
-      DB_PASSWORD: secret
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
+      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
       - mailer-static:/app/web/staticfiles
       - mailer-redis-prod-run:/app/run/redis
     ports:
       - "8001:8000"
-    # gunicorn = PID 1 (без sh -lc)
-    command: ["gunicorn", "mailer_web.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120"]
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('gunicorn',['gunicorn','mailer_web.wsgi:application','--bind','0.0.0.0:8000','--workers','2','--timeout','120'])",
+      ]
     networks: [webnet]
 
   # Все воркеры на одном образе; каждому cap как было
@@ -153,18 +147,18 @@ services:
     depends_on: [mailer-db, mailer-redis-prod]
     environment:
       PYTHONPATH: /app
-      DB_HOST: mailer-db
-      DB_PORT: "5432"
-      DB_NAME: mailersys
-      DB_USER: mailersys_user
-      DB_PASSWORD: secret
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
+      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
     cpus: "0.15"
-    command: >
-      /bin/sh -lc "python -m engine.core_prepare.prepare_cb_processor"
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_prepare.prepare_cb_processor'])",
+      ]
     networks: [webnet]
 
   mailer-engine-val-prod:
@@ -175,18 +169,18 @@ services:
     depends_on: [mailer-db, mailer-redis-prod, mailer-engine-cb-prod]
     environment:
       PYTHONPATH: /app
-      DB_HOST: mailer-db
-      DB_PORT: "5432"
-      DB_NAME: mailersys
-      DB_USER: mailersys_user
-      DB_PASSWORD: secret
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
+      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
     cpus: "0.15"
-    command: >
-      /bin/sh -lc "python -m engine.core_validate.val_processor"
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_processor'])",
+      ]
     networks: [webnet]
 
   mailer-engine-exp-prod:
@@ -197,18 +191,18 @@ services:
     depends_on: [mailer-db, mailer-redis-prod, mailer-engine-cb-prod]
     environment:
       PYTHONPATH: /app
-      DB_HOST: mailer-db
-      DB_PORT: "5432"
-      DB_NAME: mailersys
-      DB_USER: mailersys_user
-      DB_PASSWORD: secret
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
+      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
     cpus: "0.15"
-    command: >
-      /bin/sh -lc "python -m engine.core_validate.val_expand_processor"
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_expand_processor'])",
+      ]
     networks: [webnet]
 
   mailer-engine-rate-prod:
@@ -219,18 +213,18 @@ services:
     depends_on: [mailer-db, mailer-redis-prod, mailer-engine-cb-prod]
     environment:
       PYTHONPATH: /app
-      DB_HOST: mailer-db
-      DB_PORT: "5432"
-      DB_NAME: mailersys
-      DB_USER: mailersys_user
-      DB_PASSWORD: secret
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
+      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
     cpus: "0.15"
-    command: >
-      /bin/sh -lc "python -m engine.core_rate.rate_contacts_processor"
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_rate.rate_contacts_processor'])",
+      ]
     networks: [webnet]
 
   mailer-engine-cr-prod:
@@ -241,18 +235,18 @@ services:
     depends_on: [mailer-db, mailer-redis-prod, mailer-engine-cb-prod]
     environment:
       PYTHONPATH: /app
-      DB_HOST: mailer-db
-      DB_PORT: "5432"
-      DB_NAME: mailersys
-      DB_USER: mailersys_user
-      DB_PASSWORD: secret
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
+      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
     cpus: "0.10"
-    command: >
-      /bin/sh -lc "python -m engine.crawler.cr_processor"
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.crawler.cr_processor'])",
+      ]
     networks: [webnet]
 
   # -------- OPS / TOOLBOX --------
@@ -266,19 +260,19 @@ services:
     restart: unless-stopped
     environment:
       PYTHONPATH: /app
-      DB_HOST: mailer-db
-      DB_PORT: "5432"
-      DB_NAME: mailersys
-      DB_USER: mailersys_user
-      DB_PASSWORD: secret
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
+      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
       - mailer-static:/app/web/staticfiles
       - mailer-redis-prod-run:/app/run/redis
       - /home/eee/.ssh:/root/.ssh:ro
-    command: >
-      /bin/sh -lc "sleep infinity"
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('sh',['sh','-lc','sleep infinity'])",
+      ]
     networks: [webnet]
 
 volumes:
