@@ -1,28 +1,88 @@
 # FILE: engine/common/mail/logs.py
-# DATE: 2026-01-22
+# DATE: 2026-01-24
 # PURPOSE:
-# - TEMP reversible obfuscation for mail secrets (encrypt_secret/decrypt_secret).
-# - Append-only mailbox_events logger: validate -> mask -> INSERT (raises on invalid).
-# CHANGE:
-# - Use psycopg3 Json() adapter for dict->jsonb.
-# - Keep logs.py as "dumb logger": no scenarios, no returns.
+# - Strict mailbox_events logger with hard action/status contract.
+# - TEMP reversible obfuscation helpers (moved to end).
+# NOTES:
+# - NO normalization, NO trimming, NO auto-fixes.
+# - Wrong input → exception.
 
 from __future__ import annotations
 
 import base64
-from typing import Any, Dict, Iterable
+from typing import Any, Dict
 
 from psycopg.types.json import Json
-
 from engine.common import db
-from engine.common.mail.types import MAIL_SPECS
 
 
 # =========================
-# (A) TEMP secret obfuscation
+# (A) mailbox_events format (single source of truth)
 # =========================
 
-# TEMP key (просто соль, не безопасность)
+MAIL_ACTIONS_FORMAT: Dict[str, tuple[str, ...]] = {
+    "DOMAIN_CHECK_TECH": (
+        "GOOD",
+        "NORMAL",
+        "BAD",
+        "TRUSTED",
+        "CHECK_FAILED",
+    ),
+    "DOMAIN_CHECK_REPUTATION": (
+        "NORMAL",
+        "QUESTIONABLE",
+        "TRUSTED",
+        "CHECK_FAILED",
+    ),
+}
+
+
+# =========================
+# (B) mailbox_events logger (strict)
+# =========================
+
+def log_mail_event(
+    *,
+    mailbox_id: int,
+    action: str,
+    status: str,
+    payload_json: Dict[str, Any],
+) -> None:
+    """
+    Append-only logger for mailbox_events.
+
+    Contract:
+      - action MUST be exact key from MAIL_ACTIONS_FORMAT
+      - status MUST be one of allowed statuses for action
+      - payload_json MUST be dict
+    """
+    _validate_action_status(action, status)
+
+    if not isinstance(payload_json, dict):
+        raise ValueError("mail_bad_payload:payload_json_must_be_dict")
+
+    db.execute(
+        """
+        INSERT INTO mailbox_events (mailbox_id, action, status, data)
+        VALUES (%s, %s, %s, %s)
+        """,
+        (int(mailbox_id), action, status, Json(payload_json)),
+    )
+
+
+def _validate_action_status(action: str, status: str) -> None:
+    if action not in MAIL_ACTIONS_FORMAT:
+        raise ValueError(f"mail_bad_action:{action}")
+
+    if status not in MAIL_ACTIONS_FORMAT[action]:
+        raise ValueError(f"mail_bad_status:{action}:{status}")
+
+
+# =========================
+# (C) TEMP secret obfuscation (isolated, dumb)
+# =========================
+
+# TEMP key (соль, не безопасность)
 _KEY = b"serenity-mail-secret-key"
 
 
@@ -32,96 +92,19 @@ def _xor(data: bytes, key: bytes) -> bytes:
 
 
 def encrypt_secret(plain: str) -> str:
-    s = (plain or "")
-    if not s:
+    if not plain:
         return ""
-    raw = s.encode("utf-8")
+    raw = plain.encode("utf-8")
     x = _xor(raw, _KEY)
     return base64.urlsafe_b64encode(x).decode("ascii")
 
 
 def decrypt_secret(secret_enc: str) -> str:
-    s = (secret_enc or "")
-    if not s:
+    if not secret_enc:
         return ""
     try:
-        raw = base64.urlsafe_b64decode(s.encode("ascii"))
+        raw = base64.urlsafe_b64decode(secret_enc.encode("ascii"))
         plain = _xor(raw, _KEY)
         return plain.decode("utf-8", errors="strict")
     except Exception as e:
         raise ValueError("secret_decrypt_failed") from e
-
-
-# =========================
-# (B) mailbox_events logger
-# =========================
-
-_SENSITIVE_KEY_PARTS: Iterable[str] = (
-    "secret",
-    "password",
-    "passwd",
-    "token",
-    "access_token",
-    "refresh_token",
-    "authorization",
-    "xoauth2",
-)
-
-
-def log_mail_event(*, mailbox_id: int, action: str, status: str, message: str = "", data: Any = None) -> None:
-    """
-    Append-only logger for mailbox_events.
-
-    Rules:
-      - action/status are normalized to UPPERCASE
-      - (action,status) MUST match MAIL_SPECS, otherwise raises
-      - data is masked (secrets/tokens) and stored as jsonb
-    """
-    a = (action or "").strip().upper()
-    s = (status or "").strip().upper()
-    _validate_action_status(a, s)
-
-    payload = _mask_sensitive(_normalize_data(data))
-
-    db.execute(
-        """
-        INSERT INTO mailbox_events (mailbox_id, action, status, message, data)
-        VALUES (%s, %s, %s, %s, %s)
-        """,
-        (int(mailbox_id), a, s, str(message or ""), Json(payload)),
-    )
-
-
-def _validate_action_status(action: str, status: str) -> None:
-    spec = MAIL_SPECS.get(action)
-    if not spec:
-        raise ValueError(f"mail_bad_action:{action}")
-
-    statuses = spec.get("statuses") or []
-    if status not in statuses:
-        raise ValueError(f"mail_bad_status:{action}:{status}")
-
-
-def _normalize_data(data: Any) -> Dict[str, Any]:
-    if data is None:
-        return {}
-    if isinstance(data, dict):
-        return data
-    return {"value": str(data)}
-
-
-def _mask_sensitive(x: Any) -> Any:
-    if isinstance(x, dict):
-        out: Dict[str, Any] = {}
-        for k, v in x.items():
-            kk = str(k)
-            out[kk] = "***" if _is_sensitive_key(kk) else _mask_sensitive(v)
-        return out
-    if isinstance(x, list):
-        return [_mask_sensitive(v) for v in x]
-    return x
-
-
-def _is_sensitive_key(k: str) -> bool:
-    kl = (k or "").strip().lower()
-    return any(part in kl for part in _SENSITIVE_KEY_PARTS)

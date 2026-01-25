@@ -1,15 +1,21 @@
 # FILE: engine/common/mail/domain_checks.py
-# DATE: 2026-01-22
+# DATE: 2026-01-24 (новое)
 # PURPOSE:
-# - DOMAIN_TECH_CHECK / DOMAIN_REPUTATION_CHECK
-# - If domain is in whitelist → skip ALL checks, DO NOT write to DB.
-# - UI response: "TRUSTED SERVICE PROVIDER - CHECK IS NOT NEEDED"
+# - Single file: domain tech + domain reputation checks.
+# - Public API (2 funcs): domain_check_tech(), domain_check_reputation()
+# - Return JSON: {"action": str, "status": str, "data": {...}}
+# - If status == "CHECK_FAILED" -> DO NOT write to DB; else write mailbox_events.
 
 from __future__ import annotations
-import re, subprocess
-from typing import Any, Dict, List, Tuple, Optional
+
+import re
+import subprocess
+from typing import Any, Dict, List, Optional, Tuple
+
 from engine.common import db
+from engine.common.mail.logs import log_mail_event
 from .domain_whitelist import is_domain_whitelisted
+
 
 SPAMHAUS_DQS_KEY = "l3lq722e7lftnbeqbd7oh4d4pi"
 _DQS_ZONE = "dq.spamhaus.net"
@@ -17,21 +23,57 @@ _DQS_ZONE = "dq.spamhaus.net"
 _SPF_RE = re.compile(r'^\s*"?v=spf1\b', re.I)
 _DMARC_RE = re.compile(r'^\s*"?v=DMARC1\b', re.I)
 
+ACTION_TECH = "DOMAIN_CHECK_TECH"
+ACTION_REPUTATION = "DOMAIN_CHECK_REPUTATION"
 
-def mailbox_domain(mailbox_id: int) -> Optional[str]:
+
+def domain_check_tech(mailbox_id: int) -> Dict[str, Any]:
+    status, data = _domain_check_tech_impl(mailbox_id)
+    out = {"action": ACTION_TECH, "status": status, "data": data}
+
+    if status != "CHECK_FAILED":
+        log_mail_event(
+            mailbox_id=int(mailbox_id),
+            action=ACTION_TECH,
+            status=status,
+            payload_json=out,
+        )
+
+    return out
+
+
+def domain_check_reputation(mailbox_id: int) -> Dict[str, Any]:
+    status, data = _domain_check_reputation_impl(mailbox_id)
+    out = {"action": ACTION_REPUTATION, "status": status, "data": data}
+
+    if status != "CHECK_FAILED":
+        log_mail_event(
+            mailbox_id=int(mailbox_id),
+            action=ACTION_REPUTATION,
+            status=status,
+            payload_json=out,
+        )
+
+    return out
+
+
+# =========================
+# Impl
+# =========================
+
+def _mailbox_domain(mailbox_id: int) -> Optional[str]:
     r = db.fetch_one("SELECT domain FROM aap_settings_mailboxes WHERE id=%s", (int(mailbox_id),))
-    return (r[0] or "").strip().lower().strip(".") if r else None
+    d = (r[0] or "").strip().lower().strip(".") if r else ""
+    return d or None
 
 
-# ================= TECH =================
-
-def mailbox_domain_tech_check(mailbox_id: int) -> Tuple[str, Dict[str, Any], bool]:
-    d = mailbox_domain(mailbox_id)
+def _domain_check_tech_impl(mailbox_id: int) -> Tuple[str, Dict[str, Any]]:
+    d = _mailbox_domain(mailbox_id)
     if not d:
-        return "CHECK_FAILED", {"error": "domain_not_found"}, False
+        return "CHECK_FAILED", {"error": "domain_not_found"}
 
     if is_domain_whitelisted(d):
-        return "TRUSTED", {"domain": d}, True
+        return "TRUSTED", {"domain": d}
 
     spf_txt, spf_err = _dig_txt(d)
     dmarc_txt, dmarc_err = _dig_txt(f"_dmarc.{d}")
@@ -42,28 +84,35 @@ def mailbox_domain_tech_check(mailbox_id: int) -> Tuple[str, Dict[str, Any], boo
             "error": "dns_error",
             "spf_err": spf_err,
             "dmarc_err": dmarc_err,
-        }, False
+        }
 
     spf_ok = _spf_ok(spf_txt)
     dmarc_ok = _dmarc_ok(dmarc_txt)
 
-    status = "GOOD" if (spf_ok and dmarc_ok) else "BAD"
+    # GOOD: оба ок
+    # NORMAL: один ок
+    # BAD: ни один не ок
+    if spf_ok and dmarc_ok:
+        status = "GOOD"
+    elif spf_ok or dmarc_ok:
+        status = "NORMAL"
+    else:
+        status = "BAD"
+
     return status, {
         "domain": d,
         "spf": {"ok": spf_ok, "records": spf_txt},
         "dmarc": {"ok": dmarc_ok, "records": dmarc_txt},
-    }, False
+    }
 
 
-# ================= REPUTATION =================
-
-def mailbox_domain_reputation_check(mailbox_id: int) -> Tuple[str, Dict[str, Any], bool]:
-    d = mailbox_domain(mailbox_id)
+def _domain_check_reputation_impl(mailbox_id: int) -> Tuple[str, Dict[str, Any]]:
+    d = _mailbox_domain(mailbox_id)
     if not d:
-        return "CHECK_FAILED", {"error": "domain_not_found"}, False
+        return "CHECK_FAILED", {"error": "domain_not_found"}
 
     if is_domain_whitelisted(d):
-        return "TRUSTED", {"domain": d}, True
+        return "TRUSTED", {"domain": d}
 
     q = f"{d}.{SPAMHAUS_DQS_KEY}.dbl.{_DQS_ZONE}"
     ips, err = _dig_a(q)
@@ -73,7 +122,7 @@ def mailbox_domain_reputation_check(mailbox_id: int) -> Tuple[str, Dict[str, Any
             "domain": d,
             "error": err,
             "query": q,
-        }, False
+        }
 
     for ip in ips:
         if ip.startswith("127.255.255."):
@@ -82,20 +131,36 @@ def mailbox_domain_reputation_check(mailbox_id: int) -> Tuple[str, Dict[str, Any
                 "error": "spamhaus_acl",
                 "query": q,
                 "ips": ips,
-            }, False
+                "links": [
+                    "https://check.spamhaus.org/",
+                    "https://mxtoolbox.com/blacklists.aspx",
+                    "https://multirbl.valli.org/",
+                ],
+            }
 
     listed = any(ip.startswith("127.") for ip in ips)
     status = "QUESTIONABLE" if listed else "NORMAL"
 
-    return status, {
+    data: Dict[str, Any] = {
         "domain": d,
         "query": q,
         "ips": ips,
         "listed": listed,
-    }, False
+    }
+
+    if status == "QUESTIONABLE":
+        data["links"] = [
+            "https://check.spamhaus.org/",
+            "https://mxtoolbox.com/blacklists.aspx",
+            "https://multirbl.valli.org/",
+        ]
+
+    return status, data
 
 
-# ================= DNS =================
+# =========================
+# DNS helpers
+# =========================
 
 def _dig_txt(name: str) -> Tuple[List[str], str]:
     try:
