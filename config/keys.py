@@ -18,7 +18,7 @@ class KeyItem(TypedDict):
 # - encrypted format: "v1:gcm:<base64url(nonce|ciphertext|tag)>" (produced by config/load_keys.py)
 KEYS: Dict[str, KeyItem] = {
     
-    "SERENITY_PASS_KEY": {"encrypted": '', "decrypted": 'NmzStUoOt8PP5pmwUqdpZTMRaugDSV20MXjAu0dNV7U'},
+    "SERENITY_PASS_KEY": {"encrypted": 'v1:gcm:_tFpY9jHTGe_MLrDsXmvshZ9E20wqGyKRzu5_Fdpo0m8kjBpMLLlIpZKmbQJVpeysD8UM30G4hjy33BV6R2BVFb_PcXH2yo', "decrypted": ''},
     #GPT
     "OPENAI_API_KEY": {"encrypted": 'v1:gcm:UUJEChGl_M-JJpxpKHBP4yw5ChM0PCVvbyZWmSvGr031LQSxxRwCyXv6y4hxQ759iUOsNGwtJdA7YUxCuEHAEtcBNvIZbgWWQxrQfCNeRBzaVFbR7mOijGg2EBTULivuksds6S7zLcUI4ozDHB5ShPBAvMC5sKVec_63V-9wgF5bO8_Ng5-5cvO8T36aaYkjYoKnBbgjwr0-mAnbzix-KSrOZhtR3AM90dgIrcX-_16cQ33hsog5zAo11S_ipzd6', "decrypted": ''},
     

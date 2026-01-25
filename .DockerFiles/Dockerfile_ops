@@ -1,23 +1,31 @@
 # FILE: .DockerFiles/Dockerfile_ops
 # DATE: 2026-01-25
-# PURPOSE: Ops/toolbox container with Python runtime (needed for config.load_keys and admin scripts).
+# PURPOSE: Ops toolbox with python + cryptography via apt (PEP668-safe).
 
 FROM debian:bookworm-slim
 
-ENV DEBIAN_FRONTEND=noninteractive
-
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-    python3 \
-    python3-venv \
-    python3-pip \
-    ca-certificates \
-    curl \
-    git \
-    openssh-client \
+      python3 \
+      python3-venv \
+      python3-pip \
+      python3-cryptography \
+      git \
+      ca-certificates \
+      curl \
+      wget \
+      nano \
+      vim-tiny \
+      less \
+      procps \
+      iproute2 \
+      openssh-client \
+      tzdata \
+      postgresql-client \
+      dnsutils \
  && rm -rf /var/lib/apt/lists/*
 
-# make `python` available (your compose uses "python", not "python3")
-RUN ln -s /usr/bin/python3 /usr/bin/python
+RUN ln -sf /usr/bin/python3 /usr/bin/python
 
 WORKDIR /app
+ENV LANG=C.UTF-8
