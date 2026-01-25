@@ -1,19 +1,27 @@
 # FILE: engine/common/mail/imap.py
 # PATH: engine/common/mail/imap.py
-# DATE: 2026-01-25 (новое)
+# DATE: 2026-01-25
 # SUMMARY:
-# - IMAPConn(mailbox_id): stateful object with .conn(), .close(), and IMAP ops returning result-or-None
-# - Reads auth_type + credentials_json from aap_settings_imap_mailboxes, validates against types.IMAP_CREDENTIALS_FORMAT
-# - Only LOGIN реально работает; OAUTH -> NOT_SUPPORTED (with log)
-# - No DB logging. Every operation updates self.log (dict) + appends to self.trace (list)
+# - IMAPConn(mailbox_id): stateful object with .conn(), .close(), and IMAP ops returning result-or-None.
+# - Actions list at top: CONNECT/AUTH/SELECT/FETCH/LOGOUT. Status: OK/FAILED only.
+# - Reads auth_type + credentials_json from DB and validates+decrypts via engine.common.mail.types.get(fmt).
+# - LOGIN works; OAUTH types -> FAILED (not_supported) with log.
+# - Log/trace always include timestamp + server replies/diagnostics in data.
 
 from __future__ import annotations
 
 import imaplib
+import time
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple, cast
 
 from engine.common import db
+from engine.common.mail import types
 from engine.common.mail.types import IMAP_CREDENTIALS_FORMAT
+
+IMAP_ACTIONS = ("CONNECT", "AUTH", "SELECT", "FETCH", "LOGOUT")
+STATUS_OK = "OK"
+STATUS_FAILED = "FAILED"
 
 
 class IMAPConn:
@@ -31,16 +39,12 @@ class IMAPConn:
     # -------------------------
 
     def conn(self) -> bool:
-        self._set_log("IMAP_CONNECT", "START", {"mailbox_id": self.mailbox_id})
-
-        auth_type, creds, err = self._load_from_db()
-        if err:
-            self._set_log("IMAP_CONNECT", "CHECK_FAILED", err)
-            return False
-
-        ok, v_err = self._validate_contract(auth_type, creds)
-        if not ok:
-            self._set_log("IMAP_CONNECT", "CHECK_FAILED", v_err)
+        try:
+            auth_type, creds_raw = self._load_from_db()
+            fmt = IMAP_CREDENTIALS_FORMAT[auth_type]
+            creds = types.get(creds_raw, fmt)
+        except Exception as e:
+            self._set_log("CONNECT", STATUS_FAILED, {"error": "load_or_validate_failed", "detail": str(e)})
             return False
 
         self.auth_type = auth_type
@@ -48,24 +52,26 @@ class IMAPConn:
 
         if auth_type == "LOGIN":
             return self._conn_LOGIN()
-        if auth_type == "GOOGLE_OAUTH_2_0":
-            return self._conn_GOOGLE_OAUTH2()
-        if auth_type == "MICROSOFT_OAUTH_2_0":
-            return self._conn_MICROSOFT_OAUTH2()
 
-        self._set_log("IMAP_CONNECT", "CHECK_FAILED", {"error": "unknown_auth_type", "auth_type": auth_type})
+        if auth_type in ("GOOGLE_OAUTH_2_0", "MICROSOFT_OAUTH_2_0"):
+            self._set_log("AUTH", STATUS_FAILED, {"error": "not_supported", "auth_type": auth_type})
+            return False
+
+        self._set_log("CONNECT", STATUS_FAILED, {"error": "unknown_auth_type", "auth_type": auth_type})
         return False
 
     def close(self) -> bool:
         if not self.conn_obj:
-            self._set_log("IMAP_DISCONNECT", "OK", {"note": "already_closed"})
+            self._set_log("LOGOUT", STATUS_OK, {"note": "already_closed"})
             return True
+
+        c = self.conn_obj
         try:
-            self.conn_obj.logout()
-            self._set_log("IMAP_DISCONNECT", "OK", {})
+            typ, data = c.logout()
+            self._set_log("LOGOUT", STATUS_OK, {"server_reply": {"logout": {"typ": typ, "data": _b2s_list(data)}}})
             return True
         except Exception as e:
-            self._set_log("IMAP_DISCONNECT", "FAIL", {"error": "logout_failed", "detail": str(e)})
+            self._set_log("LOGOUT", STATUS_FAILED, {"error": "logout_failed", "detail": str(e)})
             return False
         finally:
             self.conn_obj = None
@@ -76,77 +82,81 @@ class IMAPConn:
 
     def select(self, mailbox: str = "INBOX", readonly: bool = True) -> Optional[Dict[str, Any]]:
         if not self.conn_obj:
-            self._set_log("IMAP_SELECT", "CHECK_FAILED", {"error": "not_connected"})
+            self._set_log("SELECT", STATUS_FAILED, {"error": "not_connected", "mailbox": mailbox})
             return None
         try:
             typ, data = self.conn_obj.select(mailbox, readonly)
+            rep = {"typ": typ, "data": _b2s_list(data)}
             if typ != "OK":
-                self._set_log("IMAP_SELECT", "FAIL", {"mailbox": mailbox, "typ": typ, "data": _b2s_list(data)})
+                self._set_log("SELECT", STATUS_FAILED, {"mailbox": mailbox, "server_reply": rep})
                 return None
-            out = {"mailbox": mailbox, "count": _parse_count(data)}
-            self._set_log("IMAP_SELECT", "OK", out)
+            out = {"mailbox": mailbox, "count": _parse_count(data), "server_reply": rep}
+            self._set_log("SELECT", STATUS_OK, out)
             return out
         except Exception as e:
-            self._set_log("IMAP_SELECT", "FAIL", {"mailbox": mailbox, "detail": str(e)})
+            self._set_log("SELECT", STATUS_FAILED, {"mailbox": mailbox, "detail": str(e)})
             return None
 
     def uid_search(self, criteria: str = "ALL") -> Optional[list[str]]:
         if not self.conn_obj:
-            self._set_log("IMAP_UID_SEARCH", "CHECK_FAILED", {"error": "not_connected"})
+            self._set_log("FETCH", STATUS_FAILED, {"error": "not_connected", "op": "UID_SEARCH", "criteria": criteria})
             return None
         try:
             typ, data = self.conn_obj.uid("SEARCH", None, criteria)
+            rep = {"typ": typ, "data": _b2s_list(data)}
             if typ != "OK":
-                self._set_log("IMAP_UID_SEARCH", "FAIL", {"criteria": criteria, "typ": typ, "data": _b2s_list(data)})
+                self._set_log("FETCH", STATUS_FAILED, {"op": "UID_SEARCH", "criteria": criteria, "server_reply": rep})
                 return None
             uids = _parse_uid_list(data)
-            self._set_log("IMAP_UID_SEARCH", "OK", {"criteria": criteria, "count": len(uids)})
+            self._set_log("FETCH", STATUS_OK, {"op": "UID_SEARCH", "criteria": criteria, "count": len(uids), "server_reply": rep})
             return uids
         except Exception as e:
-            self._set_log("IMAP_UID_SEARCH", "FAIL", {"criteria": criteria, "detail": str(e)})
+            self._set_log("FETCH", STATUS_FAILED, {"op": "UID_SEARCH", "criteria": criteria, "detail": str(e)})
             return None
 
     def uid_fetch_rfc822(self, uid: str) -> Optional[bytes]:
         if not self.conn_obj:
-            self._set_log("IMAP_UID_FETCH", "CHECK_FAILED", {"error": "not_connected"})
+            self._set_log("FETCH", STATUS_FAILED, {"error": "not_connected", "op": "UID_FETCH_RFC822", "uid": uid})
             return None
         try:
             typ, data = self.conn_obj.uid("FETCH", uid, "(RFC822)")
+            rep = {"typ": typ, "data": _b2s_list(data)}
             if typ != "OK":
-                self._set_log("IMAP_UID_FETCH", "FAIL", {"uid": uid, "typ": typ, "data": _b2s_list(data)})
+                self._set_log("FETCH", STATUS_FAILED, {"op": "UID_FETCH_RFC822", "uid": uid, "server_reply": rep})
                 return None
             raw = _extract_first_bytes(data)
             if raw is None:
-                self._set_log("IMAP_UID_FETCH", "FAIL", {"uid": uid, "error": "no_bytes"})
+                self._set_log("FETCH", STATUS_FAILED, {"op": "UID_FETCH_RFC822", "uid": uid, "error": "no_bytes", "server_reply": rep})
                 return None
-            self._set_log("IMAP_UID_FETCH", "OK", {"uid": uid, "bytes": len(raw)})
+            self._set_log("FETCH", STATUS_OK, {"op": "UID_FETCH_RFC822", "uid": uid, "bytes": len(raw), "server_reply": rep})
             return raw
         except Exception as e:
-            self._set_log("IMAP_UID_FETCH", "FAIL", {"uid": uid, "detail": str(e)})
+            self._set_log("FETCH", STATUS_FAILED, {"op": "UID_FETCH_RFC822", "uid": uid, "detail": str(e)})
             return None
 
     def uid_store_flags(self, uid: str, flags: str, mode: str = "+") -> Optional[Dict[str, Any]]:
         if not self.conn_obj:
-            self._set_log("IMAP_UID_STORE", "CHECK_FAILED", {"error": "not_connected"})
+            self._set_log("FETCH", STATUS_FAILED, {"error": "not_connected", "op": "UID_STORE_FLAGS", "uid": uid})
             return None
         cmd = f"{mode}FLAGS" if mode in ("+", "-") else "FLAGS"
         try:
             typ, data = self.conn_obj.uid("STORE", uid, cmd, flags)
+            rep = {"typ": typ, "data": _b2s_list(data)}
             if typ != "OK":
-                self._set_log("IMAP_UID_STORE", "FAIL", {"uid": uid, "op": cmd, "flags": flags, "typ": typ, "data": _b2s_list(data)})
+                self._set_log("FETCH", STATUS_FAILED, {"op": "UID_STORE_FLAGS", "uid": uid, "cmd": cmd, "flags": flags, "server_reply": rep})
                 return None
-            out = {"uid": uid, "op": cmd, "flags": flags}
-            self._set_log("IMAP_UID_STORE", "OK", out)
+            out = {"op": "UID_STORE_FLAGS", "uid": uid, "cmd": cmd, "flags": flags, "server_reply": rep}
+            self._set_log("FETCH", STATUS_OK, out)
             return out
         except Exception as e:
-            self._set_log("IMAP_UID_STORE", "FAIL", {"uid": uid, "op": cmd, "flags": flags, "detail": str(e)})
+            self._set_log("FETCH", STATUS_FAILED, {"op": "UID_STORE_FLAGS", "uid": uid, "cmd": cmd, "flags": flags, "detail": str(e)})
             return None
 
     # -------------------------
-    # DB + validation
+    # Internal: DB
     # -------------------------
 
-    def _load_from_db(self) -> Tuple[Optional[str], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    def _load_from_db(self) -> Tuple[str, Dict[str, Any]]:
         r = db.fetch_one(
             """
             SELECT auth_type, credentials_json
@@ -157,42 +167,20 @@ class IMAPConn:
             (int(self.mailbox_id),),
         )
         if not r:
-            return None, None, {"error": "imap_mailbox_not_found"}
+            raise RuntimeError("imap_mailbox_not_found")
 
         auth_type = r[0]
         creds = r[1]
 
         if not isinstance(auth_type, str) or not auth_type:
-            return None, None, {"error": "bad_auth_type"}
+            raise RuntimeError("bad_auth_type")
         if not isinstance(creds, dict):
-            return None, None, {"error": "bad_credentials_json"}
+            raise RuntimeError("bad_credentials_json")
 
-        return auth_type, cast(Dict[str, Any], creds), None
-
-    def _validate_contract(self, auth_type: str, creds: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
         if auth_type not in IMAP_CREDENTIALS_FORMAT:
-            return False, {"error": "unknown_auth_type", "auth_type": auth_type}
+            raise RuntimeError(f"unknown_auth_type: {auth_type}")
 
-        if auth_type == "LOGIN":
-            need = ("host", "port", "security", "username", "password")
-            miss = [k for k in need if k not in creds]
-            if miss:
-                return False, {"error": "bad_format", "missing": miss}
-
-            if not isinstance(creds.get("host"), str) or not creds["host"]:
-                return False, {"error": "bad_format", "field": "host"}
-            if not isinstance(creds.get("port"), int):
-                return False, {"error": "bad_format", "field": "port"}
-            if creds.get("security") not in ("none", "ssl", "starttls"):
-                return False, {"error": "bad_format", "field": "security"}
-            if not isinstance(creds.get("username"), str):
-                return False, {"error": "bad_format", "field": "username"}
-            if not isinstance(creds.get("password"), str):
-                return False, {"error": "bad_format", "field": "password"}
-
-            return True, {}
-
-        return True, {}
+        return auth_type, cast(Dict[str, Any], creds)
 
     # -------------------------
     # Connect handlers
@@ -200,6 +188,7 @@ class IMAPConn:
 
     def _conn_LOGIN(self) -> bool:
         assert self.creds is not None
+
         host = cast(str, self.creds["host"])
         port = cast(int, self.creds["port"])
         security_mode = cast(str, self.creds["security"])
@@ -208,52 +197,66 @@ class IMAPConn:
 
         base = {"auth_type": "LOGIN", "host": host, "port": port, "security": security_mode}
 
+        c: Optional[imaplib.IMAP4] = None
         try:
             if security_mode == "ssl":
-                c: imaplib.IMAP4 = imaplib.IMAP4_SSL(host=host, port=port, timeout=10)
+                c = imaplib.IMAP4_SSL(host=host, port=port, timeout=10)
             else:
                 c = imaplib.IMAP4(host=host, port=port, timeout=10)
 
-            if security_mode == "starttls":
-                c.starttls()
+            diag: Dict[str, Any] = {**base, "server_reply": {}}
 
-            typ, _ = c.login(username, password)
+            welcome = getattr(c, "welcome", None)
+            diag["server_reply"]["welcome"] = _b2s(welcome)
+
+            if security_mode == "starttls":
+                t_typ, t_data = c.starttls()
+                diag["server_reply"]["starttls"] = {"typ": t_typ, "data": _b2s_list(t_data)}
+
+            self._set_log("CONNECT", STATUS_OK, diag)
+
+            typ, data = c.login(username, password)
+            rep = {"typ": typ, "data": _b2s_list(data)}
+
             if typ != "OK":
                 try:
                     c.logout()
                 except Exception:
                     pass
                 self.conn_obj = None
-                self._set_log("IMAP_CONNECT", "FAIL", {**base, "error": "login_failed", "typ": typ})
+                self._set_log("AUTH", STATUS_FAILED, {**base, "server_reply": {"login": rep}})
                 return False
 
             self.conn_obj = c
-            self._set_log("IMAP_CONNECT", "OK", base)
+            self._set_log("AUTH", STATUS_OK, {**base, "server_reply": {"login": rep}})
             return True
 
         except Exception as e:
-            try:
-                c.logout()
-            except Exception:
-                pass
+            if c is not None:
+                try:
+                    c.logout()
+                except Exception:
+                    pass
             self.conn_obj = None
-            self._set_log("IMAP_CONNECT", "FAIL", {**base, "detail": str(e)})
+
+            if (self.log or {}).get("action") == "CONNECT" and (self.log or {}).get("status") == STATUS_OK:
+                self._set_log("AUTH", STATUS_FAILED, {**base, "detail": str(e)})
+            else:
+                self._set_log("CONNECT", STATUS_FAILED, {**base, "detail": str(e)})
             return False
-
-    def _conn_GOOGLE_OAUTH2(self) -> bool:
-        self._set_log("IMAP_CONNECT", "NOT_SUPPORTED", {"auth_type": "GOOGLE_OAUTH_2_0"})
-        return False
-
-    def _conn_MICROSOFT_OAUTH2(self) -> bool:
-        self._set_log("IMAP_CONNECT", "NOT_SUPPORTED", {"auth_type": "MICROSOFT_OAUTH_2_0"})
-        return False
 
     # -------------------------
     # Log helpers
     # -------------------------
 
     def _set_log(self, action: str, status: str, data: Dict[str, Any]) -> None:
-        rec = {"action": action, "status": status, "data": (data or {})}
+        d = dict(data or {})
+        d.setdefault("mailbox_id", self.mailbox_id)
+        d.setdefault("timestamp", int(time.time()))
+        d.setdefault("timestamp_iso", datetime.now(timezone.utc).isoformat())
+        d.setdefault("server_reply", None)
+
+        rec = {"action": action, "status": status, "data": d}
         self.log = rec
         self.trace.append(rec)
 
@@ -266,6 +269,14 @@ def _b2s_list(x: Any) -> Any:
     return x
 
 
+def _b2s(x: Any) -> str:
+    if x is None:
+        return ""
+    if isinstance(x, (bytes, bytearray)):
+        return x.decode("utf-8", errors="replace")
+    return str(x)
+
+
 def _parse_uid_list(data: Any) -> list[str]:
     if not data or not isinstance(data, list) or not data[0]:
         return []
@@ -276,7 +287,6 @@ def _parse_uid_list(data: Any) -> list[str]:
 
 
 def _extract_first_bytes(data: Any) -> Optional[bytes]:
-    # imaplib returns list like: [(b'1 (RFC822 {N}', b'...raw...'), b')']
     if not isinstance(data, list):
         return None
     for item in data:

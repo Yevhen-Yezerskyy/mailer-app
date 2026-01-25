@@ -1,21 +1,29 @@
 # FILE: engine/common/mail/smtp.py
 # PATH: engine/common/mail/smtp.py
-# DATE: 2026-01-25 (новое)
+# DATE: 2026-01-25
 # SUMMARY:
 # - SMTPConn(mailbox_id): stateful object with .conn(), .close(), .send_mail(), ._send_mail()
-# - Reads auth_type + credentials_json from aap_settings_smtp_mailboxes, validates against types.SMTP_CREDENTIALS_FORMAT
-# - Only LOGIN реально работает; OAUTH -> NOT_SUPPORTED (with log)
-# - No DB logging. Every operation updates self.log (dict) + appends to self.trace (list)
+# - Actions list at top: CONNECT/AUTH/SEND/DISCONNECT. Status: OK/FAILED only.
+# - Reads auth_type + credentials_json from DB and validates+decrypts via engine.common.mail.types.get(fmt).
+# - LOGIN works; OAUTH types -> FAILED (not_supported) with log.
+# - Log/trace always include timestamp + server replies/diagnostics in data.
 
 from __future__ import annotations
 
 import smtplib
 import ssl
+import time
+from datetime import datetime, timezone
 from email.message import EmailMessage
 from typing import Any, Dict, Optional, Tuple, cast
 
 from engine.common import db
+from engine.common.mail import types
 from engine.common.mail.types import SMTP_CREDENTIALS_FORMAT
+
+SMTP_ACTIONS = ("CONNECT", "AUTH", "SEND", "DISCONNECT")
+STATUS_OK = "OK"
+STATUS_FAILED = "FAILED"
 
 
 class SMTPConn:
@@ -34,18 +42,14 @@ class SMTPConn:
 
     def conn(self) -> bool:
         """
-        Open + authenticate. Returns bool, details in self.log.
+        Open + authenticate. Returns bool, details in self.log / self.trace.
         """
-        self._set_log("SMTP_CONNECT", "START", {"mailbox_id": self.mailbox_id})
-
-        auth_type, creds, err = self._load_from_db()
-        if err:
-            self._set_log("SMTP_CONNECT", "CHECK_FAILED", err)
-            return False
-
-        ok, v_err = self._validate_contract(auth_type, creds)
-        if not ok:
-            self._set_log("SMTP_CONNECT", "CHECK_FAILED", v_err)
+        try:
+            auth_type, creds_raw = self._load_from_db()
+            fmt = SMTP_CREDENTIALS_FORMAT[auth_type]
+            creds = types.get(creds_raw, fmt)
+        except Exception as e:
+            self._set_log("CONNECT", STATUS_FAILED, {"error": "load_or_validate_failed", "detail": str(e)})
             return False
 
         self.auth_type = auth_type
@@ -53,32 +57,33 @@ class SMTPConn:
 
         if auth_type == "LOGIN":
             return self._conn_LOGIN()
-        if auth_type == "GOOGLE_OAUTH_2_0":
-            return self._conn_GOOGLE_OAUTH2()
-        if auth_type == "MICROSOFT_OAUTH_2_0":
-            return self._conn_MICROSOFT_OAUTH2()
 
-        self._set_log("SMTP_CONNECT", "CHECK_FAILED", {"error": "unknown_auth_type", "auth_type": auth_type})
+        if auth_type in ("GOOGLE_OAUTH_2_0", "MICROSOFT_OAUTH_2_0"):
+            self._set_log("AUTH", STATUS_FAILED, {"error": "not_supported", "auth_type": auth_type})
+            return False
+
+        self._set_log("CONNECT", STATUS_FAILED, {"error": "unknown_auth_type", "auth_type": auth_type})
         return False
 
     def close(self) -> bool:
         """
-        QUIT + close. Returns bool, details in self.log.
+        QUIT + close. Returns bool, details in self.log / self.trace.
         """
         if not self.conn_obj:
-            self._set_log("SMTP_DISCONNECT", "OK", {"note": "already_closed"})
+            self._set_log("DISCONNECT", STATUS_OK, {"note": "already_closed"})
             return True
 
+        c = self.conn_obj
         try:
-            self.conn_obj.quit()
-            self._set_log("SMTP_DISCONNECT", "OK", {})
+            code, msg = c.quit()
+            self._set_log("DISCONNECT", STATUS_OK, {"server_reply": {"quit": {"code": code, "msg": _b2s(msg)}}})
             return True
         except Exception as e:
             try:
-                self.conn_obj.close()
+                c.close()
             except Exception:
                 pass
-            self._set_log("SMTP_DISCONNECT", "FAIL", {"error": "quit_failed", "detail": str(e)})
+            self._set_log("DISCONNECT", STATUS_FAILED, {"error": "quit_failed", "detail": str(e)})
             return False
         finally:
             self.conn_obj = None
@@ -94,10 +99,10 @@ class SMTPConn:
         headers: Optional[Dict[str, str]] = None,
     ) -> bool:
         """
-        Send using existing connection (does NOT close). Returns bool, details in self.log.
+        Send using existing connection (does NOT close). Returns bool, details in self.log / self.trace.
         """
         if not self.conn_obj:
-            self._set_log("SMTP_SEND", "CHECK_FAILED", {"error": "not_connected"})
+            self._set_log("SEND", STATUS_FAILED, {"error": "not_connected", "to": to_email})
             return False
 
         msg = EmailMessage()
@@ -118,21 +123,24 @@ class SMTPConn:
 
         try:
             refused = self.conn_obj.send_message(msg) or {}
-            # refused: dict[rcpt -> (code, resp)]
             refused_s: Dict[str, Any] = {}
             for rcpt, rr in refused.items():
                 try:
                     code = int(rr[0])
-                    resp = rr[1].decode("utf-8", "replace") if isinstance(rr[1], (bytes, bytearray)) else str(rr[1])
+                    resp = _b2s(rr[1])
                 except Exception:
                     code, resp = None, str(rr)
                 refused_s[str(rcpt)] = {"code": code, "resp": resp}
 
-            status = "OK" if not refused_s else "FAIL"
-            self._set_log("SMTP_SEND", status, {"to": to_email, "refused": refused_s})
-            return status == "OK"
+            if refused_s:
+                self._set_log("SEND", STATUS_FAILED, {"to": to_email, "refused": refused_s})
+                return False
+
+            self._set_log("SEND", STATUS_OK, {"to": to_email, "refused": {}})
+            return True
+
         except Exception as e:
-            self._set_log("SMTP_SEND", "FAIL", {"to": to_email, "error": "send_failed", "detail": str(e)})
+            self._set_log("SEND", STATUS_FAILED, {"to": to_email, "error": "send_failed", "detail": str(e)})
             return False
 
     def send_mail(
@@ -146,7 +154,7 @@ class SMTPConn:
         headers: Optional[Dict[str, str]] = None,
     ) -> bool:
         """
-        One-shot: conn -> _send_mail -> close. Returns bool, full details in self.trace and last op in self.log.
+        One-shot: conn -> _send_mail -> close. Returns bool.
         """
         if not self.conn():
             return False
@@ -163,10 +171,10 @@ class SMTPConn:
             self.close()
 
     # -------------------------
-    # Internal: DB + validation
+    # Internal: DB
     # -------------------------
 
-    def _load_from_db(self) -> Tuple[Optional[str], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    def _load_from_db(self) -> Tuple[str, Dict[str, Any]]:
         r = db.fetch_one(
             """
             SELECT auth_type, credentials_json
@@ -177,43 +185,20 @@ class SMTPConn:
             (int(self.mailbox_id),),
         )
         if not r:
-            return None, None, {"error": "smtp_mailbox_not_found"}
+            raise RuntimeError("smtp_mailbox_not_found")
 
         auth_type = r[0]
         creds = r[1]
 
         if not isinstance(auth_type, str) or not auth_type:
-            return None, None, {"error": "bad_auth_type"}
+            raise RuntimeError("bad_auth_type")
         if not isinstance(creds, dict):
-            return None, None, {"error": "bad_credentials_json"}
+            raise RuntimeError("bad_credentials_json")
 
-        return auth_type, cast(Dict[str, Any], creds), None
-
-    def _validate_contract(self, auth_type: str, creds: Dict[str, Any]) -> Tuple[bool, Dict[str, Any]]:
         if auth_type not in SMTP_CREDENTIALS_FORMAT:
-            return False, {"error": "unknown_auth_type", "auth_type": auth_type}
+            raise RuntimeError(f"unknown_auth_type: {auth_type}")
 
-        if auth_type == "LOGIN":
-            need = ("host", "port", "security", "username", "password")
-            miss = [k for k in need if k not in creds]
-            if miss:
-                return False, {"error": "bad_format", "missing": miss}
-
-            if not isinstance(creds.get("host"), str) or not creds["host"]:
-                return False, {"error": "bad_format", "field": "host"}
-            if not isinstance(creds.get("port"), int):
-                return False, {"error": "bad_format", "field": "port"}
-            if creds.get("security") not in ("none", "ssl", "starttls"):
-                return False, {"error": "bad_format", "field": "security"}
-            if not isinstance(creds.get("username"), str):
-                return False, {"error": "bad_format", "field": "username"}
-            if not isinstance(creds.get("password"), str):
-                return False, {"error": "bad_format", "field": "password"}
-
-            return True, {}
-
-        # For now: only ensure it's a dict (contract existence checked above)
-        return True, {}
+        return auth_type, cast(Dict[str, Any], creds)
 
     # -------------------------
     # Internal: connect handlers
@@ -221,6 +206,7 @@ class SMTPConn:
 
     def _conn_LOGIN(self) -> bool:
         assert self.creds is not None
+
         host = cast(str, self.creds["host"])
         port = cast(int, self.creds["port"])
         security_mode = cast(str, self.creds["security"])
@@ -229,50 +215,71 @@ class SMTPConn:
 
         base = {"auth_type": "LOGIN", "host": host, "port": port, "security": security_mode}
 
+        c: Optional[smtplib.SMTP] = None
         try:
             if security_mode == "ssl":
-                c: smtplib.SMTP = smtplib.SMTP_SSL(host=host, port=port, timeout=10)
+                c = smtplib.SMTP_SSL(host=host, port=port, timeout=10)
             else:
                 c = smtplib.SMTP(host=host, port=port, timeout=10)
 
-            c.ehlo()
+            diag: Dict[str, Any] = {**base, "server_reply": {}}
+
+            ehlo_code, ehlo_msg = c.ehlo()
+            diag["server_reply"]["ehlo"] = {"code": ehlo_code, "msg": _b2s(ehlo_msg)}
 
             if security_mode == "starttls":
                 ctx = ssl.create_default_context()
-                c.starttls(context=ctx)
-                c.ehlo()
+                tls_code, tls_msg = c.starttls(context=ctx)
+                diag["server_reply"]["starttls"] = {"code": tls_code, "msg": _b2s(tls_msg)}
 
-            c.login(username, password)
+                ehlo2_code, ehlo2_msg = c.ehlo()
+                diag["server_reply"]["ehlo_after_tls"] = {"code": ehlo2_code, "msg": _b2s(ehlo2_msg)}
+
+            self._set_log("CONNECT", STATUS_OK, diag)
+
+            a_code, a_msg = c.login(username, password)
+            self._set_log("AUTH", STATUS_OK, {**base, "server_reply": {"login": {"code": a_code, "msg": _b2s(a_msg)}}})
 
             self.conn_obj = c
-            self._set_log("SMTP_CONNECT", "OK", base)
             return True
 
         except Exception as e:
-            try:
-                c.quit()
-            except Exception:
+            if c is not None:
                 try:
-                    c.close()
+                    c.quit()
                 except Exception:
-                    pass
+                    try:
+                        c.close()
+                    except Exception:
+                        pass
             self.conn_obj = None
-            self._set_log("SMTP_CONNECT", "FAIL", {**base, "detail": str(e)})
+
+            # if CONNECT already OK -> mark AUTH failed, else CONNECT failed
+            if (self.log or {}).get("action") == "CONNECT" and (self.log or {}).get("status") == STATUS_OK:
+                self._set_log("AUTH", STATUS_FAILED, {**base, "detail": str(e)})
+            else:
+                self._set_log("CONNECT", STATUS_FAILED, {**base, "detail": str(e)})
             return False
-
-    def _conn_GOOGLE_OAUTH2(self) -> bool:
-        self._set_log("SMTP_CONNECT", "NOT_SUPPORTED", {"auth_type": "GOOGLE_OAUTH_2_0"})
-        return False
-
-    def _conn_MICROSOFT_OAUTH2(self) -> bool:
-        self._set_log("SMTP_CONNECT", "NOT_SUPPORTED", {"auth_type": "MICROSOFT_OAUTH_2_0"})
-        return False
 
     # -------------------------
     # Internal: log helpers
     # -------------------------
 
     def _set_log(self, action: str, status: str, data: Dict[str, Any]) -> None:
-        rec = {"action": action, "status": status, "data": (data or {})}
+        d = dict(data or {})
+        d.setdefault("mailbox_id", self.mailbox_id)
+        d.setdefault("timestamp", int(time.time()))
+        d.setdefault("timestamp_iso", datetime.now(timezone.utc).isoformat())
+        d.setdefault("server_reply", None)
+
+        rec = {"action": action, "status": status, "data": d}
         self.log = rec
         self.trace.append(rec)
+
+
+def _b2s(x: Any) -> str:
+    if x is None:
+        return ""
+    if isinstance(x, (bytes, bytearray)):
+        return x.decode("utf-8", "replace")
+    return str(x)

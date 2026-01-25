@@ -78,33 +78,3 @@ def _validate_action_status(action: str, status: str) -> None:
         raise ValueError(f"mail_bad_status:{action}:{status}")
 
 
-# =========================
-# (C) TEMP secret obfuscation (isolated, dumb)
-# =========================
-
-# TEMP key (соль, не безопасность)
-_KEY = b"serenity-mail-secret-key"
-
-
-def _xor(data: bytes, key: bytes) -> bytes:
-    klen = len(key)
-    return bytes(b ^ key[i % klen] for i, b in enumerate(data))
-
-
-def encrypt_secret(plain: str) -> str:
-    if not plain:
-        return ""
-    raw = plain.encode("utf-8")
-    x = _xor(raw, _KEY)
-    return base64.urlsafe_b64encode(x).decode("ascii")
-
-
-def decrypt_secret(secret_enc: str) -> str:
-    if not secret_enc:
-        return ""
-    try:
-        raw = base64.urlsafe_b64decode(secret_enc.encode("ascii"))
-        plain = _xor(raw, _KEY)
-        return plain.decode("utf-8", errors="strict")
-    except Exception as e:
-        raise ValueError("secret_decrypt_failed") from e
