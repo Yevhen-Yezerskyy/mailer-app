@@ -195,6 +195,9 @@ def smtp_server_view(request, id: str):
             initial["email"] = mb_email
             if "username" in initial:
                 initial["username"] = mb_email
+        
+        if not (initial.get("security") or "").strip():
+            initial["security"] = "starttls"
 
     if not require_password:
         initial["password"] = SECRET_MASK

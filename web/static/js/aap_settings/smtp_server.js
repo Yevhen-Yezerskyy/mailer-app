@@ -1,45 +1,77 @@
 // FILE: web/static/js/aap_settings/smtp_server.js
-// DATE: 2026-01-24
+// DATE: 2026-01-26
 // PURPOSE: SMTP server page: auth_type tabs + apply preset to LOGIN fields via [name="..."].
-// CHANGE: canonical auth_type values; zero dependency on Django-generated ids for inputs.
+// CHANGE:
+// - Active tab highlight via inline styles (bg/text/border) because YY-* class expansion happens server-side.
+// - OAuth stubs are separate top-level blocks: yyOauthGoogleBlock / yyOauthMicrosoftBlock (no yyOauthBlock wrapper).
 
 (function () {
   function byId(id) { return document.getElementById(id); }
   function qByName(name) { return document.querySelector('[name="' + name + '"]'); }
+
+  const ACTIVE = {
+    bg: "#d6fdda",
+    text: "#016b09",
+    border: "#71d0f4",
+  };
+
+  function setBtnActiveStyle(btn, active) {
+    if (!btn) return;
+
+    if (active) {
+      btn.style.backgroundColor = ACTIVE.bg;
+      btn.style.color = ACTIVE.text;
+      btn.style.borderColor = ACTIVE.border;
+    } else {
+      btn.style.backgroundColor = "";
+      btn.style.color = "";
+      btn.style.borderColor = "";
+    }
+  }
+
+  function show(el, yes) {
+    if (!el) return;
+    el.classList.toggle("hidden", !yes);
+  }
 
   function setAuth(v) {
     const auth = qByName("auth_type");
     if (auth) auth.value = v;
 
     const login = byId("yyLoginBlock");
-    const oauth = byId("yyOauthBlock");
     const save  = byId("yySaveWrap");
+
+    const oauthG = byId("yyOauthGoogleBlock");
+    const oauthM = byId("yyOauthMicrosoftBlock");
 
     const btnL = byId("yyAuthBtnLogin");
     const btnG = byId("yyAuthBtnGoogle");
     const btnM = byId("yyAuthBtnMicrosoft");
 
-    function mark(btn, active) {
-      if (!btn) return;
-      btn.classList.toggle("YY-BUTTON_MAIN", active);
-      btn.classList.toggle("YY-BUTTON_TAB_MAIN", !active);
-    }
-
     if (v === "LOGIN") {
-      if (login) login.classList.remove("hidden");
-      if (oauth) oauth.classList.add("hidden");
-      if (save)  save.classList.remove("hidden");
-      mark(btnL, true); mark(btnG, false); mark(btnM, false);
+      show(login, true);
+      show(save, true);
+      show(oauthG, false);
+      show(oauthM, false);
+
+      setBtnActiveStyle(btnL, true);
+      setBtnActiveStyle(btnG, false);
+      setBtnActiveStyle(btnM, false);
       return;
     }
 
-    if (login) login.classList.add("hidden");
-    if (oauth) oauth.classList.remove("hidden");
-    if (save)  save.classList.add("hidden");
+    show(login, false);
+    show(save, false);
 
-    mark(btnL, false);
-    mark(btnG, v === "GOOGLE_OAUTH_2_0");
-    mark(btnM, v === "MICROSOFT_OAUTH_2_0");
+    const isG = (v === "GOOGLE_OAUTH_2_0");
+    const isM = (v === "MICROSOFT_OAUTH_2_0");
+
+    show(oauthG, isG);
+    show(oauthM, isM);
+
+    setBtnActiveStyle(btnL, false);
+    setBtnActiveStyle(btnG, isG);
+    setBtnActiveStyle(btnM, isM);
   }
 
   function getPresets() {
@@ -59,7 +91,7 @@
 
     if (host && p.host != null) host.value = String(p.host);
     if (port && p.port != null) port.value = String(p.port);
-    if (sec  && p.security != null) sec.value = String(p.security);
+    if (sec && p.security != null) sec.value = String(p.security);
   }
 
   window.addEventListener("DOMContentLoaded", () => {
