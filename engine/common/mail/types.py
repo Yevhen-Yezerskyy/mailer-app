@@ -7,8 +7,6 @@
 # - Added put()/get() that validate payload by TypedDict annotations and encrypt/decrypt marked fields.
 # - Validation now raises RuntimeError immediately (no bool/returns).
 
-from __future__ import annotations
-
 from typing import Any, Dict, Literal, TypedDict, get_args, get_origin
 
 from engine.common.crypto import decrypt_secret, encrypt_secret

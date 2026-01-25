@@ -1,8 +1,10 @@
 // FILE: web/static/js/aap_settings/mail_servers_secret.js
-// DATE: 2026-01-23
+// DATE: 2026-01-25
 // PURPOSE: Settings → Mail servers: secret reveal (modal + fetch) + dirty-watch формы.
 // CHANGE:
-// - Secret URL берём из form[data-secret-url], чтобы работало на /mail-servers/<id>/smtp/ и /imap/.
+// - Поддержка формы yySmtpForm (не ломаем smtp_server.js).
+// - add: глаз = простой toggle password/text (без модалки/бекенда).
+// - edit: если masked (data-yy-masked=1) → модалка → OK → reveal через /secret/.
 
 (function () {
   const SECRET_MASK = "********";
@@ -28,6 +30,15 @@
     await yyRevealSecret(st.kind, st.inputId);
   }
 
+  function yyForm() {
+    return document.getElementById("yyMailServerForm") || document.getElementById("yySmtpForm");
+  }
+
+  function yyFormState() {
+    const form = yyForm();
+    return form ? ((form.dataset.state || "").trim() || "edit") : "edit";
+  }
+
   function yyGetMailboxToken() {
     const hidden = document.querySelector('input[name="id"]');
     if (!hidden) return "";
@@ -35,7 +46,7 @@
   }
 
   function yySecretUrl(kind, token) {
-    const form = document.getElementById("yyMailServerForm");
+    const form = yyForm();
     const base = form ? (form.dataset.secretUrl || "").trim() : "";
     const u = base || "secret/";
     return `${u}?id=${encodeURIComponent(token)}&kind=${encodeURIComponent(kind)}`;
@@ -75,12 +86,20 @@
     const el = document.getElementById(inputId);
     if (!el) return;
 
+    // ADD: просто показать/скрыть то, что юзер ввёл
+    if (yyFormState() === "add") {
+      el.type = (el.type === "password") ? "text" : "password";
+      return;
+    }
+
+    // EDIT:
     const masked = (el.getAttribute("data-yy-masked") || "") === "1";
     if (masked) {
       yySecretModalOpen({ kind: kind, inputId: inputId });
       return;
     }
 
+    // уже раскрыт — просто toggle
     el.type = (el.type === "password") ? "text" : "password";
   }
 
@@ -142,7 +161,7 @@
   }
 
   function yyInitDirtyWatch() {
-    const form = document.getElementById("yyMailServerForm");
+    const form = yyForm();
     if (!form) return;
 
     const initial = yyFormSnapshot(form);

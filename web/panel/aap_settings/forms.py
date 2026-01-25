@@ -1,15 +1,13 @@
 # FILE: web/panel/aap_settings/forms.py
-# DATE: 2026-01-24
+# DATE: 2026-01-25
 # PURPOSE: Settings → Mail servers: формы для Mailbox / SMTP / IMAP + отдельная SMTP-страница.
 # CHANGE:
-# - LOGIN-поля (host/port/security/username/password) строятся по ключам TypedDict из engine/common/mail/types.py.
-# - ConnSecurity choices/validation берутся из ConnSecurity (single source of truth).
-# - НИКАКИХ JS id / legacy hooks в формах. Это зона HTML/JS.
-# - Формы НЕ знают ничего про OAuth и auth_type (кроме «поле существует как строка»).
+# - Default security: SMTP=starttls, IMAP=ssl.
+# - Для отдельной страницы SMTP (SmtpServerForm) выставлены required для LOGIN-полей после _attach_login_fields().
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Tuple, get_args
+from typing import Any, Callable, Dict, List, get_args
 
 from django import forms
 from django.utils.translation import gettext_lazy as _
@@ -159,11 +157,17 @@ class SmtpConnForm(forms.Form, _LoginFieldsFromTypesMixin):
         self.require_password = bool(require_password)
         self._attach_login_fields()
 
+        # default security for SMTP
+        if "security" in self.fields:
+            self.fields["security"].initial = "starttls"
+
         if not self.require_password:
             self.fields["password"].required = False
 
         if password_masked:
-            self.fields["password"].widget.attrs.update({"readonly": "readonly", "data-yy-masked": "1", "oncopy": "return false;"})
+            self.fields["password"].widget.attrs.update(
+                {"readonly": "readonly", "data-yy-masked": "1", "oncopy": "return false;"}
+            )
 
     def clean(self):
         cleaned = super().clean()
@@ -213,11 +217,17 @@ class ImapConnForm(forms.Form, _LoginFieldsFromTypesMixin):
         self.require_password = bool(require_password)
         self._attach_login_fields()
 
+        # default security for IMAP
+        if "security" in self.fields:
+            self.fields["security"].initial = "ssl"
+
         if not self.require_password:
             self.fields["password"].required = False
 
         if password_masked:
-            self.fields["password"].widget.attrs.update({"readonly": "readonly", "data-yy-masked": "1", "oncopy": "return false;"})
+            self.fields["password"].widget.attrs.update(
+                {"readonly": "readonly", "data-yy-masked": "1", "oncopy": "return false;"}
+            )
 
     def clean(self):
         cleaned = super().clean()
@@ -284,8 +294,16 @@ class SmtpServerForm(forms.Form, _LoginFieldsFromTypesMixin):
         self.require_password = bool(require_password)
         self._attach_login_fields()
 
-        if not self.require_password:
-            self.fields["password"].required = False
+        # defaults + required for separate SMTP page
+        if "security" in self.fields:
+            self.fields["security"].initial = "starttls"
+
+        for k in ("host", "port", "security", "username"):
+            if k in self.fields:
+                self.fields[k].required = True
+
+        if "password" in self.fields:
+            self.fields["password"].required = bool(self.require_password)
 
     def clean(self):
         cleaned = super().clean()

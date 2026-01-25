@@ -1,12 +1,15 @@
 {% extends "panels/base.html" %}
 {% load i18n %}
 {% load static %}
-<!-- FILE: web/templates/panels/aap_settings/smtp_server.html  (обновлено — 2026-01-24) -->
+<!-- FILE: web/templates/panels/aap_settings/smtp_server.html -->
+<!-- DATE: 2026-01-25 -->
 <!-- PURPOSE: Settings → SMTP server (отправка): UI под PU, где payload собирается строго по engine.common.mail.types. -->
 <!-- CHANGE:
-- auth_type значения: LOGIN / GOOGLE_OAUTH_2_0 / MICROSOFT_OAUTH_2_0
-- email в форме = SMTP from_email (Mailbox.email не трогаем)
-- preset select вне формы Django, JS применяет в [name="host"/"port"/"security"] -->
+- Добавлен монохромный “глаз” внутри password-инпута.
+- add: глаз делает только toggle password/text.
+- edit: при masked — модалка → OK → reveal через /smtp/secret/.
+- Подключены mail_secret_modal + mail_servers_secret.js.
+- Ничего больше в структуре страницы не ломали. -->
 
 {% block content %}
 
@@ -16,7 +19,13 @@
   <tr>
     <td class="YY-MAIN_TOP_LEFT_TD w-[65%]">
       <div class="YY-CARD_WHITE">
-        <form id="yySmtpForm" method="post" data-api-url="{% url 'settings:mail_servers_api' %}">
+        <form
+          id="yySmtpForm"
+          method="post"
+          data-api-url="{% url 'settings:mail_servers_api' %}"
+          data-secret-url="{% url 'settings:mail_servers_smtp_secret' id=mailbox_ui_id %}"
+          data-state="{{ state }}"
+        >
           {% csrf_token %}
 
           <input type="hidden" name="id" value="{{ mailbox_ui_id }}">
@@ -93,10 +102,23 @@
               </div>
             </div>
 
+            <!-- PASSWORD + EYE (inside input) -->
             <div class="grid grid-cols-[180px_1fr] gap-3 items-center">
               <div class="YY-LABEL !mb-0">{% trans "Пароль" %}</div>
-              <div>
+              <div class="relative">
                 {{ form.password }}
+                <button
+                  type="button"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-800"
+                  onclick="yyTogglePasswordOrReveal('smtp','yySecret')"
+                  aria-label="password"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
                 {% if form.password.errors %}<div class="YY-FORM_ERROR mt-1">{{ form.password.errors }}</div>{% endif %}
               </div>
             </div>
@@ -171,7 +193,21 @@
   </tr>
 </table>
 
+{% include "panels/aap_settings/partials/mail_secret_modal.html" %}
+
 <script src="{% static 'js/aap_settings/smtp_server.js' %}"></script>
 <script src="{% static 'js/aap_settings/mail_servers_checks.js' %}"></script>
+<script src="{% static 'js/aap_settings/mail_servers_secret.js' %}"></script>
+
+<script>
+  // Приводим password к контракту JS: id=yySecret + место под кнопку справа
+  (function () {
+    const el = document.querySelector('input[name="password"]');
+    if (!el) return;
+    el.id = "yySecret";
+    // резервируем место под кнопку глаза
+    try { el.style.paddingRight = "2.75rem"; } catch (e) {}
+  })();
+</script>
 
 {% endblock %}
