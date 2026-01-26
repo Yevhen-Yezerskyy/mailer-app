@@ -162,32 +162,59 @@
         {% if state == "add" %}
           <div class="YY-STATUS_BLUE">{% trans "Добавление SMTP сервера" %}</div>
         {% else %}
-          <div class="YY-STATUS_BLUE mb-3">{% trans "Проверка SMTP" %}</div>
-
           <button
             id="yyCheckSmtpBtn"
             type="button"
-            class="YY-BUTTON_MAIN mb-3"
+            class="YY-BUTTON_MAIN mb-4 w-full"
             onclick="yyMailServersCheck('check_smtp','yyCheckSmtpBtn')"
           >
-            {% trans "Проверить SMTP" %}
+            {% trans "Проверить SMTP авторизацию" %}
           </button>
 
           <textarea
             id="yyMailChecksOut"
-            class="YY-INPUT !min-h-[220px] !font-mono"
-            placeholder="{% trans 'Результат проверки появится здесь' %}"
+            class="YY-INPUT !min-h-[180px] !font-mono"
+            placeholder="{% trans 'Результат проверки' %}"
           ></textarea>
+          <label class="YY-LABEL">{% trans "Отправить тестовое письмо по адресу:" %}</label>
+             <input
+                id="yyTestMailTo"
+                type="email"
+                class="YY-INPUT !mb-4"
+                placeholder="test@example.com"
+              >
+              <button
+                id="yySendTestMailBtn"
+                type="button"
+                class="YY-BUTTON_MAIN w-full !mb-4"
+                data-output-id="yyTestMailOut"
+                onclick="yySendTestMail('yySendTestMailBtn')"
+              >
+                {% trans "Отправить письмо" %}
+              </button>
 
-          <div class="YY-STATUS_BLUE text-sm mt-3">
-            {% trans "Последняя проверка:" %} {{ last_smtp_status|default:"—" }}
+          <textarea
+            id="yyTestMailOut"
+            class="YY-INPUT !min-h-[180px] !font-mono"
+            placeholder="{% trans 'Результат отправки' %}"
+          ></textarea>          
+        
+          <label class="YY-LABEL mb-4">{% trans "Проверки SMTP сервера (отправка)" %}</label>
+
+          {% if last_checks %}
+            <div class="YY-INPUT grid grid-cols-[130px_1fr_100px] gap-3 py-3">
+              {% for c in last_checks %}
+              
+              <div class="text-sm">{{ c.dt }}</div>
+              <div class="text-sm"><b>{{ c.action }}</b></div>
+              <div class="text-sm"><b>{{ c.status }}</b></div> 
+
+            {% endfor %}
           </div>
+        {% else %}
+          <div class="YY-STATUS_YELLOW mt-2">{% trans "Не проверено" %}</div>
+        {% endif %}
 
-          {% if last_smtp_payload %}
-            <pre class="mt-2 p-2 bg-gray-50 border rounded text-xs overflow-auto max-h-[240px]">{{ last_smtp_payload }}</pre>
-          {% else %}
-            <div class="YY-STATUS_YELLOW text-sm mt-2">{% trans "Не проверено" %}</div>
-          {% endif %}
         {% endif %}
 
       </div>

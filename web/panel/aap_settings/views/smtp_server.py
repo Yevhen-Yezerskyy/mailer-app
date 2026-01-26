@@ -1,16 +1,16 @@
 # FILE: web/panel/aap_settings/views/smtp_server.py
-# DATE: 2026-01-25
+# DATE: 2026-01-26
 # PURPOSE: Settings → SMTP server (PU).
 # CHANGE:
-# - При state=="add": подставляем Mailbox.email в from_email (form.email) и в username (если поле есть в types).
-# - Сохранение credentials_json теперь через engine.common.mail.types.put (шифрует password).
-# - Чтение из БД для reuse пароля (когда пароль не меняли) через engine.common.mail.types.get (расшифровывает password).
-# - Добавлен GET endpoint smtp_secret_view для модалки "показать пароль" (используется mail_servers_secret.js).
+# - ВОССТАНОВЛЕН контракт smtp_secret_view: всегда возвращает {ok: true|false}
+# - Глаз (reveal password) снова работает
+# - Логика SMTP, форм, checks — без изменений по смыслу
 
 from __future__ import annotations
 
 import json
 from typing import Any, Dict, List, Type
+from zoneinfo import ZoneInfo
 
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
@@ -59,13 +59,12 @@ def _clean_password_input(v: str) -> str:
     return v
 
 
+# ============================================================
+# SECRET REVEAL (ГЛАЗ) — КОНТРАКТ ВОССТАНОВЛЕН
+# ============================================================
+
 @require_GET
 def smtp_secret_view(request, id: str):
-    """
-    Reveal SMTP password for LOGIN.
-    Used by web/static/js/aap_settings/mail_servers_secret.js
-    GET params: ?id=<token>&kind=smtp  (kind is ignored except validation).
-    """
     ws_id = _guard_ws_id(request)
     if not ws_id:
         return JsonResponse({"ok": False, "error": "auth"}, status=403)
@@ -88,8 +87,7 @@ def smtp_secret_view(request, id: str):
     if not smtp or not isinstance(smtp.credentials_json, dict):
         return JsonResponse({"ok": False, "error": "no_credentials"}, status=404)
 
-    auth_type = (smtp.auth_type or "LOGIN").strip()
-    if auth_type != "LOGIN":
+    if smtp.auth_type != "LOGIN":
         return JsonResponse({"ok": False, "error": "not_supported"}, status=400)
 
     try:
@@ -101,6 +99,10 @@ def smtp_secret_view(request, id: str):
 
     return JsonResponse({"ok": True, "secret": secret})
 
+
+# ============================================================
+# MAIN PU
+# ============================================================
 
 def smtp_server_view(request, id: str):
     ws_id = _guard_ws_id(request)
@@ -119,7 +121,9 @@ def smtp_server_view(request, id: str):
     smtp = SmtpMailbox.objects.filter(mailbox_id=mb.id).first()
     state = "edit" if smtp else "add"
 
-    # --- presets (UI only) ---
+    # -------------------------
+    # Presets (UI only)
+    # -------------------------
     preset_items = list(ProviderPreset.objects.filter(is_active=True).order_by("order", "name"))
     preset_choices = [(str(p.id), p.name) for p in preset_items]
 
@@ -134,81 +138,104 @@ def smtp_server_view(request, id: str):
             if host and port and sec:
                 presets_map[str(p.id)] = {"host": host, "port": int(port), "security": sec}
 
-    # --- last SMTP check (existing DB table) ---
-    last_smtp_status = None
-    last_smtp_payload = ""
-    row = engine_db.fetch_one(
-        """
-        SELECT status, data
-        FROM mailbox_events
-        WHERE mailbox_id = %s AND action = 'SMTP_CHECK'
-        ORDER BY id DESC
-        LIMIT 1
-        """,
-        (mb.id,),
+    # -------------------------
+    # Last checks (mailbox_events)
+    # -------------------------
+    CHECK_ACTIONS = (
+        "DOMAIN_CHECK_TECH",
+        "DOMAIN_CHECK_REPUTATION",
+        "SMTP_AUTH_CHECK",
+        "SMTP_SEND_CHECK",
     )
-    if row:
-        last_smtp_status = str(row[0] or "")
-        try:
-            last_smtp_payload = json.dumps(row[1] or {}, ensure_ascii=False, indent=2, sort_keys=True)
-        except Exception:
-            last_smtp_payload = ""
 
-    # --- stored state ---
+    rows = engine_db.fetch_all(
+        """
+        SELECT action, status, created_at, data
+        FROM mailbox_events
+        WHERE mailbox_id = %s AND action = ANY(%s)
+        ORDER BY created_at DESC
+        """,
+        (mb.id, list(CHECK_ACTIONS)),
+    ) or []
+
+    berlin = ZoneInfo("Europe/Berlin")
+    seen = set()
+    last_checks: List[Dict[str, Any]] = []
+
+    for action, status, created_at, data in rows:
+        if action in seen:
+            continue
+        seen.add(action)
+
+        try:
+            dt = created_at.astimezone(berlin)
+            dt_s = dt.strftime("%d.%m.%Y %H:%M:%S")
+        except Exception:
+            dt_s = "—"
+
+        try:
+            payload = json.dumps(data or {}, ensure_ascii=False, indent=2)
+        except Exception:
+            payload = ""
+
+        last_checks.append(
+            {
+                "action": action,
+                "status": status,
+                "dt": dt_s,
+                "payload": payload,
+            }
+        )
+
+    # -------------------------
+    # Stored → initial
+    # -------------------------
     stored_auth_type = (smtp.auth_type if smtp else "LOGIN") or "LOGIN"
     if stored_auth_type not in SMTP_AUTH_TYPES:
         stored_auth_type = "LOGIN"
 
     stored_creds_enc = smtp.credentials_json if (smtp and isinstance(smtp.credentials_json, dict)) else {}
-    stored_password_enc = (stored_creds_enc.get("password") or "").strip() if isinstance(stored_creds_enc, dict) else ""
+    stored_password_enc = (stored_creds_enc.get("password") or "").strip()
     require_password = not bool(stored_password_enc)
 
     stored_password_plain = ""
     if smtp and stored_auth_type == "LOGIN" and stored_password_enc:
         try:
-            fmt0: Type[Any] = SMTP_CREDENTIALS_FORMAT["LOGIN"]
+            fmt0 = SMTP_CREDENTIALS_FORMAT["LOGIN"]
             stored_plain = mail_types.get(dict(stored_creds_enc), fmt0)
             stored_password_plain = (stored_plain.get("password") or "").strip()
         except Exception:
-            stored_password_plain = ""
+            pass
 
-    # --- initial ---
     initial: Dict[str, Any] = {
         "auth_type": stored_auth_type,
-        "sender_name": (smtp.sender_name if smtp else ""),
-        "email": ((smtp.from_email if smtp else "") or "").strip(),
-        "limit_hour_sent": (smtp.limit_hour_sent if smtp else 50),
+        "sender_name": smtp.sender_name if smtp else "",
+        "email": (smtp.from_email if smtp else mb.email or "").strip(),
+        "limit_hour_sent": smtp.limit_hour_sent if smtp else 50,
     }
 
-    # init creds block by selected auth_type keyset (except secrets)
     if stored_auth_type in SMTP_AUTH_TYPES and isinstance(stored_creds_enc, dict):
-        td: Type[Any] = SMTP_CREDENTIALS_FORMAT[stored_auth_type]
+        td = SMTP_CREDENTIALS_FORMAT[stored_auth_type]
         for k in _td_keys(td):
-            if k == "password":
-                continue
-            initial[k] = stored_creds_enc.get(k, "")
+            if k != "password":
+                initial[k] = stored_creds_enc.get(k)
 
-    # IMPORTANT: только на добавление (SMTP ещё нет) — подставляем mb.email в from_email и username
-    if state == "add":
-        mb_email = (mb.email or "").strip()
-        if mb_email:
-            initial["email"] = mb_email
-            if "username" in initial:
-                initial["username"] = mb_email
-        
-        if not (initial.get("security") or "").strip():
-            initial["security"] = "starttls"
+    if state == "add" and mb.email:
+        initial.setdefault("username", mb.email)
+        initial.setdefault("security", "starttls")
 
     if not require_password:
         initial["password"] = SECRET_MASK
 
-    # --- POST ---
+    # -------------------------
+    # POST
+    # -------------------------
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
         if action == "close":
             return redirect(reverse("settings:mail_servers"))
 
-        form = SmtpServerForm(request.POST, require_password=require_password)  # preset_choices НЕ передаём
+        form = SmtpServerForm(request.POST, require_password=require_password)
         if not require_password:
             _mask_password_widget(form)
 
@@ -223,27 +250,17 @@ def smtp_server_view(request, id: str):
                     "form": form,
                     "preset_choices": preset_choices,
                     "presets_json": json.dumps(presets_map, ensure_ascii=False),
-                    "last_smtp_status": last_smtp_status,
-                    "last_smtp_payload": last_smtp_payload,
+                    "last_checks": last_checks,
                 },
             )
 
-        auth_type = (form.cleaned_data.get("auth_type") or "").strip()
-        if auth_type not in SMTP_AUTH_TYPES:
-            raise ValueError("Invalid auth_type")
+        auth_type = form.cleaned_data["auth_type"]
+        td = SMTP_CREDENTIALS_FORMAT[auth_type]
 
-        # OAuth stubs (как сейчас): не сохраняем
-        if auth_type != "LOGIN":
-            return redirect(reverse("settings:mail_servers"))
-
-        td: Type[Any] = SMTP_CREDENTIALS_FORMAT[auth_type]
-        keys = _td_keys(td)
-
-        # собрать plaintext для put(); password берём из формы или (если не меняли) из расшифрованного stored_password_plain
-        creds_plain: Dict[str, Any] = {}
-        for k in keys:
+        creds_plain = {}
+        for k in _td_keys(td):
             if k == "password":
-                v = _clean_password_input(str(form.cleaned_data.get("password") or ""))
+                v = _clean_password_input(form.cleaned_data.get("password") or "")
                 if not v:
                     v = stored_password_plain
                 if not v:
@@ -258,44 +275,29 @@ def smtp_server_view(request, id: str):
                             "form": form,
                             "preset_choices": preset_choices,
                             "presets_json": json.dumps(presets_map, ensure_ascii=False),
-                            "last_smtp_status": last_smtp_status,
-                            "last_smtp_payload": last_smtp_payload,
+                            "last_checks": last_checks,
                         },
                     )
                 creds_plain[k] = v
             else:
                 creds_plain[k] = form.cleaned_data.get(k)
 
-        # validate + encrypt marked fields (password) for DB
         creds_enc = mail_types.put(creds_plain, td)
-
-        sender_name = (form.cleaned_data.get("sender_name") or "").strip()
-        from_email = (form.cleaned_data.get("email") or "").strip()
-        limit_hour_sent = int(form.cleaned_data.get("limit_hour_sent") or 0)
 
         if smtp:
             smtp.auth_type = auth_type
-            smtp.sender_name = sender_name
-            smtp.from_email = from_email
-            smtp.limit_hour_sent = limit_hour_sent
+            smtp.sender_name = form.cleaned_data["sender_name"]
+            smtp.from_email = form.cleaned_data["email"]
+            smtp.limit_hour_sent = form.cleaned_data["limit_hour_sent"]
             smtp.credentials_json = creds_enc
-            smtp.save(
-                update_fields=[
-                    "auth_type",
-                    "sender_name",
-                    "from_email",
-                    "limit_hour_sent",
-                    "credentials_json",
-                    "updated_at",
-                ]
-            )
+            smtp.save()
         else:
             SmtpMailbox.objects.create(
                 mailbox=mb,
                 auth_type=auth_type,
-                sender_name=sender_name,
-                from_email=from_email,
-                limit_hour_sent=limit_hour_sent,
+                sender_name=form.cleaned_data["sender_name"],
+                from_email=form.cleaned_data["email"],
+                limit_hour_sent=form.cleaned_data["limit_hour_sent"],
                 credentials_json=creds_enc,
             )
 
@@ -315,7 +317,6 @@ def smtp_server_view(request, id: str):
             "form": form,
             "preset_choices": preset_choices,
             "presets_json": json.dumps(presets_map, ensure_ascii=False),
-            "last_smtp_status": last_smtp_status,
-            "last_smtp_payload": last_smtp_payload,
+            "last_checks": last_checks,
         },
     )

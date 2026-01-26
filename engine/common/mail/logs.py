@@ -21,6 +21,7 @@ from engine.common import db
 # =========================
 
 MAIL_ACTIONS_FORMAT: Dict[str, tuple[str, ...]] = {
+    #DOMAINS
     "DOMAIN_CHECK_TECH": (
         "GOOD",
         "NORMAL",
@@ -28,11 +29,23 @@ MAIL_ACTIONS_FORMAT: Dict[str, tuple[str, ...]] = {
         "TRUSTED",
         "CHECK_FAILED",
     ),
+    
     "DOMAIN_CHECK_REPUTATION": (
         "NORMAL",
         "QUESTIONABLE",
         "TRUSTED",
         "CHECK_FAILED",
+    ),
+
+    #SMTP
+    "SMTP_AUTH_CHECK": (
+        "SUCCESS",
+        "FAIL",
+    ),
+
+    "SMTP_SEND_CHECK": (
+        "SUCCESS",
+        "FAIL",
     ),
 }
 

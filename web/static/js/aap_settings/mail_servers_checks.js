@@ -1,7 +1,9 @@
 // FILE: web/static/js/aap_settings/mail_servers_checks.js
-// DATE: 2026-01-25
-// PURPOSE: Settings → Mail servers: теперь только DOMAIN check через API.
-// CHANGE: ожидает JSON {ok, action, tech:{...}, reputation:{...}} и пишет его в textarea.
+// DATE: 2026-01-26
+// PURPOSE: Settings → Mail servers: SMTP auth check + send test mail.
+// CHANGE:
+// - Disable "send test mail" button when email is empty
+// - Backward compatible with existing checks
 
 (function () {
   function byId(id) { return document.getElementById(id); }
@@ -12,6 +14,13 @@
   }
 
   function setBtnLoading(btn, on) {
+    if (!btn) return;
+    btn.disabled = !!on;
+    btn.classList.toggle("opacity-60", !!on);
+    btn.classList.toggle("cursor-not-allowed", !!on);
+  }
+
+  function setBtnDisabled(btn, on) {
     if (!btn) return;
     btn.disabled = !!on;
     btn.classList.toggle("opacity-60", !!on);
@@ -30,39 +39,94 @@
 
     const ct = (r.headers.get("content-type") || "").toLowerCase();
     if (ct.includes("application/json")) return await r.json();
-    return { ok: r.ok, text: await r.text() };
+    return { text: await r.text() };
   }
 
-  window.yyMailServersCheck = async function (action, btnId) {
-    // action expected: "check_domain"
-    const form = byId("yySmtpForm") || document.querySelector("form[data-api-url]");
-    const out = byId("yyMailChecksOut");
-    const btn = byId(btnId);
+  function renderOut(out, res) {
+    if (!out) return;
+    if (res && typeof res === "object") {
+      let s = JSON.stringify(res, null, 2);
+      s = s.replace(/^\{\s*\n?/, "").replace(/\n?\s*\}$/, "");
+      out.value = s.trim();
+    } else {
+      out.value = String(res || "");
+    }
+  }
 
+  // -------------------------
+  // SMTP AUTH CHECK
+  // -------------------------
+  window.yyMailServersCheck = async function (action, btnId, outId) {
+    const form = byId("yySmtpForm");
     if (!form) return;
-    const url = form.getAttribute("data-api-url") || "";
-    if (!url) return;
 
-    const mbIdEl = form.querySelector('input[name="id"]');
-    const mailbox_ui_id = mbIdEl ? (mbIdEl.value || "") : "";
+    const btn = byId(btnId);
+    const out =
+      byId(outId) ||
+      (btn && byId(btn.getAttribute("data-output-id"))) ||
+      byId("yyMailChecksOut");
+
+    const url = form.getAttribute("data-api-url");
+    const mbId = form.querySelector('input[name="id"]')?.value || "";
 
     if (out) out.value = "…";
-
     setBtnLoading(btn, true);
-    try {
-      const res = await postJson(url, { action: action, id: mailbox_ui_id });
 
-      if (out) {
-        if (res && typeof res === "object") {
-          out.value = JSON.stringify(res, null, 2);
-        } else {
-          out.value = String(res || "");
-        }
-      }
+    try {
+      const res = await postJson(url, { action: action, id: mbId });
+      renderOut(out, res);
     } catch (e) {
-      if (out) out.value = "ERROR: " + (e && e.message ? e.message : String(e));
+      if (out) out.value = "ERROR: " + (e.message || e);
     } finally {
       setBtnLoading(btn, false);
     }
   };
+
+  // -------------------------
+  // SEND TEST MAIL
+  // -------------------------
+  window.yySendTestMail = async function (btnId) {
+    const form = byId("yySmtpForm");
+    if (!form) return;
+
+    const toEl = byId("yyTestMailTo");
+    const to = toEl?.value || "";
+    if (!to) return;
+
+    const btn = byId(btnId);
+    const out = byId(btn?.getAttribute("data-output-id") || "");
+
+    const url = form.getAttribute("data-api-url");
+    const mbId = form.querySelector('input[name="id"]')?.value || "";
+
+    if (out) out.value = "…";
+    setBtnLoading(btn, true);
+
+    try {
+      const res = await postJson(url, {
+        action: "send_test_mail",
+        id: mbId,
+        to: to,
+      });
+      renderOut(out, res);
+    } catch (e) {
+      if (out) out.value = "ERROR: " + (e.message || e);
+    } finally {
+      setBtnLoading(btn, false);
+    }
+  };
+
+  // -------------------------
+  // Init: disable send button when email empty
+  // -------------------------
+  (function initSendMailGuard() {
+    const toEl = byId("yyTestMailTo");
+    const btn = byId("yySendTestMailBtn");
+    if (!toEl || !btn) return;
+
+    const sync = () => setBtnDisabled(btn, !toEl.value.trim());
+    sync();
+    toEl.addEventListener("input", sync);
+  })();
+
 })();
