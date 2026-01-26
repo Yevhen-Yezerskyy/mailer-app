@@ -220,10 +220,11 @@ def smtp_server_view(request, id: str):
             if k != "password":
                 initial[k] = stored_creds_enc.get(k)
 
-    if state == "add" and mb.email:
-        initial.setdefault("username", mb.email)
-        initial.setdefault("security", "starttls")
-
+    if state == "add":
+        if mb.email:
+            initial["username"] = (mb.email or "").strip()
+        initial["security"] = "starttls"
+        
     if not require_password:
         initial["password"] = SECRET_MASK
 
