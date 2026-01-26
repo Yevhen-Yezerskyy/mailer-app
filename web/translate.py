@@ -1,5 +1,4 @@
-# FILE: web/translate.py
-# DATE: 2026-01-20
+# FILE: web/translate.py  (обновлено — 2026-01-26)
 # PURPOSE:
 # - (0) PRE-CLEAN .po for target langs (de/uk/en):
 #     - delete ALL duplicate entries by key (msgctxt+msgid+msgid_plural) entirely (every duplicate block)
@@ -7,13 +6,16 @@
 #     - delete entries with broken python-format placeholders (forces re-translate)
 # - (1) makemessages (incremental) for ru/de/uk/en
 # - (2) ALWAYS remove "#, fuzzy" from all .po
-# - (3) POST-CLEAN target langs again (duplicates/empties/broken format) to ensure clean state after merges
+# - (3) POST-CLEAN target langs again (duplicates/broken format ONLY; MUST NOT drop empty after makemessages)
 # - (4) translate ALL empty/suspicious entries for target langs (de/uk/en) with strict placeholder safety
-# - (5) compilemessages
+#     - 3 passes: pass1 uses cache, pass2/pass3 disable cache to "dodge" cached empties/bad outputs
+#     - after final pass prints leftover empty/problem entries with key + problem details
+# - (5) compilemessages (always, even if some entries remain empty)
 #
-# WHY THIS FIXES YOUR BUG:
-# - Django/msgfmt can “pick” the wrong duplicate (often the empty/broken one), so UI shows Russian.
-# - We DELETE duplicate blocks completely (not “set msgstr to empty”), so only one entry remains.
+# CHANGE (2026-01-26):
+# - FIX: Step (3) no longer deletes empty msgstr. After makemessages, new entries are empty by design;
+#        deleting empties at step (3) removed all entries and made candidates=0.
+# - ADD: multi-pass translation (cache on then off) + detailed leftover report.
 
 from __future__ import annotations
 
@@ -22,7 +24,7 @@ import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from engine.common.gpt import GPTClient
 
@@ -43,6 +45,8 @@ Rules:
 - Keep ALL placeholders exactly (e.g. %s, %(name)s, %%).
 - Do NOT change tokens like __FMT0__ if they appear.
 - Return ONLY the translated text, no quotes, no explanations.
+- Do not translate or change international tech words like SMTP, IMAP, Email, E-mail etc but keep and integrate in the context correctly
+- Do all translations in context of SaaS mailer app
 """
 
 # printf-style specs + literal %%
@@ -60,6 +64,7 @@ _BAD_TOKEN_RE = re.compile(r"__FMT\d+__")
 
 
 # ---------------- manage.py helpers ----------------
+
 
 def run_manage(cmd: list[str]) -> None:
     subprocess.check_call([sys.executable, "manage.py", *cmd], cwd=str(PROJECT_ROOT))
@@ -81,6 +86,7 @@ def po_path(lang: str) -> Path:
 
 
 # ---------------- fuzzy cleanup ----------------
+
 
 def strip_fuzzy_in_po_file(path: Path) -> None:
     text = path.read_text(encoding="utf-8")
@@ -109,6 +115,7 @@ def strip_fuzzy_all() -> None:
 
 # ---------------- PO parsing ----------------
 
+
 def _unquote_po(s: str) -> str:
     s = s.strip()
     if not (len(s) >= 2 and s[0] == '"' and s[-1] == '"'):
@@ -116,9 +123,9 @@ def _unquote_po(s: str) -> str:
     s = s[1:-1]
     return (
         s.replace(r"\\", "\\")
-         .replace(r"\"", '"')
-         .replace(r"\n", "\n")
-         .replace(r"\t", "\t")
+        .replace(r"\"", '"')
+        .replace(r"\n", "\n")
+        .replace(r"\t", "\t")
     )
 
 
@@ -134,7 +141,7 @@ def _field_text(lines: List[str], kw: str) -> str:
     head = lines[0]
     if not head.startswith(kw):
         return ""
-    text = _unquote_po(head[len(kw):])
+    text = _unquote_po(head[len(kw) :])
     for l in lines[1:]:
         text += _unquote_po(l)
     return text
@@ -158,7 +165,7 @@ class PoEntry:
     msgctxt_lines: List[str] = field(default_factory=list)
     msgid_lines: List[str] = field(default_factory=list)
     msgid_plural_lines: List[str] = field(default_factory=list)
-    msgstr_lines: List[str] = field(default_factory=list)              # singular
+    msgstr_lines: List[str] = field(default_factory=list)  # singular
     msgstrn_lines: Dict[int, List[str]] = field(default_factory=dict)  # plural
     suffix_lines: List[str] = field(default_factory=list)
 
@@ -281,6 +288,7 @@ def serialize_po(header: List[str], entries: List[PoEntry]) -> str:
 
 # ---------------- duplicate/empty/broken detection ----------------
 
+
 def _extract_specs(s: str) -> List[str]:
     return [m.group(0) for m in _PRINTF_SPEC_RE.finditer(s or "")]
 
@@ -309,7 +317,6 @@ def _entry_key(e: PoEntry) -> Tuple[str, str, str]:
 
 def _is_empty_translation(e: PoEntry, nplurals: int) -> bool:
     if e.msgid_plural_lines:
-        # if any plural form non-empty -> not empty
         for k in range(nplurals):
             kw = f"msgstr[{k}] "
             cur = _field_text(e.msgstrn_lines.get(k, []), kw)
@@ -352,22 +359,20 @@ def _drop_duplicates_and_bad(lang: str, *, drop_empty: bool) -> None:
     header, entries = parse_po(p.read_text(encoding="utf-8"))
     nplurals = _get_nplurals_from_header(header)
 
-    # 1) find duplicates by key (ctxt+msgid+plural) and mark ALL for deletion
+    # 1) duplicates by key => delete ALL
     buckets: Dict[Tuple[str, str, str], List[int]] = {}
     for i, e in enumerate(entries):
         key = _entry_key(e)
-        # ignore header entry msgid "" safely
         if key[1] == "":
             continue
         buckets.setdefault(key, []).append(i)
 
     to_delete = set()
-    for key, idxs in buckets.items():
+    for idxs in buckets.values():
         if len(idxs) > 1:
-            for i in idxs:
-                to_delete.add(i)
+            to_delete.update(idxs)
 
-    # 2) also delete empty translations (target langs) if requested
+    # 2) optionally delete empty translations
     if drop_empty:
         for i, e in enumerate(entries):
             key = _entry_key(e)
@@ -376,7 +381,7 @@ def _drop_duplicates_and_bad(lang: str, *, drop_empty: bool) -> None:
             if _is_empty_translation(e, nplurals):
                 to_delete.add(i)
 
-    # 3) delete broken python-format translations (force re-translate)
+    # 3) delete broken python-format translations
     for i, e in enumerate(entries):
         key = _entry_key(e)
         if key[1] == "":
@@ -392,6 +397,7 @@ def _drop_duplicates_and_bad(lang: str, *, drop_empty: bool) -> None:
 
 
 # ---------------- GPT translation (placeholder-safe) ----------------
+
 
 def _freeze_specs(src: str) -> Tuple[str, List[str]]:
     specs = _extract_specs(src)
@@ -416,50 +422,110 @@ def _restore_specs(text: str, specs: List[str]) -> str:
     return out
 
 
-def _gpt_translate(client: GPTClient, src: str, lang: str) -> str:
+def _gpt_translate(client: GPTClient, src: str, lang: str, *, use_cache: bool) -> str:
     resp = client.ask(
         model="mini",
         user_id="system",
         instructions=SYSTEM_PROMPT + f"\nTarget language: {lang}",
         input=src,
+        use_cache=use_cache,
     )
     return (resp.content or "").strip()
 
 
-def _translate_safe(client: GPTClient, src: str, lang: str, guard: bool) -> str:
+def _translate_safe(
+    client: GPTClient,
+    src: str,
+    lang: str,
+    guard: bool,
+    *,
+    use_cache: bool,
+    attempts: int = 2,
+) -> Tuple[str, str]:
+    """
+    returns: (translation_or_empty, reason)
+    reason: ok | gpt_empty | bad_token | specs_mismatch
+    """
     src0 = (src or "").strip()
     if not src0:
-        return ""
+        return ("", "gpt_empty")
 
     if not guard:
-        tr = _gpt_translate(client, src0, lang)
-        return "" if _BAD_TOKEN_RE.search(tr or "") else (tr or "")
+        tr0 = _gpt_translate(client, src0, lang, use_cache=use_cache)
+        if not tr0:
+            return ("", "gpt_empty")
+        if _BAD_TOKEN_RE.search(tr0):
+            return ("", "bad_token")
+        return (tr0, "ok")
 
     frozen, specs = _freeze_specs(src0)
 
-    for _ in range(2):  # 2 attempts
-        tr = _gpt_translate(client, frozen, lang)
+    last_reason = "gpt_empty"
+    for _ in range(max(1, int(attempts))):
+        tr = _gpt_translate(client, frozen, lang, use_cache=use_cache)
         if not tr:
+            last_reason = "gpt_empty"
             continue
+
         tr = _restore_specs(tr, specs)
+
         if _BAD_TOKEN_RE.search(tr):
+            last_reason = "bad_token"
             continue
+
         if _specs_match(src0, tr):
-            return tr
+            return (tr, "ok")
 
-    return ""
+        last_reason = "specs_mismatch"
+
+    return ("", last_reason)
 
 
-def _translate_lang(lang: str) -> Tuple[int, int, int]:
+# ---------------- reporting ----------------
+
+
+@dataclass
+class LeftoverIssue:
+    lang: str
+    key: Tuple[str, str, str]  # (msgctxt, msgid, msgid_plural)
+    problem: str  # empty | bad_token | specs_mismatch | gpt_empty
+    plural_index: Optional[int] = None
+    current_msgstr: str = ""
+    src_specs: List[str] = field(default_factory=list)
+    dst_specs: List[str] = field(default_factory=list)
+
+
+def _print_leftovers(issues: List[LeftoverIssue]) -> None:
+    if not issues:
+        return
+    print("[WARN] Leftover issues after translation passes:")
+    for it in issues:
+        ctxt, msgid, plural = it.key
+        ctx_s = f"msgctxt={ctxt!r} " if ctxt else ""
+        plur_s = f" msgid_plural={plural!r}" if plural else ""
+        pi_s = f" plural[{it.plural_index}]" if it.plural_index is not None else ""
+        print(f"- lang={it.lang}{pi_s} problem={it.problem} {ctx_s}msgid={msgid!r}{plur_s}")
+        if it.src_specs or it.dst_specs:
+            print(f"  specs src={it.src_specs} dst={it.dst_specs}")
+        if it.current_msgstr.strip():
+            print(f"  current={it.current_msgstr!r}")
+        else:
+            print("  current=<EMPTY>")
+
+
+# ---------------- translate pass ----------------
+
+
+def _translate_lang_once(lang: str, *, pass_no: int, use_cache: bool) -> Tuple[int, int, int, List[LeftoverIssue]]:
     """
-    returns: (candidates, translated_ok, left_empty)
+    returns: (candidates, translated_ok, left_empty_or_bad, leftover_issues)
     """
     if lang == SOURCE_LANG:
-        return (0, 0, 0)
+        return (0, 0, 0, [])
 
     p = po_path(lang)
     if not p.exists():
-        return (0, 0, 0)
+        return (0, 0, 0, [])
 
     header, entries = parse_po(p.read_text(encoding="utf-8"))
     nplurals = _get_nplurals_from_header(header)
@@ -467,6 +533,7 @@ def _translate_lang(lang: str) -> Tuple[int, int, int]:
 
     total = ok = left = 0
     changed = False
+    issues: List[LeftoverIssue] = []
 
     for e in entries:
         msgid = _field_text(e.msgid_lines, "msgid ").strip()
@@ -475,11 +542,11 @@ def _translate_lang(lang: str) -> Tuple[int, int, int]:
         if msgid == "":
             continue  # header entry
 
+        key = _entry_key(e)
         guard = _needs_guard(e, msgid)
 
         if e.msgid_plural_lines:
             plural = _field_text(e.msgid_plural_lines, "msgid_plural ").strip() or msgid
-            # ensure msgstr[n] blocks exist
             if not e.msgstrn_lines:
                 for k in range(nplurals):
                     e.msgstrn_lines[k] = [f'msgstr[{k}] ""\n']
@@ -489,12 +556,24 @@ def _translate_lang(lang: str) -> Tuple[int, int, int]:
                 src = msgid if k == 0 else plural
                 kw = f"msgstr[{k}] "
                 cur = _field_text(e.msgstrn_lines.get(k, []), kw)
-                suspicious = (not (cur or "").strip()) or (guard and not _specs_match(src, cur)) or bool(_BAD_TOKEN_RE.search(cur or ""))
+
+                suspicious = (
+                    not (cur or "").strip()
+                    or (guard and not _specs_match(src, cur))
+                    or bool(_BAD_TOKEN_RE.search(cur or ""))
+                )
                 if not suspicious:
                     continue
 
                 total += 1
-                tr = _translate_safe(client, src, lang, guard)
+                tr, reason = _translate_safe(
+                    client,
+                    src,
+                    lang,
+                    guard,
+                    use_cache=use_cache,
+                    attempts=2 if pass_no == 1 else 4,
+                )
                 if tr:
                     e.msgstrn_lines[k] = [f"msgstr[{k}] {_quote_po(tr)}\n"]
                     e.msgstr_lines = []
@@ -505,15 +584,37 @@ def _translate_lang(lang: str) -> Tuple[int, int, int]:
                     e.msgstr_lines = []
                     changed = True
                     left += 1
+                    issues.append(
+                        LeftoverIssue(
+                            lang=lang,
+                            key=key,
+                            problem=reason if reason else "gpt_empty",
+                            plural_index=k,
+                            current_msgstr=(cur or "").strip(),
+                            src_specs=_extract_specs(src),
+                            dst_specs=_extract_specs(cur or ""),
+                        )
+                    )
             continue
 
         cur = _field_text(e.msgstr_lines, "msgstr ")
-        suspicious = (not (cur or "").strip()) or (guard and not _specs_match(msgid, cur)) or bool(_BAD_TOKEN_RE.search(cur or ""))
+        suspicious = (
+            not (cur or "").strip()
+            or (guard and not _specs_match(msgid, cur))
+            or bool(_BAD_TOKEN_RE.search(cur or ""))
+        )
         if not suspicious:
             continue
 
         total += 1
-        tr = _translate_safe(client, msgid, lang, guard)
+        tr, reason = _translate_safe(
+            client,
+            msgid,
+            lang,
+            guard,
+            use_cache=use_cache,
+            attempts=2 if pass_no == 1 else 4,
+        )
         if tr:
             e.msgstr_lines = [f"msgstr {_quote_po(tr)}\n"]
             e.msgstrn_lines.clear()
@@ -524,14 +625,107 @@ def _translate_lang(lang: str) -> Tuple[int, int, int]:
             e.msgstrn_lines.clear()
             changed = True
             left += 1
+            issues.append(
+                LeftoverIssue(
+                    lang=lang,
+                    key=key,
+                    problem=reason if reason else "gpt_empty",
+                    plural_index=None,
+                    current_msgstr=(cur or "").strip(),
+                    src_specs=_extract_specs(msgid),
+                    dst_specs=_extract_specs(cur or ""),
+                )
+            )
 
     if changed:
         p.write_text(serialize_po(header, entries), encoding="utf-8")
 
-    return (total, ok, left)
+    return (total, ok, left, issues)
+
+
+def _final_scan_leftovers(lang: str) -> List[LeftoverIssue]:
+    """
+    Scan final .po and report any empty or broken-format msgstr (only printf-guarded).
+    """
+    p = po_path(lang)
+    if not p.exists():
+        return []
+
+    header, entries = parse_po(p.read_text(encoding="utf-8"))
+    nplurals = _get_nplurals_from_header(header)
+
+    out: List[LeftoverIssue] = []
+    for e in entries:
+        msgid = _field_text(e.msgid_lines, "msgid ").strip()
+        if not msgid or msgid == "":
+            continue
+        key = _entry_key(e)
+        guard = _needs_guard(e, msgid)
+
+        if e.msgid_plural_lines:
+            plural = _field_text(e.msgid_plural_lines, "msgid_plural ").strip() or msgid
+            for k in range(nplurals):
+                src = msgid if k == 0 else plural
+                kw = f"msgstr[{k}] "
+                cur = _field_text(e.msgstrn_lines.get(k, []), kw)
+                if not (cur or "").strip():
+                    out.append(
+                        LeftoverIssue(
+                            lang=lang,
+                            key=key,
+                            problem="empty",
+                            plural_index=k,
+                            current_msgstr="",
+                            src_specs=_extract_specs(src),
+                            dst_specs=[],
+                        )
+                    )
+                    continue
+                if guard and not _specs_match(src, cur):
+                    out.append(
+                        LeftoverIssue(
+                            lang=lang,
+                            key=key,
+                            problem="specs_mismatch",
+                            plural_index=k,
+                            current_msgstr=(cur or "").strip(),
+                            src_specs=_extract_specs(src),
+                            dst_specs=_extract_specs(cur or ""),
+                        )
+                    )
+            continue
+
+        cur = _field_text(e.msgstr_lines, "msgstr ")
+        if not (cur or "").strip():
+            out.append(
+                LeftoverIssue(
+                    lang=lang,
+                    key=key,
+                    problem="empty",
+                    plural_index=None,
+                    current_msgstr="",
+                    src_specs=_extract_specs(msgid),
+                    dst_specs=[],
+                )
+            )
+            continue
+        if guard and not _specs_match(msgid, cur):
+            out.append(
+                LeftoverIssue(
+                    lang=lang,
+                    key=key,
+                    problem="specs_mismatch",
+                    plural_index=None,
+                    current_msgstr=(cur or "").strip(),
+                    src_specs=_extract_specs(msgid),
+                    dst_specs=_extract_specs(cur or ""),
+                )
+            )
+    return out
 
 
 # ---------------- main ----------------
+
 
 def main() -> None:
     print("[0/6] pre-clean target .po: delete duplicates + empty + broken-format")
@@ -545,25 +739,43 @@ def main() -> None:
     strip_fuzzy_all()
 
     print("[3/6] post-clean target .po again (after makemessages merge)")
+    # IMPORTANT: MUST NOT drop empty here, because makemessages creates new entries with empty msgstr by design.
     for lang in TARGET_LANGS:
-        _drop_duplicates_and_bad(lang, drop_empty=True)
+        _drop_duplicates_and_bad(lang, drop_empty=False)
 
-    print("[4/6] translate empty/suspicious msgstr (de/uk/en)")
+    print("[4/6] translate empty/suspicious msgstr (de/uk/en) — 3 passes")
     totals: Dict[str, Tuple[int, int, int]] = {}
-    for lang in TARGET_LANGS:
-        total, ok, left = _translate_lang(lang)
-        totals[lang] = (total, ok, left)
-        print(f"  - {lang}: candidates={total} translated={ok} left_empty={left}")
+    leftovers_all: List[LeftoverIssue] = []
 
-    print("[5/6] compilemessages")
+    passes = [
+        (1, True),   # pass1: cache ON
+        (2, False),  # pass2: cache OFF
+        (3, False),  # pass3: cache OFF
+    ]
+
+    for pass_no, use_cache in passes:
+        print(f"  [pass {pass_no}/3] use_cache={use_cache}")
+        for lang in TARGET_LANGS:
+            total, ok, left, issues = _translate_lang_once(lang, pass_no=pass_no, use_cache=use_cache)
+            totals[lang] = (total, ok, left)
+            print(f"    - {lang}: candidates={total} translated={ok} left={left}")
+            # NOTE: keep issues only for visibility; final scan below is the source of truth.
+            leftovers_all.extend(issues)
+
+    print("[5/6] compilemessages (always)")
     run_compilemessages()
 
-    bad = {k: v for k, v in totals.items() if v[2] > 0}
-    if bad:
-        print("[WARN] Some entries are still empty after translation:")
-        for lang, (total, ok, left) in bad.items():
-            print(f"  - {lang}: left_empty={left} (candidates={total}, translated={ok})")
-        print("[HINT] Usually: GPT returned empty (API/key/rate-limit/error). Re-run after fixing.")
+    # Final scan & print real leftovers (after all passes)
+    final_issues: List[LeftoverIssue] = []
+    for lang in TARGET_LANGS:
+        final_issues.extend(_final_scan_leftovers(lang))
+    if final_issues:
+        _print_leftovers(final_issues)
+        print("[WARN] Some entries are still empty or have placeholder mismatch after 3 passes.")
+        print("[HINT] Usually: API/key/rate-limit/error OR model keeps breaking placeholders. Re-run later.")
+    else:
+        print("[OK] No empty/mismatched entries detected in target .po files after 3 passes.")
+
     print("[DONE]--")
 
 
