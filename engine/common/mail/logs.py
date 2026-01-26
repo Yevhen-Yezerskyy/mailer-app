@@ -47,6 +47,12 @@ MAIL_ACTIONS_FORMAT: Dict[str, tuple[str, ...]] = {
         "SUCCESS",
         "FAIL",
     ),
+
+    #IMAP
+    "IMAP_CHECK": (
+        "SUCCESS",
+        "FAIL",
+    ),
 }
 
 

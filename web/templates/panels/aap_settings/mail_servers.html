@@ -1,11 +1,14 @@
 {% extends "panels/base.html" %}
 {% load i18n %}
 {% load static %}
-<!-- FILE: web/templates/panels/aap_settings/mail_servers.html  (обновлено — 2026-01-24) -->
-<!-- PURPOSE: Settings → Mail servers: старый UX (2 карточки сверху + таблица снизу) для mailbox list/add/edit/delete. -->
+<!-- FILE: web/templates/panels/aap_settings/mail_servers.html -->
+<!-- DATE: 2026-01-26 -->
+<!-- PURPOSE: Settings → Mail servers: mailbox list/add/edit/delete + status blocks for last checks. -->
 <!-- CHANGE:
-- Возвращена кнопка "Добавить" (в состояние ?state=add) в дефолтном режиме (когда не add/edit).
-- Остальной HTML/UX не трогался. -->
+- FIX: форма должна иметь id="yySmtpForm" (mail_servers_checks.js ищет именно этот id).
+- Статусы печатаются раздельно: dt / action / status.
+- SMTP показывает две проверки: SMTP_AUTH_CHECK + SMTP_SEND_CHECK.
+- Domain/IMAP тоже печатаются раздельно через rec-объекты из view. -->
 
 {% block content %}
 
@@ -16,7 +19,7 @@
 
         {% if state == "add" or state == "edit" %}
           <form
-            id="yyMailServerForm"
+            id="yySmtpForm"
             method="post"
             data-api-url="{% url 'settings:mail_servers_api' %}"
           >
@@ -45,8 +48,22 @@
                   {% if edit_obj.domain_whitelisted %}
                     <div class="YY-STATUS_GREEN">{% trans "Публичный сервис-провайдер" %}<br>{% trans "Проверка домена не нужна" %}</div>
                   {% elif edit_obj.domain_tested %}
-                    <div class="{% if edit_obj.domain_tech_status == 'GOOD' %}YY-STATUS_GREEN{% else %}YY-STATUS_RED{% endif %} mb-2 !py-1">DNS: {{ edit_obj.domain_tech_status|default:"—" }}</div>
-                    <div class="{% if edit_obj.domain_rep_status == 'NORMAL' %}YY-STATUS_GREEN{% else %}YY-STATUS_RED{% endif %} mb-2 !py-1">Репутация: {{ edit_obj.domain_rep_status|default:"—" }}</div>
+                    <div class="YY-STATUS_BLUE text-sm">
+                      {% if edit_obj.domain_tech %}
+                        <div>{{ edit_obj.domain_tech.dt }}</div>
+                        <div><b>{{ edit_obj.domain_tech.action }}</b>: {{ edit_obj.domain_tech.status }}</div>
+                      {% else %}
+                        {% trans "Не проверено" %}
+                      {% endif %}
+                    </div>
+                    <div class="YY-STATUS_BLUE text-sm mt-2">
+                      {% if edit_obj.domain_rep %}
+                        <div>{{ edit_obj.domain_rep.dt }}</div>
+                        <div><b>{{ edit_obj.domain_rep.action }}</b>: {{ edit_obj.domain_rep.status }}</div>
+                      {% else %}
+                        {% trans "Не проверено" %}
+                      {% endif %}
+                    </div>
                   {% else %}
                     <div class="YY-STATUS_YELLOW mb-2 !py-1">{% trans "Домен не проверен" %}</div>
                     <button
@@ -54,7 +71,7 @@
                       class="YY-BUTTON_TAB_MAIN"
                       onclick="document.getElementById('yyChkDomain')?.click();"
                     >
-                            {% trans "Проверить домен" %}
+                      {% trans "Проверить домен" %}
                     </button>
                   {% endif %}
                 </div>
@@ -68,9 +85,24 @@
                       {% trans "Настроить SMTP" %}
                     </a>
                   {% else %}
-                    <div class="YY-STATUS_BLUE">
-                      {% if edit_obj.smtp_status %}{{ edit_obj.smtp_status }}{% else %}{% trans "Не проверено" %}{% endif %}
+                    <div class="YY-STATUS_BLUE text-sm">
+                      {% if edit_obj.smtp_auth %}
+                        <div>{{ edit_obj.smtp_auth.dt }}</div>
+                        <div><b>{{ edit_obj.smtp_auth.action }}</b>: {{ edit_obj.smtp_auth.status }}</div>
+                      {% else %}
+                        {% trans "Не проверено" %}
+                      {% endif %}
                     </div>
+
+                    <div class="YY-STATUS_BLUE text-sm mt-2">
+                      {% if edit_obj.smtp_send %}
+                        <div>{{ edit_obj.smtp_send.dt }}</div>
+                        <div><b>{{ edit_obj.smtp_send.action }}</b>: {{ edit_obj.smtp_send.status }}</div>
+                      {% else %}
+                        {% trans "Не проверено" %}
+                      {% endif %}
+                    </div>
+
                     <a href="{% url 'settings:mail_servers_smtp' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN mt-2 inline-block">
                       {% trans "Изменить SMTP" %}
                     </a>
@@ -87,7 +119,12 @@
                     </a>
                   {% else %}
                     <div class="YY-STATUS_BLUE text-sm">
-                      {% if edit_obj.imap_status %}{{ edit_obj.imap_status }}{% else %}{% trans "Не проверено" %}{% endif %}
+                      {% if edit_obj.imap_check %}
+                        <div>{{ edit_obj.imap_check.dt }}</div>
+                        <div><b>{{ edit_obj.imap_check.action }}</b>: {{ edit_obj.imap_check.status }}</div>
+                      {% else %}
+                        {% trans "Не проверено" %}
+                      {% endif %}
                     </div>
                     <a href="{% url 'settings:mail_servers_imap' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN mt-2 inline-block">
                       {% trans "Изменить IMAP" %}
@@ -131,7 +168,8 @@
                 id="yyChkDomain"
                 type="button"
                 class="YY-BUTTON_MAIN"
-                onclick="yyMailServersCheck('check_domain','yyChkDomain')">
+                onclick="yyMailServersCheck('check_domain','yyChkDomain','yyMailChecksOut')"
+              >
                 {% trans "Проверить домен" %}
               </button>
             </div>
@@ -145,16 +183,13 @@
           {% endif %}
 
         {% elif state == "add" %}
-        <p class="YY-LABEL">{% trans "Добавление почтового ящика" %}</p>
+          <p class="YY-LABEL">{% trans "Добавление почтового ящика" %}</p>
         {% else %}
           <a href="?state=add" class="YY-BUTTON_MAIN !py-2">
-              {% trans "Добавить" %}
+            {% trans "Добавить" %}
           </a>
-
-        
         {% endif %}
 
-        
       </div>
     </td>
   </tr>
@@ -192,8 +227,22 @@
                     {% if it.domain_whitelisted %}
                       <div class="YY-STATUS_BLUE text-sm">{% trans "TRUSTED SERVICE PROVIDER — CHECK IS NOT NEEDED" %}</div>
                     {% elif it.domain_tested %}
-                      <div class="YY-STATUS_BLUE text-sm">TECH: {{ it.domain_tech_status|default:"—" }}</div>
-                      <div class="YY-STATUS_BLUE text-sm">REP: {{ it.domain_rep_status|default:"—" }}</div>
+                      <div class="YY-STATUS_BLUE text-sm">
+                        {% if it.domain_tech %}
+                          <div>{{ it.domain_tech.dt }}</div>
+                          <div><b>{{ it.domain_tech.action }}</b>: {{ it.domain_tech.status }}</div>
+                        {% else %}
+                          {% trans "Не проверено" %}
+                        {% endif %}
+                      </div>
+                      <div class="YY-STATUS_BLUE text-sm mt-2">
+                        {% if it.domain_rep %}
+                          <div>{{ it.domain_rep.dt }}</div>
+                          <div><b>{{ it.domain_rep.action }}</b>: {{ it.domain_rep.status }}</div>
+                        {% else %}
+                          {% trans "Не проверено" %}
+                        {% endif %}
+                      </div>
                     {% else %}
                       <div class="YY-STATUS_YELLOW text-sm">{% trans "Домен не протестирован" %}</div>
                       <form method="post" class="mt-2">
@@ -215,7 +264,20 @@
                       </a>
                     {% else %}
                       <div class="YY-STATUS_BLUE text-sm">
-                        {% if it.smtp_status %}{{ it.smtp_status }}{% else %}{% trans "Не проверено" %}{% endif %}
+                        {% if it.smtp_auth %}
+                          <div>{{ it.smtp_auth.dt }}</div>
+                          <div><b>{{ it.smtp_auth.action }}</b>: {{ it.smtp_auth.status }}</div>
+                        {% else %}
+                          {% trans "Не проверено" %}
+                        {% endif %}
+                      </div>
+                      <div class="YY-STATUS_BLUE text-sm mt-2">
+                        {% if it.smtp_send %}
+                          <div>{{ it.smtp_send.dt }}</div>
+                          <div><b>{{ it.smtp_send.action }}</b>: {{ it.smtp_send.status }}</div>
+                        {% else %}
+                          {% trans "Не проверено" %}
+                        {% endif %}
                       </div>
                       <a href="{% url 'settings:mail_servers_smtp' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mt-2 inline-block">
                         {% trans "Изменить SMTP" %}
@@ -231,7 +293,12 @@
                       </a>
                     {% else %}
                       <div class="YY-STATUS_BLUE text-sm">
-                        {% if it.imap_status %}{{ it.imap_status }}{% else %}{% trans "Не проверено" %}{% endif %}
+                        {% if it.imap_check %}
+                          <div>{{ it.imap_check.dt }}</div>
+                          <div><b>{{ it.imap_check.action }}</b>: {{ it.imap_check.status }}</div>
+                        {% else %}
+                          {% trans "Не проверено" %}
+                        {% endif %}
                       </div>
                       <a href="{% url 'settings:mail_servers_imap' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mt-2 inline-block">
                         {% trans "Изменить IMAP" %}

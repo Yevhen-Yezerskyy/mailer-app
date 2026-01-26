@@ -1,0 +1,196 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+{% load static %}
+<!-- FILE: web/templates/panels/aap_settings/imap_server.html -->
+<!-- DATE: 2026-01-26 -->
+<!-- PURPOSE: Settings → IMAP server (чтение): PU, проверка через API (check_imap), показ последней проверки (дата+статус). -->
+<!-- CHANGE:
+- Добавлена кнопка проверки IMAP (AJAX).
+- Показываем last_check_dt + last_check_status.
+- Нет отправки тестового письма, нет history (пока). -->
+
+{% block content %}
+
+<script type="application/json" id="yyPresets">{{ presets_json|safe }}</script>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-[65%]">
+      <div class="YY-CARD_WHITE">
+        <form
+          id="yySmtpForm"
+          method="post"
+          data-api-url="{% url 'settings:mail_servers_api' %}"
+          data-secret-url="{% url 'settings:mail_servers_imap_secret' id=mailbox_ui_id %}"
+          data-state="{{ state }}"
+        >
+          {% csrf_token %}
+
+          <input type="hidden" name="id" value="{{ mailbox_ui_id }}">
+          {{ form.auth_type }}
+
+          <div class="YY-STATUS_BLUE mb-8">IMAP {% trans "сервер (входящие)" %}</div>
+
+          <div class="flex items-center gap-6 mb-12">
+            <button type="button" id="yyAuthBtnLogin" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "ЛОГИН (Стандарт)" %}</button>
+            <button type="button" id="yyAuthBtnGoogle" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "Google OAuth 2.0" %}</button>
+            <button type="button" id="yyAuthBtnMicrosoft" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "Microsoft OAuth 2.0" %}</button>
+          </div>
+
+          <div id="yyLoginBlock">
+            <div class="YY-STATUS_GREEN mb-8">{% trans "ЛОГИН (Стандарт)" %}</div>
+
+            <div class="grid grid-cols-[1fr_130px_250px] gap-6 items-center mb-4">
+              <div>&nbsp;</div>
+              <div class="YY-LABEL">{% trans "Провайдер" %}:</div>
+              <div>
+                <select id="yyPresetSelect" class="YY-INPUT !px-1">
+                  <option value="">{% trans "— выберите провайдера —" %}</option>
+                  {% for pid, pname in preset_choices %}
+                    <option value="{{ pid }}">{{ pname }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-[150px_1fr_120px] gap-4 mb-4">
+              <div>
+                <label class="YY-LABEL">{% trans "Шифрование" %}:</label>
+                {{ form.security }}
+                {% if form.security.errors %}<div class="YY-FORM_ERROR mt-1">{{ form.security.errors }}</div>{% endif %}
+              </div>
+
+              <div>
+                <label class="YY-LABEL">{% trans "Сервер" %}:</label>
+                {{ form.host }}
+                {% if form.host.errors %}<div class="YY-FORM_ERROR mt-1">{{ form.host.errors }}</div>{% endif %}
+              </div>
+
+              <div>
+                <label class="YY-LABEL">{% trans "Порт" %}:</label>
+                {{ form.port }}
+                {% if form.port.errors %}<div class="YY-FORM_ERROR mt-1">{{ form.port.errors }}</div>{% endif %}
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-6 items-center mb-12">
+              <div>
+                <label class="YY-LABEL">{% trans "Логин / Имя пользователя" %}:</label>
+                {{ form.username }}
+                {% if form.username.errors %}<div class="YY-FORM_ERROR mt-1">{{ form.username.errors }}</div>{% endif %}
+              </div>
+
+              <div class="relative">
+                <label class="YY-LABEL">{% trans "Пароль / Токен" %}:</label>
+                {{ form.password }}
+                {% if form.password.errors %}<div class="YY-FORM_ERROR mt-1">{{ form.password.errors }}</div>{% endif %}
+
+                <button
+                  type="button"
+                  class="absolute right-3 top-12 -translate-y-1/2 text-[#006991] hover:text-gray-800"
+                  onclick="yyTogglePasswordOrReveal('imap','yySecret')"
+                  aria-label="password"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div id="yyOauthGoogleBlock" class="hidden">
+            <div class="YY-STATUS_GREEN mb-8">Google OAuth 2.0</div>
+            <div class="YY-STATUS_YELLOW !mb-12 !py-12">
+              {% trans "Автоматически пока не реализовано." %}<br>
+              {% trans "Реализация автоматики до 1 апреля 2026 г." %}<br>
+              {% trans "Обратитесь к менеджеру для подключения вручную." %}
+            </div>
+          </div>
+
+          <div id="yyOauthMicrosoftBlock" class="hidden">
+            <div class="YY-STATUS_GREEN mb-8">Microsoft OAuth 2.0</div>
+            <div class="YY-STATUS_YELLOW !mb-12 !py-12">
+              {% trans "Автоматически пока не реализовано." %}<br>
+              {% trans "Реализация автоматики до 1 апреля 2026 г." %}<br>
+              {% trans "Обратитесь к менеджеру для подключения вручную." %}
+            </div>
+          </div>
+
+          {% if form.non_field_errors %}
+            <div class="YY-CARD_IN_FORM_ERROR mt-4">{{ form.non_field_errors }}</div>
+          {% endif %}
+
+          <div class="flex gap-3 mt-6">
+            <div id="yySaveWrap" class="w-full">
+              <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN w-full">
+                {% trans "Сохранить" %}
+              </button>
+            </div>
+
+            <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN w-full" formnovalidate>
+              {% trans "Закрыть" %}
+            </button>
+          </div>
+
+        </form>
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-[35%]">
+      <div class="YY-CARD_WHITE">
+
+        {% if state == "add" %}
+          <div class="YY-STATUS_BLUE">{% trans "Добавление IMAP сервера" %}</div>
+        {% else %}
+          <button
+            id="yyCheckImapBtn"
+            type="button"
+            class="YY-BUTTON_MAIN mb-4 w-full"
+            onclick="yyMailServersCheck('check_imap','yyCheckImapBtn','yyImapChecksOut')"
+          >
+            {% trans "Проверить IMAP авторизацию" %}
+          </button>
+
+          <textarea
+            id="yyImapChecksOut"
+            class="YY-INPUT !min-h-[220px] !font-mono"
+            placeholder="{% trans 'Результат проверки' %}"
+          ></textarea>
+
+          <div class="mt-6">
+            <div class="YY-LABEL mb-2">{% trans "Последняя проверка" %}:</div>
+            {% if last_check_status %}
+              <div class="YY-INPUT py-3">
+                <div class="text-sm">{{ last_check_dt }}</div>
+                <div class="text-sm"><b>{{ last_check_status }}</b></div>
+              </div>
+            {% else %}
+              <div class="YY-STATUS_YELLOW mt-2">{% trans "Не проверено" %}</div>
+            {% endif %}
+          </div>
+        {% endif %}
+
+      </div>
+    </td>
+  </tr>
+</table>
+
+{% include "panels/aap_settings/partials/mail_secret_modal.html" %}
+
+<script src="{% static 'js/aap_settings/smtp_server.js' %}"></script>
+<script src="{% static 'js/aap_settings/mail_servers_checks.js' %}"></script>
+<script src="{% static 'js/aap_settings/mail_servers_secret.js' %}"></script>
+
+<script>
+  (function () {
+    const el = document.querySelector('input[name="password"]');
+    if (!el) return;
+    el.id = "yySecret";
+    try { el.style.paddingRight = "2.75rem"; } catch (e) {}
+  })();
+</script>
+
+{% endblock %}

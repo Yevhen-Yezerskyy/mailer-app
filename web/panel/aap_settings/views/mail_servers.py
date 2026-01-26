@@ -1,9 +1,14 @@
 # FILE: web/panel/aap_settings/views/mail_servers.py
-# DATE: 2026-01-25
-# PURPOSE: Patch — убрать выполнение domain-check из view (только сбор статусов).
-# CHANGE: action=="test_domain" теперь просто редирект (без проверок).
+# DATE: 2026-01-26
+# PURPOSE: Settings → Mail servers: mailbox list/add/edit/delete + status blocks for last checks.
+# CHANGE:
+# - SMTP now shows TWO checks: SMTP_AUTH_CHECK + SMTP_SEND_CHECK.
+# - Status rendering data is split into 3 fields (dt/action/status) instead of one string.
+# - Template contract fields updated: domain_tech/domain_rep/smtp_auth/smtp_send/imap_check.
 
 from __future__ import annotations
+
+from zoneinfo import ZoneInfo
 
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -30,6 +35,13 @@ def _domain_from_mailbox(mb: Mailbox) -> str:
     if "@" in em:
         return em.split("@", 1)[1].strip().lower()
     return ""
+
+
+def _fmt_dt(dt) -> str:
+    try:
+        return dt.astimezone(ZoneInfo("Europe/Berlin")).strftime("%d.%m.%Y %H:%M:%S")
+    except Exception:
+        return "—"
 
 
 def mail_servers_view(request):
@@ -62,21 +74,36 @@ def mail_servers_view(request):
         .distinct()
     )
 
-    status_map: dict[tuple[int, str], str] = {}
+    ACTIONS = (
+        "SMTP_AUTH_CHECK",
+        "SMTP_SEND_CHECK",
+        "IMAP_CHECK",
+        "DOMAIN_CHECK_TECH",
+        "DOMAIN_CHECK_REPUTATION",
+    )
+
+    status_map: dict[tuple[int, str], dict] = {}
     if mb_ids:
         rows = engine_db.fetch_all(
             """
             SELECT DISTINCT ON (mailbox_id, action)
-                   mailbox_id, action, status
+                   mailbox_id, action, status, created_at
             FROM mailbox_events
             WHERE mailbox_id = ANY(%s)
-              AND action IN ('SMTP_CHECK','IMAP_CHECK','DOMAIN_TECH_CHECK','DOMAIN_REPUTATION_CHECK')
-            ORDER BY mailbox_id, action, id DESC
+              AND action = ANY(%s)
+            ORDER BY mailbox_id, action, created_at DESC
             """,
-            (mb_ids,),
+            (mb_ids, list(ACTIONS)),
         ) or []
-        for mailbox_id, action, status in rows:
-            status_map[(int(mailbox_id), str(action))] = str(status)
+        for mailbox_id, action, status, created_at in rows:
+            status_map[(int(mailbox_id), str(action))] = {
+                "dt": _fmt_dt(created_at),
+                "action": str(action),
+                "status": str(status),
+            }
+
+    def _rec(mb_id: int, action: str) -> dict | None:
+        return status_map.get((int(mb_id), action))
 
     def _apply_ui_fields(mb: Mailbox) -> None:
         mb.ui_id = encode_id(int(mb.id))
@@ -84,15 +111,18 @@ def mail_servers_view(request):
         mb.domain_name = _domain_from_mailbox(mb)
         mb.domain_whitelisted = is_domain_whitelisted(mb.domain_name)
 
-        mb.domain_tech_status = status_map.get((int(mb.id), "DOMAIN_TECH_CHECK"))
-        mb.domain_rep_status = status_map.get((int(mb.id), "DOMAIN_REPUTATION_CHECK"))
-        mb.domain_tested = bool(mb.domain_tech_status or mb.domain_rep_status)
+        mb.domain_tech = _rec(int(mb.id), "DOMAIN_CHECK_TECH")
+        mb.domain_rep = _rec(int(mb.id), "DOMAIN_CHECK_REPUTATION")
+        mb.domain_tested = bool(mb.domain_tech or mb.domain_rep)
 
         mb.smtp_configured = int(mb.id) in smtp_ids
-        mb.smtp_status = status_map.get((int(mb.id), "SMTP_CHECK"))
+        mb.smtp_auth = _rec(int(mb.id), "SMTP_AUTH_CHECK")
+        mb.smtp_send = _rec(int(mb.id), "SMTP_SEND_CHECK")
+        mb.smtp_tested = bool(mb.smtp_auth or mb.smtp_send)
 
         mb.imap_configured = int(mb.id) in imap_ids
-        mb.imap_status = status_map.get((int(mb.id), "IMAP_CHECK"))
+        mb.imap_check = _rec(int(mb.id), "IMAP_CHECK")
+        mb.imap_tested = bool(mb.imap_check)
 
     for it in items:
         _apply_ui_fields(it)
@@ -131,7 +161,6 @@ def mail_servers_view(request):
         if action == "test_domain":
             return redirect(reverse("settings:mail_servers"))
 
-        # save (add/edit)
         mailbox_id = int(edit_obj.id) if (state == "edit" and edit_obj) else None
         form = MailboxAddForm(request.POST, workspace_id=ws_id, mailbox_id=mailbox_id)
 

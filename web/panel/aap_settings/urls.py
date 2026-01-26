@@ -1,7 +1,7 @@
 # FILE: web/panel/aap_settings/urls.py
-# DATE: 2026-01-25
+# DATE: 2026-01-26
 # PURPOSE: Settings urls.
-# CHANGE: добавлен endpoint для показа пароля SMTP (modal): mail_servers_smtp_secret.
+# CHANGE: добавлен endpoint для показа пароля IMAP (modal): mail_servers_imap_secret.
 
 from django.urls import path
 from django.views.generic import RedirectView
@@ -18,4 +18,5 @@ urlpatterns = [
     path("mail-servers/<str:id>/smtp/", smtp_server.smtp_server_view, name="mail_servers_smtp"),
     path("mail-servers/<str:id>/smtp/secret/", smtp_server.smtp_secret_view, name="mail_servers_smtp_secret"),
     path("mail-servers/<str:id>/imap/", imap_server.imap_server_view, name="mail_servers_imap"),
+    path("mail-servers/<str:id>/imap/secret/", imap_server.imap_secret_view, name="mail_servers_imap_secret"),
 ]

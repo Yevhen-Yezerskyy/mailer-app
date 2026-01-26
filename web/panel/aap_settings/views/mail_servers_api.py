@@ -4,7 +4,10 @@
 # ACTIONS:
 # - check_domain
 # - check_smtp
+# - check_imap
 # - send_test_mail
+# CHANGE:
+# - Добавлен handler check_imap → engine.common.mail.utils.imap_check
 
 from __future__ import annotations
 
@@ -15,7 +18,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
 from engine.common.mail.domain_checks import domain_check_reputation, domain_check_tech
-from engine.common.mail.utils import smtp_auth_check, smtp_send_check
+from engine.common.mail.utils import imap_check, smtp_auth_check, smtp_send_check
 from mailer_web.access import decode_id
 from panel.aap_settings.models import Mailbox
 
@@ -53,6 +56,10 @@ def _handle_check_smtp(*, mailbox_id: int, **_) -> Dict[str, Any]:
     return smtp_auth_check(mailbox_id)
 
 
+def _handle_check_imap(*, mailbox_id: int, **_) -> Dict[str, Any]:
+    return imap_check(mailbox_id)
+
+
 def _handle_send_test_mail(*, mailbox_id: int, to: str | None = None, **_) -> Dict[str, Any]:
     if not to:
         return {"action": "SMTP_SEND_CHECK", "status": "FAIL", "data": {"error": "missing_to"}}
@@ -62,6 +69,7 @@ def _handle_send_test_mail(*, mailbox_id: int, to: str | None = None, **_) -> Di
 ACTION_HANDLERS: Dict[str, Callable[..., Dict[str, Any]]] = {
     "check_domain": _handle_check_domain,
     "check_smtp": _handle_check_smtp,
+    "check_imap": _handle_check_imap,
     "send_test_mail": _handle_send_test_mail,
 }
 
