@@ -1,10 +1,6 @@
-# FILE: web/panel/aap_settings/views/mail_servers.py
-# DATE: 2026-01-26
-# PURPOSE: Settings → Mail servers: mailbox list/add/edit/delete + status blocks for last checks.
-# CHANGE:
-# - SMTP now shows TWO checks: SMTP_AUTH_CHECK + SMTP_SEND_CHECK.
-# - Status rendering data is split into 3 fields (dt/action/status) instead of one string.
-# - Template contract fields updated: domain_tech/domain_rep/smtp_auth/smtp_send/imap_check.
+# FILE: web/panel/aap_settings/views/mail_servers.py  (обновлено — 2026-01-27)
+# PURPOSE: Settings → Mail servers: mailbox list/add/edit/archive + status blocks for last checks.
+# CHANGE: Delete action is now soft-delete: sets Mailbox.archived=True, and archived mailboxes are hidden in UI.
 
 from __future__ import annotations
 
@@ -60,7 +56,9 @@ def mail_servers_view(request):
     if state not in ("add", "edit"):
         state = ""
 
-    items = list(Mailbox.objects.filter(workspace_id=ws_id).order_by("email"))
+    items = list(
+        Mailbox.objects.filter(workspace_id=ws_id, archived=False).order_by("email")
+    )
     mb_ids = [int(m.id) for m in items]
 
     smtp_ids = set(
@@ -135,7 +133,9 @@ def mail_servers_view(request):
         except Exception:
             return redirect(reverse("settings:mail_servers"))
 
-        edit_obj = Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).first()
+        edit_obj = Mailbox.objects.filter(
+            id=int(mailbox_id), workspace_id=ws_id, archived=False
+        ).first()
         if not edit_obj:
             return redirect(reverse("settings:mail_servers"))
 
@@ -154,7 +154,7 @@ def mail_servers_view(request):
             except Exception:
                 return redirect(reverse("settings:mail_servers"))
 
-            Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).delete()
+            Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).update(archived=True)
             return redirect(reverse("settings:mail_servers"))
 
         # domain checks должны ездить только через AJAX API — тут ничего не выполняем

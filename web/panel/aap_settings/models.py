@@ -1,9 +1,6 @@
-# FILE: web/panel/aap_settings/models.py
-# DATE: 2026-01-24
-# PURPOSE: aap_settings models: bind auth_type values to engine/common/mail/types.py canonical list.
-# CHANGE:
-# - auth_type choices now come from SMTP_CREDENTIALS_FORMAT keys (LOGIN/GOOGLE_OAUTH_2_0/MICROSOFT_OAUTH_2_0).
-# - DB fields unchanged.
+# FILE: web/panel/aap_settings/models.py  (обновлено — 2026-01-27)
+# PURPOSE: aap_settings models: add Mailbox.archived to soft-delete mailboxes (hide from UI, keep DB rows).
+# CHANGE: Mailbox now has archived=BooleanField(default=False). Other fields/choices unchanged.
 
 from __future__ import annotations
 
@@ -21,6 +18,7 @@ class Mailbox(models.Model):
     email = models.EmailField(max_length=254)
     domain = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
+    archived = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

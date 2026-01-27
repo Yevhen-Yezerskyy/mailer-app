@@ -59,7 +59,7 @@
                             <div class="YY-STATUS_GRAY !text-sm !mb-2">
                           {% endif %}
                           <div>{{ edit_obj.domain_tech.dt }}</div>
-                          <div><b>{{ edit_obj.domain_tech.action }}: {{ edit_obj.domain_tech.status }}</b></div>
+                          <div>{{ edit_obj.domain_tech.action }}: {{ edit_obj.domain_tech.status }}</div>
                         </div>
                       {% else %}
                         <div class="YY-STATUS_YELLOW !text-sm !mb-2">
@@ -76,7 +76,7 @@
                             <div class="YY-STATUS_GRAY !text-sm ">
                           {% endif %}                      
                           <div>{{ edit_obj.domain_rep.dt }}</div>
-                          <div><b>{{ edit_obj.domain_rep.action }}: {{ edit_obj.domain_rep.status }}</b></div>
+                          <div>{{ edit_obj.domain_rep.action }}: {{ edit_obj.domain_rep.status }}</div>
                         </div>
                       {% endif %}
                     </div>
@@ -114,7 +114,7 @@
                           {% endif %}
 
                             <div>{{ edit_obj.smtp_auth.dt }}</div>
-                            <div><b>{{ edit_obj.smtp_auth.action }}: {{ edit_obj.smtp_auth.status }}</b></div>
+                            <div>{{ edit_obj.smtp_auth.action }}: {{ edit_obj.smtp_auth.status }}</div>
                           </div>
                       {% else %}
                         <div class="YY-STATUS_YELLOW !text-sm !mb-2">
@@ -130,7 +130,7 @@
                             <div class="YY-STATUS_GRAY !text-sm !mb-2">
                           {% endif %}                     
                           <div>{{ edit_obj.smtp_send.dt }}</div>
-                          <div><b>{{ edit_obj.smtp_send.action }}</b>: {{ edit_obj.smtp_send.status }}</div>
+                          <div>{{ edit_obj.smtp_send.action }}: {{ edit_obj.smtp_send.status }}</div>
                         </div>
                       {% endif %}
                   {% endif %}
@@ -156,7 +156,7 @@
                             <div class="YY-STATUS_GRAY !text-sm !mb-2">
                           {% endif %}                       
                           <div>{{ edit_obj.imap_check.dt }}</div>
-                          <div><b>{{ edit_obj.imap_check.action }}</b>: {{ edit_obj.imap_check.status }}</div>
+                          <div>{{ edit_obj.imap_check.action }}: {{ edit_obj.imap_check.status }}</div>
                         </div>
                       {% else %}
                         <div class="YY-STATUS_YELLOW !text-sm !mb-2">
@@ -251,7 +251,7 @@
                 <tr class="YY-TB_TR align-top">
 
                   <td class="YY-TB_TD">
-                    <div class="YY-STATUS_BLUE mb-2">{{ it.email }}</div>
+                    <b>{{ it.email }}</b>
                   </td>
 
                   <td class="YY-TB_TD">
@@ -271,7 +271,7 @@
                             <div class="YY-STATUS_GRAY !text-sm !mb-2">
                           {% endif %}
                           <div>{{ it.domain_tech.dt }}</div>
-                          <div><b>{{ it.domain_tech.action }}: {{ it.domain_tech.status }}</b></div>
+                          <div>{{ it.domain_tech.action }}: {{ it.domain_tech.status }}</div>
                         </div>
                         {% else %}
                         <div class="YY-STATUS_YELLOW !text-sm !mb-2">
@@ -288,7 +288,7 @@
                             <div class="YY-STATUS_GRAY !text-sm ">
                           {% endif %}
                           <div>{{ it.domain_rep.dt }}</div>
-                          <div><b>{{ it.domain_rep.action }}: {{ it.domain_rep.status }}</b></div>
+                          <div>{{ it.domain_rep.action }}: {{ it.domain_rep.status }}</div>
                         </div>
                     {% else %}
                     <div class="YY-STATUS_YELLOW !text-sm ">
@@ -319,7 +319,7 @@
                             <div class="YY-STATUS_GRAY !text-sm !mb-2">
                           {% endif %}
                             <div>{{ it.smtp_auth.dt }}</div>
-                            <div><b>{{ it.smtp_auth.action }}: {{ it.smtp_auth.status }}</b></div>
+                            <div>{{ it.smtp_auth.action }}: {{ it.smtp_auth.status }}</div>
                           </div>
                         {% else %}
                         <div class="YY-STATUS_YELLOW !text-sm !mb-2">
@@ -335,7 +335,7 @@
                             <div class="YY-STATUS_GRAY !text-sm !mb-2">
                           {% endif %}
                             <div>{{ it.smtp_send.dt }}</div>
-                            <div><b>{{ it.smtp_send.action }}: {{ it.smtp_send.status }}</b></div>
+                            <div>{{ it.smtp_send.action }}: {{ it.smtp_send.status }}</div>
                           </div>
                         {% endif %}
                     {% endif %}
@@ -360,7 +360,7 @@
                             <div class="YY-STATUS_GRAY !text-sm !mb-2">
                           {% endif %}
                             <div>{{ it.imap_check.dt }}</div>
-                            <div><b>{{ it.imap_check.action }}: {{ it.imap_check.status }}</b></div>
+                            <div>{{ it.imap_check.action }}: {{ it.imap_check.status }}</div>
                           </div>
                         {% else %}
                         <div class="YY-STATUS_YELLOW !text-sm !mb-2">
