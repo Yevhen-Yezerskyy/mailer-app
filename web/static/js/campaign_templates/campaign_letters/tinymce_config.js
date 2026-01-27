@@ -1,14 +1,12 @@
 // FILE: web/static/js/campaign_templates/campaign_letters/tinymce_config.js
-// DATE: 2026-01-22
-// PURPOSE: Tiny config для письма: исходный конфиг + детерминированное поведение Enter/Paste.
+// DATE: 2026-01-27
+// PURPOSE: Tiny config для письма: детерминированное Enter/Paste + динамические кнопки вставки HTML.
 // CHANGE:
-// - Paste: только plain text; каждая строка -> <p>...</p>.
-// - После Enter: глобально по DOM меняем <br><br> внутри <p> на split <p> -> <p></p><p></p>.
-//   Каретка ставится в начало ПОСЛЕДНЕГО созданного <p>.
-// - Если split не было: каретка ставится ПЕРЕД последним <br> в текущем <p>.
-// - После программного перемещения каретки: дергаем Tiny (mceInsertContent пустым) чтобы сбросить caret-state,
-//   иначе второй <br> может не разрешаться до ручного движения курсора.
-// - NEW: динамические кнопки вставки HTML из window.yyCampInitButtons (ключ=название, значение=HTML).
+// - Link: как в конфиге шаблонов — всегда открываем НАШ диалог "Link" (toolbar + контекст/панель через mceLink перехват).
+//   Protocol=(none/https/mailto/tel/WhatsApp/Telegram) + Address + Text; Remove link слева с иконкой unlink (только при edit).
+//   WhatsApp/Telegram — префиксы https://wa.me/ и https://t.me/ (не протоколы).
+// - Добавлена кнопка "•" (вставляет &bull;&nbsp;&nbsp; в курсор).
+// - Сохранено: Paste text-><p>, Enter-нормализация <br><br> в split <p>, caret-фиксы, init-css, yyCampInitButtons.
 
 (function () {
   "use strict";
@@ -16,6 +14,136 @@
   if (!window.tinymce) return;
 
   const $ = (s) => document.querySelector(s);
+
+  /* ===== Link prefixes (same as templates config) ===== */
+
+  const PREFIXES = {
+    "": "",
+    "https://": "https://",
+    "mailto:": "mailto:",
+    "tel:": "tel:",
+    wa: "https://wa.me/",
+    tg: "https://t.me/",
+  };
+
+  const PARSE_PREFIXES = [
+    { key: "wa", prefix: "https://wa.me/" },
+    { key: "tg", prefix: "https://t.me/" },
+    { key: "https://", prefix: "https://" },
+    { key: "mailto:", prefix: "mailto:" },
+    { key: "tel:", prefix: "tel:" },
+  ];
+
+  function parseHref(href) {
+    href = String(href || "");
+    for (const it of PARSE_PREFIXES) {
+      if (href.startsWith(it.prefix)) {
+        return { protoKey: it.key, address: href.slice(it.prefix.length) };
+      }
+    }
+    return { protoKey: "", address: href };
+  }
+
+  function currentLinkNode(editor) {
+    const n = editor.selection.getNode();
+    if (!n) return null;
+    if (n.nodeName === "A") return n;
+    return editor.dom.getParent(n, "a");
+  }
+
+  function openLinkDialog(editor) {
+    const linkNode = currentLinkNode(editor);
+
+    const href = linkNode ? editor.dom.getAttrib(linkNode, "href") : "";
+    const parsed = parseHref(href);
+
+    const selectedText = editor.selection.getContent({ format: "text" }) || "";
+    const existingText = linkNode ? (linkNode.textContent || "") : "";
+    const initialText = existingText || selectedText;
+
+    editor.windowManager.open({
+      title: "Link",
+      body: {
+        type: "panel",
+        items: [
+          {
+            type: "bar",
+            items: [
+              {
+                type: "selectbox",
+                name: "protoKey",
+                label: "Protocol",
+                items: [
+                  { text: "(none)", value: "" },
+                  { text: "https://", value: "https://" },
+                  { text: "mailto:", value: "mailto:" },
+                  { text: "tel:", value: "tel:" },
+                  { text: "WhatsApp", value: "wa" },
+                  { text: "Telegram", value: "tg" },
+                ],
+              },
+              {
+                type: "input",
+                name: "address",
+                label: "Address",
+                maximized: true,
+              },
+            ],
+          },
+          {
+            type: "input",
+            name: "text",
+            label: "Text",
+          },
+        ],
+      },
+      initialData: {
+        protoKey: parsed.protoKey,
+        address: parsed.address,
+        text: initialText,
+      },
+      buttons: [
+        linkNode
+          ? { type: "custom", name: "unlink", text: "Remove link", icon: "unlink", align: "start" }
+          : null,
+        { type: "cancel", text: "Cancel" },
+        { type: "submit", text: "Save", primary: true },
+      ].filter(Boolean),
+
+      onAction(api, details) {
+        if (details.name === "unlink") {
+          editor.execCommand("unlink");
+          api.close();
+        }
+      },
+
+      onSubmit(api) {
+        const d = api.getData() || {};
+        const protoKey = String(d.protoKey || "");
+        const address = String(d.address || "");
+        const text = String(d.text || "");
+
+        const prefix = Object.prototype.hasOwnProperty.call(PREFIXES, protoKey) ? PREFIXES[protoKey] : "";
+        const newHref = prefix ? prefix + address : address;
+
+        const ln = currentLinkNode(editor);
+        if (ln) {
+          editor.dom.setAttrib(ln, "href", newHref);
+          if (text) ln.textContent = text;
+        } else {
+          editor.execCommand("mceInsertLink", false, newHref);
+          if (text) {
+            const n = editor.selection.getNode();
+            if (n && n.nodeName === "A") n.textContent = text;
+          }
+        }
+
+        api.close();
+      },
+    });
+  }
+
+  /* ===== init inputs ===== */
 
   function readInitCss() {
     const ta = $("#yyInitCss");
@@ -51,7 +179,7 @@
       statusbar: false,
 
       plugins: "link",
-      toolbar: "undo redo | bold italic | link" + extraToolbar,
+      toolbar: "undo redo | bold italic | yyBullet | link" + extraToolbar,
       link_default_target: "_blank",
 
       newline_behavior: "linebreak",
@@ -85,6 +213,27 @@
             });
           });
         } catch (_) {}
+
+        // bullet button
+        try {
+          editor.ui.registry.addButton("yyBullet", {
+            text: "●",
+            tooltip: "Bullet",
+            onAction: () => {
+              try {
+                editor.insertContent("&bull;&nbsp;&nbsp;");
+              } catch (_) {}
+            },
+          });
+        } catch (_) {}
+
+        // Link dialog override (toolbar + context/panel)
+        editor.on("BeforeExecCommand", function (e) {
+          if (e && e.command === "mceLink") {
+            e.preventDefault();
+            openLinkDialog(editor);
+          }
+        });
 
         let enterArmed = false;
         let postScheduled = false;
