@@ -1,10 +1,9 @@
 # FILE: web/panel/aap_campaigns/template_editor.py
-# DATE: 2026-01-21
+# DATE: 2026-01-29
 # PURPOSE: Единый центр HTML-операций для editors (Templates + Letters).
 # CHANGE:
-# - Расширен _DEFAULT_TEMPLATE_VARS (company_name/city_land/date_time/city/UTM) для demo-подстановки.
-# - FIX: letter_editor_extract_content теперь делает reverse-vars: demo-значения -> {{ var }} (как в шаблонах),
-#        чтобы при сохранении не терялись переменные.
+# - Подстановки переменных полностью переведены на engine.common.mail.send (apply_vars/unapply_vars + DEFAULT_VARS).
+# - Набор переменных теперь 100% как в send (без локального списка/дубликатов).
 
 from __future__ import annotations
 
@@ -13,25 +12,19 @@ import re
 from typing import Any, Dict, Optional, Tuple
 
 from engine.common.email_template import PLACEHOLDER, StylesJSON, sanitize
+from engine.common.mail.send import DEFAULT_VARS as _SEND_DEFAULT_VARS
+from engine.common.mail.send import apply_vars as _send_apply_vars
+from engine.common.mail.send import unapply_vars as _send_unapply_vars
 from panel.models import GlobalTemplate
 
 # ---- Wrapper (Tiny-safe) ----
 
 _EDITOR_WRAP_CLASS = "yy_content_wrap"
 
-# ---- Default vars (for {{ var }}) ----
-
-_DEFAULT_TEMPLATE_VARS: Dict[str, str] = {
-    "company_name": "Unternehmen Adressat GmbH",
-    "city_land": "Köln, Nordrhein-Westfalen",
-    "date_time": "12:00 21.01.2028",
-    "city": "Hauptstadt",
-    "UTM": "smrel=132246897659",
-}
-
 
 def default_template_vars() -> Dict[str, str]:
-    return dict(_DEFAULT_TEMPLATE_VARS)
+    # полный набор переменных — как в send.DEFAULT_VARS
+    return dict(_SEND_DEFAULT_VARS)
 
 
 _TINY_CLASS_STRIP_RE = re.compile(r'(?is)\bclass\s*=\s*(?P<q>["\'])(?P<v>.*?)(?P=q)')
@@ -50,23 +43,6 @@ def _strip_tiny_edit_classes(html: str) -> str:
         return f'class={q}{" ".join(parts)}{q}'
 
     return _TINY_CLASS_STRIP_RE.sub(repl, html)
-
-
-def _unapply_template_vars(html: str, vars_dict: Dict[str, str]) -> str:
-    """
-    Reverse: demo-строки -> {{ var }}.
-    Делает простые replace, длинные значения — первыми.
-    """
-    s = html or ""
-    if not s or not isinstance(vars_dict, dict) or not vars_dict:
-        return s
-
-    pairs = [(k, str(v)) for k, v in vars_dict.items() if k and v is not None and str(v)]
-    pairs.sort(key=lambda kv: len(kv[1]), reverse=True)
-
-    for key, val in pairs:
-        s = s.replace(val, f"{{{{ {key} }}}}")
-    return s
 
 
 def wrap_editor_content(inner_html: str) -> str:
@@ -206,32 +182,12 @@ def styles_css_to_json(css_text: str) -> Dict[str, Dict[str, str]]:
         if not rules:
             continue
 
-        # IMPORTANT: merge — не затираем весь селектор целиком
         if sel in out:
-            out[sel].update(rules)  # новые ключи перекрывают только совпавшие свойства
+            out[sel].update(rules)
         else:
             out[sel] = rules
 
     return out
-
-
-# ---- helpers: {{ var }} ----
-
-_VAR_RE = re.compile(r"(?s)\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
-
-
-def _apply_template_vars(html: str, vars_dict: Dict[str, str]) -> str:
-    if not html:
-        return ""
-
-    def repl(m: re.Match) -> str:
-        key = (m.group(1) or "").strip()
-        if not key:
-            return m.group(0)
-        v = vars_dict.get(key)
-        return str(v) if v is not None else m.group(0)
-
-    return _VAR_RE.sub(repl, html)
 
 
 # ---- helpers: Tiny editability ----
@@ -249,13 +205,10 @@ def _apply_tiny_editability(html: str) -> str:
     if not html:
         return ""
 
-    # Ловим и <tag ...>, и </tag>
     tag_re = re.compile(r"(?is)<\s*(/)?\s*([a-zA-Z][a-zA-Z0-9:_-]*)([^<>]*?)>")
 
     out: list[str] = []
     pos = 0
-
-    # стек: для каждого открытого тега флаг "это TemplateEdit"
     stack: list[bool] = []
 
     for m in tag_re.finditer(html):
@@ -274,7 +227,6 @@ def _apply_tiny_editability(html: str) -> str:
             out.append(full_tag)
             continue
 
-        # self-closing или void-теги — не пушим в стек
         is_self_closing = full_tag.rstrip().endswith("/>") or name in _VOID_TAGS
 
         if name in ("script", "style") or name in _VOID_TAGS:
@@ -352,8 +304,8 @@ def editor_template_render_html(template_html: str, content_html: str) -> str:
     wrapped = wrap_editor_content(content_html or "")
     html1 = (template_html or "").replace(PLACEHOLDER, wrapped, 1)
 
-    vars_dict = dict(_DEFAULT_TEMPLATE_VARS)
-    html2 = _apply_template_vars(html1, vars_dict)
+    # demo: {{ var }} -> demo-value (из send)
+    html2 = _send_apply_vars(html1, rate_contact_id=None)
 
     html3 = sanitize(html2)
     return _apply_tiny_editability(html3)
@@ -361,7 +313,9 @@ def editor_template_render_html(template_html: str, content_html: str) -> str:
 
 def editor_template_parse_html(editor_html: str) -> str:
     raw0 = _strip_tiny_edit_classes(editor_html or "")
-    raw = _unapply_template_vars(raw0, _DEFAULT_TEMPLATE_VARS)
+
+    # reverse demo-value -> {{ var }} (из send)
+    raw = _send_unapply_vars(raw0, rate_contact_id=None)
 
     span = _find_wrapper_table_span(raw)
     if not span:
@@ -419,8 +373,8 @@ def letter_editor_render_html(template_html: str, content_html: str) -> str:
     wrapped = wrap_editor_content(content_html or "")
     html1 = (template_html or "").replace(PLACEHOLDER, wrapped, 1)
 
-    vars_dict = dict(_DEFAULT_TEMPLATE_VARS)
-    html2 = _apply_template_vars(html1, vars_dict)
+    # demo: {{ var }} -> demo-value (из send)
+    html2 = _send_apply_vars(html1, rate_contact_id=None)
 
     raw = sanitize(html2)
 
@@ -439,7 +393,7 @@ def letter_editor_extract_content(editor_html: str) -> str:
     raw0 = _strip_tiny_edit_classes(editor_html or "")
     inner0 = unwrap_editor_content(raw0) or ""
 
-    # FIX: reverse demo-vars обратно в {{ var }} (как в templates)
-    inner1 = _unapply_template_vars(inner0, _DEFAULT_TEMPLATE_VARS)
+    # reverse demo-value -> {{ var }} (из send)
+    inner1 = _send_unapply_vars(inner0, rate_contact_id=None)
 
     return sanitize(inner1 or "")

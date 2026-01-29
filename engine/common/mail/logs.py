@@ -1,8 +1,8 @@
 # FILE: engine/common/mail/logs.py
-# DATE: 2026-01-24
+# DATE: 01-29
 # PURPOSE:
-# - Strict mailbox_events logger with hard action/status contract.
-# - TEMP reversible obfuscation helpers (moved to end).
+# - Strict mailbox_events logger (actions + statuses)
+# - Strict mailbox_sent logger (statuses only)
 # NOTES:
 # - NO normalization, NO trimming, NO auto-fixes.
 # - Wrong input → exception.
@@ -13,6 +13,7 @@ import base64
 from typing import Any, Dict
 
 from psycopg.types.json import Json
+
 from engine.common import db
 
 
@@ -21,7 +22,7 @@ from engine.common import db
 # =========================
 
 MAIL_ACTIONS_FORMAT: Dict[str, tuple[str, ...]] = {
-    #DOMAINS
+    # DOMAINS
     "DOMAIN_CHECK_TECH": (
         "GOOD",
         "NORMAL",
@@ -29,26 +30,23 @@ MAIL_ACTIONS_FORMAT: Dict[str, tuple[str, ...]] = {
         "TRUSTED",
         "CHECK_FAILED",
     ),
-    
     "DOMAIN_CHECK_REPUTATION": (
         "NORMAL",
         "QUESTIONABLE",
         "TRUSTED",
         "CHECK_FAILED",
     ),
-
-    #SMTP
+    # SMTP
     "SMTP_AUTH_CHECK": (
         "SUCCESS",
         "FAIL",
     ),
-
     "SMTP_SEND_CHECK": (
         "SUCCESS",
+        "FAIL_TMP",
         "FAIL",
     ),
-
-    #IMAP
+    # IMAP
     "IMAP_CHECK": (
         "SUCCESS",
         "FAIL",
@@ -97,3 +95,67 @@ def _validate_action_status(action: str, status: str) -> None:
         raise ValueError(f"mail_bad_status:{action}:{status}")
 
 
+# =========================
+# (C) mailbox_sent format (single source of truth)
+# =========================
+
+MAILBOX_SENT_STATUSES: tuple[str, ...] = (
+    "SEND",
+    "BAD_ADDRESS",
+    "REPUTATION",
+    "OTHER",
+)
+
+
+# =========================
+# (D) mailbox_sent logger (strict)
+# =========================
+
+def log_mailbox_sent(
+    *,
+    campaign_id: int,
+    list_id: int,
+    rate_contact_id: int,
+    status: str,
+    payload_json: Dict[str, Any],
+) -> None:
+    """
+    Insert single row into mailbox_sent.
+
+    Contract:
+      - status MUST be one of MAILBOX_SENT_STATUSES
+      - payload_json MUST be dict
+      - all ids MUST be int-like
+      - processed=true, processed_at=now() are set here
+    """
+    _validate_sent_status(status)
+
+    if not isinstance(payload_json, dict):
+        raise ValueError("mail_bad_payload:payload_json_must_be_dict")
+
+    db.execute(
+        """
+        INSERT INTO mailbox_sent (
+            campaign_id,
+            list_id,
+            rate_contact_id,
+            processed,
+            status,
+            data,
+            processed_at
+        )
+        VALUES (%s, %s, %s, true, %s, %s, now())
+        """,
+        (
+            int(campaign_id),
+            int(list_id),
+            int(rate_contact_id),
+            status,
+            Json(payload_json),
+        ),
+    )
+
+
+def _validate_sent_status(status: str) -> None:
+    if status not in MAILBOX_SENT_STATUSES:
+        raise ValueError(f"mail_bad_sent_status:{status}")
