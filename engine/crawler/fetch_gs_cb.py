@@ -1,11 +1,10 @@
-# FILE: engine/crawler/fetch_gs_cb.py  (новое — 2026-01-03)
+# FILE: engine/crawler/fetch_gs_cb.py  (обновлено — 2026-01-29)
 # PATH: engine/crawler/fetch_gs_cb.py
-# Смысл:
-# - Очередь строим просто: для каждого task_id ищем ПЕРВУЮ score-группу с uncollected и берём из неё cb_id LIMIT=QUEUE_BUILD_LIMIT.
-# - Потом делаем round-robin по 1 элементу, без shuffle, чтобы все task-и попали.
-# - В кеше только: cbq:list (pickle(list[tuple(cb_id, plz, branch_slug, task_id)])) и cbq:cb2task:<cb_id> (pickle(int task_id)).
-# - worker_run_once: под lock rebuild при пустой очереди, pop 1 элемент, запускает паука без lock.
-# - cbq_reset_cache: раз в 10 минут очищает cbq:list.
+# PURPOSE:
+# - Очередь строим через queue_builder.get_crawler(task_id) (cb_id, rate, collected) + round-robin по task.
+# - Перед использованием перепроверяем cb_crawler.collected пачкой; обновлённые флаги сохраняем через queue_builder.put_crawler.
+# - plz/branch_slug НЕ кешируем (cb_id ~ миллионы): при ребилде очереди делаем ОДИН SELECT по всем cb_id из out и вклеиваем мету в очередь.
+# - В кеше очереди: cbq:list (pickle(list[tuple(cb_id, plz, branch_slug, task_id)])) и cbq:cb2task:<cb_id> (pickle(int task_id)).
 
 from __future__ import annotations
 
@@ -20,16 +19,16 @@ from scrapy.crawler import CrawlerProcess
 
 from engine.common.cache.client import CLIENT
 from engine.common.db import fetch_all, fetch_one
+from engine.core_validate import queue_builder
 from engine.crawler.spiders.spider_gs_cb import GelbeSeitenCBSpider
-from engine.core_validate.val_expand_processor import _build_score_groups
 
 # -------------------------
 # Settings
 # -------------------------
 QUEUE_BUILD_LIMIT = 500
-RATE_CONTACTS_PRIORITY_OFFSET = 50
+PER_TASK_PICK_LIMIT = 500
 
-PAIRS_SQL_CHUNK = 2000
+RATE_CONTACTS_PRIORITY_OFFSET = 50
 
 CBQ_LIST_KEY = "cbq:list"
 CB2TASK_PREFIX = "cbq:cb2task:"
@@ -53,7 +52,7 @@ class QueueItem:
 
 
 # -------------------------
-# Cache helpers
+# Cache helpers (queue)
 # -------------------------
 def _cache_get_queue() -> List[QueueItem]:
     payload = CLIENT.get(CBQ_LIST_KEY, ttl_sec=QUEUE_TTL_SEC)
@@ -183,76 +182,51 @@ def _get_target_task_ids(active_task_ids: List[int]) -> Tuple[str, List[int]]:
 
 
 # -------------------------
-# Group fetch
+# Collected recheck + persist crawler
 # -------------------------
-def _pairs_chunks(pairs: List[Tuple[int, int]]) -> List[List[Tuple[int, int]]]:
-    return [pairs[i : i + PAIRS_SQL_CHUNK] for i in range(0, len(pairs), PAIRS_SQL_CHUNK)]
-
-
-def _fetch_group_uncollected_limited(*, task_id: int, pairs: List[Tuple[int, int]], limit: int) -> List[QueueItem]:
-    if limit <= 0 or not pairs:
-        return []
-
-    out: List[QueueItem] = []
-    left = int(limit)
-
-    for chunk in _pairs_chunks(pairs):
-        if left <= 0:
-            break
-
-        values_sql = ", ".join(["(%s,%s)"] * len(chunk))
-        params: List[int] = []
-        for city_id, branch_id in chunk:
-            params.extend((int(city_id), int(branch_id)))
-
-        rows = fetch_all(
-            f"""
-            WITH pairs(city_id, branch_id) AS (VALUES {values_sql})
-            SELECT c.id, c.plz, c.branch_slug
-            FROM cb_crawler c
-            JOIN pairs p
-              ON p.city_id = c.city_id
-             AND p.branch_id = c.branch_id
-            WHERE c.collected = false
-            ORDER BY c.id ASC
-            LIMIT %s
-            """,
-            tuple(params + [left]),
-        )
-
-        for cb_id, plz, branch_slug in rows:
-            cb_id_i = int(cb_id)
-            it = QueueItem(cb_id_i, str(plz), str(branch_slug), int(task_id))
-            _cache_set_cb2task(cb_id_i, int(task_id))
-            out.append(it)
-            left -= 1
-            if left <= 0:
-                break
-
+def _cb_collected_map(cb_ids: List[int]) -> Dict[int, bool]:
+    if not cb_ids:
+        return {}
+    rows = fetch_all(
+        """
+        SELECT id, collected
+        FROM cb_crawler
+        WHERE id = ANY(%s::bigint[])
+        """,
+        (list(map(int, cb_ids)),),
+    )
+    out: Dict[int, bool] = {}
+    for cb_id, collected in rows:
+        out[int(cb_id)] = bool(collected)
     return out
 
 
-def _pick_for_task_first_uncollected_group(*, task_id: int) -> List[QueueItem]:
-    groups = _build_score_groups(int(task_id))
-    if not groups:
-        print(f"[cbq] task={task_id} groups=0 -> skip")
+def _refresh_crawler_and_pick(*, task_id: int, limit: int) -> List[int]:
+    crawler = list(queue_builder.get_crawler(int(task_id)))
+    if not crawler:
         return []
 
-    for group_i, (score, pairs) in enumerate(groups):
-        items = _fetch_group_uncollected_limited(task_id=int(task_id), pairs=pairs, limit=QUEUE_BUILD_LIMIT)
-        print(f"[cbq] task={task_id} group_i={group_i} score={score} pairs={len(pairs)} picked={len(items)}")
-        if items:
-            return items
+    cb_ids = [int(cb_id) for (cb_id, _rate, _col) in crawler]
+    cmap = _cb_collected_map(cb_ids)
 
-    print(f"[cbq] task={task_id} no_uncollected_in_any_group")
-    return []
+    updated: List[Tuple[int, int, bool]] = []
+    picked: List[int] = []
+
+    for cb_id, rate, old_col in crawler:
+        now_col = bool(cmap.get(int(cb_id), bool(old_col)))
+        updated.append((int(cb_id), int(rate), bool(now_col)))
+        if (not now_col) and (len(picked) < int(limit)):
+            picked.append(int(cb_id))
+
+    queue_builder.put_crawler(int(task_id), updated)
+    return picked
 
 
 # -------------------------
 # RR build (no shuffle)
 # -------------------------
-def _round_robin_one_by_one(picked: Dict[int, List[QueueItem]], limit: int) -> List[QueueItem]:
-    out: List[QueueItem] = []
+def _round_robin_one_by_one(picked: Dict[int, List[int]], limit: int) -> List[Tuple[int, int]]:
+    out: List[Tuple[int, int]] = []  # (cb_id, task_id)
     if limit <= 0 or not picked:
         return out
 
@@ -264,13 +238,31 @@ def _round_robin_one_by_one(picked: Dict[int, List[QueueItem]], limit: int) -> L
             lst = picked.get(tid)
             if not lst:
                 continue
-            out.append(lst.pop(0))
+            cb_id = lst.pop(0)
+            out.append((int(cb_id), int(tid)))
             progressed = True
             if len(out) >= limit:
                 break
         if not progressed:
             break
 
+    return out
+
+
+def _load_cbmeta_map(cb_ids: List[int]) -> Dict[int, Tuple[str, str]]:
+    if not cb_ids:
+        return {}
+    rows = fetch_all(
+        """
+        SELECT id, plz, branch_slug
+        FROM cb_crawler
+        WHERE id = ANY(%s::bigint[])
+        """,
+        (list(map(int, cb_ids)),),
+    )
+    out: Dict[int, Tuple[str, str]] = {}
+    for cb_id, plz, branch_slug in rows:
+        out[int(cb_id)] = (str(plz), str(branch_slug))
     return out
 
 
@@ -285,19 +277,32 @@ def _rebuild_queue() -> List[QueueItem]:
     mode, targets = _get_target_task_ids(active)
     print(f"[cbq] rebuild: mode={mode} target_tasks={len(targets)} build_limit={QUEUE_BUILD_LIMIT}")
 
-    picked: Dict[int, List[QueueItem]] = {}
+    picked: Dict[int, List[int]] = {}
     touched = 0
 
     for tid in targets:
         touched += 1
-        items = _pick_for_task_first_uncollected_group(task_id=int(tid))
-        if items:
-            picked[int(tid)] = items
+        cb_ids = _refresh_crawler_and_pick(task_id=int(tid), limit=int(PER_TASK_PICK_LIMIT))
+        if cb_ids:
+            picked[int(tid)] = cb_ids
 
     print(f"[cbq] rebuild: tasks_touched={touched} tasks_with_items={len(picked)}")
 
-    out = _round_robin_one_by_one(picked, limit=QUEUE_BUILD_LIMIT)
-    print(f"[cbq] rebuild done: out={len(out)}")
+    rr = _round_robin_one_by_one(picked, limit=QUEUE_BUILD_LIMIT)
+    cb_ids_all = [cb_id for (cb_id, _tid) in rr]
+    meta_map = _load_cbmeta_map(cb_ids_all)
+
+    out: List[QueueItem] = []
+    missing_meta = 0
+    for cb_id, tid in rr:
+        meta = meta_map.get(int(cb_id))
+        if not meta:
+            missing_meta += 1
+            continue
+        plz, branch_slug = meta
+        out.append(QueueItem(int(cb_id), str(plz), str(branch_slug), int(tid)))
+
+    print(f"[cbq] rebuild done: rr={len(rr)} out={len(out)} meta_miss={missing_meta}")
     return out
 
 
@@ -318,6 +323,7 @@ def worker_run_once() -> None:
         if q:
             item = q[0]
             _cache_set_queue(q[1:])
+            _cache_set_cb2task(int(item.cb_crawler_id), int(item.task_id))
     finally:
         _lock_release(token)
 
@@ -329,4 +335,4 @@ def worker_run_once() -> None:
         f"[cbq] pop cb_crawler_id={item.cb_crawler_id} task_id={item.task_id} "
         f"plz='{item.plz}' branch='{item.branch_slug}'"
     )
-    _run_spider(cb_crawler_id=item.cb_crawler_id, plz=item.plz, branch_slug=item.branch_slug)
+    _run_spider(cb_crawler_id=int(item.cb_crawler_id), plz=str(item.plz), branch_slug=str(item.branch_slug))

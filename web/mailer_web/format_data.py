@@ -1,21 +1,9 @@
-# FILE: web/mailer_web/format_data.py  (обновлено — 2026-01-12)
+# FILE: web/mailer_web/format_data.py  (обновлено — 2026-01-29)
 # PURPOSE:
-#   format_data v8:
-#   - UI зовёт ТОЛЬКО публичные функции (get_contact / get_ratings / build_contact_packet).
-#   - *_raw спрятаны внутри.
-#   - CONTACT (печать): raw_contacts_aggr.{id,email,company_data(norm)} + город по norm.plz (через cb_crawler.plz → city_id → cities_sys).
-#     Если company_data не dict ИЛИ norm отсутствует/пустой -> raise (катастрофа).
-#   - RATINGS: контракт рейтингов сохранён, но city-поля приведены к новому контракту:
-#       city      = cities_sys.name (просто город)
-#       city_norm = normalize_city(city)
-#       city_land = city_norm + " - " + state_name
-#     То же самое в ratings.chosen_cb (вместо city_str).
-#   - _choose_cb_id memoized на TTL_HOUR (как ratings_raw) — второй проход быстрый.
-#   - Убрана мёртвая ветка (дублирующий return) в get_contact_raw.
-# CHANGE:
-#   - Для кеширования рейтингов добавлены опциональные rate_cb/rate_cl параметры (для строки контакта).
-#   - TTL НЕ меняем, но добавляем rate_cb/rate_cl в ключ memo для ratings_raw (если переданы),
-#     чтобы при изменении рейтингов ключ кеша менялся и не отдавался старый результат.
+#   format_data v9:
+#   - RATINGS упрощены: используем rate_contacts.cb_id (больше НЕ выбираем cb через _choose_cb_id и НЕ читаем aggr_cb_ids).
+#   - Кеш (TTL_HOUR) оставлен как был: memo ключ ratings_raw включает опциональные rate_cb/rate_cl (как раньше).
+#   - chosen_cb строится напрямую из cb_id -> cb_crawler(city_id, branch_id) -> cities_sys/branches i18n.
 
 from __future__ import annotations
 
@@ -31,7 +19,7 @@ import re
 
 TTL_WEEK = 7 * 24 * 60 * 60
 TTL_HOUR = 60 * 60
-MEMO_VERSION = "format_data:v8"
+MEMO_VERSION = "format_data:v9"
 
 
 # ============================================================
@@ -173,21 +161,6 @@ def _rate_cl_bg(rate_cl: Any) -> str:
 def _rate_cb_1_100(rate_cb: Any) -> Optional[int]:
     return rate_cb
 
-#    if rate_cb is None:
-#        return None
-#    try:
-#        v = int(rate_cb)
-#    except Exception:
-#        return None
-#    if v <= 0:
-#        return 1
-#    x = (v + 99) // 100  # ceil(v/100)
-#    if x < 1:
-#        return 1
-#    if x > 100:
-#        return 100
-#    return int(x)
-
 
 def _safe_int_list(v: Any) -> List[int]:
     if not isinstance(v, list):
@@ -299,7 +272,6 @@ def get_city_payload_by_plz(plz: str) -> Dict[str, Any]:
 # ============================================================
 
 def get_branch_row(branch_id: int, ui_lang: str) -> Optional[Dict[str, str]]:
-
     lang = (ui_lang or "ru").strip().lower()
 
     def _load(_: Tuple[str, int, str]):
@@ -601,7 +573,7 @@ def get_ratings_raw(rate_contact_id: int, *, rate_cb: Any = None, rate_cl: Any =
         with connection.cursor() as cur:
             cur.execute(
                 """
-                SELECT id, task_id, contact_id, rate_cl, rate_cb
+                SELECT id, task_id, contact_id, rate_cl, rate_cb, cb_id
                 FROM public.rate_contacts
                 WHERE id = %s
                 LIMIT 1
@@ -617,31 +589,11 @@ def get_ratings_raw(rate_contact_id: int, *, rate_cb: Any = None, rate_cl: Any =
                 "aggr_id": int(row[2]),
                 "rate_cl": row[3],
                 "rate_cb": row[4],
+                "cb_id": int(row[5]) if row[5] is not None else None,
             }
 
-    # ВАЖНО: TTL оставляем как был (TTL_HOUR),
-    # но добавляем rate_cb/rate_cl в ключ (если UI их передал), чтобы кеш автоматически "инвалидировался" при изменении.
+    # TTL как был; rate_cb/rate_cl остаются в ключе (как раньше)
     return memo(("ratings_raw", int(rc), k_cb, k_cl), _load, ttl=TTL_HOUR, version=MEMO_VERSION)
-
-
-def get_aggr_cb_ids(aggr_id: int) -> List[int]:
-    def _load(_: Tuple[str, int]):
-        with connection.cursor() as cur:
-            cur.execute(
-                """
-                SELECT cb_crawler_ids
-                FROM public.raw_contacts_aggr
-                WHERE id = %s
-                LIMIT 1
-                """,
-                [int(aggr_id)],
-            )
-            row = cur.fetchone()
-            if not row:
-                return []
-            return _safe_int_list(row[0] or [])
-
-    return memo(("aggr_cb_ids", int(aggr_id)), _load, ttl=TTL_WEEK, version=MEMO_VERSION) or []
 
 
 def get_aggr_id_by_rate_contact(rate_contact_id: Optional[int]) -> Optional[int]:
@@ -665,86 +617,13 @@ def get_aggr_id_by_rate_contact(rate_contact_id: Optional[int]) -> Optional[int]
     return memo(("aggr_id_by_rate_contact", int(rate_contact_id)), _load, ttl=TTL_HOUR, version=MEMO_VERSION)
 
 
-def _choose_cb_id(task_id: int, rate_cb: Any, cb_ids: List[int]) -> Optional[int]:
-    if not cb_ids:
-        return None
-
-    target: Optional[int] = None
-    try:
-        target = int(rate_cb) if rate_cb is not None else None
-    except Exception:
-        target = None
-
-    import hashlib
-
-    h = hashlib.sha1()
-    h.update(str(int(task_id)).encode("utf-8"))
-    h.update(b"|")
-    h.update(str(int(target)).encode("utf-8") if target is not None else b"none")
-    h.update(b"|")
-    h.update(",".join(str(int(x)) for x in cb_ids).encode("utf-8"))
-    digest = h.hexdigest()[:16]
-
-    def _load(_: Tuple[str, int, str]):
-        with connection.cursor() as cur:
-            cur.execute(
-                """
-                WITH cb AS (
-                  SELECT id::bigint AS cb_id, city_id::int, branch_id::int
-                  FROM public.cb_crawler
-                  WHERE id = ANY(%s)
-                ),
-                city_r AS (
-                  SELECT value_id::int AS city_id, MIN(rate)::int AS rate_city
-                  FROM public.crawl_tasks
-                  WHERE task_id = %s AND type = 'city'
-                  GROUP BY value_id
-                ),
-                branch_r AS (
-                  SELECT value_id::int AS branch_id, MIN(rate)::int AS rate_branch
-                  FROM public.crawl_tasks
-                  WHERE task_id = %s AND type = 'branch'
-                  GROUP BY value_id
-                )
-                SELECT
-                  cb.cb_id,
-                  (cr.rate_city * br.rate_branch) AS product
-                FROM cb
-                LEFT JOIN city_r cr ON cr.city_id = cb.city_id
-                LEFT JOIN branch_r br ON br.branch_id = cb.branch_id
-                """,
-                [cb_ids, int(task_id), int(task_id)],
-            )
-            rows = cur.fetchall()
-
-        if target is not None:
-            for cb_id, product in rows:
-                if product is not None and int(product) == target:
-                    return int(cb_id)
-
-        best_cb: Optional[int] = None
-        best_prod: Optional[int] = None
-        for cb_id, product in rows:
-            if product is None:
-                continue
-            p = int(product)
-            if best_prod is None or p < best_prod:
-                best_prod = p
-                best_cb = int(cb_id)
-
-        return best_cb if best_cb is not None else int(cb_ids[0])
-
-    return memo(("choose_cb_id", int(task_id), digest), _load, ttl=TTL_HOUR, version=MEMO_VERSION)
-
-
-def build_ratings(r: Dict[str, Any], cb_ids: List[int], ui_lang: str) -> Dict[str, Any]:
+def build_ratings(r: Dict[str, Any], ui_lang: str) -> Dict[str, Any]:
     task_id = int(r["task_id"])
     rate_contact_id = int(r["rate_contact_id"])
     aggr_id = int(r["aggr_id"])
     rate_cl = r.get("rate_cl")
     rate_cb = r.get("rate_cb")
-
-    chosen_cb_id = _choose_cb_id(task_id, rate_cb, cb_ids)
+    cb_id = r.get("cb_id")
 
     city_id: Optional[int] = None
     branch_id: Optional[int] = None
@@ -754,8 +633,8 @@ def build_ratings(r: Dict[str, Any], cb_ids: List[int], ui_lang: str) -> Dict[st
     city_land = ""
     branch_str = ""
 
-    if chosen_cb_id:
-        cb = get_cb_row(chosen_cb_id)
+    if cb_id is not None:
+        cb = get_cb_row(int(cb_id))
         if cb:
             city_id = cb["city_id"]
             branch_id = cb["branch_id"]
@@ -765,7 +644,7 @@ def build_ratings(r: Dict[str, Any], cb_ids: List[int], ui_lang: str) -> Dict[st
                 city_norm = normalize_city(city)
                 city_land = get_city_land(int(city_id))
 
-            branch_str = get_branch_str(branch_id, ui_lang) if branch_id is not None else ""
+            branch_str = get_branch_str(int(branch_id), ui_lang) if branch_id is not None else ""
 
     return {
         "cache_ttl_sec": TTL_HOUR,
@@ -777,7 +656,7 @@ def build_ratings(r: Dict[str, Any], cb_ids: List[int], ui_lang: str) -> Dict[st
         "rate_cb_100": _rate_cb_1_100(rate_cb),
         "rate_cl_bg": _rate_cl_bg(rate_cl),
         "chosen_cb": {
-            "cb_id": int(chosen_cb_id) if chosen_cb_id else None,
+            "cb_id": int(cb_id) if cb_id is not None else None,
             "city_id": city_id,
             "city": city,
             "city_norm": city_norm,
@@ -792,14 +671,19 @@ def build_ratings(r: Dict[str, Any], cb_ids: List[int], ui_lang: str) -> Dict[st
 # RATINGS (PUBLIC)
 # ============================================================
 
-def get_ratings(rate_contact_id: Optional[int], ui_lang: str, *, rate_cb: Any = None, rate_cl: Any = None) -> Optional[Dict[str, Any]]:
+def get_ratings(
+    rate_contact_id: Optional[int],
+    ui_lang: str,
+    *,
+    rate_cb: Any = None,
+    rate_cl: Any = None,
+) -> Optional[Dict[str, Any]]:
     if not rate_contact_id:
         return None
     rr = get_ratings_raw(int(rate_contact_id), rate_cb=rate_cb, rate_cl=rate_cl)
     if not rr:
         return None
-    cb_ids = get_aggr_cb_ids(int(rr["aggr_id"]))
-    return build_ratings(rr, cb_ids, ui_lang)
+    return build_ratings(rr, ui_lang)
 
 
 # ============================================================

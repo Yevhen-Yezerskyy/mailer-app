@@ -1,18 +1,9 @@
-# FILE: engine/core_validate/val_expand_processor.py
-# DATE: 2026-01-29
+# FILE: engine/core_validate/val_expand_processor.py  (обновлено — 2026-01-29)
 # PURPOSE:
 # - Expander + hash-guard as one logical block with queue_builder.
-# - Insert-only into rate_contacts: ON CONFLICT (task_id, contact_id) DO NOTHING.
-# - full: get_expand_full(task_id) -> cb_id batches -> insert contacts not yet present.
-# - light:
-#     * if task has NO rate_contacts yet -> call full for this task and exit.
-#     * get crawler list (cb_id, rate, collected flag)
-#     * recheck cb_crawler.collected for these cb_ids
-#     * insert ONLY for cb_ids that became collected=true since last cached flag
-#     * update local flags and persist back via queue_builder.put_crawler
-# - hash-guard (every 10 min):
-#     * compare queue_builder.kt_hash(crawl_tasks) vs __task__kt_hash.kt_hash
-#     * if mismatch: TOUCH one crawl_tasks.updated_at, recompute hash via SAME cursor, DELETE rate_contacts, store new hash
+# - light/full: БЕЗ проверки hash (как просили).
+# - hash_guard: ВСЕГДА делает DELETE rate_contacts, если хеша нет или он не совпадает;
+#   при этом делает TOUCH crawl_tasks.updated_at, пересчитывает hash через ТОТ ЖЕ cursor, и сохраняет новый hash.
 
 from __future__ import annotations
 
@@ -57,19 +48,16 @@ def _get_stored_task_hash(task_id: int) -> str | None:
     return str(row[0]) if row and row[0] else None
 
 
-def _is_task_hash_ok(task_id: int) -> bool:
-    stored = _get_stored_task_hash(int(task_id))
-    if stored is None:
-        return False
-    return str(stored) == str(queue_builder.kt_hash(int(task_id)))
+def _get_stored_task_hash_cur(cur, task_id: int) -> str | None:
+    cur.execute("SELECT kt_hash FROM __task__kt_hash WHERE task_id = %s", (int(task_id),))
+    row = cur.fetchone()
+    return str(row[0]) if row and row[0] else None
 
 
 def _insert_for_cb_batch(task_id: int, cb_batch: List[Tuple[int, int]]) -> int:
     """
     cb_batch: [(cb_id, rate_cb)].
     Insert-only; ON CONFLICT DO NOTHING.
-    Deterministic: for contacts matching multiple cb_ids in batch:
-      pick min(rate_cb), and if tie pick min(cb_id).
     """
     if not cb_batch:
         return 0
@@ -167,25 +155,12 @@ def mark_collected_once() -> None:
             _p(f"MARK task_id={task_id} -> collected=true (limit={MAX_RATE_CONTACTS_PER_TASK})")
             continue
 
-        row_rc = fetch_one("SELECT max(updated_at) FROM rate_contacts WHERE task_id = %s", (int(task_id),))
-        rc_max = row_rc[0] if row_rc else None
-        if rc_max is None:
-            continue
-
-        row_old = fetch_one("SELECT 1 WHERE %s < (now() - interval '24 hours')", (rc_max,))
-        if row_old:
-            execute(
-                """
-                UPDATE aap_audience_audiencetask
-                SET collected = true
-                WHERE id = %s
-                """,
-                (int(task_id),),
-            )
-            _p(f"MARK task_id={task_id} -> collected=true (stale >24h)")
-
 
 def hash_guard_once() -> None:
+    """
+    Always deletes rate_contacts if hash is missing or mismatched vs queue_builder.kt_hash.
+    Uses SAME cursor for: read stored -> compute current -> touch -> recompute -> delete -> store.
+    """
     rows = fetch_all(
         """
         SELECT id
@@ -203,25 +178,13 @@ def hash_guard_once() -> None:
             for (task_id_raw,) in rows:
                 task_id = int(task_id_raw)
 
-                stored = _get_stored_task_hash(task_id)
+                stored = _get_stored_task_hash_cur(cur, task_id)
                 current = str(queue_builder.kt_hash(task_id, cur=cur))
 
-                if stored is None:
-                    cur.execute(
-                        """
-                        INSERT INTO __task__kt_hash (task_id, kt_hash)
-                        VALUES (%s, %s)
-                        ON CONFLICT (task_id)
-                        DO UPDATE SET kt_hash = EXCLUDED.kt_hash
-                        """,
-                        (task_id, current),
-                    )
+                if stored is not None and str(stored) == current:
                     continue
 
-                if str(stored) == current:
-                    continue
-
-                # atomic switch: touch -> new hash (same cursor) -> delete -> store
+                # touch (force new kt_hash version) + recompute via SAME cursor
                 cur.execute(
                     """
                     UPDATE crawl_tasks
@@ -251,7 +214,7 @@ def hash_guard_once() -> None:
                     (task_id, new_hash),
                 )
 
-                _p(f"HASH-GUARD task_id={task_id} mismatch -> touch + delete + set_hash")
+                _p(f"HASH-GUARD task_id={task_id} -> delete + set_hash (stored={stored is not None})")
 
 
 def light_run_once() -> None:
@@ -259,11 +222,6 @@ def light_run_once() -> None:
     if not task_id:
         return
 
-    # if guard hasn't initialized hash yet or mismatch is in progress -> do nothing (avoid "floating")
-    if not _is_task_hash_ok(int(task_id)):
-        return
-
-    # if deleted by guard (or new task) -> do full immediately for THIS task
     if not _has_any_rate_contacts(int(task_id)):
         full_reconcile_task(int(task_id))
         return
@@ -294,9 +252,6 @@ def light_run_once() -> None:
 
 
 def full_reconcile_task(task_id: int) -> None:
-    if not _is_task_hash_ok(int(task_id)):
-        return
-
     values = list(queue_builder.get_expand_full(int(task_id)))
     if not values:
         return
