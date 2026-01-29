@@ -314,7 +314,7 @@ def main() -> None:
     w.register(
         name="full_reconcile_rate_contacts",
         fn=full_reconcile_once,
-        every_sec=600,
+        every_sec=1200,
         timeout_sec=1800,
         singleton=True,
         heavy=True,
@@ -324,7 +324,7 @@ def main() -> None:
     w.register(
         name="hash_guard_tasks",
         fn=hash_guard_once,
-        every_sec=600,
+        every_sec=1000,
         timeout_sec=600,
         singleton=True,
         heavy=False,
@@ -334,7 +334,7 @@ def main() -> None:
     w.register(
         name="mark_tasks_collected",
         fn=mark_collected_once,
-        every_sec=120,
+        every_sec=1200,
         timeout_sec=900,
         singleton=True,
         heavy=False,
