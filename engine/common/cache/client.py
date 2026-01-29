@@ -20,8 +20,9 @@ from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Tupl
 DEFAULT_TTL_SEC = 7 * 24 * 60 * 60
 DEFAULT_VERSION = "dev"
 
-MAX_VALUE_BYTES = 128 * 1024
-MAX_QUERY_BYTES = 32 * 1024
+
+MAX_VALUE_BYTES = 5 * 1024 * 1024      # 5 MB
+MAX_QUERY_BYTES = 5 * 1024 * 1024      # 5 MB (чтобы guard не резал payload)
 
 RPC_TIMEOUT_SEC = 1.0
 
