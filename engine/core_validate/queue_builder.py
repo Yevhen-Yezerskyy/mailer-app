@@ -1,9 +1,12 @@
-# FILE: engine/core_validate/queue_builder.py  (обновлено — 2026-01-29)
+# FILE: engine/core_validate/queue_builder.py
+# DATE: 2026-01-29
 # PURPOSE:
 # - Build TOP-K window values for task_id as sorted list: (cb_id, rate, collected).
-# - get_expand(task_id): cached slice around first uncollected (±CB_DIFF).
+# - get_expand(task_id): cached slice from first uncollected .. (first+CB_DIFF), NO backward part.
 # - get_expand_full(task_id): cached prefix up to (and incl.) first uncollected (may fail to cache if >5MB -> ok).
-# - get_crawler(task_id): cached 2*CB_DIFF uncollected items starting from first uncollected.
+# - get_crawler(task_id): cached CB_DIFF uncollected items starting from first uncollected (NO *2).
+# - put_expand/put_crawler: overwrite same cache with provided list (used by expander to persist updated flags).
+# - If cached expand/crawler has <=500 uncollected inside returned list -> refresh cache by recompute+overwrite.
 # - Cache key version = kt_hash(task_id) from crawl_tasks; TTL random 2–4 hours. No debug prints.
 
 from __future__ import annotations
@@ -17,7 +20,8 @@ from engine.common.db import fetch_all, fetch_one, get_connection
 
 CB_WINDOW = 100_000
 CB_BATCH = 1_000
-CB_DIFF = 1_000
+CB_DIFF = 3_000
+UNCOLLECTED_REFRESH_TAIL = 500
 
 # -----------------------------
 # types
@@ -39,22 +43,51 @@ def _ttl_2_4h_sec() -> int:
     return int(random.randint(2 * 60 * 60, 4 * 60 * 60))
 
 
-def _kt_hash(task_id: int) -> str:
-    row = fetch_one(
-        """
+def kt_hash(task_id: int, *, conn=None, cur=None) -> str:
+    """
+    Hash = md5(string_agg(type:value_id=rate) + '||' + max(updated_at)).
+    If cur provided -> uses it (transaction-safe for hash-guard).
+    """
+    sql = """
+        WITH mx AS (
+            SELECT COALESCE(max(updated_at)::text, '') AS mxu
+            FROM crawl_tasks
+            WHERE task_id = %s
+        )
         SELECT md5(
-            string_agg(
-                type || ':' || value_id::text || '=' || rate::text,
-                '|'
-                ORDER BY type, value_id
+            (
+                COALESCE(
+                    (
+                        SELECT string_agg(
+                            type || ':' || value_id::text || '=' || rate::text,
+                            '|'
+                            ORDER BY type, value_id
+                        )
+                        FROM crawl_tasks
+                        WHERE task_id = %s
+                    ),
+                    ''
+                )
+                || '||' || (SELECT mxu FROM mx)
             )
         )
-        FROM crawl_tasks
-        WHERE task_id = %s
-        """,
-        (task_id,),
-    )
-    return str(row[0]) if row and row[0] else ""
+    """
+    if cur is not None:
+        cur.execute(sql, (int(task_id), int(task_id)))
+        row = cur.fetchone()
+        return str(row[0]) if row and row[0] else ""
+    if conn is not None:
+        with conn.cursor() as c:
+            c.execute(sql, (int(task_id), int(task_id)))
+            row = c.fetchone()
+            return str(row[0]) if row and row[0] else ""
+    row2 = fetch_one(sql, (int(task_id), int(task_id)))
+    return str(row2[0]) if row2 and row2[0] else ""
+
+
+def _kt_hash(task_id: int) -> str:
+    # legacy alias (used across codebase)
+    return kt_hash(int(task_id))
 
 
 # -----------------------------
@@ -102,7 +135,6 @@ def _top_k_pairs(plz_rates: List[PlzRate], branch_rates: List[BranchRate], k: in
     outer = branch_rates if outer_is_branch else plz_rates
     inner = plz_rates if outer_is_branch else branch_rates
 
-    # heap item: (score, plz, branch_id, i, j)
     h: List[Tuple[int, str, int, int, int]] = []
     for i, (orate, oid) in enumerate(outer):
         irate0, iid0 = inner[0]
@@ -183,12 +215,35 @@ def _first_uncollected_idx(values: List[Val]) -> Optional[int]:
     return None
 
 
+def _count_uncollected(values: List[Val]) -> int:
+    n = 0
+    for _cb_id, _rate, collected in values:
+        if not bool(collected):
+            n += 1
+    return int(n)
+
+
+# -----------------------------
+# cache helpers
+# -----------------------------
+
+def _memo_get(tag: str, task_id: int, compute_fn, *, ttl: int, kt: str) -> List[Val]:
+    return list(memo((str(tag), int(task_id)), compute_fn, ttl=ttl, version=str(kt), update=False))  # type: ignore[arg-type]
+
+
+def _memo_put(tag: str, task_id: int, values: List[Val], *, ttl: int, kt: str) -> None:
+    def _compute(_q: Tuple[str, int]) -> List[Val]:
+        return list(values)
+
+    memo((str(tag), int(task_id)), _compute, ttl=ttl, version=str(kt), update=True)  # type: ignore[arg-type]
+
+
 # -----------------------------
 # API
 # -----------------------------
 
 def get_expand(task_id: int) -> List[Val]:
-    kt = _kt_hash(task_id)
+    kt = _kt_hash(int(task_id))
     ttl = _ttl_2_4h_sec()
 
     def _compute(q: Tuple[str, int]) -> List[Val]:
@@ -197,15 +252,24 @@ def get_expand(task_id: int) -> List[Val]:
         i = _first_uncollected_idx(values)
         if i is None:
             return []
-        lo = max(0, i - CB_DIFF)
-        hi = min(len(values), i + CB_DIFF)
-        return values[lo:hi]
+        hi = min(len(values), int(i) + int(CB_DIFF))
+        return values[int(i):hi]
 
-    return list(memo(("expand", int(task_id)), _compute, ttl=ttl, version=str(kt), update=False))  # type: ignore[arg-type]
+    out = _memo_get("expand", int(task_id), _compute, ttl=ttl, kt=kt)
+    if out and _count_uncollected(out) <= int(UNCOLLECTED_REFRESH_TAIL):
+        out = _compute(("expand", int(task_id)))
+        _memo_put("expand", int(task_id), out, ttl=ttl, kt=kt)
+    return out
+
+
+def put_expand(task_id: int, values: List[Val]) -> None:
+    kt = _kt_hash(int(task_id))
+    ttl = _ttl_2_4h_sec()
+    _memo_put("expand", int(task_id), list(values), ttl=ttl, kt=kt)
 
 
 def get_expand_full(task_id: int) -> List[Val]:
-    kt = _kt_hash(task_id)
+    kt = _kt_hash(int(task_id))
     ttl = _ttl_2_4h_sec()
 
     def _compute(q: Tuple[str, int]) -> List[Val]:
@@ -214,15 +278,15 @@ def get_expand_full(task_id: int) -> List[Val]:
         i = _first_uncollected_idx(values)
         if i is None:
             return values
-        return values[: i + 1]
+        return values[: int(i) + 1]
 
-    return list(memo(("expand_full", int(task_id)), _compute, ttl=ttl, version=str(kt), update=False))  # type: ignore[arg-type]
+    return _memo_get("expand_full", int(task_id), _compute, ttl=ttl, kt=kt)
 
 
 def get_crawler(task_id: int) -> List[Val]:
-    kt = _kt_hash(task_id)
+    kt = _kt_hash(int(task_id))
     ttl = _ttl_2_4h_sec()
-    need = int(2 * CB_DIFF)
+    need = int(CB_DIFF)
 
     def _compute(q: Tuple[str, int]) -> List[Val]:
         _tag, _task_id = q
@@ -231,11 +295,21 @@ def get_crawler(task_id: int) -> List[Val]:
         if i is None:
             return []
         out: List[Val] = []
-        for cb_id, rate, collected in values[i:]:
+        for cb_id, rate, collected in values[int(i):]:
             if not bool(collected):
                 out.append((int(cb_id), int(rate), bool(collected)))
                 if len(out) >= need:
                     break
         return out
 
-    return list(memo(("crawler", int(task_id)), _compute, ttl=ttl, version=str(kt), update=False))  # type: ignore[arg-type]
+    out = _memo_get("crawler", int(task_id), _compute, ttl=ttl, kt=kt)
+    if out and _count_uncollected(out) <= int(UNCOLLECTED_REFRESH_TAIL):
+        out = _compute(("crawler", int(task_id)))
+        _memo_put("crawler", int(task_id), out, ttl=ttl, kt=kt)
+    return out
+
+
+def put_crawler(task_id: int, values: List[Val]) -> None:
+    kt = _kt_hash(int(task_id))
+    ttl = _ttl_2_4h_sec()
+    _memo_put("crawler", int(task_id), list(values), ttl=ttl, kt=kt)
