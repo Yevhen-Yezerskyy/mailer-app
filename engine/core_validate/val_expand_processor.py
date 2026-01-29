@@ -156,10 +156,14 @@ def mark_collected_once() -> None:
             continue
 
 
+# FILE: engine/core_validate/val_expand_processor.py  (обновлено — 2026-01-29)
+# PATH: engine/core_validate/val_expand_processor.py
+# PURPOSE: hash_guard_once — при missing/mismatch хеша: touch crawl_tasks -> recompute hash (same cursor) -> DELETE rate_contacts -> store hash -> subscribers_limit=0.
+
 def hash_guard_once() -> None:
     """
     Always deletes rate_contacts if hash is missing or mismatched vs queue_builder.kt_hash.
-    Uses SAME cursor for: read stored -> compute current -> touch -> recompute -> delete -> store.
+    Uses SAME cursor for: read stored -> compute current -> touch -> recompute -> delete -> store -> reset subscribers_limit.
     """
     rows = fetch_all(
         """
@@ -203,7 +207,18 @@ def hash_guard_once() -> None:
 
                 new_hash = str(queue_builder.kt_hash(task_id, cur=cur))
 
+                # purge client ratings + reset UI limit
                 cur.execute("DELETE FROM rate_contacts WHERE task_id = %s", (task_id,))
+                cur.execute(
+                    """
+                    UPDATE aap_audience_audiencetask
+                    SET subscribers_limit = 0,
+                        updated_at = now()
+                    WHERE id = %s
+                    """,
+                    (task_id,),
+                )
+
                 cur.execute(
                     """
                     INSERT INTO __task__kt_hash (task_id, kt_hash)
@@ -214,7 +229,8 @@ def hash_guard_once() -> None:
                     (task_id, new_hash),
                 )
 
-                _p(f"HASH-GUARD task_id={task_id} -> delete + set_hash (stored={stored is not None})")
+                _p(f"HASH-GUARD task_id={task_id} -> delete + limit=0 + set_hash (stored={stored is not None})")
+
 
 
 def light_run_once() -> None:
