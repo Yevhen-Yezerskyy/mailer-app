@@ -239,40 +239,36 @@ def _sender_loop(
     stop_flag: Dict[str, bool],
     death_at_ts: float,
 ) -> None:
-    row = fetch_one(
-        """
-        SELECT limit_hour_sent
-        FROM public.aap_settings_smtp_mailboxes
-        WHERE mailbox_id = %s
-        LIMIT 1
-        """,
-        [int(mailbox_id)],
-    )
-    limit_hour_sent = int(row[0]) if row and row[0] is not None else 0
+    def _read_limit() -> int:
+        r = fetch_one(
+            """
+            SELECT limit_hour_sent
+            FROM public.aap_settings_smtp_mailboxes
+            WHERE mailbox_id = %s
+            LIMIT 1
+            """,
+            [int(mailbox_id)],
+        )
+        return int(r[0]) if r and r[0] is not None else 0
 
-    if limit_hour_sent <= 0:
-        while not stop_flag.get("v") and _now_ts() < death_at_ts:
-            nxt = _now_ts() + 60.0
-            hb(
-                next_wake_at=nxt,
-                state="NO_LIMIT",
-                reason=f"limit_hour_sent={limit_hour_sent} (<=0) → sleep=60s",
-            )
-            time.sleep(60)
-        dead("DONE")
-        return
-
-    send_interval = 3600.0 / float(limit_hour_sent)
+    last_limit = _read_limit()
+    send_interval: Optional[float] = None
 
     camp_ids = [int(x) for x in campaign_ids if int(x) > 0]
     if not camp_ids:
         while not stop_flag.get("v") and _now_ts() < death_at_ts:
+            # even without campaigns, keep reporting current limit/interval
+            cur_limit = _read_limit()
+            if cur_limit != last_limit:
+                last_limit = cur_limit
+            if last_limit > 0:
+                send_interval = 3600.0 / float(last_limit)
+                reason = f"limit_hour_sent={last_limit} interval={send_interval:.1f}s → sleep=30s"
+            else:
+                send_interval = None
+                reason = f"limit_hour_sent={last_limit} (<=0) → sleep=30s"
             nxt = _now_ts() + 30.0
-            hb(
-                next_wake_at=nxt,
-                state="NO_CAMPAIGNS",
-                reason=f"limit_hour_sent={limit_hour_sent} interval={send_interval:.1f}s → sleep=30s",
-            )
+            hb(next_wake_at=nxt, state="NO_CAMPAIGNS", reason=reason)
             time.sleep(30)
         dead("DONE")
         return
@@ -280,7 +276,7 @@ def _sender_loop(
     hb(
         next_wake_at=_now_ts() + 0.1,
         state="START",
-        reason=f"limit_hour_sent={limit_hour_sent} (~{limit_hour_sent}/h) interval={send_interval:.1f}s campaigns={len(camp_ids)}",
+        reason=f"limit_hour_sent={last_limit} campaigns={len(camp_ids)}",
     )
 
     while True:
@@ -290,6 +286,36 @@ def _sender_loop(
         if _now_ts() >= death_at_ts:
             dead("DEATH_AT")
             return
+
+        # --- reread limit each iteration; recompute interval only on change ---
+        cur_limit = _read_limit()
+        if cur_limit != last_limit:
+            last_limit = cur_limit
+            if last_limit > 0:
+                send_interval = 3600.0 / float(last_limit)
+                hb(
+                    next_wake_at=_now_ts() + 0.1,
+                    state="LIMIT_CHANGED",
+                    reason=f"limit_hour_sent={last_limit} (~{last_limit}/h) interval={send_interval:.1f}s",
+                )
+            else:
+                send_interval = None
+                hb(
+                    next_wake_at=_now_ts() + 0.1,
+                    state="LIMIT_CHANGED",
+                    reason=f"limit_hour_sent={last_limit} (<=0) → NO_LIMIT mode",
+                )
+
+        # --- NO_LIMIT mode: sleep+cheap reread until limit becomes >0 ---
+        if last_limit <= 0:
+            nxt = _now_ts() + 60.0
+            hb(next_wake_at=nxt, state="NO_LIMIT", reason=f"limit_hour_sent={last_limit} (<=0) → sleep=60s")
+            time.sleep(60)
+            continue
+
+        # at this point we must have a positive interval
+        if send_interval is None:
+            send_interval = 3600.0 / float(last_limit)
 
         now_de = datetime.now(tz=ZoneInfo("UTC")).astimezone(_TZ_BERLIN)
 
@@ -306,11 +332,11 @@ def _sender_loop(
             [int(mailbox_id), camp_ids],
         )
         if not rows:
-            sl = min(60.0, send_interval)
+            sl = min(60.0, float(send_interval))
             hb(
                 next_wake_at=_now_ts() + sl,
                 state="NO_ACTIVE_CAMPAIGNS",
-                reason=f"limit_hour_sent={limit_hour_sent} interval={send_interval:.1f}s → sleep={sl:.0f}s",
+                reason=f"limit_hour_sent={last_limit} interval={send_interval:.1f}s → sleep={sl:.0f}s",
             )
             time.sleep(sl)
             continue
@@ -341,11 +367,11 @@ def _sender_loop(
                 candidates.append((int(camp_id), w))
 
         if not candidates:
-            sl = min(60.0, send_interval)
+            sl = min(60.0, float(send_interval))
             hb(
                 next_wake_at=_now_ts() + sl,
                 state="NO_PENDING_OR_WINDOW",
-                reason=f"limit_hour_sent={limit_hour_sent} interval={send_interval:.1f}s → sleep={sl:.0f}s",
+                reason=f"limit_hour_sent={last_limit} interval={send_interval:.1f}s → sleep={sl:.0f}s",
             )
             time.sleep(sl)
             continue
@@ -382,12 +408,12 @@ def _sender_loop(
             [int(camp_id)],
         )
         if not row:
-            sl = min(30.0, send_interval)
+            sl = min(30.0, float(send_interval))
             hb(
                 next_wake_at=_now_ts() + sl,
                 state="NO_CANDIDATE",
                 campaign_id=camp_id,
-                reason=f"limit_hour_sent={limit_hour_sent} interval={send_interval:.1f}s → sleep={sl:.0f}s",
+                reason=f"limit_hour_sent={last_limit} interval={send_interval:.1f}s → sleep={sl:.0f}s",
             )
             time.sleep(sl)
             continue
@@ -395,10 +421,13 @@ def _sender_loop(
         list_contact_id = int(row[0])
 
         hb(
-            next_wake_at=_now_ts() + (send_interval + 60.0),
+            next_wake_at=_now_ts() + (float(send_interval) + 60.0),
             state="SENDING",
             campaign_id=camp_id,
-            reason=f"limit_hour_sent={limit_hour_sent} (~{limit_hour_sent}/h) interval={send_interval:.1f}s → send_one(campaign_id={camp_id}, list_contact_id={list_contact_id})",
+            reason=(
+                f"limit_hour_sent={last_limit} (~{last_limit}/h) interval={send_interval:.1f}s "
+                f"→ send_one(campaign_id={camp_id}, list_contact_id={list_contact_id})"
+            ),
         )
         try:
             send_one(int(camp_id), int(list_contact_id))
@@ -407,12 +436,11 @@ def _sender_loop(
             return
 
         sl = max(0.0, float(send_interval))
-        nxt = _now_ts() + sl
         hb(
-            next_wake_at=nxt,
+            next_wake_at=_now_ts() + sl,
             state="SLEEP",
             campaign_id=camp_id,
-            reason=f"sent_ok list_contact_id={list_contact_id} → sleep={sl:.1f}s (limit_hour_sent={limit_hour_sent})",
+            reason=f"sent_ok list_contact_id={list_contact_id} → sleep={sl:.1f}s (limit_hour_sent={last_limit})",
         )
         time.sleep(sl)
 
