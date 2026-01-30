@@ -1,7 +1,8 @@
 # FILE: web/panel/aap_lists/views/modal_contacts.py
-# DATE: 2026-01-12
-# PURPOSE: /panel/lists/contacts/modal/?id=... — модалка контакта по aggr_id: контакт + аудитории (rate_cl/rate_cb) + списки.
-# CHANGE: новый рендер без rate_contact_id (контакт может быть в разных аудиториях).
+# DATE: 2026-01-30
+# SUMMARY:
+# - Fix PG error: DISTINCT + ORDER BY требует поля в SELECT → убрали ml.created_at из ORDER BY.
+# - lists_contacts хранит rate_contact_id (FK -> rate_contacts.id): списки ищем через rc.contact_id (= aggr_id).
 
 from __future__ import annotations
 
@@ -33,12 +34,14 @@ def _fetch_lists(ws_id, aggr_id: int) -> list[dict]:
     with connection.cursor() as cur:
         cur.execute(
             """
-            SELECT ml.id::bigint, ml.title::text, ml.archived::bool
+            SELECT DISTINCT ml.id::bigint, ml.title::text, ml.archived::bool
             FROM public.lists_contacts lc
+            JOIN public.rate_contacts rc
+              ON rc.id = lc.rate_contact_id
             JOIN public.aap_lists_mailinglist ml
               ON ml.id = lc.list_id AND ml.workspace_id = %s::uuid
-            WHERE lc.contact_id = %s::bigint
-            ORDER BY ml.archived ASC, ml.created_at DESC, ml.id DESC
+            WHERE rc.contact_id = %s::bigint
+            ORDER BY ml.archived ASC, ml.id DESC
             """,
             [ws_id, int(aggr_id)],
         )
@@ -55,7 +58,6 @@ def _fetch_lists(ws_id, aggr_id: int) -> list[dict]:
 
 
 def _fetch_audiences(ws_id, aggr_id: int) -> list[dict]:
-    # только таски текущего workspace (user не учитываем)
     with connection.cursor() as cur:
         cur.execute(
             """
@@ -115,10 +117,5 @@ def modal_contacts_view(request):
     return render(
         request,
         "panels/aap_lists/modal_contacts.html",
-        {
-            "status": "done",
-            "contact": contact,
-            "lists": lists,
-            "audiences": audiences,
-        },
+        {"status": "done", "contact": contact, "lists": lists, "audiences": audiences},
     )

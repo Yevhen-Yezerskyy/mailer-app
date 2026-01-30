@@ -1,8 +1,9 @@
-# FILE: web/panel/aap_lists/views/lists_list.py  (обновлено — 2026-01-12)
-# PURPOSE: /panel/lists/lists/list/?id=... — управление конкретным списком рассылки.
-# CHANGE (2026-01-12):
-# - Под новое кеширование format_data.build_contact_packet(): прокидываем rate_cb/rate_cl (снапшот) в вызов,
-#   чтобы ключ кеша учитывал текущие рейтинги и UI не показывал устаревшие значения.
+# FILE: web/panel/aap_lists/views/lists_list.py
+# DATE: 2026-01-30
+# SUMMARY:
+# - lists_contacts теперь хранит rate_contact_id (FK -> rate_contacts.id), а не raw_contacts_aggr.id.
+# - UI/POST по-прежнему шлёт "contact_id", но это теперь rate_contact_id (чтобы не трогать шаблон).
+# - В ws_contacts по-прежнему пишем raw_contacts_aggr.id, получая его через rate_contacts.contact_id.
 
 from __future__ import annotations
 
@@ -73,8 +74,8 @@ def _list_active_cnt(list_id: int) -> int:
         return int((cur.fetchone() or [0])[0] or 0)
 
 
-def _ws_upsert_many(ws_id, contact_ids: list[int]) -> None:
-    if not contact_ids:
+def _ws_upsert_many(ws_id, aggr_contact_ids: list[int]) -> None:
+    if not aggr_contact_ids:
         return
     with connection.cursor() as cur:
         cur.execute(
@@ -85,73 +86,91 @@ def _ws_upsert_many(ws_id, contact_ids: list[int]) -> None:
             ON CONFLICT (workspace_id, contact_id)
             DO UPDATE SET active = EXCLUDED.active
             """,
-            [ws_id, contact_ids],
+            [ws_id, aggr_contact_ids],
         )
 
 
-def _lists_insert_many(list_id: int, contact_ids: list[int]) -> None:
-    if not contact_ids:
+def _aggr_ids_by_rate_contact_ids(rate_contact_ids: list[int]) -> list[int]:
+    ids = [int(x) for x in (rate_contact_ids or []) if int(x) > 0]
+    if not ids:
+        return []
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT DISTINCT rc.contact_id::bigint
+            FROM public.rate_contacts rc
+            WHERE rc.id = ANY(%s::bigint[])
+            """,
+            [ids],
+        )
+        return [int(r[0]) for r in cur.fetchall()]
+
+
+def _lists_insert_many(list_id: int, rate_contact_ids: list[int]) -> None:
+    if not rate_contact_ids:
         return
     with connection.cursor() as cur:
         cur.execute(
             """
-            INSERT INTO public.lists_contacts (list_id, contact_id, active, reason, added_at)
+            INSERT INTO public.lists_contacts (list_id, rate_contact_id, active, reason, added_at)
             SELECT %s::bigint, x::bigint, true, NULL, now()
             FROM unnest(%s::bigint[]) AS x
-            ON CONFLICT (list_id, contact_id)
+            ON CONFLICT (list_id, rate_contact_id)
             DO UPDATE SET active = EXCLUDED.active
             """,
-            [int(list_id), contact_ids],
+            [int(list_id), rate_contact_ids],
         )
 
 
-def _lists_delete_many(list_id: int, contact_ids: list[int]) -> None:
-    if not contact_ids:
+def _lists_delete_many(list_id: int, rate_contact_ids: list[int]) -> None:
+    if not rate_contact_ids:
         return
     with connection.cursor() as cur:
         cur.execute(
             """
             DELETE FROM public.lists_contacts
-            WHERE list_id = %s AND contact_id = ANY(%s::bigint[])
+            WHERE list_id = %s AND rate_contact_id = ANY(%s::bigint[])
             """,
-            [int(list_id), contact_ids],
+            [int(list_id), rate_contact_ids],
         )
 
 
-def _lists_set_active(list_id: int, contact_ids: list[int], active: bool) -> None:
-    if not contact_ids:
+def _lists_set_active(list_id: int, rate_contact_ids: list[int], active: bool) -> None:
+    if not rate_contact_ids:
         return
     with connection.cursor() as cur:
         cur.execute(
             """
             UPDATE public.lists_contacts
             SET active = %s, reason = NULL
-            WHERE list_id = %s AND contact_id = ANY(%s::bigint[])
+            WHERE list_id = %s AND rate_contact_id = ANY(%s::bigint[])
             """,
-            [bool(active), int(list_id), contact_ids],
+            [bool(active), int(list_id), rate_contact_ids],
         )
 
 
 def _bulk_add_by_rate(task_id: int, list_id: int, ws_id, *, rate_max: int) -> None:
+    # lists_contacts: кладём rc.id
     with connection.cursor() as cur:
         cur.execute(
             """
             WITH candidates AS (
-              SELECT DISTINCT rc.contact_id::bigint AS contact_id
+              SELECT DISTINCT rc.id::bigint AS rate_contact_id
               FROM public.rate_contacts rc
               WHERE rc.task_id = %s
                 AND rc.rate_cl IS NOT NULL
                 AND rc.rate_cl BETWEEN 1 AND %s
             )
-            INSERT INTO public.lists_contacts (list_id, contact_id, active, reason, added_at)
-            SELECT %s::bigint, c.contact_id, true, NULL, now()
+            INSERT INTO public.lists_contacts (list_id, rate_contact_id, active, reason, added_at)
+            SELECT %s::bigint, c.rate_contact_id, true, NULL, now()
             FROM candidates c
-            ON CONFLICT (list_id, contact_id)
+            ON CONFLICT (list_id, rate_contact_id)
             DO UPDATE SET active = EXCLUDED.active
             """,
             [int(task_id), int(rate_max), int(list_id)],
         )
 
+    # ws_contacts: кладём rc.contact_id (= raw_contacts_aggr.id)
     with connection.cursor() as cur:
         cur.execute(
             """
@@ -244,13 +263,13 @@ def _fetch_rows(
 
     # base mode
     if mode == "list":
-        where.append("lc.contact_id IS NOT NULL")
+        where.append("lc.rate_contact_id IS NOT NULL")
     else:
-        where.append("lc.contact_id IS NULL")
+        where.append("lc.rate_contact_id IS NULL")
 
-    # search override: "в списке" ограничивает только при активном поиске (и расширяет audience->list по смыслу)
+    # search override
     if search_active and in_list_only:
-        where.append("lc.contact_id IS NOT NULL")
+        where.append("lc.rate_contact_id IS NOT NULL")
 
     need_join_aggr = False
 
@@ -285,7 +304,7 @@ def _fetch_rows(
     where_sql = " AND ".join(where)
 
     join_aggr_sql = "JOIN public.raw_contacts_aggr ra ON ra.id = rc.contact_id" if need_join_aggr else ""
-    join_lc_sql = "LEFT JOIN public.lists_contacts lc ON lc.list_id = %s AND lc.contact_id = rc.contact_id"
+    join_lc_sql = "LEFT JOIN public.lists_contacts lc ON lc.list_id = %s AND lc.rate_contact_id = rc.id"
     params_with_list = [int(list_id)] + params
 
     with connection.cursor() as cur:
@@ -309,7 +328,7 @@ def _fetch_rows(
             SELECT
               rc.id::bigint,
               rc.contact_id::bigint,
-              (lc.contact_id IS NOT NULL) AS in_list,
+              (lc.rate_contact_id IS NOT NULL) AS in_list,
               lc.active AS list_active,
               rc.rate_cb,
               rc.rate_cl
@@ -321,7 +340,7 @@ def _fetch_rows(
               (rc.rate_cl IS NULL) ASC,
               rc.rate_cl ASC,
               rc.rate_cb ASC NULLS LAST,
-              rc.contact_id ASC
+              rc.id ASC
             LIMIT %s OFFSET %s
             """,
             params_with_list + [int(PAGE_SIZE), int(offset)],
@@ -332,9 +351,12 @@ def _fetch_rows(
     packets = _packets_for_rows(rows_for_packets, ui_lang=ui_lang)
 
     meta_by_rc: dict[int, dict[str, Any]] = {}
-    for rc_id, contact_id, in_list, list_active, _rate_cb, _rate_cl in rows:
+    for rc_id, aggr_id, in_list, list_active, _rate_cb, _rate_cl in rows:
+        # ВАЖНО: meta["contact_id"] оставляем как rc_id (rate_contact_id),
+        # чтобы не менять HTML формы (она шлёт contact_id).
         meta_by_rc[int(rc_id)] = {
-            "contact_id": int(contact_id),
+            "contact_id": int(rc_id),      # == rate_contact_id
+            "aggr_id": int(aggr_id),       # raw_contacts_aggr.id (если нужно)
             "in_list": bool(in_list),
             "list_active": None if list_active is None else bool(list_active),
         }
@@ -345,7 +367,7 @@ def _fetch_rows(
         rid = ratings.get("rate_contact_id")
         if rid is None:
             continue
-        p["meta"] = meta_by_rc.get(int(rid), {"contact_id": None, "in_list": False, "list_active": None})
+        p["meta"] = meta_by_rc.get(int(rid), {"contact_id": None, "aggr_id": None, "in_list": False, "list_active": None})
         out.append(p)
 
     return total, out
@@ -396,24 +418,26 @@ def lists_list_view(request):
                 )
             return _redir_same()
 
+        # NB: contact_id из формы теперь = rate_contact_id (rc.id)
         cid_s = (request.POST.get("contact_id") or "").strip()
-        contact_id = None
+        rate_contact_id = None
         if cid_s:
             try:
-                contact_id = int(cid_s)
+                rate_contact_id = int(cid_s)
             except Exception:
-                contact_id = None
+                rate_contact_id = None
 
-        if action in ("include", "exclude", "subscribe", "unsubscribe") and contact_id:
+        if action in ("include", "exclude", "subscribe", "unsubscribe") and rate_contact_id:
             if action == "include":
-                _lists_insert_many(int(ml.id), [int(contact_id)])
-                _ws_upsert_many(ws_id, [int(contact_id)])
+                _lists_insert_many(int(ml.id), [int(rate_contact_id)])
+                aggr_ids = _aggr_ids_by_rate_contact_ids([int(rate_contact_id)])
+                _ws_upsert_many(ws_id, aggr_ids)
             elif action == "exclude":
-                _lists_delete_many(int(ml.id), [int(contact_id)])
+                _lists_delete_many(int(ml.id), [int(rate_contact_id)])
             elif action == "subscribe":
-                _lists_set_active(int(ml.id), [int(contact_id)], True)
+                _lists_set_active(int(ml.id), [int(rate_contact_id)], True)
             elif action == "unsubscribe":
-                _lists_set_active(int(ml.id), [int(contact_id)], False)
+                _lists_set_active(int(ml.id), [int(rate_contact_id)], False)
             return _redir_same()
 
         return _redir_same()
@@ -435,7 +459,6 @@ def lists_list_view(request):
     else:
         in_list_only = False
 
-    # page: при активном поиске всегда ожидаем p=1 с формы, но на всякий случай
     page = _safe_int(request.GET.get("p"), 1)
 
     total, rows = _fetch_rows(

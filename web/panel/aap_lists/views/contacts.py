@@ -1,11 +1,9 @@
 # FILE: web/panel/aap_lists/views/contacts.py
-# DATE: 2026-01-12
-# PURPOSE: /panel/lists/contacts/ — контакты workspace (ws_contacts) + "букет" + поиск + пагинация.
-# CHANGE:
-# - добавлен фильтр "Неподписанные" (?unsub=1) = wc.active=false
-# - "букет" сверху слева: только неархивные списки
-# - в таблице branches_html (2-я колонка)
-# - "Забыть" показываем только если контакт ни в каких списках ИЛИ только в архивных списках
+# DATE: 2026-01-30
+# SUMMARY:
+# - lists_contacts теперь хранит rate_contact_id (FK -> rate_contacts.id), а ws_contacts.contact_id = raw_contacts_aggr.id.
+# - Все проверки “контакт в списках” переписаны через JOIN lists_contacts -> rate_contacts (rc.id=lc.rate_contact_id) -> rc.contact_id (= wc.contact_id).
+# - Логика UI/фильтров/“Забыть” сохранена.
 
 from __future__ import annotations
 
@@ -146,9 +144,11 @@ def _fetch_count_no_list(ws_id) -> int:
               AND NOT EXISTS (
                 SELECT 1
                 FROM public.lists_contacts lc
+                JOIN public.rate_contacts rc
+                  ON rc.id = lc.rate_contact_id
                 JOIN public.aap_lists_mailinglist ml
                   ON ml.id = lc.list_id AND ml.workspace_id = wc.workspace_id
-                WHERE lc.contact_id = wc.contact_id
+                WHERE rc.contact_id = wc.contact_id
               )
             """,
             [ws_id],
@@ -187,7 +187,7 @@ def _decode_list_id_or_redirect(request):
 
 def _fetch_lists_for_contacts(ws_id, contact_ids: list[int]) -> dict[int, list[dict]]:
     """
-    Возвращает для каждого contact_id список списков (включая архивные).
+    Возвращает для каждого aggr_id (raw_contacts_aggr.id) список списков (включая архивные).
     """
     if not contact_ids:
         return {}
@@ -196,24 +196,26 @@ def _fetch_lists_for_contacts(ws_id, contact_ids: list[int]) -> dict[int, list[d
         cur.execute(
             """
             SELECT
-              lc.contact_id::bigint,
+              rc.contact_id::bigint AS aggr_id,
               ml.title::text,
               ml.archived::bool
             FROM public.lists_contacts lc
+            JOIN public.rate_contacts rc
+              ON rc.id = lc.rate_contact_id
             JOIN public.aap_lists_mailinglist ml
               ON ml.id = lc.list_id AND ml.workspace_id = %s::uuid
-            WHERE lc.contact_id = ANY(%s::bigint[])
+            WHERE rc.contact_id = ANY(%s::bigint[])
             ORDER BY ml.archived ASC, ml.created_at DESC, ml.id DESC
             """,
             [ws_id, contact_ids],
         )
 
         out: dict[int, list[dict]] = {}
-        for cid, title, archived in cur.fetchall() or []:
+        for aggr_id, title, archived in cur.fetchall() or []:
             t = (title or "").strip()
             if not t:
                 continue
-            out.setdefault(int(cid), []).append({"title": t, "archived": bool(archived)})
+            out.setdefault(int(aggr_id), []).append({"title": t, "archived": bool(archived)})
         return out
 
 
@@ -265,9 +267,12 @@ def _fetch_rows(
             EXISTS (
               SELECT 1
               FROM public.lists_contacts lc2
+              JOIN public.rate_contacts rc2
+                ON rc2.id = lc2.rate_contact_id
               JOIN public.aap_lists_mailinglist ml2
                 ON ml2.id = lc2.list_id AND ml2.workspace_id = wc.workspace_id
-              WHERE lc2.contact_id = wc.contact_id AND lc2.list_id = %s::bigint
+              WHERE rc2.contact_id = wc.contact_id
+                AND lc2.list_id = %s::bigint
             )
             """
         )
@@ -279,9 +284,11 @@ def _fetch_rows(
             NOT EXISTS (
               SELECT 1
               FROM public.lists_contacts lc3
+              JOIN public.rate_contacts rc3
+                ON rc3.id = lc3.rate_contact_id
               JOIN public.aap_lists_mailinglist ml3
                 ON ml3.id = lc3.list_id AND ml3.workspace_id = wc.workspace_id
-              WHERE lc3.contact_id = wc.contact_id
+              WHERE rc3.contact_id = wc.contact_id
             )
             """
         )
@@ -361,13 +368,11 @@ def _fetch_rows(
                 "aggr_id": aggr_id,
                 "ui_id": encode_id(int(aggr_id)),
                 "active": bool(active),
-
                 "company_name": (c.get("company_name") or "").strip(),
                 "address": (c.get("address") or "").strip(),
                 "city_land": (c.get("city_land") or "").strip(),
                 "email": (c.get("email") or "").strip(),
                 "branches_html": c.get("branches_html") or "",
-
                 "lists": lst,
                 "lists_str": _lists_str(lst),
                 "forget_allowed": _forget_allowed(lst),
