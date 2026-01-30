@@ -1,24 +1,31 @@
-# FILE: web/panel/aap_campaigns/views/campaigns.py  (обновлено — 2026-01-30)
-# PURPOSE: Campaigns page: holidays/window logic — убрать дубль holidays-cache, переиспользовать общий _is_de_public_holiday().
-# CHANGE: удалён локальный _HOL_DE_CACHE + _get_de_wide_holidays_for_year + _is_de_public_holiday; import holidays убран.
+# FILE: web/panel/aap_campaigns/views/campaigns.py
+# PATH: web/panel/aap_campaigns/views/campaigns.py
+# DATE: 2026-01-30
+# PURPOSE: Campaigns page.
+# CHANGE:
+# - reuse send-window helpers from engine.core_sender.sender (no local duplicates)
+# - add per-campaign stats: total / sent / left (left = total - sent, sent = all mailbox_sent rows)
+# - add POST action send_test: pick 10 random active list_contacts from campaign list, choose 1, send_one(..., to_email_override=..., record_sent=False)
 
 from __future__ import annotations
 
 import json
+import random
 from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, Iterable, Optional, Tuple, Union
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-# import holidays  # удалено: теперь общий helper в engine.common.email_template
-
+from django.db import connection
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from engine.common.email_template import _is_de_public_holiday, render_html, sanitize
+from engine.common.mail.send import send_one
+from engine.core_sender.sender import _is_now_in_send_window  # NOTE: single source of truth (UI==sender)
 from mailer_web.access import decode_id, encode_id, resolve_pk_or_redirect
 from panel.aap_campaigns.models import Campaign, Letter, Templates
 from panel.aap_campaigns.template_editor import (
@@ -139,82 +146,69 @@ def _now_berlin() -> datetime:
     return dt.astimezone(_TZ_BERLIN)
 
 
-# -------- Window evaluation --------
-
-
-def _parse_hhmm_to_minutes(s: str) -> Optional[int]:
-    try:
-        s = (s or "").strip()
-        if not s or ":" not in s:
-            return None
-        h, m = s.split(":", 1)
-        hh = int(h)
-        mm = int(m)
-        if hh < 0 or hh > 23 or mm < 0 or mm > 59:
-            return None
-        return hh * 60 + mm
-    except Exception:
-        return None
-
-
-def _window_is_nonempty(win: object) -> bool:
-    if not isinstance(win, dict):
-        return False
-    for v in win.values():
-        if isinstance(v, list) and len(v) > 0:
-            return True
-    return False
-
-
-def _iter_slots(slots_obj: Any) -> Iterable[Tuple[str, str]]:
+def _stats_by_campaign_ids(campaign_ids: list[int]) -> dict[int, tuple[int, int, int]]:
     """
-    Accept formats:
-      A) [{"from":"09:00","to":"12:00"}, ...]   (JS current)
-      B) [["09:00","12:00"], ...] or [("09:00","12:00"), ...]
+    Returns {campaign_id: (total, sent, left)} where:
+      total = COUNT(DISTINCT lists_contacts.id) for c.mailing_list_id with active=true
+      sent  = COUNT(DISTINCT mailbox_sent.id) for campaign_id
+      left  = max(0, total - sent)
     """
-    if not isinstance(slots_obj, list):
-        return []
-    out: list[Tuple[str, str]] = []
-    for it in slots_obj:
-        if isinstance(it, dict):
-            a = str(it.get("from") or "").strip()
-            b = str(it.get("to") or "").strip()
-            if a and b:
-                out.append((a, b))
-            continue
-        if isinstance(it, (list, tuple)) and len(it) == 2:
-            a = str(it[0] or "").strip()
-            b = str(it[1] or "").strip()
-            if a and b:
-                out.append((a, b))
+    ids = [int(x) for x in (campaign_ids or []) if int(x) > 0]
+    if not ids:
+        return {}
+
+    out: dict[int, tuple[int, int, int]] = {cid: (0, 0, 0) for cid in ids}
+
+    sql = """
+    SELECT
+      c.id AS campaign_id,
+      COUNT(DISTINCT lc.id) AS total_cnt,
+      COUNT(DISTINCT ms.id) AS sent_cnt
+    FROM public.campaigns_campaigns c
+    LEFT JOIN public.lists_contacts lc
+      ON lc.list_id = c.mailing_list_id
+     AND lc.active = true
+    LEFT JOIN public.mailbox_sent ms
+      ON ms.campaign_id = c.id
+    WHERE c.id = ANY(%s)
+    GROUP BY c.id
+    """
+    with connection.cursor() as cur:
+        cur.execute(sql, [ids])
+        for camp_id, total_cnt, sent_cnt in cur.fetchall():
+            cid = int(camp_id)
+            total = int(total_cnt or 0)
+            sent = int(sent_cnt or 0)
+            left = total - sent
+            if left < 0:
+                left = 0
+            out[cid] = (total, sent, left)
+
     return out
 
 
-def _is_now_in_send_window(now_de: datetime, camp_window: object, global_window: object) -> bool:
-    win = camp_window if _window_is_nonempty(camp_window) else (global_window if isinstance(global_window, dict) else {})
-    if not isinstance(win, dict):
-        return False
-
-    today = now_de.date()
-    if _is_de_public_holiday(today):
-        key = "hol"
-    else:
-        wd = now_de.weekday()  # mon=0..sun=6
-        key = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")[wd]
-
-    cur = now_de.hour * 60 + now_de.minute
-
-    for a_str, b_str in _iter_slots(win.get(key, [])):
-        a = _parse_hhmm_to_minutes(a_str)
-        b = _parse_hhmm_to_minutes(b_str)
-        if a is None or b is None:
-            continue
-        if b <= a:
-            continue
-        if a <= cur < b:
-            return True
-
-    return False
+def _pick_test_list_contact_id(mailing_list_id: int) -> Optional[int]:
+    """
+    Pick 10 random active list_contacts for list_id, then choose 1 random from those 10.
+    """
+    mlid = int(mailing_list_id)
+    sql = """
+    SELECT id
+    FROM public.lists_contacts
+    WHERE list_id = %s
+      AND active = true
+    ORDER BY random()
+    LIMIT 10
+    """
+    ids: list[int] = []
+    with connection.cursor() as cur:
+        cur.execute(sql, [mlid])
+        for (lc_id,) in cur.fetchall():
+            if lc_id is not None:
+                ids.append(int(lc_id))
+    if not ids:
+        return None
+    return int(random.choice(ids))
 
 
 def _ctx_build(
@@ -232,6 +226,7 @@ def _ctx_build(
     letter_init_subjects: str,
     letter_init_headers: str,
     letter_template_html: str,
+    letter_ready_html: str,
     deleted_tpl_ui,
     deleted_tpl_id,
     *,
@@ -242,6 +237,9 @@ def _ctx_build(
 
     sender_label_by_mb_id = _build_sender_labels(list(mb_items))
     now_de = _now_berlin()
+
+    camp_ids = [int(it.id) for it in items if getattr(it, "id", None) is not None]
+    stats = _stats_by_campaign_ids(camp_ids)
 
     for it in items:
         it.sender_label = sender_label_by_mb_id.get(int(it.mailbox_id), f"{it.mailbox.email}")
@@ -254,6 +252,11 @@ def _ctx_build(
             it.letter_tpl_label = tpl.template_name
         else:
             it.letter_tpl_label = _("Шаблон удален")
+
+        total, sent, left = stats.get(int(it.id), (0, 0, 0))
+        it.stat_total = int(total)
+        it.stat_sent = int(sent)
+        it.stat_left = int(left)
 
         it.is_in_window = False
         if getattr(it, "active", False):
@@ -282,6 +285,7 @@ def _ctx_build(
         "letter_init_subjects": letter_init_subjects,
         "letter_init_headers": letter_init_headers,
         "letter_template_html": letter_template_html,
+        "letter_ready_html": letter_ready_html,
         # form errors
         "form_error_msg": form_error_msg,
         "form_error_field": form_error_field,
@@ -360,6 +364,7 @@ def campaigns_view(request):
     letter_init_subjects = "[]"
     letter_init_headers = "{}"
     letter_template_html = ""
+    letter_ready_html = ""
 
     if state == "letter" and edit_obj:
         letter_obj = _ensure_letter(ws_id, edit_obj)
@@ -388,12 +393,39 @@ def campaigns_view(request):
         except Exception:
             letter_init_headers = "{}"
 
+        # ready HTML (readonly preview block)
+        letter_ready_html = (getattr(letter_obj, "ready_content", "") or "").strip()
+
     # ---------------- POST ----------------
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
 
         if action == "close":
             return redirect(request.path)
+
+        if action == "send_test":
+            post_id = (request.POST.get("id") or "").strip()
+            test_email = (request.POST.get("test_email") or "").strip()
+            if not (post_id and test_email):
+                return redirect(request.get_full_path())
+
+            try:
+                camp_id = int(decode_id(post_id))
+            except Exception:
+                return redirect(request.get_full_path())
+
+            camp = Campaign.objects.filter(id=int(camp_id), workspace_id=ws_id).only("id", "mailing_list_id").first()
+            if not camp:
+                return redirect(request.get_full_path())
+
+            list_contact_id = _pick_test_list_contact_id(int(camp.mailing_list_id))
+            if not list_contact_id:
+                return redirect(request.get_full_path())
+
+            # NOTE: send_one prepares HTML itself; we override recipient; record_sent=False to not consume contact
+            send_one(int(camp.id), int(list_contact_id), to_email_override=test_email, record_sent=False)
+
+            return redirect(f"{request.path}?state=letter&id={encode_id(int(camp.id))}")
 
         if action in ("activate", "pause"):
             post_id = (request.POST.get("id") or "").strip()
@@ -451,6 +483,7 @@ def campaigns_view(request):
                     letter_init_subjects,
                     letter_init_headers,
                     letter_template_html,
+                    letter_ready_html,
                     deleted_tpl_ui,
                     deleted_tpl_id,
                     form_error_msg=_("Пожалуйста, заполните все обязательные поля"),
@@ -478,6 +511,7 @@ def campaigns_view(request):
                     letter_init_subjects,
                     letter_init_headers,
                     letter_template_html,
+                    letter_ready_html,
                     deleted_tpl_ui,
                     deleted_tpl_id,
                     form_error_msg=_("Некорректные значения формы"),
@@ -502,6 +536,7 @@ def campaigns_view(request):
                     letter_init_subjects,
                     letter_init_headers,
                     letter_template_html,
+                    letter_ready_html,
                     deleted_tpl_ui,
                     deleted_tpl_id,
                     form_error_msg=_("Этот список рассылки уже используется в другой кампании"),
@@ -643,6 +678,7 @@ def campaigns_view(request):
         letter_init_subjects,
         letter_init_headers,
         letter_template_html,
+        letter_ready_html,
         deleted_tpl_ui,
         deleted_tpl_id,
     )

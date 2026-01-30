@@ -248,7 +248,19 @@ def unapply_vars(html: str, vars_map: Dict[str, str]) -> str:
 # ============================================================
 # send_one
 # ============================================================
-def send_one(campaign_id: int, list_contact_id: int) -> None:
+# FILE: engine/common/mail/send.py
+# PATH: engine/common/mail/send.py
+# DATE: 2026-01-30
+# SUMMARY:
+# - send_one: add to_email_override + record_sent (default True); tests can send without consuming contact / mailbox_sent row
+
+def send_one(
+    campaign_id: int,
+    list_contact_id: int,
+    *,
+    to_email_override: Optional[str] = None,
+    record_sent: bool = True,
+) -> None:
     now = datetime.now(tz=_TZ)
 
     row = db.fetch_one(
@@ -325,7 +337,8 @@ def send_one(campaign_id: int, list_contact_id: int) -> None:
     utm = f"smrel={smrel_id}"
 
     vars_map = VarsContext(rate_contact_id, utm).build()
-    to_email = (vars_map.get("company_email") or "").strip()
+
+    to_email = (to_email_override or "").strip() or (vars_map.get("company_email") or "").strip()
     if not to_email:
         raise RuntimeError("TO_EMAIL_EMPTY")
 
@@ -380,6 +393,10 @@ def send_one(campaign_id: int, list_contact_id: int) -> None:
         body_html=html2,
         headers=headers,
     )
+
+    # NOTE: test-send path should not write mailbox_sent (and must not consume contact via uniq(campaign_id, rate_contact_id))
+    if not record_sent:
+        return
 
     if ok:
         payload = {

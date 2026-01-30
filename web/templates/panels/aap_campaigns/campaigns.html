@@ -345,12 +345,27 @@
                 {% trans "Закрыть" %}
               </button>
             </div>
-
+          </form>
           </div>
+<div class="YY-CARD_WHITE  mt-10">
+  <form method="post" class="grid grid-cols-1 gap-2">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="send_test">
+    <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
+
+    <label class="YY-LABEL">{% trans "Отправить тестовое письмо по адресу:" %}:</label>
+    <input type="email" name="test_email" class="YY-INPUT !mb-1" placeholder="test@example.com" required>
+    <button type="submit" class="YY-BUTTON_MAIN mb-2">
+      {% trans "Отправить тестовое письмо" %}
+    </button>
+  </form>
+</div>
+
+
         </td>
       </tr>
     </table>
-  </form>
+  
 
 {% endif %}
 
@@ -396,22 +411,20 @@
                     </a>
                   </td>
 
+     
                   <td class="YY-TB_TD">
-                    <div class="grid grid-cols-[250px_1fr] gap-x-2 gap-y-1">
-                        <div class="YY-STATUS_BLUE !py-1">
-                            Всего писем к отправке:
-                        </div>
-                        <div class="YY-STATUS_BLUE !py-1">1450</div>
-                        <div class="YY-STATUS_BLUE !py-1">
-                            Отправлено:
-                        </div>
-                        <div class="YY-STATUS_BLUE !py-1">350</div>
-                        <div class="YY-STATUS_BLUE !py-1">
-                            Осталось:
-                        </div>
-                        <div class="YY-STATUS_BLUE !py-1">680</div>
+                    <div class="grid grid-cols-[250px_1fr] gap-x-2 gap-y-2">
+                      <div class="YY-STATUS_BLUE !py-1 !px-2">{% trans "Писем к отправке" %}:</div>
+                      <div class="YY-STATUS_BLUE !py-1 !px-2">{{ it.stat_total }}</div>
+
+                      <div class="YY-STATUS_GREEN !py-1 !px-2">{% trans "Отправлено" %}:</div>
+                      <div class="YY-STATUS_GREEN !py-1 !px-2">{{ it.stat_sent }}</div>
+
+                      <div class="YY-STATUS_YELLOW !py-1 !px-2">{% trans "Осталось" %}:</div>
+                      <div class="YY-STATUS_YELLOW !py-1 !px-2">{{ it.stat_left }}</div>
                     </div>
                   </td>
+
 
                   <td class="YY-TB_TD">
                     {% if it.active %}

@@ -2,9 +2,8 @@
 # PATH: engine/core_sender/sender.py
 # DATE: 2026-01-30
 # SUMMARY:
-# - lists_contacts.rate_contact_id = rate_contacts.id (а не aggr_id)
-# - mailbox_sent.rate_contact_id сравниваем с lists_contacts.rate_contact_id
-# - выбор кандидата: отдаём list_contact_id (lists_contacts.id) в send_one()
+# - add verbose sender state prints (limits/interval/sleep/target) via heartbeat reason + main_guide status dump
+# - keep existing logic: lists_contacts.rate_contact_id=rate_contacts.id; mailbox_sent compares by rate_contact_id; send_one(campaign_id, list_contact_id)
 
 from __future__ import annotations
 
@@ -114,6 +113,16 @@ class SenderRuntime:
 
 def _now_ts() -> float:
     return time.time()
+
+
+def _fmt_wait_sec(ts: float, now: float) -> str:
+    try:
+        d = float(ts) - float(now)
+        if d < 0:
+            d = 0.0
+        return f"{d:.0f}s"
+    except Exception:
+        return "?"
 
 
 def _pending_by_campaign(campaign_ids: List[int]) -> Dict[int, int]:
@@ -244,7 +253,11 @@ def _sender_loop(
     if limit_hour_sent <= 0:
         while not stop_flag.get("v") and _now_ts() < death_at_ts:
             nxt = _now_ts() + 60.0
-            hb(next_wake_at=nxt, state="NO_LIMIT", reason="limit_hour_sent<=0")
+            hb(
+                next_wake_at=nxt,
+                state="NO_LIMIT",
+                reason=f"limit_hour_sent={limit_hour_sent} (<=0) → sleep=60s",
+            )
             time.sleep(60)
         dead("DONE")
         return
@@ -255,10 +268,20 @@ def _sender_loop(
     if not camp_ids:
         while not stop_flag.get("v") and _now_ts() < death_at_ts:
             nxt = _now_ts() + 30.0
-            hb(next_wake_at=nxt, state="NO_CAMPAIGNS")
+            hb(
+                next_wake_at=nxt,
+                state="NO_CAMPAIGNS",
+                reason=f"limit_hour_sent={limit_hour_sent} interval={send_interval:.1f}s → sleep=30s",
+            )
             time.sleep(30)
         dead("DONE")
         return
+
+    hb(
+        next_wake_at=_now_ts() + 0.1,
+        state="START",
+        reason=f"limit_hour_sent={limit_hour_sent} (~{limit_hour_sent}/h) interval={send_interval:.1f}s campaigns={len(camp_ids)}",
+    )
 
     while True:
         if stop_flag.get("v"):
@@ -284,7 +307,11 @@ def _sender_loop(
         )
         if not rows:
             sl = min(60.0, send_interval)
-            hb(next_wake_at=_now_ts() + sl, state="NO_ACTIVE_CAMPAIGNS")
+            hb(
+                next_wake_at=_now_ts() + sl,
+                state="NO_ACTIVE_CAMPAIGNS",
+                reason=f"limit_hour_sent={limit_hour_sent} interval={send_interval:.1f}s → sleep={sl:.0f}s",
+            )
             time.sleep(sl)
             continue
 
@@ -315,7 +342,11 @@ def _sender_loop(
 
         if not candidates:
             sl = min(60.0, send_interval)
-            hb(next_wake_at=_now_ts() + sl, state="NO_PENDING_OR_WINDOW")
+            hb(
+                next_wake_at=_now_ts() + sl,
+                state="NO_PENDING_OR_WINDOW",
+                reason=f"limit_hour_sent={limit_hour_sent} interval={send_interval:.1f}s → sleep={sl:.0f}s",
+            )
             time.sleep(sl)
             continue
 
@@ -329,7 +360,6 @@ def _sender_loop(
                 camp_id = cid
                 break
 
-        # выбираем list_contact_id (lists_contacts.id), но фильтруем по ms.rate_contact_id vs lc.rate_contact_id
         row = fetch_one(
             """
             SELECT lc.id AS list_contact_id
@@ -353,22 +383,38 @@ def _sender_loop(
         )
         if not row:
             sl = min(30.0, send_interval)
-            hb(next_wake_at=_now_ts() + sl, state="NO_CANDIDATE", campaign_id=camp_id)
+            hb(
+                next_wake_at=_now_ts() + sl,
+                state="NO_CANDIDATE",
+                campaign_id=camp_id,
+                reason=f"limit_hour_sent={limit_hour_sent} interval={send_interval:.1f}s → sleep={sl:.0f}s",
+            )
             time.sleep(sl)
             continue
 
         list_contact_id = int(row[0])
 
-        hb(next_wake_at=_now_ts() + (send_interval + 60.0), state="SENDING", campaign_id=camp_id)
+        hb(
+            next_wake_at=_now_ts() + (send_interval + 60.0),
+            state="SENDING",
+            campaign_id=camp_id,
+            reason=f"limit_hour_sent={limit_hour_sent} (~{limit_hour_sent}/h) interval={send_interval:.1f}s → send_one(campaign_id={camp_id}, list_contact_id={list_contact_id})",
+        )
         try:
             send_one(int(camp_id), int(list_contact_id))
         except Exception as e:
             dead(f"SEND_ONE_EXCEPTION:{type(e).__name__}:{e}")
             return
 
-        nxt = _now_ts() + float(send_interval)
-        hb(next_wake_at=nxt, state="SLEEP", campaign_id=camp_id)
-        time.sleep(max(0.0, float(send_interval)))
+        sl = max(0.0, float(send_interval))
+        nxt = _now_ts() + sl
+        hb(
+            next_wake_at=nxt,
+            state="SLEEP",
+            campaign_id=camp_id,
+            reason=f"sent_ok list_contact_id={list_contact_id} → sleep={sl:.1f}s (limit_hour_sent={limit_hour_sent})",
+        )
+        time.sleep(sl)
 
 
 class Sender:
@@ -408,6 +454,27 @@ class Sender:
             self._poll_heartbeats()
 
             now = _now_ts()
+
+            # PRINT: current sender status snapshot
+            if self.currently_sending:
+                for mid in sorted(self.currently_sending.keys()):
+                    rt = self.currently_sending.get(mid)
+                    hb0 = self.hb.get(mid)
+                    pid = rt.proc.pid if rt else None
+                    alive = bool(rt.proc.is_alive()) if rt else False
+                    if not hb0:
+                        print(f"[SENDER]   STATUS mailbox_id={mid} pid={pid} alive={alive} hb=NONE")
+                        continue
+                    wait = _fmt_wait_sec(hb0.next_wake_at, now)
+                    cid = hb0.campaign_id
+                    rsn = (hb0.reason or "").strip()
+                    if len(rsn) > 220:
+                        rsn = rsn[:220] + "..."
+                    print(
+                        f"[SENDER]   STATUS mailbox_id={mid} pid={pid} alive={alive} "
+                        f"state={hb0.state} campaign_id={cid} next_in={wait} reason={rsn}"
+                    )
+
             stale_killed = 0
             for mid in list(self.currently_sending.keys()):
                 hb0 = self.hb.get(mid)
@@ -445,7 +512,10 @@ class Sender:
                     continue
 
             tick_took = _now_ts() - tick_started
-            print(f"[SENDER] TICK#{self._tick_n} done: started={started} stale_killed={stale_killed} took={tick_took:.2f}s sleep={float(tick_sec):.0f}s")
+            print(
+                f"[SENDER] TICK#{self._tick_n} done: started={started} stale_killed={stale_killed} "
+                f"took={tick_took:.2f}s sleep={float(tick_sec):.0f}s"
+            )
             time.sleep(float(tick_sec))
 
     def _build_desired_targets(self) -> Dict[int, List[int]]:
