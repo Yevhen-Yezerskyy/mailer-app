@@ -1,9 +1,6 @@
-# FILE: web/panel/aap_campaigns/views/campaigns.py
-# DATE: 2026-01-24
-# PURPOSE: Campaigns page: add/edit + letter-editor init ctx + bottom table.
-# CHANGE:
-# - sender_label теперь показывает ТОЛЬКО email (SmtpMailbox.from_email, fallback -> Mailbox.email)
-# - удалены ConnKind/MailboxConnection и весь fallback по праздникам (требуется пакет holidays)
+# FILE: web/panel/aap_campaigns/views/campaigns.py  (обновлено — 2026-01-30)
+# PURPOSE: Campaigns page: holidays/window logic — убрать дубль holidays-cache, переиспользовать общий _is_de_public_holiday().
+# CHANGE: удалён локальный _HOL_DE_CACHE + _get_de_wide_holidays_for_year + _is_de_public_holiday; import holidays убран.
 
 from __future__ import annotations
 
@@ -14,14 +11,14 @@ from typing import Any, Iterable, Optional, Tuple, Union
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-import holidays
+# import holidays  # удалено: теперь общий helper в engine.common.email_template
 
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from engine.common.email_template import render_html, sanitize
+from engine.common.email_template import _is_de_public_holiday, render_html, sanitize
 from mailer_web.access import decode_id, encode_id, resolve_pk_or_redirect
 from panel.aap_campaigns.models import Campaign, Letter, Templates
 from panel.aap_campaigns.template_editor import (
@@ -140,25 +137,6 @@ def _now_berlin() -> datetime:
     if timezone.is_naive(dt):
         dt = timezone.make_aware(dt, timezone=ZoneInfo("UTC"))
     return dt.astimezone(_TZ_BERLIN)
-
-
-# -------- Holidays (requires python-holidays) --------
-
-_HOL_DE_CACHE: dict[int, set[date]] = {}
-
-
-def _get_de_wide_holidays_for_year(y: int) -> set[date]:
-    if y in _HOL_DE_CACHE:
-        return _HOL_DE_CACHE[y]
-
-    h = holidays.country_holidays("DE", years=[y])  # Germany-wide by default
-    out = {d for d in h.keys() if isinstance(d, date)}
-    _HOL_DE_CACHE[y] = set(out)
-    return _HOL_DE_CACHE[y]
-
-
-def _is_de_public_holiday(d: date) -> bool:
-    return d in _get_de_wide_holidays_for_year(d.year)
 
 
 # -------- Window evaluation --------

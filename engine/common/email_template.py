@@ -1,16 +1,37 @@
-# FILE: engine/common/email_template.py  (обновлено — 2026-01-17)
-# PURPOSE: Финальный рендер HTML-писем: склейка template+content (body-фрагмент), vars, sanitize (whitelist),
-#          inline styles из styles_json (tag + .class override), Outlook-safe p->table/tr/td.
-# CHANGE: Убраны html/head/body из whitelist и спец-обработка meta.
-#         Финальная обёртка <html><head><meta...></head><body>...</body></html> хардкодится в render_html.
+# FILE: engine/common/email_template.py  (обновлено — 2026-01-30)
+# PURPOSE: Финальный рендер HTML-писем + (NEW) общий хелпер праздников DE для send-window.
+# CHANGE: Добавлен импорт holidays БЕЗ try/except (если пакета нет — падаем), кеш праздников и _is_de_public_holiday().
 
 from __future__ import annotations
 
 import json
 import re
+from datetime import date
 from typing import Any, Dict, Optional, Union
 
+import holidays  # если пакета нет — пусть валится нах
+
 StylesJSON = Union[str, Dict[str, Dict[str, Any]], None]
+
+# -------------------------
+# holidays (DE-wide)
+# -------------------------
+
+_HOL_DE_CACHE: Dict[int, set[date]] = {}
+
+
+def _get_de_wide_holidays_for_year(y: int) -> set[date]:
+    if y in _HOL_DE_CACHE:
+        return _HOL_DE_CACHE[y]
+    h = holidays.country_holidays("DE", years=[y])
+    out = {d for d in h.keys() if isinstance(d, date)}
+    _HOL_DE_CACHE[y] = set(out)
+    return _HOL_DE_CACHE[y]
+
+
+def _is_de_public_holiday(d: date) -> bool:
+    return d in _get_de_wide_holidays_for_year(d.year)
+
 
 # ---- whitelist ----
 
