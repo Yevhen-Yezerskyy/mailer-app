@@ -1,14 +1,6 @@
-# FILE: engine/core_sender/sender.py  (обновлено — 2026-01-30)
-# PURPOSE:
-# - Sender: один объект-оркестратор (main_guide) + много sender-процессов (по mailbox_id).
-# - Оркестратор:
-#   - строит desired_targets из активных кампаний с учётом окон
-#   - запускает недостающих sender'ов по mailbox_id
-#   - убивает "подозрительных на сдохшесть" (now > hb.next_wake_at + grace) и запускает нового
-#   - global fail-fast: если >=10 START'ов sender-процессов за 60 секунд → kill all + sleep 10 минут;
-#     если повторится после пробуждения → hard-dead (навсегда), раз в минуту печатает статус.
-# - SMTP/лимиты/кулдауны — только внутри sender() и send_one().
-# - Праздники (DE) берём из engine/common/email_template.py (там import holidays без try/except).
+# FILE: engine/core_sender/sender.py
+# DATE: 2026-01-30
+# PURPOSE: Sender orchestrator + per-mailbox sender processes; main_guide tick ~30s; desired_targets also disables campaigns with no pending contacts; per-mailbox loop uses 1 aggregate pending query (no per-campaign COUNT loops).
 
 from __future__ import annotations
 
@@ -23,7 +15,7 @@ from multiprocessing import Pipe, Process
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
-from engine.common.db import fetch_all, fetch_one
+from engine.common.db import execute, fetch_all, fetch_one
 from engine.common.email_template import _is_de_public_holiday
 from engine.common.mail.send import send_one
 
@@ -134,6 +126,60 @@ class SenderRuntime:
 
 def _now_ts() -> float:
     return time.time()
+
+
+# -------------------------
+# DB helpers
+# -------------------------
+
+
+def _pending_by_campaign(campaign_ids: List[int]) -> Dict[int, int]:
+    """
+    Returns pending active contacts per campaign:
+      pending = count(lists_contacts active) that are NOT in mailbox_sent for (campaign_id, contact_id).
+    """
+    ids = [int(x) for x in campaign_ids if int(x) > 0]
+    if not ids:
+        return {}
+    rows = fetch_all(
+        """
+        SELECT
+            c.id AS campaign_id,
+            COUNT(*) FILTER (WHERE ms.id IS NULL) AS pending
+        FROM campaigns_campaigns c
+        JOIN lists_contacts lc
+          ON lc.list_id = c.mailing_list_id
+         AND lc.active = true
+        LEFT JOIN mailbox_sent ms
+          ON ms.campaign_id = c.id
+         AND ms.rate_contact_id = lc.contact_id
+        WHERE c.id = ANY(%s)
+        GROUP BY c.id
+        """,
+        [ids],
+    )
+    out: Dict[int, int] = {}
+    for cid, pending in rows:
+        out[int(cid)] = int(pending) if pending is not None else 0
+    # campaigns with empty lists won't appear -> treat as 0
+    for cid in ids:
+        out.setdefault(int(cid), 0)
+    return out
+
+
+def _disable_campaigns(campaign_ids: List[int]) -> None:
+    ids = [int(x) for x in campaign_ids if int(x) > 0]
+    if not ids:
+        return
+    execute(
+        """
+        UPDATE campaigns_campaigns
+        SET active = false
+        WHERE id = ANY(%s)
+          AND active = true
+        """,
+        [ids],
+    )
 
 
 # -------------------------
@@ -271,7 +317,7 @@ def _sender_loop(
 
         rows = fetch_all(
             """
-            SELECT id, workspace_id, mailing_list_id, window
+            SELECT id, workspace_id, mailing_list_id, "window"
             FROM campaigns_campaigns
             WHERE mailbox_id = %s
               AND id = ANY(%s)
@@ -283,9 +329,10 @@ def _sender_loop(
         )
 
         if not rows:
-            nxt = _now_ts() + min(60.0, send_interval)
+            sl = min(60.0, send_interval)
+            nxt = _now_ts() + sl
             hb(next_wake_at=nxt, state="NO_ACTIVE_CAMPAIGNS")
-            time.sleep(min(60.0, send_interval))
+            time.sleep(sl)
             continue
 
         ws_ids = sorted({str(r[1]) for r in rows if r and r[1]})
@@ -302,33 +349,23 @@ def _sender_loop(
             for ws_id, val in wrows:
                 global_windows[str(ws_id)] = val
 
-        candidates: List[Tuple[int, int]] = []  # (campaign_id, weight)
-        for camp_id, ws_id, mailing_list_id, win in rows:
+        # pending for all these campaigns in 1 query
+        pending = _pending_by_campaign([int(r[0]) for r in rows])
+
+        candidates: List[Tuple[int, int]] = []  # (campaign_id, weight=pending)
+        for camp_id, ws_id, _mailing_list_id, win in rows:
             gw = global_windows.get(str(ws_id), {})
             if not _is_now_in_send_window(now_de, win, gw):
                 continue
-
-            r = fetch_one(
-                """
-                SELECT COUNT(*)
-                FROM lists_contacts lc
-                LEFT JOIN mailbox_sent ms
-                  ON ms.campaign_id = %s
-                 AND ms.rate_contact_id = lc.contact_id
-                WHERE lc.list_id = %s
-                  AND lc.active = true
-                  AND ms.id IS NULL
-                """,
-                [int(camp_id), int(mailing_list_id)],
-            )
-            w = int(r[0]) if r and r[0] is not None else 0
+            w = int(pending.get(int(camp_id), 0))
             if w > 0:
                 candidates.append((int(camp_id), w))
 
         if not candidates:
-            nxt = _now_ts() + min(60.0, send_interval)
+            sl = min(60.0, send_interval)
+            nxt = _now_ts() + sl
             hb(next_wake_at=nxt, state="NO_PENDING_OR_WINDOW")
-            time.sleep(min(60.0, send_interval))
+            time.sleep(sl)
             continue
 
         total = sum(w for _, w in candidates)
@@ -365,9 +402,10 @@ def _sender_loop(
         )
 
         if not row:
-            nxt = _now_ts() + min(30.0, send_interval)
+            sl = min(30.0, send_interval)
+            nxt = _now_ts() + sl
             hb(next_wake_at=nxt, state="NO_CANDIDATE", campaign_id=camp_id)
-            time.sleep(min(30.0, send_interval))
+            time.sleep(sl)
             continue
 
         list_contact_id = int(row[0])
@@ -397,50 +435,80 @@ class Sender:
         self.currently_sending: Dict[int, SenderRuntime] = {}
         self.hb: Dict[int, Heartbeat] = {}
 
-        # считаем START'ы процессов sender
         self._start_events: deque[float] = deque()
-
-        # fail-fast levels
         self._soft_failed_once: bool = False
         self._hard_dead: bool = False
 
-    def main_guide(self, *, tick_sec: float = 2.0, hb_grace_sec: float = 60.0) -> None:
+        # NEW: tick counter for readable logs
+        self._tick_n: int = 0
+
+    def main_guide(self, *, tick_sec: float = 30.0, hb_grace_sec: float = 60.0) -> None:
         while True:
+            self._tick_n += 1
+            tick_started = _now_ts()
+
             if self._hard_dead:
-                print("[SENDER] HARD-DEAD: мы сдохли навсегда")
+                print(f"[SENDER] TICK#{self._tick_n} HARD-DEAD (sleep 60s)")
                 time.sleep(60)
                 continue
+
+            print(f"[SENDER] TICK#{self._tick_n} build_desired_targets...")
 
             try:
                 desired_targets = self._build_desired_targets()
                 self.targets = desired_targets
             except Exception as e:
-                print(f"[SENDER] desired_targets error: {type(e).__name__}: {e}")
+                print(f"[SENDER] TICK#{self._tick_n} desired_targets error: {type(e).__name__}: {e}")
                 time.sleep(5)
                 continue
 
             desired_mailboxes = set(desired_targets.keys())
 
+            # Print summary of what we decided to run
+            total_campaigns = sum(len(v) for v in desired_targets.values())
+            print(
+                f"[SENDER] TICK#{self._tick_n} desired_mailboxes={len(desired_mailboxes)} "
+                f"campaigns_total={total_campaigns}"
+            )
+            if desired_targets:
+                for mid in sorted(desired_targets.keys()):
+                    cids = desired_targets.get(mid, [])
+                    # keep line short: show first 12 ids
+                    head = ",".join(str(x) for x in cids[:12])
+                    tail = "" if len(cids) <= 12 else f",...(+{len(cids)-12})"
+                    print(f"[SENDER]   mailbox_id={mid} campaigns=[{head}{tail}]")
+
+            # Heartbeats
             self._poll_heartbeats()
 
             now = _now_ts()
 
             # kill suspicious on stale (based on sender-provided next_wake_at)
+            stale_killed = 0
             for mid in list(self.currently_sending.keys()):
                 hb = self.hb.get(mid)
                 if not hb:
                     continue
                 if now > hb.next_wake_at + float(hb_grace_sec):
+                    stale_killed += 1
                     print(
-                        f"[SENDER] STALE mailbox_id={mid} state={hb.state} next_wake_at={hb.next_wake_at:.0f} → terminate"
+                        f"[SENDER] TICK#{self._tick_n} STALE mailbox_id={mid} "
+                        f"state={hb.state} next_wake_at={hb.next_wake_at:.0f} "
+                        f"(now={now:.0f}) → terminate"
                     )
                     self._terminate_runtime(mid, reason="stale_kill")
 
             # ensure running: start missing / dead (only if needed now)
+            started = 0
             for mid in sorted(desired_mailboxes):
                 rt = self.currently_sending.get(mid)
                 if rt and rt.proc.is_alive():
                     continue
+                started += 1
+                print(
+                    f"[SENDER] TICK#{self._tick_n} START_NEEDED mailbox_id={mid} "
+                    f"campaigns={len(self.targets.get(mid, []))}"
+                )
                 self._start_sender(mid, self.targets.get(mid, []))
 
             # global fail-fast by START rate
@@ -458,14 +526,20 @@ class Sender:
                     self._hard_dead = True
                     continue
 
+            tick_took = _now_ts() - tick_started
+            print(
+                f"[SENDER] TICK#{self._tick_n} done: started={started} stale_killed={stale_killed} "
+                f"took={tick_took:.2f}s sleep={float(tick_sec):.0f}s"
+            )
             time.sleep(float(tick_sec))
 
+            
     def _build_desired_targets(self) -> Dict[int, List[int]]:
         now_de = datetime.now(tz=ZoneInfo("UTC")).astimezone(_TZ_BERLIN)
 
         rows = fetch_all(
             """
-            SELECT id, mailbox_id, workspace_id, window
+            SELECT id, mailbox_id, workspace_id, mailing_list_id, "window"
             FROM campaigns_campaigns
             WHERE active = true
               AND start_at <= now()
@@ -475,6 +549,14 @@ class Sender:
         )
         if not rows:
             return {}
+
+        camp_ids = [int(r[0]) for r in rows if r and r[0] is not None]
+        pending = _pending_by_campaign(camp_ids)
+
+        # выключаем кампании без неотправленных (active contacts minus mailbox_sent)
+        to_disable = [cid for cid, cnt in pending.items() if int(cnt) <= 0]
+        if to_disable:
+            _disable_campaigns(to_disable)
 
         ws_ids = sorted({str(r[2]) for r in rows if r and r[2]})
         global_windows: Dict[str, object] = {}
@@ -491,12 +573,17 @@ class Sender:
                 global_windows[str(ws_id)] = val
 
         out: Dict[int, List[int]] = {}
-        for camp_id, mailbox_id, ws_id, win in rows:
+        for camp_id, mailbox_id, ws_id, _mailing_list_id, win in rows:
+            cid = int(camp_id)
+            if int(pending.get(cid, 0)) <= 0:
+                continue
+
             gw = global_windows.get(str(ws_id), {})
             if not _is_now_in_send_window(now_de, win, gw):
                 continue
+
             mid = int(mailbox_id)
-            out.setdefault(mid, []).append(int(camp_id))
+            out.setdefault(mid, []).append(cid)
 
         return out
 
@@ -624,7 +711,7 @@ class Sender:
 
 
 def main() -> None:
-    Sender().main_guide(tick_sec=2.0, hb_grace_sec=60.0)
+    Sender().main_guide(tick_sec=30.0, hb_grace_sec=60.0)
 
 
 if __name__ == "__main__":

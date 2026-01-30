@@ -148,7 +148,8 @@ class SMTPConn:
             else self.from_email
         )
         msg["From"] = from_value
-        msg["To"] = to_email
+        #msg["To"] = to_email
+        msg["To"] = "yevhen.yezerskyy@gmail.com"
         msg["Subject"] = subject
         msg["X-Mailer-App"] = "Serenity Mailer"
 
