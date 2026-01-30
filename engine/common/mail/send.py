@@ -1,15 +1,16 @@
 # FILE: engine/common/mail/send.py
+# PATH: engine/common/mail/send.py
 # DATE: 2026-01-30
-# PURPOSE:
-# - Публичный API: apply_vars / unapply_vars используется в template-editor (preview).
-# - send_one(campaign_id, list_contact_id): отправка одного письма.
-# - list_contact_id = lists_contacts.id (физическая строка списка).
-# - mailbox_sent пишется ТОЛЬКО на SMTP 2xx или терминальные 5xx.
-# - Никакой “магии”, минимум абстракций, прямые raise.
+# SUMMARY:
+# - list_contact_id = lists_contacts.id
+# - lists_contacts.rate_contact_id = rate_contacts.id (FK)
+# - mailbox_sent.rate_contact_id хранит rate_contacts.id (а НЕ raw_contacts_aggr.id)
+# - VarsContext(rate_contact_id) трактуется как rate_contacts.id (правильно)
 
 from __future__ import annotations
 
 import html as _html
+import json  # <-- ДОБАВЬ ВВЕРХУ ФАЙЛА
 import random
 import re
 import textwrap
@@ -24,11 +25,9 @@ from engine.common import db
 from engine.common.mail.logs import log_mail_event
 from engine.common.mail.smtp import SMTPConn
 
-
 # ============================================================
 # const / regex
 # ============================================================
-
 _TZ = ZoneInfo("Europe/Berlin")
 
 _RE_VAR = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
@@ -47,11 +46,9 @@ _RE_A_TAG = re.compile(
 )
 _RE_WS = re.compile(r"[ \t]+")
 
-
 # ============================================================
 # defaults (ONLY for UI preview when rate_contact_id is None)
 # ============================================================
-
 DEFAULT_VARS: Dict[str, str] = {
     "company_name": "Unternehmen Adressat GmbH",
     "company_address": "Adressatenstraße 12, 40213 Düsseldorf, Nordrhein-Westfalen",
@@ -71,9 +68,9 @@ DEFAULT_VARS: Dict[str, str] = {
 # ============================================================
 # VarsContext (shared for UI + send)
 # ============================================================
-
 @dataclass
 class VarsContext:
+    # rate_contact_id == rate_contacts.id
     rate_contact_id: Optional[int]
     utm_value: Optional[str]
 
@@ -91,16 +88,17 @@ class VarsContext:
         row = db.fetch_one(
             """
             SELECT
-                rc.task_id,
-                rc.contact_id,
-                rc.rate_cb,
-                ag.company_name,
-                ag.email,
-                ag.address_list,
-                ag.plz_list,
-                ag.cb_crawler_ids
-            FROM rate_contacts rc
-            JOIN raw_contacts_aggr ag ON ag.id = rc.contact_id
+              rc.task_id,
+              rc.contact_id,
+              rc.rate_cb,
+              ag.company_name,
+              ag.email,
+              ag.address_list,
+              ag.plz_list,
+              ag.cb_crawler_ids
+            FROM public.rate_contacts rc
+            JOIN public.raw_contacts_aggr ag
+              ON ag.id = rc.contact_id
             WHERE rc.id = %s
             LIMIT 1
             """,
@@ -116,11 +114,10 @@ class VarsContext:
         if not cb_ids:
             raise RuntimeError("CB_IDS_EMPTY")
 
-        # choose cb
         cb_rows = db.fetch_all(
             """
             SELECT id, city_id, branch_id, plz
-            FROM cb_crawler
+            FROM public.cb_crawler
             WHERE id = ANY(%s)
             """,
             [cb_ids],
@@ -129,10 +126,11 @@ class VarsContext:
             raise RuntimeError("CB_ROWS_EMPTY")
 
         city_rate = {
-            vid: r for vid, r in db.fetch_all(
+            int(vid): int(r)
+            for vid, r in db.fetch_all(
                 """
                 SELECT value_id::int, MIN(rate)::int
-                FROM crawl_tasks
+                FROM public.crawl_tasks
                 WHERE task_id=%s AND type='city'
                 GROUP BY value_id
                 """,
@@ -140,10 +138,11 @@ class VarsContext:
             )
         }
         branch_rate = {
-            vid: r for vid, r in db.fetch_all(
+            int(vid): int(r)
+            for vid, r in db.fetch_all(
                 """
                 SELECT value_id::int, MIN(rate)::int
-                FROM crawl_tasks
+                FROM public.crawl_tasks
                 WHERE task_id=%s AND type='branch'
                 GROUP BY value_id
                 """,
@@ -151,42 +150,43 @@ class VarsContext:
             )
         }
 
-        best: Optional[Tuple[int, int]] = None
-        for cb_id, city_id, branch_id, _ in cb_rows:
+        best: Optional[Tuple[int, int]] = None  # (score, cb_id)
+        for cb_id, city_id, branch_id, _plz in cb_rows:
+            city_id = int(city_id)
+            branch_id = int(branch_id)
             if city_id not in city_rate or branch_id not in branch_rate:
                 continue
-            score = city_rate[city_id] * branch_rate[branch_id]
-            if rate_cb is not None and score == rate_cb:
-                best = (score, cb_id)
+            score = int(city_rate[city_id]) * int(branch_rate[branch_id])
+            if rate_cb is not None and int(score) == int(rate_cb):
+                best = (score, int(cb_id))
                 break
             if best is None or score < best[0]:
-                best = (score, cb_id)
+                best = (score, int(cb_id))
 
         if not best:
             raise RuntimeError("CHOSEN_CB_NOT_FOUND")
 
-        chosen_cb_id = best[1]
+        chosen_cb_id = int(best[1])
 
         row = db.fetch_one(
-            "SELECT city_id, branch_id, plz FROM cb_crawler WHERE id=%s LIMIT 1",
+            "SELECT city_id, branch_id, plz FROM public.cb_crawler WHERE id=%s LIMIT 1",
             [chosen_cb_id],
         )
         if not row:
             raise RuntimeError("CB_ROW_MISSING")
-
         city_id, branch_id, cb_plz = row
 
         row = db.fetch_one(
-            "SELECT name, state_name FROM cities_sys WHERE id=%s LIMIT 1",
-            [city_id],
+            "SELECT name, state_name FROM public.cities_sys WHERE id=%s LIMIT 1",
+            [int(city_id)],
         )
         if not row:
             raise RuntimeError("CITY_NOT_FOUND")
         city, land = row
 
         row = db.fetch_one(
-            "SELECT name FROM gb_branches WHERE id=%s LIMIT 1",
-            [branch_id],
+            "SELECT name FROM public.gb_branches WHERE id=%s LIMIT 1",
+            [int(branch_id)],
         )
         if not row:
             raise RuntimeError("BRANCH_NOT_FOUND")
@@ -207,13 +207,13 @@ class VarsContext:
         d0 = now.date()
 
         return {
-            "company_name": company_name,
-            "company_email": company_email,
-            "city": city,
-            "land": land,
-            "city_land": f"{city}, {land}",
-            "branch": branch,
-            "company_address": f"{addr}, {cb_plz} {city}, {land}",
+            "company_name": (company_name or "").strip(),
+            "company_email": (company_email or "").strip(),
+            "city": (city or "").strip(),
+            "land": (land or "").strip(),
+            "city_land": f"{(city or '').strip()}, {(land or '').strip()}",
+            "branch": (branch or "").strip(),
+            "company_address": f"{(addr or '').strip()}, {cb_plz} {(city or '').strip()}, {(land or '').strip()}",
             "date_time": now.strftime("%H:%M %d.%m.%Y"),
             "date": now.strftime("%d.%m.%Y"),
             "date_plus_1m": (d0 + relativedelta(months=+1)).strftime("%d.%m.%Y"),
@@ -225,7 +225,6 @@ class VarsContext:
 # ============================================================
 # public API (USED BY TEMPLATE-EDITOR)
 # ============================================================
-
 def apply_vars(html: str, rate_contact_id: Optional[int] = None, *, utm_value: Optional[str] = None) -> str:
     s = str(html or "")
     vars_map = VarsContext(rate_contact_id, utm_value).build()
@@ -239,29 +238,24 @@ def apply_vars(html: str, rate_contact_id: Optional[int] = None, *, utm_value: O
 
 def unapply_vars(html: str, vars_map: Dict[str, str]) -> str:
     s = str(html or "")
-
     items = [(k, v) for k, v in (vars_map or {}).items() if k and v]
     items.sort(key=lambda x: len(str(x[1])), reverse=True)
-
     for k, v in items:
         s = re.sub(re.escape(str(v)), f"{{{{ {k} }}}}", s)
-
     return s
 
 
 # ============================================================
 # send_one
 # ============================================================
-
 def send_one(campaign_id: int, list_contact_id: int) -> None:
     now = datetime.now(tz=_TZ)
 
-    # campaign + letter
     row = db.fetch_one(
         """
         SELECT c.mailbox_id, l.ready_content, l.subjects, l.headers
-        FROM campaigns_campaigns c
-        JOIN campaigns_letters  l ON l.campaign_id = c.id
+        FROM public.campaigns_campaigns c
+        JOIN public.campaigns_letters l ON l.campaign_id = c.id
         WHERE c.id = %s
         LIMIT 1
         """,
@@ -277,21 +271,23 @@ def send_one(campaign_id: int, list_contact_id: int) -> None:
     if not html_tpl:
         raise RuntimeError("READY_CONTENT_EMPTY")
 
-    # list_contact -> contact_id
     row = db.fetch_one(
-        "SELECT contact_id FROM lists_contacts WHERE id=%s AND active=true LIMIT 1",
+        """
+        SELECT rate_contact_id
+        FROM public.lists_contacts
+        WHERE id=%s AND active=true
+        LIMIT 1
+        """,
         [int(list_contact_id)],
     )
     if not row:
         raise RuntimeError("LIST_CONTACT_NOT_FOUND_OR_INACTIVE")
-
     rate_contact_id = int(row[0])
 
-    # gate
     rows = db.fetch_all(
         """
         SELECT action, status, created_at
-        FROM mailbox_events
+        FROM public.mailbox_events
         WHERE mailbox_id=%s
           AND action IN ('SMTP_AUTH_CHECK','SMTP_SEND_CHECK')
         ORDER BY created_at DESC
@@ -322,7 +318,6 @@ def send_one(campaign_id: int, list_contact_id: int) -> None:
     if blocked("SMTP_SEND_CHECK", "FAIL", timedelta(minutes=5), timedelta(minutes=60)):
         return
 
-    # reserve smrel
     r = db.fetch_one("SELECT nextval('mailbox_sent_id_seq')", [])
     if not r or r[0] is None:
         raise RuntimeError("MAILBOX_SENT_NEXTVAL_FAILED")
@@ -330,8 +325,7 @@ def send_one(campaign_id: int, list_contact_id: int) -> None:
     utm = f"smrel={smrel_id}"
 
     vars_map = VarsContext(rate_contact_id, utm).build()
-
-    to_email = vars_map.get("company_email", "").strip()
+    to_email = (vars_map.get("company_email") or "").strip()
     if not to_email:
         raise RuntimeError("TO_EMAIL_EMPTY")
 
@@ -346,11 +340,11 @@ def send_one(campaign_id: int, list_contact_id: int) -> None:
                 return m.group(0)
             sep = "&" if "?" in url else "?"
             return f"{m.group(1)}{m.group(2)}{url}{sep}{utm}{m.group(2)}"
+
         return _RE_A_HREF.sub(rep, s)
 
     html2 = add_smrel(html1)
 
-    # text/plain
     def html_to_text(s: str) -> str:
         def a_rep(m: re.Match) -> str:
             inner = _RE_TAG.sub("", m.group(3) or "")
@@ -388,38 +382,37 @@ def send_one(campaign_id: int, list_contact_id: int) -> None:
     )
 
     if ok:
+        payload = {
+            "mailbox_id": mailbox_id,
+            "to": to_email,
+            "subject": subj,
+            "utm": utm,
+            "smtp_trace": smtp.trace,
+        }
         db.execute(
             """
-            INSERT INTO mailbox_sent (
-                id, campaign_id, list_contact_id, rate_contact_id,
-                processed, status, data, processed_at
+            INSERT INTO public.mailbox_sent (
+              id, campaign_id, list_contact_id, rate_contact_id,
+              processed, status, data, processed_at
             )
-            VALUES (%s,%s,%s,%s,true,'SEND',%s,now())
+            VALUES (%s,%s,%s,%s,true,'SEND',%s::jsonb,now())
             """,
             (
                 smrel_id,
-                campaign_id,
-                list_contact_id,
-                rate_contact_id,
-                {
-                    "mailbox_id": mailbox_id,
-                    "to": to_email,
-                    "subject": subj,
-                    "utm": utm,
-                    "smtp_trace": smtp.trace,
-                },
+                int(campaign_id),
+                int(list_contact_id),
+                int(rate_contact_id),
+                json.dumps(payload, ensure_ascii=False),
             ),
         )
         return
 
-    # failure classify
     trace = smtp.trace or []
     last = next((r for r in reversed(trace) if r.get("action") == "SEND"), None)
-
     if last and isinstance(last.get("data"), dict):
         refused = last["data"].get("refused")
         if isinstance(refused, dict):
-            rr = refused.get(to_email) or next(iter(refused.values()), {})
+            rr = refused.get(to_email) or next(iter(refused.values()), {}) or {}
             code = rr.get("code")
             if code:
                 code = int(code)
@@ -433,28 +426,29 @@ def send_one(campaign_id: int, list_contact_id: int) -> None:
                     return
                 if 500 <= code <= 599:
                     status = "BAD_ADDRESS" if code in (550, 551, 553) else "REPUTATION" if code == 554 else "OTHER"
+                    payload = {
+                        "mailbox_id": mailbox_id,
+                        "to": to_email,
+                        "subject": subj,
+                        "utm": utm,
+                        "smtp_trace": trace,
+                        "smtp_code": code,
+                    }
                     db.execute(
                         """
-                        INSERT INTO mailbox_sent (
-                            id, campaign_id, list_contact_id, rate_contact_id,
-                            processed, status, data, processed_at
+                        INSERT INTO public.mailbox_sent (
+                          id, campaign_id, list_contact_id, rate_contact_id,
+                          processed, status, data, processed_at
                         )
-                        VALUES (%s,%s,%s,%s,true,%s,%s,now())
+                        VALUES (%s,%s,%s,%s,true,%s,%s::jsonb,now())
                         """,
                         (
                             smrel_id,
-                            campaign_id,
-                            list_contact_id,
-                            rate_contact_id,
+                            int(campaign_id),
+                            int(list_contact_id),
+                            int(rate_contact_id),
                             status,
-                            {
-                                "mailbox_id": mailbox_id,
-                                "to": to_email,
-                                "subject": subj,
-                                "utm": utm,
-                                "smtp_trace": trace,
-                                "smtp_code": code,
-                            },
+                            json.dumps(payload, ensure_ascii=False),
                         ),
                     )
                     return
