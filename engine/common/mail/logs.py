@@ -114,7 +114,7 @@ MAILBOX_SENT_STATUSES: tuple[str, ...] = (
 def log_mailbox_sent(
     *,
     campaign_id: int,
-    list_id: int,
+    list_contact_id: int,
     rate_contact_id: int,
     status: str,
     payload_json: Dict[str, Any],
@@ -137,7 +137,7 @@ def log_mailbox_sent(
         """
         INSERT INTO mailbox_sent (
             campaign_id,
-            list_id,
+            list_contact_id,
             rate_contact_id,
             processed,
             status,
@@ -148,7 +148,7 @@ def log_mailbox_sent(
         """,
         (
             int(campaign_id),
-            int(list_id),
+            int(list_contact_id),
             int(rate_contact_id),
             status,
             Json(payload_json),
