@@ -5,7 +5,7 @@
 # - Parse smrel.log from mounted volume
 # - Batch insert into mailbox_stats(letter_id, time)
 # - Append-only processing with file offset
-# - Prints progress
+# - Run via engine.common.worker.Worker (run_forever)
 
 from __future__ import annotations
 
@@ -15,10 +15,8 @@ from datetime import datetime
 from engine.common.db import execute
 from engine.common.worker import Worker
 
-
 LOG_PATH = "/var/www/serenity-stat/smrel.log"
 OFFSET_PATH = "/var/www/serenity-stat/.smrel.offset"
-
 BATCH_SIZE = 500
 
 
@@ -49,7 +47,7 @@ def _parse_line(line: str):
         return None
 
 
-def _flush_batch(batch):
+def _flush_batch(batch) -> int:
     if not batch:
         return 0
 
@@ -110,17 +108,22 @@ def process_once() -> int:
     return processed
 
 
-class StatProcessorWorker(Worker):
-    name = "stat_processor"
-    interval = 10  # seconds
-
-    def tick(self):
-        process_once()
-
-
-def main():
+def main() -> None:
     print("[STAT] worker started")
-    StatProcessorWorker().run()
+
+    w = Worker(name="stat_processor", tick_sec=0.5)
+
+    w.register(
+        "process_smrel_log",
+        process_once,
+        every_sec=10,
+        timeout_sec=60,
+        singleton=True,
+        heavy=False,
+        priority=50,
+    )
+
+    w.run_forever()
 
 
 if __name__ == "__main__":
