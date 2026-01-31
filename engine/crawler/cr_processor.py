@@ -14,7 +14,7 @@ def main() -> None:
     w = Worker(
         name="crawl_cr_processor",
         tick_sec=2,
-        max_parallel=5,
+        max_parallel=8,
     )
 
     w.register(
