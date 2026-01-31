@@ -1,11 +1,10 @@
 # FILE: web/panel/aap_campaigns/views/campaigns.py
 # PATH: web/panel/aap_campaigns/views/campaigns.py
-# DATE: 2026-01-30
-# PURPOSE: Campaigns page.
-# CHANGE:
-# - reuse send-window helpers from engine.core_sender.sender (no local duplicates)
-# - add per-campaign stats: total / sent / left (left = total - sent, sent = all mailbox_sent rows)
-# - add POST action send_test: pick 10 random active list_contacts from campaign list, choose 1, send_one(..., to_email_override=..., record_sent=False)
+# DATE: 2026-01-31
+# SUMMARY (new):
+# - stats in bottom table: total/sent/left for each campaign (total=active lists_contacts; sent=all mailbox_sent rows; left=max(0,total-sent))
+# - POST action send_test: only when letter exists; pick 10 random active list_contacts from campaign list, pick 1, call send_one(..., to_email_override=..., record_sent=False)
+# - do NOT touch existing window logic/helpers (kept local); reuse shared _is_de_public_holiday() helper
 
 from __future__ import annotations
 
@@ -25,7 +24,6 @@ from django.utils.translation import gettext as _
 
 from engine.common.email_template import _is_de_public_holiday, render_html, sanitize
 from engine.common.mail.send import send_one
-from engine.core_sender.sender import _is_now_in_send_window  # NOTE: single source of truth (UI==sender)
 from mailer_web.access import decode_id, encode_id, resolve_pk_or_redirect
 from panel.aap_campaigns.models import Campaign, Letter, Templates
 from panel.aap_campaigns.template_editor import (
@@ -146,12 +144,90 @@ def _now_berlin() -> datetime:
     return dt.astimezone(_TZ_BERLIN)
 
 
+# -------- Window evaluation (KEEP LOCAL; UI logic) --------
+
+
+def _parse_hhmm_to_minutes(s: str) -> Optional[int]:
+    try:
+        s = (s or "").strip()
+        if not s or ":" not in s:
+            return None
+        h, m = s.split(":", 1)
+        hh = int(h)
+        mm = int(m)
+        if hh < 0 or hh > 23 or mm < 0 or mm > 59:
+            return None
+        return hh * 60 + mm
+    except Exception:
+        return None
+
+
+def _window_is_nonempty(win: object) -> bool:
+    if not isinstance(win, dict):
+        return False
+    for v in win.values():
+        if isinstance(v, list) and len(v) > 0:
+            return True
+    return False
+
+
+def _iter_slots(slots_obj: Any) -> Iterable[Tuple[str, str]]:
+    """
+    Accept formats:
+      A) [{"from":"09:00","to":"12:00"}, ...]   (JS current)
+      B) [["09:00","12:00"], ...] or [("09:00","12:00"), ...]
+    """
+    if not isinstance(slots_obj, list):
+        return []
+    out: list[Tuple[str, str]] = []
+    for it in slots_obj:
+        if isinstance(it, dict):
+            a = str(it.get("from") or "").strip()
+            b = str(it.get("to") or "").strip()
+            if a and b:
+                out.append((a, b))
+            continue
+        if isinstance(it, (list, tuple)) and len(it) == 2:
+            a = str(it[0] or "").strip()
+            b = str(it[1] or "").strip()
+            if a and b:
+                out.append((a, b))
+    return out
+
+
+def _is_now_in_send_window(now_de: datetime, camp_window: object, global_window: object) -> bool:
+    win = camp_window if _window_is_nonempty(camp_window) else (global_window if isinstance(global_window, dict) else {})
+    if not isinstance(win, dict):
+        return False
+
+    today = now_de.date()
+    if _is_de_public_holiday(today):
+        key = "hol"
+    else:
+        wd = now_de.weekday()  # mon=0..sun=6
+        key = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")[wd]
+
+    cur = now_de.hour * 60 + now_de.minute
+
+    for a_str, b_str in _iter_slots(win.get(key, [])):
+        a = _parse_hhmm_to_minutes(a_str)
+        b = _parse_hhmm_to_minutes(b_str)
+        if a is None or b is None:
+            continue
+        if b <= a:
+            continue
+        if a <= cur < b:
+            return True
+
+    return False
+
+
+# -------- Stats (total/sent/left) --------
+
+
 def _stats_by_campaign_ids(campaign_ids: list[int]) -> dict[int, tuple[int, int, int]]:
     """
-    Returns {campaign_id: (total, sent, left)} where:
-      total = COUNT(DISTINCT lists_contacts.id) for c.mailing_list_id with active=true
-      sent  = COUNT(DISTINCT mailbox_sent.id) for campaign_id
-      left  = max(0, total - sent)
+    {campaign_id: (total, sent, left)}
     """
     ids = [int(x) for x in (campaign_ids or []) if int(x) > 0]
     if not ids:
@@ -159,30 +235,48 @@ def _stats_by_campaign_ids(campaign_ids: list[int]) -> dict[int, tuple[int, int,
 
     out: dict[int, tuple[int, int, int]] = {cid: (0, 0, 0) for cid in ids}
 
-    sql = """
+    # --- total: active contacts per campaign list ---
+    sql_total = """
     SELECT
-      c.id AS campaign_id,
-      COUNT(DISTINCT lc.id) AS total_cnt,
-      COUNT(DISTINCT ms.id) AS sent_cnt
+        c.id AS campaign_id,
+        COUNT(lc.id) AS total_cnt
     FROM public.campaigns_campaigns c
-    LEFT JOIN public.lists_contacts lc
+    JOIN public.lists_contacts lc
       ON lc.list_id = c.mailing_list_id
      AND lc.active = true
-    LEFT JOIN public.mailbox_sent ms
-      ON ms.campaign_id = c.id
     WHERE c.id = ANY(%s)
     GROUP BY c.id
     """
+
+    # --- sent: mailbox_sent rows per campaign ---
+    sql_sent = """
+    SELECT
+        campaign_id,
+        COUNT(id) AS sent_cnt
+    FROM public.mailbox_sent
+    WHERE campaign_id = ANY(%s)
+    GROUP BY campaign_id
+    """
+
+    totals: dict[int, int] = {}
+    sents: dict[int, int] = {}
+
     with connection.cursor() as cur:
-        cur.execute(sql, [ids])
-        for camp_id, total_cnt, sent_cnt in cur.fetchall():
-            cid = int(camp_id)
-            total = int(total_cnt or 0)
-            sent = int(sent_cnt or 0)
-            left = total - sent
-            if left < 0:
-                left = 0
-            out[cid] = (total, sent, left)
+        cur.execute(sql_total, [ids])
+        for cid, total_cnt in cur.fetchall():
+            totals[int(cid)] = int(total_cnt or 0)
+
+        cur.execute(sql_sent, [ids])
+        for cid, sent_cnt in cur.fetchall():
+            sents[int(cid)] = int(sent_cnt or 0)
+
+    for cid in ids:
+        total = totals.get(cid, 0)
+        sent = sents.get(cid, 0)
+        left = total - sent
+        if left < 0:
+            left = 0
+        out[cid] = (total, sent, left)
 
     return out
 
@@ -226,12 +320,12 @@ def _ctx_build(
     letter_init_subjects: str,
     letter_init_headers: str,
     letter_template_html: str,
-    letter_ready_html: str,
     deleted_tpl_ui,
     deleted_tpl_id,
     *,
     form_error_msg: str = "",
     form_error_field: str = "",
+    test_msg: str = "",
 ):
     items = _with_ui_ids(_qs(ws_id))
 
@@ -266,11 +360,16 @@ def _ctx_build(
     if edit_obj and isinstance(edit_obj.window, dict):
         edit_window_json_str = json.dumps(edit_obj.window or {}, ensure_ascii=False)
 
+    # IMPORTANT: тестовая отправка доступна только когда письмо реально есть (Letter существует)
+    has_letter = bool(letter_obj and getattr(letter_obj, "id", None))
+
     return {
         "items": items,
         "state": state,
         "edit_obj": edit_obj,
         "letter_obj": letter_obj,
+        "has_letter": has_letter,
+        "test_msg": test_msg,
         "list_items": list_items,
         "mb_items": mb_items,
         "tpl_items": tpl_items,
@@ -285,7 +384,6 @@ def _ctx_build(
         "letter_init_subjects": letter_init_subjects,
         "letter_init_headers": letter_init_headers,
         "letter_template_html": letter_template_html,
-        "letter_ready_html": letter_ready_html,
         # form errors
         "form_error_msg": form_error_msg,
         "form_error_field": form_error_field,
@@ -364,9 +462,10 @@ def campaigns_view(request):
     letter_init_subjects = "[]"
     letter_init_headers = "{}"
     letter_template_html = ""
-    letter_ready_html = ""
+    test_msg = ""
 
     if state == "letter" and edit_obj:
+        # IMPORTANT: letter may not exist yet -> create for editor screen
         letter_obj = _ensure_letter(ws_id, edit_obj)
         letter_obj.ui_id = encode_id(int(letter_obj.id))
 
@@ -393,9 +492,6 @@ def campaigns_view(request):
         except Exception:
             letter_init_headers = "{}"
 
-        # ready HTML (readonly preview block)
-        letter_ready_html = (getattr(letter_obj, "ready_content", "") or "").strip()
-
     # ---------------- POST ----------------
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -418,11 +514,56 @@ def campaigns_view(request):
             if not camp:
                 return redirect(request.get_full_path())
 
+            # ONLY if letter exists (otherwise "CAMPAIGN_OR_LETTER_NOT_FOUND")
+            has_letter = Letter.objects.filter(workspace_id=ws_id, campaign_id=int(camp.id)).exists()
+            if not has_letter:
+                test_msg = _("Письмо ещё не создано — сначала откройте редактор письма и сохраните.")
+                ctx = _ctx_build(
+                    ws_id,
+                    "letter",
+                    edit_obj,
+                    list_items,
+                    mb_items,
+                    tpl_items,
+                    parent_items,
+                    global_window_json,
+                    letter_obj,
+                    letter_init_html,
+                    letter_init_css,
+                    letter_init_subjects,
+                    letter_init_headers,
+                    letter_template_html,
+                    deleted_tpl_ui,
+                    deleted_tpl_id,
+                    test_msg=test_msg,
+                )
+                return render(request, "panels/aap_campaigns/campaigns.html", ctx)
+
             list_contact_id = _pick_test_list_contact_id(int(camp.mailing_list_id))
             if not list_contact_id:
-                return redirect(request.get_full_path())
+                test_msg = _("В списке рассылки нет активных контактов для теста.")
+                ctx = _ctx_build(
+                    ws_id,
+                    "letter",
+                    edit_obj,
+                    list_items,
+                    mb_items,
+                    tpl_items,
+                    parent_items,
+                    global_window_json,
+                    letter_obj,
+                    letter_init_html,
+                    letter_init_css,
+                    letter_init_subjects,
+                    letter_init_headers,
+                    letter_template_html,
+                    deleted_tpl_ui,
+                    deleted_tpl_id,
+                    test_msg=test_msg,
+                )
+                return render(request, "panels/aap_campaigns/campaigns.html", ctx)
 
-            # NOTE: send_one prepares HTML itself; we override recipient; record_sent=False to not consume contact
+            # NOTE: send_one готовит HTML сам; override получателя; record_sent=False чтобы НЕ "съедать" контакт
             send_one(int(camp.id), int(list_contact_id), to_email_override=test_email, record_sent=False)
 
             return redirect(f"{request.path}?state=letter&id={encode_id(int(camp.id))}")
@@ -483,7 +624,6 @@ def campaigns_view(request):
                     letter_init_subjects,
                     letter_init_headers,
                     letter_template_html,
-                    letter_ready_html,
                     deleted_tpl_ui,
                     deleted_tpl_id,
                     form_error_msg=_("Пожалуйста, заполните все обязательные поля"),
@@ -511,7 +651,6 @@ def campaigns_view(request):
                     letter_init_subjects,
                     letter_init_headers,
                     letter_template_html,
-                    letter_ready_html,
                     deleted_tpl_ui,
                     deleted_tpl_id,
                     form_error_msg=_("Некорректные значения формы"),
@@ -536,7 +675,6 @@ def campaigns_view(request):
                     letter_init_subjects,
                     letter_init_headers,
                     letter_template_html,
-                    letter_ready_html,
                     deleted_tpl_ui,
                     deleted_tpl_id,
                     form_error_msg=_("Этот список рассылки уже используется в другой кампании"),
@@ -678,7 +816,6 @@ def campaigns_view(request):
         letter_init_subjects,
         letter_init_headers,
         letter_template_html,
-        letter_ready_html,
         deleted_tpl_ui,
         deleted_tpl_id,
     )

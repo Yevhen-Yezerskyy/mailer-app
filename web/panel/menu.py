@@ -22,7 +22,7 @@ PANEL_MENU = [
     },
     {
         # AUDIENCE
-        "title": _("Аудитории"),
+        "title": _("Управление аудиториями"),
         "open_prefixes": ["/panel/audience/"],
         "items": [
             {
@@ -39,7 +39,7 @@ PANEL_MENU = [
             },
             {
                 "title": _("Сбор контактов / Рейтинг"),
-                "page_title": _("Аудитория : Собранные компании"),
+                "page_title": _("Аудитории : Сбор контактов"),
                 "url_name": "audience:status",
                 "active_prefixes": ["/panel/audience/status/"],
             },
@@ -47,17 +47,17 @@ PANEL_MENU = [
     },
     {
         # CONTACTS / LISTS
-        "title": _("Контакты"),
+        "title": _("Списки рассылок"),
         "open_prefixes": ["/panel/lists/"],
         "items": [
             {
-                "title": _("Списки рассылок"),
+                "title": _("Управление списками"),
                 "page_title": _("Контакты : Списки рассылок"),
                 "url_name": "lists:lists",
                 "active_prefixes": ["/panel/lists/lists/"],
             },
             {
-                "title": _("Все контакты"),
+                "title": _("Все контакты списков"),
                 "page_title": _("Контакты : Все контакты"),
                 "url_name": "lists:contacts",
                 "active_prefixes": ["/panel/lists/contacts/"],
@@ -66,12 +66,12 @@ PANEL_MENU = [
     },
     {
         # CAMPAIGNS
-        "title": _("Кампании"),
+        "title": _("Кампании и рассылки"),
         "open_prefixes": ["/panel/campaigns/"],
         "items": [
             {
-                "title": _("Кампании"),
-                "page_title": _("Кампании"),
+                "title": _("Кампании / письма"),
+                "page_title": _("Кампании : рассылки и письма"),
                 "url_name": "campaigns:campaigns",
                 "active_prefixes": ["/panel/campaigns/campaigns/"],
             },
@@ -89,8 +89,8 @@ PANEL_MENU = [
         "open_prefixes": ["/panel/settings/"],
         "items": [
             {
-                "title": _("Отправка писем"),
-                "page_title": _("Настройки : Отправка писем"),
+                "title": _("'Окна' отправки"),
+                "page_title": _("Настройки : 'Окна' отправки"),
                 "url_name": "settings:sending",
                 "active_prefixes": ["/panel/settings/sending/"],
             },

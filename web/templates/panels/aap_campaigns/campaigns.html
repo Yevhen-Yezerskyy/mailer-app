@@ -347,6 +347,8 @@
             </div>
           </form>
           </div>
+          
+{% if has_letter %}          
 <div class="YY-CARD_WHITE  mt-10">
   <form method="post" class="grid grid-cols-1 gap-2">
     {% csrf_token %}
@@ -360,6 +362,7 @@
     </button>
   </form>
 </div>
+{% endif %}
 
 
         </td>

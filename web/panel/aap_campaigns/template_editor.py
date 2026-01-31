@@ -1,9 +1,10 @@
 # FILE: web/panel/aap_campaigns/template_editor.py
-# DATE: 2026-01-29
+# PATH: web/panel/aap_campaigns/template_editor.py
+# DATE: 2026-01-30
 # PURPOSE: Единый центр HTML-операций для editors (Templates + Letters).
 # CHANGE:
-# - Подстановки переменных полностью переведены на engine.common.mail.send (apply_vars/unapply_vars + DEFAULT_VARS).
-# - Набор переменных теперь 100% как в send (без локального списка/дубликатов).
+# - FIX: unapply_vars() вызывается правильно: (html, vars_map), без rate_contact_id
+# - Подстановки переменных: apply_vars/unapply_vars + DEFAULT_VARS только из engine.common.mail.send (без локальных дублей)
 
 from __future__ import annotations
 
@@ -315,7 +316,7 @@ def editor_template_parse_html(editor_html: str) -> str:
     raw0 = _strip_tiny_edit_classes(editor_html or "")
 
     # reverse demo-value -> {{ var }} (из send)
-    raw = _send_unapply_vars(raw0, rate_contact_id=None)
+    raw = _send_unapply_vars(raw0, _SEND_DEFAULT_VARS)
 
     span = _find_wrapper_table_span(raw)
     if not span:
@@ -394,6 +395,6 @@ def letter_editor_extract_content(editor_html: str) -> str:
     inner0 = unwrap_editor_content(raw0) or ""
 
     # reverse demo-value -> {{ var }} (из send)
-    inner1 = _send_unapply_vars(inner0, rate_contact_id=None)
+    inner1 = _send_unapply_vars(inner0, _SEND_DEFAULT_VARS)
 
     return sanitize(inner1 or "")
