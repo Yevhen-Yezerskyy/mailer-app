@@ -275,6 +275,29 @@ services:
       ]
     networks: [webnet]
 
+  mailer-engine-stat-prod:
+    image: mailer-engine-prod:latest
+    container_name: mailer-engine-stat-prod
+    working_dir: /app
+    restart: unless-stopped
+    depends_on: [mailer-db, mailer-redis-prod]
+    environment:
+      PYTHONPATH: /app
+      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
+      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
+    volumes:
+      - mailer-app-prod:/app
+      - mailer-redis-prod-run:/app/run/redis
+      - serenity-stat:/var/www/serenity-stat
+    cpus: "0.10"
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_stats.stat_processor'])",
+      ]
+    networks: [webnet]
+
   mailer-engine-sender-prod:
     image: mailer-engine-prod:latest
     container_name: mailer-engine-sender-prod
@@ -309,6 +332,10 @@ volumes:
   mailer-redis-prod-run:
     external: true
     name: mailer-redis-prod-run
+    
+  serenity-stat:
+    external: true
+    name: serenity-stat    
 
 networks:
   webnet:

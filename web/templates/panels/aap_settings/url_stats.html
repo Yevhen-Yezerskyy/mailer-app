@@ -1,0 +1,53 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_settings/url_stats.html -->
+<!-- DATE: 2026-01-31 -->
+<!-- PURPOSE: URL stats settings page (static). -->
+
+{% block content %}
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-[60%]">
+      <div class="YY-CARD_WHITE">
+        <div class="text-xl font-semibold">
+          {% trans "Учет переходов" %}
+        </div>
+        <p class="YY-TEXT">
+          {% trans "Выберите ОДИН из двух вариантов кода и установите его на Ваш интернет-сайт." %}
+        </p>
+
+        <div class="mt-6">
+          <label class="YY-LABEL">
+            {% trans "Вариант 1 — stat.serenity-mail.de" %}
+          </label>
+          <textarea class="YY-INPUT w-full !min-h-[220px] !font-mono" readonly>{{ snippet_de }}</textarea>
+        </div>
+
+        <div class="mt-6">
+          <label class="YY-LABEL">
+            {% trans "Вариант 2 — stat.serenity-mail.com" %}
+          </label>
+          <textarea class="YY-INPUT w-full !min-h-[220px] !font-mono" readonly>{{ snippet_com }}</textarea>
+        </div>
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-[40%]">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-STATUS_BLUE mb-6">
+          {% trans "Инструкция по установке кода" %}
+        </div>
+
+        <p class="YY-TEXT">1) {% trans "Выберите ОДИН из двух вариантов кода слева (любой)." %}</p>
+        <p class="YY-TEXT">2) {% trans "Установите код на Ваш в раздел &lt;head&gt; (перед закрывающим тегом &lt;/head&gt;)." %}</p>
+        <p class="YY-TEXT">3) {% trans "Если используется Google Tag Manager — добавьте как Custom HTML и включите на всех страницах." %}</p>
+        <p class="YY-TEXT">4) {% trans "Скрипт (код) учитывает (срабатывает) ТОЛЬКО если в URL страницы есть параметр smrel=... , или ТОЛЬКО при переходах из рассылки, сделанной через Serenity Mailer" %}</p>
+        <p class="YY-TEXT">4) {% trans "Параметр устанавливается к ссылке на Ваш сайт в письмах рассылки автоматически." %}</p>
+       </div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+{% endblock %}

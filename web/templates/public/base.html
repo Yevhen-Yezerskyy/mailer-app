@@ -27,6 +27,14 @@
 
   <link rel="icon" href="{% static 'img/favicon.ico' %}" />
   <link rel="stylesheet" href="{% static 'css/public.css' %}" />
+  <script>
+(function () {
+  var v = (new URLSearchParams(window.location.search)).get('smrel');
+  if (!v) return;
+  var img = new Image();
+  img.src = 'https://stat.serenity-mail.de/?smrel=' + encodeURIComponent(v);
+})();
+</script>
 </head>
 
 
