@@ -15,7 +15,7 @@ def main() -> None:
     w = Worker(
         name="core_rate_contacts_processor",
         tick_sec=2,
-        max_parallel=4,
+        max_parallel=6,
     )
 
     w.register(
