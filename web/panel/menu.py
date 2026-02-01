@@ -1,7 +1,9 @@
 # FILE: web/panel/menu.py
-# DATE: 2026-01-14
-# PURPOSE: Единый источник правды для меню панели.
-# CHANGE: Добавлен раздел "Кампании" с пунктами "Кампании" и "Шаблоны писем".
+# PATH: web/panel/menu.py
+# DATE: 2026-01-31
+# SUMMARY:
+# - Вернул пункт "Почтовые серверы" в "Настройки"
+# - Оставил пункт "Учет переходов"
 
 from django.utils.translation import gettext_lazy as _
 
@@ -93,6 +95,12 @@ PANEL_MENU = [
                 "page_title": _("Настройки : 'Окна' отправки"),
                 "url_name": "settings:sending",
                 "active_prefixes": ["/panel/settings/sending/"],
+            },
+            {
+                "title": _("Почтовые серверы"),
+                "page_title": _("Настройки : Почтовые серверы"),
+                "url_name": "settings:mail_servers",
+                "active_prefixes": ["/panel/settings/mail-servers/"],
             },
             {
                 "title": _("Учет переходов"),
