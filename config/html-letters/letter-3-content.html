@@ -3,16 +3,17 @@
 <p>Sed non risus. <strong>Suspendisse</strong> lectus tortor, dignissim sit amet, adipiscing nec, ultricies sed, 
 dolor. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi. Proin porttitor, orci nec nonummy molestie, enim est eleifend mi, non fermentum diam 
 nisl sit amet erat.</p>
-<table class="table-main">
+<table class="table-main" cellspacing="0" cellpadding="0" border="0" role="presentation" width="100%">
     <tr>
         <td class="td-important bg-1">
-            <p class="p-important">Maecenas ligula massa, varius a, semper congue, euismod non, mi. Proin porttitor, orci nec nonummy molestie. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi.</p>
+            <p>Maecenas ligula massa, varius a, semper congue, euismod non, mi. Proin porttitor, orci nec nonummy molestie. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi.</p>
         </td>
     </tr>
     <tr>
         <td class="spacer">&nbsp;</td>
     </tr>
 </table>
+
 <p><strong>Suspendisse</strong> lectus tortor, dignissim sit amet, adipiscing nec, ultricies sed, 
 dolor. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi. </p>
 <p>Duis semper. Duis arcu massa, scelerisque vitae, consequat in, pretium a, enim. 
@@ -23,32 +24,32 @@ Ihr Team der Mein Unternehmen GmbH</p>
 
 
 
-<table class="table-main id-3">
+<table class="table-main id-4" width="100%" cellspacing="0" cellpadding="0" border="0"  role="presentation">
     <tr>
         <td class="td-main" align="left">
-<table class="table-600" align="left">
+<table class="table-645" align="left" width="645" cellspacing="0" cellpadding="0" border="0" role="presentation">
     <tr>
         <td>
 
-            <table class="table-main">
+            <table class="table-main" cellspacing="0" cellpadding="0" border="0" width="100%"  role="presentation">
                 <tr>
                     <td class="bg-1">
-                        <p class="header-tl TemplateEdit">&nbsp;</p>
+                        <p class="header-tl color-1 TemplateEdit">&nbsp;</p>
                     </td>
                     <td class="bg-1">
-                        <p class="header-tr TemplateEdit">Mein Unternehmen GmbH</p>
+                        <p class="header-tr color-1 TemplateEdit">Mein Unternehmen GmbH</p>
                     </td>
                 </tr>
                 <tr>
                     <td class="bg-1 border-bottom">
-                        <p class="header-bl TemplateEdit">Dienstleistung, Produkt</p>
+                        <p class="header-bl color-1 TemplateEdit">Dienstleistung, Produkt</p>
                     </td>
                     <td class="bg-1 border-bottom">
-                        <p class="header-br TemplateEdit">Dienstleistungen, Produkte</p>
+                        <p class="header-br color-1 TemplateEdit">Dienstleistungen, Produkte</p>
                     </td>
                 </tr>
             </table>
-            <table class="table-main">
+            <table class="table-main"  cellspacing="0" cellpadding="0" border="0" width="100%" role="presentation">
                 <tr>
                     <td class="td-body">
                         <p><strong>{{ company_name }}</strong><br>
@@ -61,7 +62,7 @@ Ihr Team der Mein Unternehmen GmbH</p>
                     </td>
                 </tr>
             </table>
-            <table class="table-main bg-1">
+            <table class="table-main bg-1" cellspacing="0" cellpadding="0" border="0" width="100%" role="presentation">
                 <tr>
                     <td class="border-top border-bottom">
                         <p class="footer TemplateEdit">
@@ -74,11 +75,11 @@ Ihr Team der Mein Unternehmen GmbH</p>
                     </td>
                 </tr>
             </table>
-            <table class="table-main">
+            <table class="table-main" cellspacing="0" cellpadding="0" border="0" width="100%" role="presentation">
                 <tr>
                     <td>
                         <p class="footer-sm">
-                            <em>Kontaktaufnahme für mögliche Zusammenarbeit. Bei Nichtinteresse bitte kurz antworten.<br>({{ date_time }})</em>
+                            <em>Kontaktaufnahme für mögliche Zusammenarbeit. Bei Nichtinteresse bitte kurz antworten. ({{ date_time }})</em>
                         </p>
                     </td>
                 </tr>
@@ -89,6 +90,7 @@ Ihr Team der Mein Unternehmen GmbH</p>
         </td>
     </tr>
 </table>
+
 
 
 
@@ -124,8 +126,9 @@ Ihr Team der Mein Unternehmen GmbH</p>
       "border-spacing": "0"
     },
     ".td-main": { "text-align": "left" },
-    ".table-600": {
-      "width": "600px",
+    ".table-645": {
+      "max-width": "645px",
+      "width": "100%",
       "border-collapse": "collapse",
       "border-spacing": "0",
       "text-align": "left"
@@ -167,14 +170,13 @@ Ihr Team der Mein Unternehmen GmbH</p>
       "padding": "15px 7px 7px 0"
     },
     ".td-important": {
-      "border-left": "3px solid #16974B"
+      "border-left": "3px solid #16974B",
+      "padding": "12px 14px 0 7px"
     },
-    ".p-important": {
-      "padding": "10px 14px 10px 14px"
-    },
+
     ".spacer": {
-      "height": "8px",
-      "line-height": "8px",
+      "height": "10px",
+      "line-height": "10px",
       "font-size": "1px"
     }
   },
@@ -344,12 +346,23 @@ Ihr Team der Mein Unternehmen GmbH</p>
       ".td-important": { "border-left": "3px solid #d6a500" },
       ".border-top": { "border-top": "1px solid #8c6a00" },
       ".border-bottom": { "border-bottom": "1px solid #8c6a00" }
-    }
+    },
+    
+    "GRAY": {
+      "a": { "color": "#2b2b2b" },
+      ".color-1": { "color": "#2b2b2b" },
+      ".color-2": { "color": "#ffffff" },
+      ".bg-1": { "background": "#f5f5f5" },
+      ".bg-2": { "background": "#5e5e5e" },
+      ".td-important": { "border-left": "3px solid #5e5e5e" },
+      ".border-top": { "border-top": "1px solid #101010" },
+      ".border-bottom": { "border-bottom": "1px solid #101010" }
+    }    
   }
 }
 
 {
-  "IMPORTANT": "<table class=\"table-main\"><tr><td class=\"td-important bg-1\"><p class=\"p-important\">Maecenas ligula massa, varius a, semper congue, euismod non, mi. Proin porttitor, orci nec nonummy molestie. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi.</p></td></tr><tr><td class=\"spacer\">&nbsp;</td></tr></table>"
+  "IMPORTANT": "<table class=\"table-main\" cellspacing=\"0\" cellpadding=\"0\" border=\"0\" width=\"100%\" role=\"presentation\"><tr><td class=\"td-important bg-1\"><p>Maecenas ligula massa, varius a, semper congue, euismod non, mi. Proin porttitor, orci nec nonummy molestie. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi.</p></td></tr><tr><td class=\"spacer\">&nbsp;</td></tr></table>"
 }
 
 </script>

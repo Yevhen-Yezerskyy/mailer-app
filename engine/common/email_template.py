@@ -48,6 +48,11 @@ ALLOWED_ATTRS = {
     "colspan",
     "rowspan",
     "align",
+    "width", 
+    "cellspacing", 
+    "cellpadding",
+    "border",
+    "role",
 }
 
 # ---- placeholder ----
@@ -191,7 +196,7 @@ def _inline_one_pass(html0: str, styles_obj: Dict[str, Dict[str, Any]]) -> str:
             rules = _merged_rules(styles_obj, "p", classes)
             td_style = _style_str_from_rules(rules)
             td_attr = f' style="{td_style}"' if td_style else ""
-            out.append(f'<table style="{table_style}"><tr><td{td_attr}>')
+            out.append(f'<table style="{table_style}" width="100%" cellspacing="0" cellpadding="0" border="0" role="presentation"><tr><td{td_attr}>')
             p_wrap_depth += 1
             pos = m.end()
             continue
