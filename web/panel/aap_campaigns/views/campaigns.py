@@ -409,7 +409,7 @@ def campaigns_view(request):
         )
 
     list_items = MailingList.objects.filter(workspace_id=ws_id, archived=False).order_by("-created_at")
-    mb_items = Mailbox.objects.filter(workspace_id=ws_id, is_active=True).order_by("email")
+    mb_items = Mailbox.objects.filter(workspace_id=ws_id, is_active=True, archived=False).order_by("email")
 
     tpl_items = Templates.objects.filter(
         workspace_id=ws_id,
