@@ -28,6 +28,11 @@
       <div class="YY-CARD_WHITE">
         
         {% if state == "edit" and edit_obj or state == "add" %}
+        {% if messages %}
+            {% for m in messages %}
+              <div class="YY-CARD_IN_FORM_ERROR">{{ m }}</div>
+            {% endfor %}
+        {% endif %}
         <input type="text" name="template_name" class="YY-INPUT !mb-3" value="{{ edit_obj.template_name|default:'' }}" placeholder="{% trans "Ваш шаблон: название" %}">
           <div id="yyUserModeLeft">
             <textarea id="yyTinyEditor"

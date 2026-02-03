@@ -1,9 +1,10 @@
 # FILE: web/panel/aap_campaigns/views/templates.py
-# DATE: 2026-01-21
+# DATE: 2026-02-03
 # PURPOSE: /panel/campaigns/templates/ — CRUD шаблонов писем (user + advanced mode).
 # CHANGE:
-#   - list/edit: показываем/редактируем только Templates.archived=False
-#   - delete: вместо удаления — архивирование (archived=True, is_active=False)
+#   - безопасная обработка совпадения template_name (IntegrityError)
+#   - вместо 500 — возврат на страницу с ошибкой
+#   - логика и структура сохранены, без оптимизаций
 
 from __future__ import annotations
 
@@ -12,8 +13,11 @@ from types import SimpleNamespace
 from typing import Optional, Union
 from uuid import UUID
 
+from django.db import IntegrityError
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
+from django.contrib import messages
+from django.utils.translation import gettext as _
 
 from engine.common.email_template import sanitize
 from mailer_web.access import encode_id, resolve_pk_or_redirect
@@ -85,7 +89,10 @@ def _extract_global_template_id_from_first_tag(template_html: str) -> int | None
         return None
 
     attrs = m_tag.group(2) or ""
-    m_class = re.search(r"""(?is)\bclass\s*=\s*(?P<q>["'])(?P<v>.*?)(?P=q)""", attrs)
+    m_class = re.search(
+        r"""(?is)\bclass\s*=\s*(?P<q>["'])(?P<v>.*?)(?P=q)""",
+        attrs,
+    )
     if not m_class:
         return None
 
@@ -112,8 +119,13 @@ def _global_style_keys_by_gid(gid: int | None) -> tuple[int | None, list[str], l
     colors = gt.styles.get("colors")
     fonts = gt.styles.get("fonts")
 
-    c_keys = sorted([k for k in (colors or {}).keys() if isinstance(k, str)]) if isinstance(colors, dict) else []
-    f_keys = sorted([k for k in (fonts or {}).keys() if isinstance(k, str)]) if isinstance(fonts, dict) else []
+    c_keys = sorted(
+        [k for k in (colors or {}).keys() if isinstance(k, str)]
+    ) if isinstance(colors, dict) else []
+    f_keys = sorted(
+        [k for k in (fonts or {}).keys() if isinstance(k, str)]
+    ) if isinstance(fonts, dict) else []
+
     return int(gt.id), c_keys, f_keys
 
 
@@ -130,6 +142,12 @@ def _build_global_tpl_items(current_gid: int | None):
         )
     return out
 
+# FILE: web/panel/aap_campaigns/views/templates.py
+# DATE: 2026-02-03
+# CHANGE:
+# - убран дубль сообщений: перед messages.error() чистим storage
+# - редирект при ошибке сохраняет state/id
+# - остальная логика не тронута
 
 def templates_view(request):
     ws_id, _user = _guard(request)
@@ -141,7 +159,6 @@ def templates_view(request):
     if isinstance(edit_obj, HttpResponseRedirect):
         return edit_obj
 
-    # ADD: если state=add и нет gl_tpl в URL — редирект на случайный активный GlobalTemplate
     if request.method == "GET" and state == "add":
         if not _get_gl_tpl_from_query(request):
             rid = _pick_random_active_gl_tpl_id()
@@ -170,10 +187,7 @@ def templates_view(request):
                 id=int(res),
                 workspace_id=ws_id,
                 archived=False,
-            ).update(
-                archived=True,
-                is_active=False,
-            )
+            ).update(archived=True, is_active=False)
             return redirect(request.path)
 
         template_name = (request.POST.get("template_name") or "").strip()
@@ -181,18 +195,28 @@ def templates_view(request):
         css_text = request.POST.get("css_text") or ""
 
         if not template_name:
-            return redirect(request.path)
+            storage = messages.get_messages(request)
+            storage.used = True
+            messages.error(request, _("Имя шаблона обязательно."))
+            return redirect(f"{request.path}?{request.GET.urlencode()}")
 
         clean_html = sanitize(editor_template_parse_html(editor_html))
         styles_obj = styles_css_to_json(css_text)
 
         if action == "add":
-            obj = Templates.objects.create(
-                workspace_id=ws_id,
-                template_name=template_name,
-                template_html=clean_html,
-                styles=styles_obj,
-            )
+            try:
+                obj = Templates.objects.create(
+                    workspace_id=ws_id,
+                    template_name=template_name,
+                    template_html=clean_html,
+                    styles=styles_obj,
+                )
+            except IntegrityError:
+                storage = messages.get_messages(request)
+                storage.used = True
+                messages.error(request, _("Шаблон с таким именем уже существует."))
+                return redirect(f"{request.path}?{request.GET.urlencode()}")
+
             return redirect(f"{request.path}?state=edit&id={encode_id(int(obj.id))}")
 
         if action == "save":
@@ -211,21 +235,39 @@ def templates_view(request):
                 workspace_id=ws_id,
                 archived=False,
             ).first()
+
             if obj:
                 obj.template_name = template_name
                 obj.template_html = clean_html
                 obj.styles = styles_obj
-                obj.save(update_fields=["template_name", "template_html", "styles", "updated_at"])
-                return redirect(f"{request.path}?state=edit&id={encode_id(int(obj.id))}")
+                try:
+                    obj.save(
+                        update_fields=[
+                            "template_name",
+                            "template_html",
+                            "styles",
+                            "updated_at",
+                        ]
+                    )
+                except IntegrityError:
+                    storage = messages.get_messages(request)
+                    storage.used = True
+                    messages.error(request, _("Шаблон с таким именем уже существует."))
+                    return redirect(f"{request.path}?{request.GET.urlencode()}")
+
+                return redirect(
+                    f"{request.path}?state=edit&id={encode_id(int(obj.id))}"
+                )
 
             return redirect(request.path)
 
         return redirect(request.path)
 
-    # active GlobalTemplate: приоритет ?gl_tpl=..., иначе edit -> id-<N> из HTML
     current_gid = _get_gl_tpl_from_query(request)
     if not current_gid and state == "edit" and edit_obj:
-        current_gid = _extract_global_template_id_from_first_tag(edit_obj.template_html or "")
+        current_gid = _extract_global_template_id_from_first_tag(
+            edit_obj.template_html or ""
+        )
 
     global_style_gid, global_colors, global_fonts = _global_style_keys_by_gid(current_gid)
     global_tpl_items = _build_global_tpl_items(current_gid)
