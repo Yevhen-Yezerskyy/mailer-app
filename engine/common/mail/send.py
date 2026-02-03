@@ -283,18 +283,25 @@ def send_one(
     if not html_tpl:
         raise RuntimeError("READY_CONTENT_EMPTY")
 
-    row = db.fetch_one(
-        """
-        SELECT rate_contact_id
-        FROM public.lists_contacts
-        WHERE id=%s AND active=true
-        LIMIT 1
-        """,
-        [int(list_contact_id)],
-    )
-    if not row:
-        raise RuntimeError("LIST_CONTACT_NOT_FOUND_OR_INACTIVE")
-    rate_contact_id = int(row[0])
+    if list_contact_id is None:
+        if record_sent or not (to_email_override or "").strip():
+            raise RuntimeError("LIST_CONTACT_ID_REQUIRED")
+        rate_contact_id: Optional[int] = None
+    else:
+        row = db.fetch_one(
+            """
+            SELECT rate_contact_id
+            FROM public.lists_contacts
+            WHERE id=%s AND active=true
+            LIMIT 1
+            """,
+            [int(list_contact_id)],
+        )
+        if not row:
+            raise RuntimeError("LIST_CONTACT_NOT_FOUND_OR_INACTIVE")
+        if row[0] is None:
+            raise RuntimeError("LIST_CONTACT_RATE_CONTACT_ID_NULL")
+        rate_contact_id = int(row[0])
 
     rows = db.fetch_all(
         """

@@ -1,7 +1,8 @@
 # FILE: web/panel/aap_campaigns/views/campaigns.py
 # PATH: web/panel/aap_campaigns/views/campaigns.py
-# DATE: 2026-01-31
-# SUMMARY (new):
+# DATE: 2026-02-03
+# SUMMARY (patch):
+# - fix: keep POSTed form values when mailing list is taken (dedup error), so form doesn't reset
 # - stats in bottom table: total/sent/left for each campaign (total=active lists_contacts; sent=all mailbox_sent rows; left=max(0,total-sent))
 # - POST action send_test: only when letter exists; pick 10 random active list_contacts from campaign list, pick 1, call send_one(..., to_email_override=..., record_sent=False)
 # - do NOT touch existing window logic/helpers (kept local); reuse shared _is_de_public_holiday() helper
@@ -361,7 +362,7 @@ def _ctx_build(
         edit_window_json_str = json.dumps(edit_obj.window or {}, ensure_ascii=False)
 
     # IMPORTANT: тестовая отправка доступна только когда письмо реально есть (Letter существует)
-    has_letter = bool(letter_obj and getattr(letter_obj, "id", None))
+    has_letter = bool(letter_obj and (getattr(letter_obj, "ready_content", "") or "").strip())
 
     return {
         "items": items,
@@ -540,34 +541,18 @@ def campaigns_view(request):
                 return render(request, "panels/aap_campaigns/campaigns.html", ctx)
 
             list_contact_id = _pick_test_list_contact_id(int(camp.mailing_list_id))
-            if not list_contact_id:
-                test_msg = _("В списке рассылки нет активных контактов для теста.")
-                ctx = _ctx_build(
-                    ws_id,
-                    "letter",
-                    edit_obj,
-                    list_items,
-                    mb_items,
-                    tpl_items,
-                    parent_items,
-                    global_window_json,
-                    letter_obj,
-                    letter_init_html,
-                    letter_init_css,
-                    letter_init_subjects,
-                    letter_init_headers,
-                    letter_template_html,
-                    deleted_tpl_ui,
-                    deleted_tpl_id,
-                    test_msg=test_msg,
-                )
-                return render(request, "panels/aap_campaigns/campaigns.html", ctx)
 
-            # NOTE: send_one готовит HTML сам; override получателя; record_sent=False чтобы НЕ "съедать" контакт
-            send_one(int(camp.id), int(list_contact_id), to_email_override=test_email, record_sent=False)
+            # NOTE: send_one готовит HTML сам; override получателя;
+            # record_sent=False чтобы НЕ "съедать" контакт.
+            # Пустой список -> list_contact_id=None -> DEFAULT_VARS.
+            send_one(
+                int(camp.id),
+                int(list_contact_id) if list_contact_id else None,
+                to_email_override=test_email,
+                record_sent=False,
+            )
 
             return redirect(f"{request.path}?state=letter&id={encode_id(int(camp.id))}")
-
         if action in ("activate", "pause"):
             post_id = (request.POST.get("id") or "").strip()
             if not post_id:
@@ -660,10 +645,47 @@ def campaigns_view(request):
 
             exclude_id = int(edit_obj.id) if (edit_obj and action in ("save_campaign", "save_campaign_close")) else None
             if _mailing_list_is_taken(ws_id, mailing_list_pk, exclude_id):
+                # keep form values on error (do not reset form)
+                tmp = edit_obj or SimpleNamespace()
+                if not getattr(tmp, "id", None):
+                    tmp.id = 0
+                if not getattr(tmp, "ui_id", ""):
+                    tmp.ui_id = getattr(edit_obj, "ui_id", "") if edit_obj else ""
+
+                tmp.title = title
+                tmp.mailing_list_id = int(mailing_list_pk)
+                tmp.mailbox_id = int(mailbox_pk)
+
+                tmp.start_at = _parse_date_from_post(request, "start") or date.today()
+                tmp.end_at = _parse_date_from_post(request, "end") or (tmp.start_at + timedelta(days=90))
+
+                tmp.letter = getattr(tmp, "letter", None) or SimpleNamespace()
+                tmp.letter.template_id = int(template_pk)
+
+                send_after_days_tmp = 0
+                try:
+                    send_after_days_tmp = int(request.POST.get("send_after_parent_days") or 0)
+                except Exception:
+                    send_after_days_tmp = 0
+                if send_after_days_tmp < 0:
+                    send_after_days_tmp = 0
+                tmp.send_after_parent_days = send_after_days_tmp
+
+                use_global_window_tmp = True if request.POST.get("use_global_window") else False
+                window_raw_tmp = (request.POST.get("window") or "").strip()
+                window_obj_tmp: dict = {}
+                if not use_global_window_tmp:
+                    try:
+                        parsed_tmp = json.loads(window_raw_tmp) if window_raw_tmp else {}
+                        window_obj_tmp = parsed_tmp if isinstance(parsed_tmp, dict) else {}
+                    except Exception:
+                        window_obj_tmp = {}
+                tmp.window = window_obj_tmp
+
                 ctx = _ctx_build(
                     ws_id,
                     state,
-                    edit_obj,
+                    tmp,
                     list_items,
                     mb_items,
                     tpl_items,
