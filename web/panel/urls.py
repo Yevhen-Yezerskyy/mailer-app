@@ -1,7 +1,5 @@
-# FILE: web/panel/urls.py
-# DATE: 2026-01-14
-# PURPOSE: Корень панели /panel/ + include всех panel-app urlconf.
-# CHANGE: Добавлен роут /panel/campaigns/ → panel.aap_campaigns.urls (include_flagged).
+# FILE: web/panel/urls.py  (обновлено — 2026-02-06)
+# PURPOSE: /panel/ редирект на /panel/overview/; /panel/overview/ рендерит dashboard (таблица stats).
 
 from __future__ import annotations
 
@@ -12,6 +10,8 @@ from django.urls import path, include
 from django.views.generic import RedirectView
 from django.urls.resolvers import URLPattern, URLResolver
 
+from panel.views import dashboard
+
 
 _FLAG_ATTR = "_tw_classmap_enabled"
 
@@ -21,6 +21,7 @@ def _flag_view(view_func):
     def _wrapped(request, *args, **kwargs):
         setattr(request, _FLAG_ATTR, True)
         return view_func(request, *args, **kwargs)
+
     return _wrapped
 
 
@@ -40,12 +41,12 @@ def include_flagged(module_path: str):
     mod = import_module(module_path)
     patterns = _flag_urlpatterns(getattr(mod, "urlpatterns", []))
     app_name = getattr(mod, "app_name", None)
-    # сохраним namespace как app_name (как и было)
     return include((patterns, app_name), namespace=app_name)
 
 
 urlpatterns = [
-    path("", RedirectView.as_view(url="audience/how/", permanent=False), name="dashboard"),
+    path("", RedirectView.as_view(url="overview/", permanent=False), name="dashboard"),
+    path("overview/", _flag_view(dashboard), name="overview"),
 
     path("audience/", include_flagged("panel.aap_audience.urls")),
     path("lists/", include_flagged("panel.aap_lists.urls")),

@@ -1,0 +1,57 @@
+<!-- FILE: web/templates/panels/overview.html -->
+<!-- DATE: 2026-02-06 -->
+<!-- PURPOSE: Таблица кликов: DISTINCT по aggr_id, count и время первого посещения. -->
+
+{% extends "panels/base.html" %}
+{% load i18n %}
+
+{% block content %}
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+
+      {% if stats %}
+        <div class="YY-MAIN_BOTTOM_DIV">
+
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH w-[220px]">{% trans "Первое посещение" %}</th>
+                <th class="YY-TH_TH w-[120px]">{% trans "Переходов" %}</th>
+                <th class="YY-TH_TH w-[35%]">{% trans "Кампания" %}</th>
+                <th class="YY-TH_TH">{% trans "Компания" %}</th>
+                <th class="YY-TH_TH w-[200px]">{% trans "Действие" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for it in stats %}
+                <tr class="YY-TB_TR align-top">
+                  <td class="YY-TB_TD">{{ it.first_time|date:"d.m.Y H:i:s" }}</td>
+                  <td class="YY-TB_TD">{{ it.visits }}</td>
+                  <td class="YY-TB_TD">{{ it.campaign_title }}</td>
+                  <td class="YY-TB_TD">{{ it.company_name }}</td>
+                  <td class="YY-TB_TD">
+                    <a href="#"
+                      class="YY-BUTTON_TAB_MAIN w-full inline-block text-center"
+                      data-yy-modal="url=/panel/lists/contacts/modal/?id={{ it.ui_id }}">
+                      {% trans "Показать компанию" %}
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+        </div>
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
+      {% endif %}
+
+    </td>
+  </tr>
+</table>
+
+{% endblock %}
