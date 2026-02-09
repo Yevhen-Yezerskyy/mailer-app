@@ -1,68 +1,64 @@
 # FILE: docker-compose.yml
-# DATE: 2026-01-25
-# PURPOSE:
-# - Switch secrets to config/load_keys.py (decrypt into process env at startup via SERENITY_KEYS_MASTER_KEY).
-# - Remove plaintext DB_* / OPENAI_API_KEY from compose; services exec real process (gunicorn/python) as PID 1 after key-load.
-# NOTE:
-# - Provide SERENITY_KEYS_MASTER_KEY in host env (or .env) for containers that need secrets.
+# DATE: 2026-02-09
+# PURPOSE: PROD full stack (db+redis+web+engine+ops) + nginx+certbot.
+#          DB_* secrets НЕ в compose: mailer-secrets-init расшифровывает через config/load_keys и пишет файлы в internal volume serenity-secrets.
+#          Реально используемые данные-volumes = external: mailer-db-data, mailer-app-prod, mailer-static, mailer-media, mailer-redis-prod-run, serenity-stat.
+#          Certbot + serenity-secrets = internal.
 
 services:
-  # -------- DEV --------
+  mailer-secrets-init:
+    build:
+      context: .
+      dockerfile: .DockerFiles/Dockerfile_ops
+    image: mailer-ops-prod:latest
+    container_name: mailer-secrets-init
+    working_dir: /app
+    restart: "no"
+    environment:
+      PYTHONPATH: /app
+      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
+      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
+    volumes:
+      - mailer-app-prod:/app
+      - serenity-secrets:/run/serenity-secrets
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        set -e
+        eval "$(python -m config.load_keys --print-export)"
+        umask 077
+        mkdir -p /run/serenity-secrets
+
+        [ -n "$${DB_NAME:-}" ] || { echo "DB_NAME missing" >&2; exit 2; }
+        [ -n "$${DB_USER:-}" ] || { echo "DB_USER missing" >&2; exit 2; }
+        [ -n "$${DB_PASSWORD:-}" ] || { echo "DB_PASSWORD missing" >&2; exit 2; }
+
+        printf %s "$$DB_NAME" > /run/serenity-secrets/DB_NAME
+        printf %s "$$DB_USER" > /run/serenity-secrets/DB_USER
+        printf %s "$$DB_PASSWORD" > /run/serenity-secrets/DB_PASSWORD
+
   mailer-db:
     image: postgres:16
     container_name: mailer-db
     restart: unless-stopped
-    environment:
-      POSTGRES_DB: mailersys
-      POSTGRES_USER: mailersys_user
-      POSTGRES_PASSWORD: secret
+    depends_on:
+      mailer-secrets-init:
+        condition: service_completed_successfully
     volumes:
       - mailer-db-data:/var/lib/postgresql/data
+      - serenity-secrets:/run/serenity-secrets:ro
     command: >
-      postgres -c shared_preload_libraries=pg_stat_statements
-           -c pg_stat_statements.track=all
-           -c pg_stat_statements.max=10000
-    ports:
-      - "5433:5432"
-    networks: [webnet]
+      bash -lc '
+        export POSTGRES_DB="$(cat /run/serenity-secrets/DB_NAME)";
+        export POSTGRES_USER="$(cat /run/serenity-secrets/DB_USER)";
+        export POSTGRES_PASSWORD="$(cat /run/serenity-secrets/DB_PASSWORD)";
+        exec docker-entrypoint.sh postgres
+          -c shared_preload_libraries=pg_stat_statements
+          -c pg_stat_statements.track=all
+          -c pg_stat_statements.max=10000
+      '
 
-  mailer-redis:
-    image: redis:7-alpine
-    container_name: mailer-redis
-    restart: unless-stopped
-    command: ["redis-server", "/app/config/redis/redis-dev.conf"]
-    volumes:
-      - ./:/app
-    networks: [webnet]
-
-  mailer-web:
-    build:
-      context: .
-      dockerfile: .DockerFiles/Dockerfile_Django
-    container_name: mailer-web
-    working_dir: /app/web
-    restart: unless-stopped
-    user: "1001:1001"
-    depends_on: [mailer-db, mailer-redis]
-    environment:
-      PYTHONPATH: /app
-      DEBUG: "1"
-      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
-      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
-    volumes:
-      - ./:/app
-    ports:
-      - "8000:8000"
-    cpus: "0.5"
-    command:
-      [
-        "/app/.venv/bin/python",
-        "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('/app/.venv/bin/python',['/app/.venv/bin/python','manage.py','runserver','0.0.0.0:8000'])",
-      ]
-    networks: [webnet]
-
-  # -------- PROD --------
   mailer-redis-prod:
     image: redis:7-alpine
     container_name: mailer-redis-prod
@@ -72,9 +68,7 @@ services:
     volumes:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
-    networks: [webnet]
 
-  # One-shot init: translate.py + collectstatic (только на compose up)
   mailer-init-prod:
     build:
       context: .
@@ -83,7 +77,11 @@ services:
     container_name: mailer-init-prod
     working_dir: /app/web
     restart: "no"
-    depends_on: [mailer-db, mailer-redis-prod]
+    depends_on:
+      mailer-db:
+        condition: service_started
+      mailer-redis-prod:
+        condition: service_started
     environment:
       PYTHONPATH: /app
       DEBUG: "0"
@@ -92,6 +90,7 @@ services:
     volumes:
       - mailer-app-prod:/app
       - mailer-static:/app/web/staticfiles
+      - mailer-media:/app/web/media
       - mailer-redis-prod-run:/app/run/redis
     command: >
       /bin/sh -lc "
@@ -99,7 +98,6 @@ services:
         python translate.py &&
         python manage.py collectstatic --noinput
       "
-    networks: [webnet]
 
   mailer-web-prod:
     build:
@@ -124,18 +122,13 @@ services:
     volumes:
       - mailer-app-prod:/app
       - mailer-static:/app/web/staticfiles
+      - mailer-media:/app/web/media
       - mailer-redis-prod-run:/app/run/redis
-    ports:
-      - "8001:8000"
+    expose:
+      - "8000"
     command:
-      [
-        "python",
-        "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('gunicorn',['gunicorn','mailer_web.wsgi:application','--bind','0.0.0.0:8000','--workers','2','--timeout','120'])",
-      ]
-    networks: [webnet]
+      ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('gunicorn',['gunicorn','mailer_web.wsgi:application','--bind','0.0.0.0:8000','--workers','2','--timeout','120'])"]
 
-  # Все воркеры на одном образе; каждому cap как было
   mailer-engine-cb-prod:
     build:
       context: .
@@ -153,13 +146,7 @@ services:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
     cpus: "0.15"
-    command:
-      [
-        "python",
-        "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_prepare.prepare_cb_processor'])",
-      ]
-    networks: [webnet]
+    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_prepare.prepare_cb_processor'])"]
 
   mailer-engine-val-prod:
     image: mailer-engine-prod:latest
@@ -175,13 +162,7 @@ services:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
     cpus: "0.15"
-    command:
-      [
-        "python",
-        "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_processor'])",
-      ]
-    networks: [webnet]
+    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_processor'])"]
 
   mailer-engine-exp-prod:
     image: mailer-engine-prod:latest
@@ -197,13 +178,7 @@ services:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
     cpus: "0.15"
-    command:
-      [
-        "python",
-        "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_expand_processor'])",
-      ]
-    networks: [webnet]
+    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_expand_processor'])"]
 
   mailer-engine-rate-prod:
     image: mailer-engine-prod:latest
@@ -219,13 +194,7 @@ services:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
     cpus: "0.15"
-    command:
-      [
-        "python",
-        "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_rate.rate_contacts_processor'])",
-      ]
-    networks: [webnet]
+    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_rate.rate_contacts_processor'])"]
 
   mailer-engine-cr-prod:
     image: mailer-engine-prod:latest
@@ -241,39 +210,7 @@ services:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
     cpus: "0.10"
-    command:
-      [
-        "python",
-        "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.crawler.cr_processor'])",
-      ]
-    networks: [webnet]
-
-  # -------- OPS / TOOLBOX --------
-  mailer-ops-prod:
-    build:
-      context: .
-      dockerfile: .DockerFiles/Dockerfile_ops
-    image: mailer-ops-prod:latest
-    container_name: mailer-ops-prod
-    working_dir: /app
-    restart: unless-stopped
-    environment:
-      PYTHONPATH: /app
-      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
-      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
-    volumes:
-      - mailer-app-prod:/app
-      - mailer-static:/app/web/staticfiles
-      - mailer-redis-prod-run:/app/run/redis
-      - /home/eee/.ssh:/root/.ssh:ro
-    command:
-      [
-        "python",
-        "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('sh',['sh','-lc','sleep infinity'])",
-      ]
-    networks: [webnet]
+    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.crawler.cr_processor'])"]
 
   mailer-engine-stat-prod:
     image: mailer-engine-prod:latest
@@ -290,13 +227,7 @@ services:
       - mailer-redis-prod-run:/app/run/redis
       - serenity-stat:/var/www/serenity-stat
     cpus: "0.10"
-    command:
-      [
-        "python",
-        "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_stats.stat_processor'])",
-      ]
-    networks: [webnet]
+    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_stats.stat_processor'])"]
 
   mailer-engine-sender-prod:
     image: mailer-engine-prod:latest
@@ -312,31 +243,65 @@ services:
       - mailer-app-prod:/app
       - mailer-redis-prod-run:/app/run/redis
     cpus: "0.10"
-    command:
-      [
-        "python",
-        "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_sender.sender'])",
-      ]
-    networks: [webnet]
+    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_sender.sender'])"]
+
+  mailer-ops-prod:
+    image: mailer-ops-prod:latest
+    container_name: mailer-ops-prod
+    working_dir: /app
+    restart: unless-stopped
+    environment:
+      PYTHONPATH: /app
+      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
+      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
+    volumes:
+      - mailer-app-prod:/app
+      - mailer-static:/app/web/staticfiles
+      - mailer-media:/app/web/media
+      - mailer-redis-prod-run:/app/run/redis
+      - /home/eee/.ssh:/root/.ssh:ro
+    command: ["sh","-lc","sleep infinity"]
+
+  nginx:
+    image: nginx:1.26
+    container_name: serenity-nginx
+    restart: unless-stopped
+    depends_on: [mailer-web-prod]
+    ports: ["80:80","443:443"]
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./logs:/app/logs
+      - mailer-static:/var/www/mail-static:ro
+      - mailer-media:/var/www/mail-media:ro
+      - serenity-stat:/var/www/serenity-stat:ro
+      - certbot-www:/var/www/certbot
+      - certbot-etc:/etc/letsencrypt
+
+  certbot:
+    image: certbot/certbot
+    container_name: serenity-certbot
+    restart: unless-stopped
+    volumes:
+      - certbot-www:/var/www/certbot
+      - certbot-etc:/etc/letsencrypt
+    command: >
+      sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h; done"
 
 volumes:
   mailer-db-data:
-
+    external: true
   mailer-app-prod:
     external: true
-
   mailer-static:
     external: true
-
+  mailer-media:
+    external: true
   mailer-redis-prod-run:
     external: true
-    name: mailer-redis-prod-run
-    
   serenity-stat:
     external: true
-    name: serenity-stat    
 
-networks:
-  webnet:
-    external: true
+  serenity-secrets:
+  certbot-www:
+  certbot-etc:
