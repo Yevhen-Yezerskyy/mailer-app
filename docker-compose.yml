@@ -103,7 +103,7 @@ services:
       - serenity-secrets:/run/serenity-secrets:ro
     ports:
       - "8000:8000"
-    cpus: "0.5"
+    cpus: "1.0"
     command:
       [
         "/app/.venv/bin/python",
@@ -353,6 +353,8 @@ services:
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
       - /home/eee/.ssh:/root/.ssh:ro
+      - serenity-stat:/var/www/serenity-stat
+
     command: ["sh", "-c", "sleep infinity"]
 
   # -------- nginx + certbot --------
