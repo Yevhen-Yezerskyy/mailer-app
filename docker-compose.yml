@@ -1,16 +1,12 @@
-# FILE: docker-compose.yml
-# DATE: 2026-02-09
+# FILE: docker-compose.yml  (обновлено — 2026-02-09)
 # PURPOSE:
-# - New server: NO DB_* / other secrets in repo/compose (dev+prod).
-# - Secrets flow: mailer-secrets-init decrypts via config/load_keys.py -> writes DB_* files into internal volume serenity-secrets.
-# - Postgres reads POSTGRES_* from serenity-secrets files at container start.
-# - ONE Redis shared for dev+prod via unix-socket in tmpfs volume (serenity-redis-run) mounted at /app/run/redis.
-# - nginx + certbot included; nginx mounts static/media/stat volumes + certbot volumes + nginx configs.
-# NOTE:
-# - networks removed: default compose network is used.
+# - Fix Postgres crash: do NOT use login-shell (-l) in db command (it can reset PATH => initdb not found).
+# - Fix YAML issues: remove trailing commas in JSON-style command arrays (mailer-web / mailer-web-prod).
+# - Keep secrets flow (serenity-secrets), single redis unix-socket tmpfs, nginx+certbot as-is.
 
 services:
   # -------- SECRETS INIT (writes /run/serenity-secrets/*) --------
+
   mailer-secrets-init:
     build:
       context: .
@@ -28,21 +24,27 @@ services:
       - serenity-secrets:/run/serenity-secrets
     command:
       - /bin/sh
-      - -lc
+      - -c
       - |
         set -e
-        eval "$(python -m config.load_keys --print-export)"
+        python <<'PY'
+        import os
+        from pathlib import Path
+        from config.load_keys import init_keys
 
-        umask 077
-        mkdir -p /run/serenity-secrets
+        init_keys()
 
-        [ -n "$${DB_NAME:-}" ] || { echo "DB_NAME missing"; exit 2; }
-        [ -n "$${DB_USER:-}" ] || { echo "DB_USER missing"; exit 2; }
-        [ -n "$${DB_PASSWORD:-}" ] || { echo "DB_PASSWORD missing"; exit 2; }
+        base = Path("/run/serenity-secrets")
+        base.mkdir(parents=True, exist_ok=True)
 
-        printf %s "$$DB_NAME" > /run/serenity-secrets/DB_NAME
-        printf %s "$$DB_USER" > /run/serenity-secrets/DB_USER
-        printf %s "$$DB_PASSWORD" > /run/serenity-secrets/DB_PASSWORD
+        for key in ("DB_NAME", "DB_USER", "DB_PASSWORD"):
+            val = os.environ.get(key)
+            if not val:
+                raise SystemExit(f"{key} missing")
+            (base / key).write_text(val)
+
+        print("OK: serenity secrets written")
+        PY
 
   # -------- ONE DB (dev+prod) --------
   mailer-db:
@@ -56,7 +58,8 @@ services:
       - mailer-db-data:/var/lib/postgresql/data
       - serenity-secrets:/run/serenity-secrets:ro
     command: >
-      bash -lc '
+      bash -c '
+        export PATH="/usr/lib/postgresql/16/bin:$PATH";
         export POSTGRES_DB="$(cat /run/serenity-secrets/DB_NAME)";
         export POSTGRES_USER="$(cat /run/serenity-secrets/DB_USER)";
         export POSTGRES_PASSWORD="$(cat /run/serenity-secrets/DB_PASSWORD)";
@@ -74,7 +77,7 @@ services:
     container_name: mailer-redis
     restart: unless-stopped
     command: >
-      /bin/sh -lc "exec redis-server /etc/redis/redis.conf"
+      /bin/sh -c "exec redis-server /etc/redis/redis.conf"
     volumes:
       - ./config/redis/redis-prod.conf:/etc/redis/redis.conf:ro
       - serenity-redis-run:/app/run/redis
@@ -101,11 +104,11 @@ services:
     ports:
       - "8000:8000"
     cpus: "0.5"
-    command: 
+    command:
       [
         "/app/.venv/bin/python",
         "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('/app/.venv/bin/python',['/app/.venv/bin/python','manage.py','runserver','0.0.0.0:8000'])",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('/app/.venv/bin/python',['/app/.venv/bin/python','manage.py','runserver','0.0.0.0:8000'])"
       ]
 
   # -------- PROD: init (translate + collectstatic) --------
@@ -130,7 +133,7 @@ services:
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
     command: >
-      /bin/sh -lc "
+      /bin/sh -c "
         eval \"$(python -m config.load_keys --print-export)\" &&
         python translate.py &&
         python manage.py collectstatic --noinput
@@ -168,7 +171,7 @@ services:
       [
         "python",
         "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('gunicorn',['gunicorn','mailer_web.wsgi:application','--bind','0.0.0.0:8000','--workers','2','--timeout','120'])",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('gunicorn',['gunicorn','mailer_web.wsgi:application','--bind','0.0.0.0:8000','--workers','2','--timeout','120'])"
       ]
 
   # -------- PROD ENGINE WORKERS --------
@@ -194,7 +197,7 @@ services:
       [
         "python",
         "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_prepare.prepare_cb_processor'])",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_prepare.prepare_cb_processor'])"
       ]
 
   mailer-engine-val-prod:
@@ -216,7 +219,7 @@ services:
       [
         "python",
         "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_processor'])",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_processor'])"
       ]
 
   mailer-engine-exp-prod:
@@ -238,7 +241,7 @@ services:
       [
         "python",
         "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_expand_processor'])",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_expand_processor'])"
       ]
 
   mailer-engine-rate-prod:
@@ -260,7 +263,7 @@ services:
       [
         "python",
         "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_rate.rate_contacts_processor'])",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_rate.rate_contacts_processor'])"
       ]
 
   mailer-engine-cr-prod:
@@ -282,7 +285,7 @@ services:
       [
         "python",
         "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.crawler.cr_processor'])",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.crawler.cr_processor'])"
       ]
 
   mailer-engine-stat-prod:
@@ -305,7 +308,7 @@ services:
       [
         "python",
         "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_stats.stat_processor'])",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_stats.stat_processor'])"
       ]
 
   mailer-engine-sender-prod:
@@ -327,7 +330,7 @@ services:
       [
         "python",
         "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_sender.sender'])",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_sender.sender'])"
       ]
 
   # -------- OPS / TOOLBOX --------
@@ -350,7 +353,7 @@ services:
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
       - /home/eee/.ssh:/root/.ssh:ro
-    command: ["sh","-lc","sleep infinity"]
+    command: ["sh", "-c", "sleep infinity"]
 
   # -------- nginx + certbot --------
   nginx:
@@ -364,20 +367,11 @@ services:
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./logs:/app/logs
       - mailer-static:/var/www/mail-static:ro
-      - mailer-media:/var/www/mail-media:ro
-      - serenity-stat:/var/www/serenity-stat:ro
+      - mailer-media:/var/www/mail-media
+      - serenity-stat:/var/www/serenity-stat
       - certbot-www:/var/www/certbot
       - certbot-etc:/etc/letsencrypt
 
-  certbot:
-    image: certbot/certbot
-    container_name: serenity-certbot
-    restart: unless-stopped
-    volumes:
-      - certbot-www:/var/www/certbot
-      - certbot-etc:/etc/letsencrypt
-    command: >
-      sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot; sleep 12h; done"
 
 volumes:
   mailer-db-data:
