@@ -1,11 +1,16 @@
 # FILE: docker-compose.yml
 # DATE: 2026-02-09
-# PURPOSE: PROD full stack (db+redis+web+engine+ops) + nginx+certbot.
-#          DB_* secrets НЕ в compose: mailer-secrets-init расшифровывает через config/load_keys и пишет файлы в internal volume serenity-secrets.
-#          Реально используемые данные-volumes = external: mailer-db-data, mailer-app-prod, mailer-static, mailer-media, mailer-redis-prod-run, serenity-stat.
-#          Certbot + serenity-secrets = internal.
+# PURPOSE:
+# - New server: NO DB_* / other secrets in repo/compose (dev+prod).
+# - Secrets flow: mailer-secrets-init decrypts via config/load_keys.py -> writes DB_* files into internal volume serenity-secrets.
+# - Postgres reads POSTGRES_* from serenity-secrets files at container start.
+# - ONE Redis shared for dev+prod via unix-socket in tmpfs volume (serenity-redis-run) mounted at /app/run/redis.
+# - nginx + certbot included; nginx mounts static/media/stat volumes + certbot volumes + nginx configs.
+# NOTE:
+# - networks removed: default compose network is used.
 
 services:
+  # -------- SECRETS INIT (writes /run/serenity-secrets/*) --------
   mailer-secrets-init:
     build:
       context: .
@@ -27,17 +32,19 @@ services:
       - |
         set -e
         eval "$(python -m config.load_keys --print-export)"
+
         umask 077
         mkdir -p /run/serenity-secrets
 
-        [ -n "$${DB_NAME:-}" ] || { echo "DB_NAME missing" >&2; exit 2; }
-        [ -n "$${DB_USER:-}" ] || { echo "DB_USER missing" >&2; exit 2; }
-        [ -n "$${DB_PASSWORD:-}" ] || { echo "DB_PASSWORD missing" >&2; exit 2; }
+        [ -n "$${DB_NAME:-}" ] || { echo "DB_NAME missing"; exit 2; }
+        [ -n "$${DB_USER:-}" ] || { echo "DB_USER missing"; exit 2; }
+        [ -n "$${DB_PASSWORD:-}" ] || { echo "DB_PASSWORD missing"; exit 2; }
 
         printf %s "$$DB_NAME" > /run/serenity-secrets/DB_NAME
         printf %s "$$DB_USER" > /run/serenity-secrets/DB_USER
         printf %s "$$DB_PASSWORD" > /run/serenity-secrets/DB_PASSWORD
 
+  # -------- ONE DB (dev+prod) --------
   mailer-db:
     image: postgres:16
     container_name: mailer-db
@@ -58,17 +65,50 @@ services:
           -c pg_stat_statements.track=all
           -c pg_stat_statements.max=10000
       '
+    ports:
+      - "5433:5432"
 
-  mailer-redis-prod:
+  # -------- ONE REDIS (dev+prod), unix-socket in tmpfs --------
+  mailer-redis:
     image: redis:7-alpine
-    container_name: mailer-redis-prod
+    container_name: mailer-redis
     restart: unless-stopped
     command: >
-      /bin/sh -lc "mkdir -p /app/run/redis && chmod 777 /app/run/redis && exec redis-server /app/config/redis/redis-prod.conf"
+      /bin/sh -lc "exec redis-server /etc/redis/redis.conf"
     volumes:
-      - mailer-app-prod:/app
-      - mailer-redis-prod-run:/app/run/redis
+      - ./config/redis/redis-prod.conf:/etc/redis/redis.conf:ro
+      - serenity-redis-run:/app/run/redis
 
+  # -------- DEV: only mailer-web --------
+  mailer-web:
+    build:
+      context: .
+      dockerfile: .DockerFiles/Dockerfile_Django
+    container_name: mailer-web
+    working_dir: /app/web
+    restart: unless-stopped
+    user: "1001:1001"
+    depends_on: [mailer-db, mailer-redis]
+    environment:
+      PYTHONPATH: /app
+      DEBUG: "1"
+      SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
+      SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
+    volumes:
+      - ./:/app
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
+    ports:
+      - "8000:8000"
+    cpus: "0.5"
+    command: 
+      [
+        "/app/.venv/bin/python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('/app/.venv/bin/python',['/app/.venv/bin/python','manage.py','runserver','0.0.0.0:8000'])",
+      ]
+
+  # -------- PROD: init (translate + collectstatic) --------
   mailer-init-prod:
     build:
       context: .
@@ -77,11 +117,7 @@ services:
     container_name: mailer-init-prod
     working_dir: /app/web
     restart: "no"
-    depends_on:
-      mailer-db:
-        condition: service_started
-      mailer-redis-prod:
-        condition: service_started
+    depends_on: [mailer-db, mailer-redis]
     environment:
       PYTHONPATH: /app
       DEBUG: "0"
@@ -91,7 +127,8 @@ services:
       - mailer-app-prod:/app
       - mailer-static:/app/web/staticfiles
       - mailer-media:/app/web/media
-      - mailer-redis-prod-run:/app/run/redis
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
     command: >
       /bin/sh -lc "
         eval \"$(python -m config.load_keys --print-export)\" &&
@@ -112,7 +149,7 @@ services:
         condition: service_completed_successfully
       mailer-db:
         condition: service_started
-      mailer-redis-prod:
+      mailer-redis:
         condition: service_started
     environment:
       PYTHONPATH: /app
@@ -123,12 +160,18 @@ services:
       - mailer-app-prod:/app
       - mailer-static:/app/web/staticfiles
       - mailer-media:/app/web/media
-      - mailer-redis-prod-run:/app/run/redis
-    expose:
-      - "8000"
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
+    ports:
+      - "8001:8000"
     command:
-      ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('gunicorn',['gunicorn','mailer_web.wsgi:application','--bind','0.0.0.0:8000','--workers','2','--timeout','120'])"]
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('gunicorn',['gunicorn','mailer_web.wsgi:application','--bind','0.0.0.0:8000','--workers','2','--timeout','120'])",
+      ]
 
+  # -------- PROD ENGINE WORKERS --------
   mailer-engine-cb-prod:
     build:
       context: .
@@ -137,115 +180,161 @@ services:
     container_name: mailer-engine-cb-prod
     working_dir: /app
     restart: unless-stopped
-    depends_on: [mailer-db, mailer-redis-prod]
+    depends_on: [mailer-db, mailer-redis]
     environment:
       PYTHONPATH: /app
       SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
       SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
-      - mailer-redis-prod-run:/app/run/redis
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
     cpus: "0.15"
-    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_prepare.prepare_cb_processor'])"]
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_prepare.prepare_cb_processor'])",
+      ]
 
   mailer-engine-val-prod:
     image: mailer-engine-prod:latest
     container_name: mailer-engine-val-prod
     working_dir: /app
     restart: unless-stopped
-    depends_on: [mailer-db, mailer-redis-prod, mailer-engine-cb-prod]
+    depends_on: [mailer-db, mailer-redis, mailer-engine-cb-prod]
     environment:
       PYTHONPATH: /app
       SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
       SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
-      - mailer-redis-prod-run:/app/run/redis
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
     cpus: "0.15"
-    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_processor'])"]
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_processor'])",
+      ]
 
   mailer-engine-exp-prod:
     image: mailer-engine-prod:latest
     container_name: mailer-engine-exp-prod
     working_dir: /app
     restart: unless-stopped
-    depends_on: [mailer-db, mailer-redis-prod, mailer-engine-cb-prod]
+    depends_on: [mailer-db, mailer-redis, mailer-engine-cb-prod]
     environment:
       PYTHONPATH: /app
       SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
       SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
-      - mailer-redis-prod-run:/app/run/redis
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
     cpus: "0.15"
-    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_expand_processor'])"]
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_validate.val_expand_processor'])",
+      ]
 
   mailer-engine-rate-prod:
     image: mailer-engine-prod:latest
     container_name: mailer-engine-rate-prod
     working_dir: /app
     restart: unless-stopped
-    depends_on: [mailer-db, mailer-redis-prod, mailer-engine-cb-prod]
+    depends_on: [mailer-db, mailer-redis, mailer-engine-cb-prod]
     environment:
       PYTHONPATH: /app
       SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
       SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
-      - mailer-redis-prod-run:/app/run/redis
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
     cpus: "0.15"
-    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_rate.rate_contacts_processor'])"]
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_rate.rate_contacts_processor'])",
+      ]
 
   mailer-engine-cr-prod:
     image: mailer-engine-prod:latest
     container_name: mailer-engine-cr-prod
     working_dir: /app
     restart: unless-stopped
-    depends_on: [mailer-db, mailer-redis-prod, mailer-engine-cb-prod]
+    depends_on: [mailer-db, mailer-redis, mailer-engine-cb-prod]
     environment:
       PYTHONPATH: /app
       SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
       SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
-      - mailer-redis-prod-run:/app/run/redis
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
     cpus: "0.10"
-    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.crawler.cr_processor'])"]
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.crawler.cr_processor'])",
+      ]
 
   mailer-engine-stat-prod:
     image: mailer-engine-prod:latest
     container_name: mailer-engine-stat-prod
     working_dir: /app
     restart: unless-stopped
-    depends_on: [mailer-db, mailer-redis-prod]
+    depends_on: [mailer-db, mailer-redis]
     environment:
       PYTHONPATH: /app
       SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
       SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
-      - mailer-redis-prod-run:/app/run/redis
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
       - serenity-stat:/var/www/serenity-stat
     cpus: "0.10"
-    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_stats.stat_processor'])"]
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_stats.stat_processor'])",
+      ]
 
   mailer-engine-sender-prod:
     image: mailer-engine-prod:latest
     container_name: mailer-engine-sender-prod
     working_dir: /app
     restart: unless-stopped
-    depends_on: [mailer-db, mailer-redis-prod]
+    depends_on: [mailer-db, mailer-redis]
     environment:
       PYTHONPATH: /app
       SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
       SERENITY_KEYS_MASTER_KEY_OLD: ${SERENITY_KEYS_MASTER_KEY_OLD:-}
     volumes:
       - mailer-app-prod:/app
-      - mailer-redis-prod-run:/app/run/redis
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
     cpus: "0.10"
-    command: ["python","-c","import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_sender.sender'])"]
+    command:
+      [
+        "python",
+        "-c",
+        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('python',['python','-m','engine.core_sender.sender'])",
+      ]
 
+  # -------- OPS / TOOLBOX --------
   mailer-ops-prod:
+    build:
+      context: .
+      dockerfile: .DockerFiles/Dockerfile_ops
     image: mailer-ops-prod:latest
     container_name: mailer-ops-prod
     working_dir: /app
@@ -258,16 +347,18 @@ services:
       - mailer-app-prod:/app
       - mailer-static:/app/web/staticfiles
       - mailer-media:/app/web/media
-      - mailer-redis-prod-run:/app/run/redis
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
       - /home/eee/.ssh:/root/.ssh:ro
     command: ["sh","-lc","sleep infinity"]
 
+  # -------- nginx + certbot --------
   nginx:
     image: nginx:1.26
     container_name: serenity-nginx
     restart: unless-stopped
-    depends_on: [mailer-web-prod]
-    ports: ["80:80","443:443"]
+    depends_on: [mailer-web-prod, mailer-web]
+    ports: ["80:80", "443:443"]
     volumes:
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
@@ -291,17 +382,26 @@ services:
 volumes:
   mailer-db-data:
     external: true
+
   mailer-app-prod:
     external: true
   mailer-static:
     external: true
   mailer-media:
     external: true
-  mailer-redis-prod-run:
-    external: true
   serenity-stat:
     external: true
+    name: serenity-stat
 
   serenity-secrets:
+
+  # shared in-RAM unix-socket volume for redis (/app/run/redis/redis.sock)
+  serenity-redis-run:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: "size=64m,uid=1001,gid=1001,mode=0777"
+
   certbot-www:
   certbot-etc:
