@@ -1,8 +1,9 @@
-# FILE: web/mailer_web/middleware_public_lang.py  (обновлено — 2026-01-10)
+# FILE: web/mailer_web/middleware_public_lang.py  (обновлено — 2026-02-10)
 # PURPOSE:
 # - Public: язык через /{lang}/... + cookie+geo редиректы (как было), но синхронизируем serenity_lang и django_language.
 # - Panel (/panel/...): НИКАКИХ редиректов; activate(lang) по cookie. Приоритет: django_language (setlang) -> serenity_lang -> geo.
 #   Если пользователь переключил язык через setlang (django_language), синхронизируем serenity_lang = django_language, чтобы всё было едино.
+# - Admin (/admin/...): принудительно RU, без редиректов и без влияния переключалки.
 
 from __future__ import annotations
 
@@ -191,7 +192,15 @@ class PublicLangMiddleware:
             finally:
                 translation.deactivate()
 
-        # --- bypass for admin/static/i18n ---
+        # --- ADMIN: всегда RU, без редиректов/кук ---
+        if path.startswith("/admin/") or path == "/admin":
+            try:
+                _activate(request, "ru")
+                return self.get_response(request)
+            finally:
+                translation.deactivate()
+
+        # --- bypass for static/i18n (admin уже обработали выше) ---
         for pfx in cfg.bypass_prefixes:
             if path.startswith(pfx):
                 return self.get_response(request)

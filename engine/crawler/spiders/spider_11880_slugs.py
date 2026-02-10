@@ -1,6 +1,6 @@
-# FILE: engine/crawler/spiders/spider_11880_slugs.py  (обновлено — 2026-02-04)
+# FILE: engine/crawler/spiders/spider_11880_slugs.py  (обновлено — 2026-02-09)
 # PURPOSE: Scrapy-спайдер: собирает все /suche/<slug> со страниц https://www.11880.com/branchen*,
-#          берёт label из текста ссылки и пишет (upsert) в таблицу crwl_slug_11880.
+#          берёт label из текста ссылки и пишет (upsert) в таблицу branches_raw_11880 (уникально по slug).
 
 from __future__ import annotations
 
@@ -90,8 +90,9 @@ class Slugs11880Spider(scrapy.Spider):
         if not self._pairs:
             return
 
+        # гарантия уникальности: (1) _seen_slugs в рантайме, (2) UNIQUE(slug) в БД
         sql = """
-            INSERT INTO crwl_slug_11880 (slug, label)
+            INSERT INTO branches_raw_11880 (slug, label)
             VALUES (%s, %s)
             ON CONFLICT (slug)
             DO UPDATE SET
