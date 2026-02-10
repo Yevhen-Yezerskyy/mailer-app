@@ -1,0 +1,172 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+<!-- FILE: web/templates/admin/serenity/branches_sys_edit.html  (новое — 2026-02-10)
+     PURPOSE: Редактирование branches_raw_sys: поля + 2 блока (11880/GS) с мгновенным add/remove и поиском слева. -->
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate "Home" %}</a>
+  &rsaquo; Бранчи
+  &rsaquo; <a href="{% url 'admin:serenity_branches_sys' %}">SYS</a>
+  &rsaquo; Изменить
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content" class="content">
+
+  <h1>Бранчи SYS: изменить</h1>
+
+  <div class="module" style="max-width: 1100px; margin-bottom: 14px;">
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save">
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+      <fieldset class="module aligned">
+        <div class="form-row">
+          <div>
+            <label>label</label>
+            <input type="text" name="label" value="{{ label }}" style="min-width: 520px;">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div>
+            <label>label_rus</label>
+            <input type="text" name="label_rus" value="{{ label_rus }}" style="min-width: 520px;">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div>
+            <label><input type="checkbox" name="is_active" value="1" {% if is_active %}checked{% endif %}> active</label>
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="submit-row">
+        <input type="submit" value="Сохранить" class="default">
+        <a class="button" href="{% url 'admin:serenity_branches_sys' %}">Назад</a>
+      </div>
+    </form>
+  </div>
+
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+    <!-- 11880 block -->
+    <div class="module">
+      <h2>11880</h2>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div>
+          <form method="get" style="margin-bottom: 10px;">
+            <div>
+              <label>Поиск (активные, доступные)</label><br>
+              <input type="text" name="q11880" value="{{ q11880 }}" style="min-width: 240px;">
+              <input type="hidden" name="qgs" value="{{ qgs }}">
+              <button type="submit" class="button">Искать</button>
+            </div>
+          </form>
+
+          <div style="max-height: 520px; overflow:auto; border:1px solid #ddd; padding:8px;">
+            {% for r in left_11880 %}
+              <form method="post" style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_11880">
+                <input type="hidden" name="item_id" value="{{ r.id }}">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button class="button" type="submit">добавить</button>
+                <div>
+                  <div>{{ r.label }}</div>
+                  <div style="opacity:.7;">{% if r.label_rus %}{{ r.label_rus }}{% else %}—{% endif %}</div>
+                </div>
+              </form>
+            {% empty %}
+              <div style="opacity:.7;">Нет доступных.</div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div>
+          <div style="margin-bottom:10px; opacity:.8;">В списке</div>
+          <div style="max-height: 520px; overflow:auto; border:1px solid #ddd; padding:8px;">
+            {% for r in right_11880 %}
+              <form method="post" style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="del_11880">
+                <input type="hidden" name="item_id" value="{{ r.id }}">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button class="button" type="submit">удалить</button>
+                <div>
+                  <div>{{ r.label }}</div>
+                  <div style="opacity:.7;">{% if r.label_rus %}{{ r.label_rus }}{% else %}—{% endif %}</div>
+                </div>
+              </form>
+            {% empty %}
+              <div style="opacity:.7;">Пусто.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GS block -->
+    <div class="module">
+      <h2>GS</h2>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div>
+          <form method="get" style="margin-bottom: 10px;">
+            <div>
+              <label>Поиск (активные, доступные)</label><br>
+              <input type="text" name="qgs" value="{{ qgs }}" style="min-width: 240px;">
+              <input type="hidden" name="q11880" value="{{ q11880 }}">
+              <button type="submit" class="button">Искать</button>
+            </div>
+          </form>
+
+          <div style="max-height: 520px; overflow:auto; border:1px solid #ddd; padding:8px;">
+            {% for r in left_gs %}
+              <form method="post" style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_gs">
+                <input type="hidden" name="item_id" value="{{ r.id }}">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button class="button" type="submit">добавить</button>
+                <div>
+                  <div>{{ r.label }}</div>
+                  <div style="opacity:.7;">{% if r.label_rus %}{{ r.label_rus }}{% else %}—{% endif %}</div>
+                </div>
+              </form>
+            {% empty %}
+              <div style="opacity:.7;">Нет доступных.</div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div>
+          <div style="margin-bottom:10px; opacity:.8;">В списке</div>
+          <div style="max-height: 520px; overflow:auto; border:1px solid #ddd; padding:8px;">
+            {% for r in right_gs %}
+              <form method="post" style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="del_gs">
+                <input type="hidden" name="item_id" value="{{ r.id }}">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button class="button" type="submit">удалить</button>
+                <div>
+                  <div>{{ r.label }}</div>
+                  <div style="opacity:.7;">{% if r.label_rus %}{{ r.label_rus }}{% else %}—{% endif %}</div>
+                </div>
+              </form>
+            {% empty %}
+              <div style="opacity:.7;">Пусто.</div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

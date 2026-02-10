@@ -1,0 +1,115 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+<!-- FILE: web/templates/admin/serenity/branches_gs.html  (новое — 2026-02-10)
+     PURPOSE: UI для branches_raw_gs: поиск/фильтр/сортировка/пэйджинг, toggle is_active. -->
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate "Home" %}</a>
+  &rsaquo; Бранчи
+  &rsaquo; GS
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content" class="content">
+
+  <h1>Бранчи GS</h1>
+
+  <div class="module" style="margin-bottom:12px;">
+    <form method="get">
+      <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;">
+        <div>
+          <label>Поиск</label><br>
+          <input type="text" name="q" value="{{ q }}" style="min-width:320px;">
+        </div>
+
+        <div>
+          <label>Актив</label><br>
+          <select name="active">
+            <option value="1" {% if active == "1" %}selected{% endif %}>Только активные</option>
+            <option value="0" {% if active == "0" %}selected{% endif %}>Только неактивные</option>
+            <option value="all" {% if active == "all" %}selected{% endif %}>Все</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Сортировка</label><br>
+          <select name="sort">
+            <option value="label" {% if sort == "label" %}selected{% endif %}>label</option>
+            <option value="label_rus" {% if sort == "label_rus" %}selected{% endif %}>label_rus</option>
+          </select>
+        </div>
+
+        <div>
+          <label>На странице</label><br>
+          <input type="number" name="per_page" value="{{ per_page }}" min="1" max="1000" style="width:120px;">
+        </div>
+
+        <div>
+          <button type="submit" class="button">Показать</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+    <div style="display:flex; gap:10px; align-items:center; margin:10px 0;">
+      <span style="opacity:.8;">Всего: {{ total }} | Страница: {{ page }} / {{ pages }}</span>
+    </div>
+
+    <div class="module">
+      <table id="result_list">
+        <thead>
+          <tr>
+            <th style="width:90px;">id</th>
+            <th>slug</th>
+            <th>label</th>
+            <th>label_rus</th>
+            <th style="width:120px;">is_active</th>
+            <th style="width:120px;">toggle</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr class="{% cycle 'row1' 'row2' %}">
+            <td>{{ r.id }}</td>
+            <td style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;">
+              {{ r.slug }}
+            </td>
+            <td>{{ r.label }}</td>
+            <td>{% if r.label_rus %}{{ r.label_rus }}{% else %}<span style="opacity:.5;">—</span>{% endif %}</td>
+            <td>{% if r.is_active %}<strong>true</strong>{% else %}false{% endif %}</td>
+            <td>
+              <button type="submit" class="button" name="toggle_id" value="{{ r.id }}">
+                {% if r.is_active %}выкл{% else %}вкл{% endif %}
+              </button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6">Ничего не найдено.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </form>
+
+  <div style="margin-top:14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+    {% if page > 1 %}
+      <a class="button" href="?{{ qs }}&page=1">« 1</a>
+      <a class="button" href="?{{ qs }}&page={{ page|add:"-1" }}">‹</a>
+    {% endif %}
+
+    <span style="padding:0 6px;">{{ page }} / {{ pages }}</span>
+
+    {% if page < pages %}
+      <a class="button" href="?{{ qs }}&page={{ page|add:"1" }}">›</a>
+      <a class="button" href="?{{ qs }}&page={{ pages }}">» {{ pages }}</a>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

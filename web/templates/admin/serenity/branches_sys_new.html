@@ -1,0 +1,52 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+<!-- FILE: web/templates/admin/serenity/branches_sys_new.html  (новое — 2026-02-10)
+     PURPOSE: Добавление branches_raw_sys (label/label_rus/is_active). После создания редирект в edit. -->
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">{% translate "Home" %}</a>
+  &rsaquo; Бранчи
+  &rsaquo; <a href="{% url 'admin:serenity_branches_sys' %}">SYS</a>
+  &rsaquo; Добавить
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content" class="content">
+  <h1>Бранчи SYS: добавить</h1>
+
+  <div class="module" style="max-width: 860px;">
+    <form method="post">
+      {% csrf_token %}
+
+      <fieldset class="module aligned">
+        <div class="form-row">
+          <div>
+            <label>label</label>
+            <input type="text" name="label" style="min-width: 420px;">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div>
+            <label>label_rus</label>
+            <input type="text" name="label_rus" style="min-width: 420px;">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div>
+            <label><input type="checkbox" name="is_active" value="1" checked> active</label>
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="submit-row">
+        <input type="submit" value="Создать" class="default">
+        <a class="button" href="{% url 'admin:serenity_branches_sys' %}">Отмена</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,20 @@
+{% load i18n %}
+<!-- FILE: web/templates/admin/nav_sidebar.html  (обновлено — 2026-02-10)
+     CHANGE: В секцию "Бранчи" добавлена ссылка на SYS. -->
+
+<button class="sticky toggle-nav-sidebar" id="toggle-nav-sidebar" aria-label="{% translate 'Toggle navigation' %}"></button>
+<nav class="sticky" id="nav-sidebar" aria-label="{% translate 'Sidebar' %}">
+  <input type="search" id="nav-filter"
+         placeholder="{% translate 'Start typing to filter…' %}"
+         aria-label="{% translate 'Filter navigation items' %}">
+  {% include 'admin/app_list.html' with app_list=available_apps show_changelinks=False %}
+
+  <div class="module" style="margin-top: 12px;">
+    <h2>Бранчи</h2>
+    <ul>
+      <li><a href="{% url 'admin:serenity_branches_11880' %}">11880</a></li>
+      <li><a href="{% url 'admin:serenity_branches_gs' %}">GS</a></li>
+      <li><a href="{% url 'admin:serenity_branches_sys' %}">SYS</a></li>
+    </ul>
+  </div>
+</nav>
