@@ -2,9 +2,9 @@
 # PATH: engine/common/mail/smtp.py
 # DATE: 2026-02-11
 # SUMMARY:
-# - Добавлен единый полный file-log всех SMTP действий (CONNECT/AUTH/SEND/DISCONNECT)
-#   в logs/smtp.log (каждая запись — одна JSON-строка).
-# - Логируется всё из self.trace, best-effort, без влияния на отправку.
+# - Единый полный file-log всех SMTP действий (CONNECT/AUTH/SEND/DISCONNECT) в logs/smtp.log (JSONL), best-effort.
+# - Исправлено: SMTP-ошибки с кодом, приходящие через исключения (SMTPRecipientsRefused/SMTPDataError/SMTPSenderRefused/SMTPResponseException),
+#   теперь нормализуются в data.refused{rcpt:{code,resp}} чтобы send_one() корректно классифицировал 4xx/5xx.
 
 from __future__ import annotations
 
@@ -158,16 +158,19 @@ class SMTPConn:
 
         msg = EmailMessage()
 
+        # --- defaults ---
         from_value = f'{self.sender_name} <{self.from_email}>' if self.sender_name else self.from_email
         msg["From"] = from_value
         msg["To"] = to_email
         msg["Subject"] = subject
         msg["X-Mailer-App"] = "Serenity Mailer"
 
+        # --- DB extra headers override defaults ---
         for k, v in (self.extra_headers or {}).items():
             if k and v:
                 msg[k] = v
 
+        # --- call headers override everything ---
         if headers:
             for k, v in headers.items():
                 if k and v:
@@ -201,7 +204,52 @@ class SMTPConn:
             self._set_log("SEND", STATUS_OK, {"to": to_email, "refused": {}})
             return True
 
+        except smtplib.SMTPRecipientsRefused as e:
+            # e.recipients: {rcpt: (code, msg)}
+            refused_s: Dict[str, Any] = {}
+            try:
+                for rcpt, rr in (getattr(e, "recipients", {}) or {}).items():
+                    try:
+                        code = int(rr[0])
+                        resp = _b2s(rr[1])
+                    except Exception:
+                        code, resp = None, str(rr)
+                    refused_s[str(rcpt)] = {"code": code, "resp": resp}
+            except Exception:
+                refused_s = {}
+
+            if not refused_s:
+                refused_s = {str(to_email): {"code": None, "resp": "SMTPRecipientsRefused"}}
+
+            self._set_log("SEND", STATUS_FAILED, {"to": to_email, "refused": refused_s})
+            return False
+
+        except smtplib.SMTPSenderRefused as e:
+            # отказ на MAIL FROM (код есть) — нормализуем как refused по "to", чтобы send_one мог классифицировать 4xx/5xx.
+            code = getattr(e, "smtp_code", None)
+            err = _b2s(getattr(e, "smtp_error", None))
+            refused_s = {str(to_email): {"code": int(code) if code is not None else None, "resp": err or "SMTPSenderRefused"}}
+            self._set_log("SEND", STATUS_FAILED, {"to": to_email, "refused": refused_s, "stage": "MAIL_FROM"})
+            return False
+
+        except smtplib.SMTPDataError as e:
+            # отказ на DATA (код есть)
+            code = getattr(e, "smtp_code", None)
+            err = _b2s(getattr(e, "smtp_error", None))
+            refused_s = {str(to_email): {"code": int(code) if code is not None else None, "resp": err or "SMTPDataError"}}
+            self._set_log("SEND", STATUS_FAILED, {"to": to_email, "refused": refused_s, "stage": "DATA"})
+            return False
+
+        except smtplib.SMTPResponseException as e:
+            # общий случай: есть smtp_code/smtp_error
+            code = getattr(e, "smtp_code", None)
+            err = _b2s(getattr(e, "smtp_error", None))
+            refused_s = {str(to_email): {"code": int(code) if code is not None else None, "resp": err or "SMTPResponseException"}}
+            self._set_log("SEND", STATUS_FAILED, {"to": to_email, "refused": refused_s, "stage": "SMTP_RESPONSE"})
+            return False
+
         except Exception as e:
+            # системное/неструктурированное: не считаем адресатной ошибкой
             self._set_log("SEND", STATUS_FAILED, {"to": to_email, "error": "send_failed", "detail": str(e)})
             return False
 
