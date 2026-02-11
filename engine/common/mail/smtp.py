@@ -1,19 +1,20 @@
 # FILE: engine/common/mail/smtp.py
 # PATH: engine/common/mail/smtp.py
-# DATE: 2026-01-26
+# DATE: 2026-02-11
 # SUMMARY:
-# - From формируется ТОЛЬКО из aap_settings_smtp_mailboxes (sender_name + from_email).
-# - extra_headers_json из БД применяется (перетирает дефолты).
-# - headers из аргументов перетирают всё.
-# - credentials_json используется ТОЛЬКО для auth/connect (types.get не трогаем).
+# - Добавлен единый полный file-log всех SMTP действий (CONNECT/AUTH/SEND/DISCONNECT)
+#   в logs/smtp.log (каждая запись — одна JSON-строка).
+# - Логируется всё из self.trace, best-effort, без влияния на отправку.
 
 from __future__ import annotations
 
+import json
 import smtplib
 import ssl
 import time
 from datetime import datetime, timezone
 from email.message import EmailMessage
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, cast
 
 from engine.common import db
@@ -27,6 +28,20 @@ STATUS_FAILED = "FAILED"
 
 _DB_CACHE_TTL_SEC = 60
 _DB_CACHE_VERSION = "mailbox_creds_v2"
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_LOG_DIR = _PROJECT_ROOT / "logs"
+_SMTP_LOG_FILE = _LOG_DIR / "smtp.log"
+
+
+def _smtp_file_log(record: Dict[str, Any]) -> None:
+    try:
+        _LOG_DIR.mkdir(parents=True, exist_ok=True)
+        line = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+        with _SMTP_LOG_FILE.open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass  # never break sending because of logging
 
 
 def _smtp_load_from_db_uncached(q: Tuple[Optional[str], int]) -> Tuple[str, Dict[str, Any], str, str, Dict[str, Any]]:
@@ -109,6 +124,7 @@ class SMTPConn:
     def close(self) -> bool:
         if not self.conn_obj:
             self._set_log("DISCONNECT", STATUS_OK, {"note": "already_closed"})
+            self._flush_trace()
             return True
 
         c = self.conn_obj
@@ -125,6 +141,7 @@ class SMTPConn:
             return False
         finally:
             self.conn_obj = None
+            self._flush_trace()
 
     def _send_mail(
         self,
@@ -141,24 +158,16 @@ class SMTPConn:
 
         msg = EmailMessage()
 
-        # --- defaults ---
-        from_value = (
-            f'{self.sender_name} <{self.from_email}>'
-            if self.sender_name
-            else self.from_email
-        )
+        from_value = f'{self.sender_name} <{self.from_email}>' if self.sender_name else self.from_email
         msg["From"] = from_value
         msg["To"] = to_email
-        #msg["To"] = "yevhen.yezerskyy@gmail.com"
         msg["Subject"] = subject
         msg["X-Mailer-App"] = "Serenity Mailer"
 
-        # --- DB extra headers override defaults ---
         for k, v in (self.extra_headers or {}).items():
             if k and v:
                 msg[k] = v
 
-        # --- call headers override everything ---
         if headers:
             for k, v in headers.items():
                 if k and v:
@@ -206,6 +215,7 @@ class SMTPConn:
         headers: Optional[Dict[str, str]] = None,
     ) -> bool:
         if not self.conn():
+            self._flush_trace()
             return False
         try:
             return self._send_mail(
@@ -307,6 +317,11 @@ class SMTPConn:
         rec = {"action": action, "status": status, "data": d}
         self.log = rec
         self.trace.append(rec)
+
+    def _flush_trace(self) -> None:
+        for rec in self.trace:
+            _smtp_file_log(rec)
+        self.trace.clear()
 
 
 def _b2s(x: Any) -> str:
