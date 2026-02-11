@@ -369,7 +369,6 @@ class SMTPConn:
     def _flush_trace(self) -> None:
         for rec in self.trace:
             _smtp_file_log(rec)
-        self.trace.clear()
 
 
 def _b2s(x: Any) -> str:
