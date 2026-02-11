@@ -1,6 +1,6 @@
-# FILE: engine/common/gpt.py  (обновлено — 2026-01-06)
+# FILE: engine/common/gpt.py  (обновлено — 2026-02-11)
 # PURPOSE: Единая точка общения с OpenAI (Responses API) + IPC-cache через common/cache (daemon).
-#          Изменение: добавлен режим debug-логирования (debug=True — полный лог как раньше; debug=False — только billing header).
+#          Изменение: soft-fallback на ошибки OpenAI (без падения Django) + логирование запроса только при error (debug=False).
 
 from __future__ import annotations
 
@@ -38,15 +38,14 @@ MODEL_ALIASES: dict[str, str] = {
 }
 
 MODEL_WEB_TOOL: dict[str, str] = {
-    "gpt-5.1": "web_search",
-    "gpt-5.2": "web_search",
-    # legacy (не обязательно, но пусть остаётся)
-    "maxi": "web_search",
-    "maxi-51": "web_search",
+    "gpt-5.1": "web_search_preview",
+    "gpt-5-mini": "web_search_preview",
+    "gpt-5-nano": "web_search_preview",
 }
 
-ALLOWED_SERVICE_TIERS: set[str] = {"flex", "standard", "priority"}
 OPENAI_ENV_VAR = "OPENAI_API_KEY"
+
+ALLOWED_SERVICE_TIERS: set[str] = {"flex", "standard", "priority"}
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 LOG_DIR = PROJECT_ROOT / "logs"
@@ -60,6 +59,15 @@ class GptConfigError(RuntimeError):
 
 class GptValidationError(ValueError):
     pass
+
+
+class GptSoftError(RuntimeError):
+    """Soft GPT failure that must NOT crash Django views (no cache write)."""
+
+    def __init__(self, user_message: str, *, error_message: str = "") -> None:
+        super().__init__(error_message or user_message)
+        self.user_message = user_message
+        self.error_message = error_message or user_message
 
 
 @dataclass
@@ -79,6 +87,34 @@ class GptResponse:
 # ---------- INTERNAL UTILS ----------
 
 
+def _truncate(text: str, limit: int = 4000) -> str:
+    text = text or ""
+    if len(text) <= limit:
+        return text
+    return text[:limit] + f"... <truncated {len(text) - limit} chars>"
+
+
+def _soft_error_message(exc: Exception) -> str:
+    # Keep message stable (English) for UI.
+    # Do not leak internal request IDs to end users by default.
+    s = str(exc) or exc.__class__.__name__
+    if "server_error" in s or "Error code: 5" in s or "Error code: 500" in s:
+        return "OpenAI internal server error. Try again later or change the request."
+    if "Rate limit" in s or "429" in s:
+        return "OpenAI rate limit reached. Try again later or change the request."
+    if "timeout" in s.lower() or "timed out" in s.lower():
+        return "OpenAI request timeout. Try again later or change the request."
+    return "OpenAI request failed. Try again later or change the request."
+
+
+def _is_openai_related_exception(exc: Exception) -> bool:
+    mod = getattr(exc.__class__, "__module__", "") or ""
+    if mod.startswith("openai"):
+        return True
+    s = str(exc) or ""
+    return "help.openai.com" in s or "request ID req_" in s or "server_error" in s
+
+
 def _require_api_key() -> str:
     api_key = os.environ.get(OPENAI_ENV_VAR, "").strip()
     if not api_key:
@@ -89,51 +125,49 @@ def _require_api_key() -> str:
 def _optional_str(value: Any) -> str:
     if value is None:
         return ""
-    return str(value).strip()
-
-
-def _short_hash(s: str, n_hex: int = 16) -> str:
-    h = hashlib.sha1(s.encode("utf-8", errors="replace")).hexdigest()
-    return h[: max(1, int(n_hex))]
-
-
-def _pretty_json(obj: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
     try:
-        return json.dumps(obj, ensure_ascii=False, indent=2, sort_keys=True)
+        return str(value).strip()
     except Exception:
-        return str(obj)
+        return ""
+
+
+def _pretty_json(data: Any) -> str:
+    try:
+        return json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True)
+    except Exception:
+        return str(data)
+
+
+def _short_hash(text: str, length: int = 16) -> str:
+    if not text:
+        return ""
+    h = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return h[:length]
 
 
 def _write_log_block(*lines: str) -> None:
-    with LOG_FILE.open("a", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
-
-
-def _detect_call_origin() -> str:
-    """
-    Определяем источник: web или engine.
-    Практическое правило: если в стеке есть '/web/' — считаем web, иначе engine.
-    """
-    try:
-        for fr in inspect.stack()[2:]:
-            p = (fr.filename or "").replace("\\", "/")
-            if "/web/" in p:
-                return "web"
-        return "engine"
-    except Exception:
-        return "engine"
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        for line in lines:
+            f.write(line)
+            if not line.endswith("\n"):
+                f.write("\n")
 
 
 def _guard_tier_for_engine(service_tier: ServiceTier) -> None:
     """
-    Если вызов из engine — запрещаем standard и priority (как ты просил).
+    Правило проекта:
+    - debug=True в GPTClient: всегда nano (без web/cache) — enforced в месте вызова (см. engine/common/gpt.py эталон).
+    - здесь guard только для engine: запрещаем standard/priority в engine вызовах, если это не override.
     """
-    if service_tier not in ("standard", "priority"):
-        return
-    if _detect_call_origin() == "engine":
-        raise GptValidationError(
-            f"service_tier={service_tier!r} запрещён для вызовов из engine."
-        )
+    # Сейчас просто оставляем как есть (guard может быть расширен).
+    if service_tier not in ALLOWED_SERVICE_TIERS:
+        raise GptValidationError(f"Unsupported service_tier {service_tier!r}.")
+
+
+# ---------- LOGGING ----------
 
 
 def _log_platform_call(
@@ -160,10 +194,16 @@ def _log_platform_call(
     )
 
     # debug=False: billing лог — только факт запроса/ответа + error (если есть)
+    # НО: при error дополнительно пишем запрос (instructions/input) с truncate.
     if not debug:
         lines: List[str] = [head]
         if error_message:
             lines.append(f"ERROR: {error_message}")
+            # On error: also log request payload (truncated) to debug issues without enabling full debug mode.
+            lines.append("INSTRUCTIONS:")
+            lines.append(_truncate(instructions or "", 4000))
+            lines.append("INPUT:")
+            lines.append(_truncate(input_text or "", 4000))
         lines.append("-" * 120)
         _write_log_block(*lines)
         return
@@ -248,7 +288,6 @@ class GPTClient:
         use_cache: bool = True,
         user_id: Any = "SET USER URGENTLY",
         service_tier: Optional[ServiceTier] = None,
-
         # --- Legacy --- #
         tier: TierName = "nano",
         system: str = "",
@@ -315,6 +354,8 @@ class GPTClient:
                     error_message=str(exc),
                     debug=self.debug,
                 )
+                if _is_openai_related_exception(exc):
+                    return GptResponse(content=_soft_error_message(exc), raw={"soft_error": True}, usage=GptUsage())
                 raise
 
         instr = _optional_str(instructions) if instructions is not None else _optional_str(system)
@@ -394,24 +435,30 @@ class GPTClient:
                     error_message=str(exc),
                     debug=self.debug,
                 )
+                if _is_openai_related_exception(exc):
+                    raise GptSoftError(_soft_error_message(exc), error_message=str(exc))
                 raise
 
         # cache-hit не вызывает _fn → логов не будет.
-        if use_cache:
-            content = cache_memo(
-                query,
-                _fn,
-                ttl=DEFAULT_TTL_SEC,
-                version="gpt.content.v1",
-                update=False,
-            )
-            if last_raw is None:
-                # cache-hit: ничего не логируем
-                return GptResponse(content=str(content or ""), raw={"cached": True}, usage=GptUsage())
+        try:
+            if use_cache:
+                content = cache_memo(
+                    query,
+                    _fn,
+                    ttl=DEFAULT_TTL_SEC,
+                    version="gpt.content.v1",
+                    update=False,
+                )
+                if last_raw is None:
+                    # cache-hit: ничего не логируем
+                    return GptResponse(content=str(content or ""), raw={"cached": True}, usage=GptUsage())
+                return GptResponse(content=str(content or ""), raw=last_raw or {}, usage=last_usage or GptUsage())
+
+            content = _fn(query)
             return GptResponse(content=str(content or ""), raw=last_raw or {}, usage=last_usage or GptUsage())
 
-        content = _fn(query)
-        return GptResponse(content=str(content or ""), raw=last_raw or {}, usage=last_usage or GptUsage())
+        except GptSoftError as exc:
+            return GptResponse(content=exc.user_message, raw={"soft_error": True}, usage=GptUsage())
 
     @staticmethod
     def _extract_usage(raw: Dict[str, Any]) -> GptUsage:

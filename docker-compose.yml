@@ -1,7 +1,8 @@
-# FILE: docker-compose.yml  (обновлено — 2026-02-09)
+# FILE: docker-compose.yml  (обновлено — 2026-02-10)
 # PURPOSE:
-# - Fix Postgres crash: do NOT use login-shell (-l) in db command (it can reset PATH => initdb not found).
-# - Fix YAML issues: remove trailing commas in JSON-style command arrays (mailer-web / mailer-web-prod).
+# - Ensure ALL prod logs live inside the project directory (/app/logs in mailer-app-prod volume), not on host bind-mount.
+# - Gunicorn (prod): write access/error logs to /app/logs/gunicorn_*.log (+ capture stdout/stderr).
+# - Nginx: stop using ./logs:/app/logs bind-mount; write logs into /app/logs in mailer-app-prod volume.
 # - Keep secrets flow (serenity-secrets), single redis unix-socket tmpfs, nginx+certbot as-is.
 
 services:
@@ -168,11 +169,8 @@ services:
     ports:
       - "8001:8000"
     command:
-      [
-        "python",
-        "-c",
-        "import os; from config.load_keys import init_keys; init_keys(); os.execvp('gunicorn',['gunicorn','mailer_web.wsgi:application','--bind','0.0.0.0:8000','--workers','2','--timeout','120'])"
-      ]
+      ["python","-c","from config.load_keys import init_keys; init_keys(); import os; os.makedirs('/app/logs', exist_ok=True); os.execvp('gunicorn',['gunicorn','mailer_web.wsgi:application','--bind','0.0.0.0:8000','--workers','2','--timeout','120','--access-logfile','/app/logs/gunicorn_access.log','--error-logfile','/app/logs/gunicorn_error.log','--capture-output','--log-level','info'])"]
+
 
   # -------- PROD ENGINE WORKERS --------
   mailer-engine-cb-prod:
@@ -367,12 +365,20 @@ services:
     volumes:
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./logs:/app/logs
+      - mailer-app-prod:/app
       - mailer-static:/var/www/mail-static:ro
       - mailer-media:/var/www/mail-media
       - serenity-stat:/var/www/serenity-stat
       - certbot-www:/var/www/certbot
       - certbot-etc:/etc/letsencrypt
+    command:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mkdir -p /app/logs
+        chmod 777 /app/logs || true
+        exec nginx -g 'daemon off;'
 
 
 volumes:

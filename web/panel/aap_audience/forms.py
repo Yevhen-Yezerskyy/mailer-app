@@ -89,9 +89,6 @@ class AudienceHowBuyForm(AudienceHowSellForm):
         self.fields["what"].widget.attrs["placeholder"] = _(
             "Продукт / услуга. Что именно Вы приобретаете? Суть, бизнес-характеристики"
         )
-        self.fields["what"].initial = _(
-            "Необходимо приобрести: "
-        )
         
         self.fields["who"].label = _(
             "Компания-покупатель. Кто Вы? Направление деятельности, опыт, достижения, репутация."
@@ -99,18 +96,12 @@ class AudienceHowBuyForm(AudienceHowSellForm):
         self.fields["who"].widget.attrs["placeholder"] = _(
             "Название компании, сайт, страна и краткая информация о покупателе"
         )
-        self.fields["who"].initial = _(
-            "Покупатель:"
-        )
 
         self.fields["geo"].label = _(
             "География покупки в Германии. Возможности и ограничения. Территория, логистика."
         )
         self.fields["geo"].widget.attrs["placeholder"] = _(
             "Регионы Германии, допустимая логистика, требования к месту доставки / месту оказания услуги."
-        )
-        self.fields["geo"].initial = _(
-            "География:"
         )
 
 
