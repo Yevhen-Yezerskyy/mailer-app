@@ -15,10 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --- SECURITY ---
 
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-3m*cqi8#r2wwaw=n_*mj2@7u+%(wys52q*n$!lr8f3r9jg#ksg",
-)
+SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
 
 # DEBUG from env (default = True for backward compat)
 DEBUG = os.environ.get("DEBUG", "1") not in ("0", "false", "False", "no", "NO")
