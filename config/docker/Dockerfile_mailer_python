@@ -1,4 +1,4 @@
-# FILE: .DockerFiles/Dockerfile_mailer_python
+# FILE: config/docker/Dockerfile_mailer_python
 # DATE: 2026-02-21
 # PURPOSE: Unified Python runtime image for Django web, engine workers, and tools.
 
@@ -22,7 +22,7 @@ RUN apt-get update \
       postgresql-client \
  && rm -rf /var/lib/apt/lists/*
 
-COPY requirements/mailer.lock.txt /tmp/requirements/mailer.lock.txt
+COPY config/docker/mailer.lock.txt /tmp/requirements/mailer.lock.txt
 
 RUN python -m pip install --no-cache-dir -U pip \
  && pip install --no-cache-dir -r /tmp/requirements/mailer.lock.txt \

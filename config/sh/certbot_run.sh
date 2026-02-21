@@ -121,44 +121,43 @@ if [ ! -s "$tmp_certs" ]; then
   exit 1
 fi
 
-while IFS= read -r cert_name; do
-  [ -n "$cert_name" ] || continue
-  domains="$(awk -F '\t' -v c="$cert_name" '$1 == c {print $2}' "$tmp_pairs" | sort -u)"
-  if [ -z "$domains" ]; then
-    domains="$cert_name"
-  fi
-
-  set -- certbot certonly \
-    --non-interactive \
-    --agree-tos \
-    --email "$EMAIL" \
-    --keep-until-expiring \
-    --expand \
-    --cert-name "$cert_name"
-
-  if [ "$MODE" = "init" ]; then
-    set -- "$@" --standalone --preferred-challenges http
-  else
-    set -- "$@" --webroot -w "$WEBROOT"
-  fi
-
-  if [ "$STAGING" = "1" ]; then
-    set -- "$@" --test-cert
-  fi
-
-  has_cert_name=0
-  for d in $domains; do
-    [ "$d" = "$cert_name" ] && has_cert_name=1
-    set -- "$@" -d "$d"
-  done
-  [ "$has_cert_name" -eq 1 ] || set -- "$@" -d "$cert_name"
-
-  "$@"
-done < "$tmp_certs"
-
-reload_nginx_if_shared_pid
-
 if [ "$MODE" = "init" ]; then
+  while IFS= read -r cert_name; do
+    [ -n "$cert_name" ] || continue
+    if [ -s "$LE_DIR/live/$cert_name/fullchain.pem" ] && [ -s "$LE_DIR/live/$cert_name/privkey.pem" ]; then
+      echo "INFO: cert exists, skip init issue: $cert_name"
+      continue
+    fi
+
+    domains="$(awk -F '\t' -v c="$cert_name" '$1 == c {print $2}' "$tmp_pairs" | sort -u)"
+    if [ -z "$domains" ]; then
+      domains="$cert_name"
+    fi
+
+    set -- certbot certonly \
+      --non-interactive \
+      --agree-tos \
+      --email "$EMAIL" \
+      --keep-until-expiring \
+      --expand \
+      --cert-name "$cert_name" \
+      --standalone \
+      --preferred-challenges http
+
+    if [ "$STAGING" = "1" ]; then
+      set -- "$@" --test-cert
+    fi
+
+    has_cert_name=0
+    for d in $domains; do
+      [ "$d" = "$cert_name" ] && has_cert_name=1
+      set -- "$@" -d "$d"
+    done
+    [ "$has_cert_name" -eq 1 ] || set -- "$@" -d "$cert_name"
+
+    "$@"
+  done < "$tmp_certs"
+
   certbot certificates
   exit 0
 fi

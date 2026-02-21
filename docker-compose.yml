@@ -6,7 +6,7 @@ services:
   mailer-set-env:
     build:
       context: .
-      dockerfile: .DockerFiles/Dockerfile_mailer_python
+      dockerfile: config/docker/Dockerfile_mailer_python
     image: mailer-python:latest
     container_name: mailer-set-env
     working_dir: /app
