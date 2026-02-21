@@ -10,15 +10,15 @@ import io
 import os
 import re
 import secrets
+import shlex
 import sys
 import tokenize
 from pathlib import Path
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 MASTER_ENV = "SERENITY_KEYS_MASTER_KEY"
-MASTER_OLD_ENV = "SERENITY_KEYS_MASTER_KEY_OLD"
 PREFIX = "v1:gcm:"
 
 
@@ -259,20 +259,22 @@ def _token_rewrite_keys_dict(src: str, updates: Dict[str, Tuple[str, str]]) -> s
 
 
 # FILE: config/load_keys.py
-# DATE: 2026-01-25
-# PURPOSE: Full rewrite of init_keys() and main(): add --print-export to export decrypted keys into caller shell via eval.
+# DATE: 2026-02-21
+# PURPOSE: Unified key workflow with explicit modes:
+# - seal: encrypt plaintext values from KEYS[*].decrypted into KEYS[*].encrypted and clear plaintext.
+# - load: decrypt KEYS[*].encrypted into process env (or print shell exports).
 
-def init_keys(print_keys: bool = False, print_export: bool = False) -> None:
+def _resolve_master() -> bytes:
     master = _parse_master_key(os.environ.get(MASTER_ENV, ""))
-    old_raw = (os.environ.get(MASTER_OLD_ENV) or "").strip()
-    master_old = _parse_master_key(old_raw) if old_raw else None
+    return master
 
+
+def _seal_keys(master: bytes) -> None:
     path = _keys_file()
     src = path.read_text(encoding="utf-8")
-
     keys = _exec_keys(src, str(path))
 
-    # Step 1: encrypt any plaintext (decrypted -> encrypted) and clear decrypted, then rewrite file preserving comments/format
+    # Encrypt plaintext values (decrypted -> encrypted), then clear decrypted.
     updates: Dict[str, Tuple[str, str]] = {}
     for name, item in keys.items():
         dec = (item.get("decrypted") or "").strip()
@@ -283,38 +285,61 @@ def init_keys(print_keys: bool = False, print_export: bool = False) -> None:
         new_src = _token_rewrite_keys_dict(src, updates)
         if new_src != src:
             path.write_text(new_src, encoding="utf-8")
-        # reload after rewrite
-        src = path.read_text(encoding="utf-8")
-        keys = _exec_keys(src, str(path))
 
-    # Step 2: decrypt and either export to shell or set into current process env
+
+def _load_keys(master: bytes, print_keys: bool = False, print_export: bool = False) -> None:
+    path = _keys_file()
+    src = path.read_text(encoding="utf-8")
+    keys = _exec_keys(src, str(path))
+
+    # Decrypt and either export to shell or set into current process env.
     for name, item in keys.items():
         enc = (item.get("encrypted") or "").strip()
         if not enc:
             continue
 
-        try:
-            val = _decrypt(master, enc)
-        except Exception:
-            if master_old is None:
-                raise
-            val = _decrypt(master_old, enc)
+        val = _decrypt(master, enc)
 
         if print_export:
-            # shell-safe via python repr single quotes
-            print(f"export {name}={val!r}")
+            print(f"export {name}={shlex.quote(val)}")
         else:
             os.environ[name] = val
             if print_keys:
                 print(f"{name}={val}")
 
 
+def init_keys(
+    print_keys: bool = False,
+    print_export: bool = False,
+    do_seal: bool = True,
+    do_load: bool = True,
+) -> None:
+    master = _resolve_master()
+
+    if do_seal:
+        _seal_keys(master)
+
+    if do_load:
+        _load_keys(master, print_keys=print_keys, print_export=print_export)
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("--print", action="store_true", help="Print decrypted keys (process-only).")
     p.add_argument("--print-export", action="store_true", help="Print shell export lines (use with eval).")
+    p.add_argument("--seal-only", action="store_true", help="Only seal plaintext KEYS[*].decrypted into encrypted.")
+    p.add_argument("--load-only", action="store_true", help="Only decrypt encrypted keys and load/export.")
     args = p.parse_args()
-    init_keys(print_keys=args.print, print_export=args.print_export)
+
+    if args.seal_only and args.load_only:
+        raise SystemExit("Use either --seal-only or --load-only, not both.")
+
+    if args.seal_only:
+        init_keys(do_seal=True, do_load=False)
+    elif args.load_only:
+        init_keys(print_keys=args.print, print_export=args.print_export, do_seal=False, do_load=True)
+    else:
+        init_keys(print_keys=args.print, print_export=args.print_export, do_seal=True, do_load=True)
     return 0
 
 

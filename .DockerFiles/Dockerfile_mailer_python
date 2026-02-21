@@ -1,0 +1,32 @@
+# FILE: .DockerFiles/Dockerfile_mailer_python
+# DATE: 2026-02-21
+# PURPOSE: Unified Python runtime image for Django web, engine workers, and tools.
+
+FROM python:3.12-slim
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      gettext \
+      dnsutils \
+      git \
+      ca-certificates \
+      curl \
+      wget \
+      nano \
+      vim-tiny \
+      less \
+      procps \
+      iproute2 \
+      openssh-client \
+      tzdata \
+      postgresql-client \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY requirements/mailer.lock.txt /tmp/requirements/mailer.lock.txt
+
+RUN python -m pip install --no-cache-dir -U pip \
+ && pip install --no-cache-dir -r /tmp/requirements/mailer.lock.txt \
+ && rm -rf /tmp/requirements
+
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1
