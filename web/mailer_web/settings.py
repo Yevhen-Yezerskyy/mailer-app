@@ -58,6 +58,8 @@ INSTALLED_APPS = [
     "panel.aap_campaigns",
 ]
 
+AUTH_USER_MODEL = "public.ClientUser"
+
 # --- MIDDLEWARE ---
 
 MIDDLEWARE = [

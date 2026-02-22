@@ -4,13 +4,13 @@
 
 from uuid import uuid4
 
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.db import models
 
 
 class FrontUser(models.Model):
     user = models.OneToOneField(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="front",
     )
@@ -24,7 +24,7 @@ class FrontUser(models.Model):
 
 class UserWorkspace(models.Model):
     user = models.OneToOneField(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="workspace_link",
     )
