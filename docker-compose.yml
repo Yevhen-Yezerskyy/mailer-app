@@ -20,6 +20,7 @@ services:
       - ./logs:/host-logs
       - serenity-logs:/serenity-logs
       - ./config/sh/init_set_env.sh:/usr/local/bin/init_set_env.sh:ro
+      - ./config/sh/trim_host_logs.sh:/usr/local/bin/trim_host_logs.sh:ro
       - mailer-app-prod:/app
       - serenity-secrets:/run/serenity-secrets
     command:

@@ -32,4 +32,12 @@ python -m config.load_keys --seal-only
 python -m config.load_keys --load-only --print-export > /run/serenity-secrets/runtime.env
 chmod 644 /run/serenity-secrets/runtime.env
 
+# host logs: hourly trim loop (24 MB max per file, keep 16 MB tail)
+(
+  while :; do
+    /usr/local/bin/trim_host_logs.sh || true
+    sleep 3600
+  done
+) &
+
 exec sleep infinity
