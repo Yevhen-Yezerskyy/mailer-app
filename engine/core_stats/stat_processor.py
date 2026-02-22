@@ -2,7 +2,7 @@
 # PATH: engine/core_stats/stat_processor.py
 # DATE: 2026-01-31
 # SUMMARY:
-# - Parse smrel.log from mounted volume
+# - Parse smrel.log from serenity-logs volume
 # - Batch insert into mailbox_stats(letter_id, time)
 # - Append-only processing with file offset
 # - Run via engine.common.worker.Worker (run_forever)
@@ -15,8 +15,8 @@ from datetime import datetime
 from engine.common.db import execute
 from engine.common.worker import Worker
 
-LOG_PATH = "/var/www/serenity-stat/smrel.log"
-OFFSET_PATH = "/var/www/serenity-stat/.smrel.offset"
+LOG_PATH = "/serenity-logs/smrel/smrel.log"
+OFFSET_PATH = "/serenity-logs/smrel/.smrel.offset"
 BATCH_SIZE = 500
 
 
@@ -29,6 +29,7 @@ def _load_offset() -> int:
 
 
 def _save_offset(offset: int) -> None:
+    os.makedirs(os.path.dirname(OFFSET_PATH), exist_ok=True)
     with open(OFFSET_PATH, "w") as f:
         f.write(str(offset))
 

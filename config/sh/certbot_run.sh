@@ -14,6 +14,26 @@ LE_DIR="${CERTBOT_LE_DIR:-/etc/letsencrypt}"
 EMAIL="${CERTBOT_EMAIL:?CERTBOT_EMAIL is required}"
 RENEW_INTERVAL_SECONDS="${CERTBOT_RENEW_INTERVAL_SECONDS:-43200}"
 STAGING="${CERTBOT_STAGING:-0}"
+HOST_LOG_DIR="${CERTBOT_HOST_LOG_DIR:-/host-logs/certbot}"
+SYS_LOG_DIR="${CERTBOT_SYS_LOG_DIR:-/serenity-logs/certbot}"
+
+LOG_BASENAME="certbot.log"
+if [ "$MODE" = "init" ]; then
+  LOG_BASENAME="certbot-init.log"
+fi
+HOST_LOG_FILE="$HOST_LOG_DIR/$LOG_BASENAME"
+SYS_LOG_FILE="$SYS_LOG_DIR/$LOG_BASENAME"
+
+mkdir -p "$HOST_LOG_DIR" "$SYS_LOG_DIR"
+
+LOG_PIPE="/tmp/certbot-log.pipe.$$"
+rm -f "$LOG_PIPE"
+mkfifo "$LOG_PIPE"
+tee -a "$HOST_LOG_FILE" "$SYS_LOG_FILE" <"$LOG_PIPE" &
+exec >"$LOG_PIPE" 2>&1
+rm -f "$LOG_PIPE"
+
+echo "INFO: certbot logger enabled mode=$MODE host_log=$HOST_LOG_FILE sys_log=$SYS_LOG_FILE"
 
 mkdir -p "$WEBROOT"
 

@@ -12,8 +12,10 @@ mkdir -p \
   /host-logs/django-prod \
   /host-logs/nginx \
   /host-logs/postgres \
+  /host-logs/smrel \
   /serenity-logs \
-  /serenity-logs/nginx
+  /serenity-logs/nginx \
+  /serenity-logs/smrel
 
 chmod 777 \
   /host-logs \
@@ -21,8 +23,10 @@ chmod 777 \
   /host-logs/django-prod \
   /host-logs/nginx \
   /host-logs/postgres \
+  /host-logs/smrel \
   /serenity-logs \
-  /serenity-logs/nginx
+  /serenity-logs/nginx \
+  /serenity-logs/smrel
 
 python -m config.load_keys --seal-only
 python -m config.load_keys --load-only --print-export > /run/serenity-secrets/runtime.env

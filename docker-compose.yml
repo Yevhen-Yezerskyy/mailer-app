@@ -48,7 +48,6 @@ services:
       - serenity-redis-run:/app-dev/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
       - /home/eee/.ssh:/root/.ssh:ro
-      - serenity-stat:/serenity-stat
       - ./:/app-dev
     command: ["/app/config/sh/with-secrets.sh", "sleep", "infinity"]
 
@@ -84,7 +83,7 @@ services:
         mkdir -p /host-logs/postgres
         touch /host-logs/postgres/postgresql.log
         chown postgres:postgres /host-logs/postgres /host-logs/postgres/postgresql.log
-        chmod 755 /host-logs/postgres
+        chmod 777 /host-logs/postgres
         chmod 640 /host-logs/postgres/postgresql.log
         exec docker-entrypoint.sh postgres \
           -c shared_preload_libraries=pg_stat_statements \
@@ -337,7 +336,6 @@ services:
       - mailer-app-prod:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
-      - serenity-stat:/var/www/serenity-stat
     cpus: "0.10"
     command:
       [
@@ -403,7 +401,6 @@ services:
       - mailer-app-prod:/app
       - mailer-static:/var/www/mail-static:ro
       - mailer-media:/var/www/mail-media
-      - serenity-stat:/var/www/serenity-stat
       - certbot-www:/var/www/certbot
       - certbot-etc:/etc/letsencrypt
     command:
@@ -413,7 +410,9 @@ services:
         set -e
         mkdir -p /host-logs/nginx
         mkdir -p /serenity-logs/nginx
-        chmod 777 /host-logs/nginx /serenity-logs/nginx || true
+        mkdir -p /host-logs/smrel
+        mkdir -p /serenity-logs/smrel
+        chmod 777 /host-logs/nginx /serenity-logs/nginx /host-logs/smrel /serenity-logs/smrel || true
         exec nginx -g 'daemon off;'
 
   certbot-init:
@@ -466,8 +465,6 @@ volumes:
   mailer-static:
     external: true
   mailer-media:
-    external: true
-  serenity-stat:
     external: true
   serenity-redis-run:
     driver: local
