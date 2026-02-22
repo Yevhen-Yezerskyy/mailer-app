@@ -17,3 +17,4 @@
 13. Для доступа к БД с хоста использовать `docker exec` и `psql`: `docker exec -it mailer-db psql -U mailersys_user mailersys`.
 14. Для БД: read-only запросы (`SELECT`, `EXPLAIN`, `WITH ... SELECT`) разрешены без подтверждения; изменяющие запросы (`INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, `ALTER`, `DROP`, `CREATE`, `REINDEX`, `GRANT`, `REVOKE`) выполнять только после явного подтверждения пользователя.
 15. Docker Compose перезапускать только целиком: всегда `docker compose down` и затем `docker compose up -d`; частичные рестарты отдельных сервисов не использовать.
+16. Код в `mailer-app-prod` обновлять только через git-процесс (commit/push/pull). Прямое копирование/правка файлов в volume `/app` (через `docker cp`, `cp`, `cat >`, bind из `mailer-tools` и т. п.) запрещены.
