@@ -172,6 +172,73 @@ services:
           --capture-output \
           --log-level info
 
+  mailer-web-admin:
+    image: mailer-python:latest
+    container_name: mailer-web-admin
+    working_dir: /app/web-admin
+    restart: unless-stopped
+    user: "1001:1001"
+    depends_on:
+      mailer-set-env:
+        condition: service_started
+      mailer-db:
+        condition: service_started
+      mailer-redis:
+        condition: service_started
+    environment:
+      DEBUG: "1"
+      DJANGO_INSTANCE: "admin-dev"
+      PYTHONPATH: /app
+    volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
+      - ./:/app
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
+    ports:
+      - "8002:8000"
+    command: ["/app/config/sh/with-secrets.sh", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+
+  mailer-web-admin-prod:
+    image: mailer-python:latest
+    container_name: mailer-web-admin-prod
+    working_dir: /app/web-admin
+    restart: unless-stopped
+    depends_on:
+      mailer-set-env:
+        condition: service_started
+      mailer-db:
+        condition: service_started
+      mailer-redis:
+        condition: service_started
+    environment:
+      DEBUG: "0"
+      DJANGO_INSTANCE: "admin-prod"
+      PYTHONPATH: /app
+    volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
+      - mailer-app-prod:/app
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
+    ports:
+      - "8003:8000"
+    command:
+      - /app/config/sh/with-secrets.sh
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mkdir -p /host-logs/django-admin-prod
+        exec gunicorn web_admin.wsgi:application \
+          --bind 0.0.0.0:8000 \
+          --workers 2 \
+          --timeout 120 \
+          --access-logfile /host-logs/django-admin-prod/access.log \
+          --error-logfile /host-logs/django-admin-prod/error.log \
+          --capture-output \
+          --log-level info
+
   mailer-engine-cb-prod:
     image: mailer-python:latest
     container_name: mailer-engine-cb-prod
@@ -389,6 +456,10 @@ services:
       mailer-web:
         condition: service_started
       mailer-web-prod:
+        condition: service_started
+      mailer-web-admin:
+        condition: service_started
+      mailer-web-admin-prod:
         condition: service_started
     ports:
       - "80:80"
