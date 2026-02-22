@@ -6,7 +6,6 @@ __pycache__/
 *.pyo
 *.pyd
 *.pdb
-*.pycache/
 
 ########################################
 # Virtualenv
@@ -25,9 +24,6 @@ staticfiles/
 ########################################
 # Translations (Django)
 ########################################
-*.po
-*.mo
-web/locale/
 
 ########################################
 # Testing / QA
@@ -66,11 +62,11 @@ logs/
 # Docker / Runtime / IPC
 ########################################
 *.pid
-*.lock
 *.sock
 *.tar
 docker-data/
 db-data/
+run/
 
 ########################################
 # Environment files
