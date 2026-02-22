@@ -164,3 +164,78 @@ LOGOUT_REDIRECT_URL = "landing"
 # --- MISC ---
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- LOGGING ---
+
+DJANGO_INSTANCE = os.environ.get("DJANGO_INSTANCE", "dev" if DEBUG else "prod")
+DJANGO_LOG_FOLDER = os.environ.get("DJANGO_LOG_FOLDER", f"django-{DJANGO_INSTANCE}")
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "app": {
+            "format": "%(levelname)s\t%(name)s\t%(message)s",
+        },
+        "access": {
+            "format": "%(message)s",
+        },
+    },
+    "handlers": {
+        "host_access": {
+            "()": "engine.common.logs.HostFilePrintHandler",
+            "log_file": "access.log",
+            "folder": DJANGO_LOG_FOLDER,
+            "formatter": "access",
+        },
+        "host_app": {
+            "()": "engine.common.logs.HostFilePrintHandler",
+            "log_file": "app.log",
+            "folder": DJANGO_LOG_FOLDER,
+            "formatter": "app",
+        },
+        "host_error": {
+            "()": "engine.common.logs.HostFilePrintHandler",
+            "log_file": "error.log",
+            "folder": DJANGO_LOG_FOLDER,
+            "formatter": "app",
+            "level": "ERROR",
+        },
+    },
+    "loggers": {
+        "django.server": {
+            "handlers": ["host_access"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["host_error"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django": {
+            "handlers": ["host_app", "host_error"],
+            "level": "INFO" if DEBUG else "WARNING",
+            "propagate": False,
+        },
+        "mailer_web": {
+            "handlers": ["host_app", "host_error"],
+            "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": False,
+        },
+        "panel": {
+            "handlers": ["host_app", "host_error"],
+            "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": False,
+        },
+        "public": {
+            "handlers": ["host_app", "host_error"],
+            "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": False,
+        },
+    },
+    "root": {
+        "handlers": ["host_app", "host_error"],
+        "level": "INFO" if DEBUG else "WARNING",
+    },
+}

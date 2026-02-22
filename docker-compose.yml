@@ -17,18 +17,14 @@ services:
       PYTHONPATH: /app
       SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
+      - ./config/sh/init_set_env.sh:/usr/local/bin/init_set_env.sh:ro
       - mailer-app-prod:/app
       - serenity-secrets:/run/serenity-secrets
     command:
       - /bin/sh
-      - -c
-      - |
-        set -eu
-        umask 077
-        python -m config.load_keys --seal-only
-        python -m config.load_keys --load-only --print-export > /run/serenity-secrets/runtime.env
-        chmod 644 /run/serenity-secrets/runtime.env
-        exec sleep infinity
+      - /usr/local/bin/init_set_env.sh
 
   mailer-tools:
     image: mailer-python:latest
@@ -43,6 +39,8 @@ services:
       mailer-redis:
         condition: service_started
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - mailer-app-prod:/app
       - mailer-static:/app/web/staticfiles
       - mailer-media:/app/web/media
@@ -61,6 +59,8 @@ services:
     command: >
       /bin/sh -c "exec redis-server /etc/redis/redis.conf"
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - ./config/redis/redis-prod.conf:/etc/redis/redis.conf:ro
       - serenity-redis-run:/app/run/redis
 
@@ -72,18 +72,34 @@ services:
       mailer-set-env:
         condition: service_started
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - mailer-db-data:/var/lib/postgresql/data
       - mailer-app-prod:/app:ro
       - serenity-secrets:/run/serenity-secrets:ro
-    entrypoint: ["/app/config/sh/with-secrets.sh", "docker-entrypoint.sh"]
+    entrypoint: ["/app/config/sh/with-secrets.sh", "/bin/sh", "-c"]
     command:
-      - postgres
-      - -c
-      - shared_preload_libraries=pg_stat_statements
-      - -c
-      - pg_stat_statements.track=all
-      - -c
-      - pg_stat_statements.max=10000
+      - |
+        set -e
+        mkdir -p /host-logs/postgres
+        touch /host-logs/postgres/postgresql.log
+        chown postgres:postgres /host-logs/postgres /host-logs/postgres/postgresql.log
+        chmod 755 /host-logs/postgres
+        chmod 640 /host-logs/postgres/postgresql.log
+        exec docker-entrypoint.sh postgres \
+          -c shared_preload_libraries=pg_stat_statements \
+          -c pg_stat_statements.track=all \
+          -c pg_stat_statements.max=10000 \
+          -c logging_collector=on \
+          -c log_destination=stderr \
+          -c log_directory='/host-logs/postgres' \
+          -c log_filename='postgresql.log' \
+          -c log_truncate_on_rotation=off \
+          -c log_rotation_age=0 \
+          -c log_rotation_size=0 \
+          -c log_min_messages=warning \
+          -c log_min_error_statement=error \
+          -c log_min_duration_statement=1000
     ports:
       - "5433:5432"
 
@@ -102,8 +118,11 @@ services:
         condition: service_started
     environment:
       DEBUG: "1"
+      DJANGO_INSTANCE: "dev"
       PYTHONPATH: /app
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - ./:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
@@ -125,8 +144,11 @@ services:
         condition: service_started
     environment:
       DEBUG: "0"
+      DJANGO_INSTANCE: "prod"
       PYTHONPATH: /app
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - mailer-app-prod:/app
       - mailer-static:/app/web/staticfiles
       - mailer-media:/app/web/media
@@ -135,24 +157,20 @@ services:
     ports:
       - "8001:8000"
     command:
-      [
-        "/app/config/sh/with-secrets.sh",
-        "gunicorn",
-        "mailer_web.wsgi:application",
-        "--bind",
-        "0.0.0.0:8000",
-        "--workers",
-        "2",
-        "--timeout",
-        "120",
-        "--access-logfile",
-        "/app/logs/gunicorn_access.log",
-        "--error-logfile",
-        "/app/logs/gunicorn_error.log",
-        "--capture-output",
-        "--log-level",
-        "info"
-      ]
+      - /app/config/sh/with-secrets.sh
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        mkdir -p /host-logs/django-prod
+        exec gunicorn mailer_web.wsgi:application \
+          --bind 0.0.0.0:8000 \
+          --workers 2 \
+          --timeout 120 \
+          --access-logfile /host-logs/django-prod/access.log \
+          --error-logfile /host-logs/django-prod/error.log \
+          --capture-output \
+          --log-level info
 
   mailer-engine-cb-prod:
     image: mailer-python:latest
@@ -169,6 +187,8 @@ services:
     environment:
       PYTHONPATH: /app
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - mailer-app-prod:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
@@ -196,6 +216,8 @@ services:
     environment:
       PYTHONPATH: /app
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - mailer-app-prod:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
@@ -223,6 +245,8 @@ services:
     environment:
       PYTHONPATH: /app
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - mailer-app-prod:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
@@ -250,6 +274,8 @@ services:
     environment:
       PYTHONPATH: /app
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - mailer-app-prod:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
@@ -277,6 +303,8 @@ services:
     environment:
       PYTHONPATH: /app
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - mailer-app-prod:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
@@ -304,6 +332,8 @@ services:
     environment:
       PYTHONPATH: /app
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - mailer-app-prod:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
@@ -332,6 +362,8 @@ services:
     environment:
       PYTHONPATH: /app
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - mailer-app-prod:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
@@ -363,6 +395,8 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./config/nginx/includes:/etc/nginx/includes:ro
@@ -377,8 +411,9 @@ services:
       - -c
       - |
         set -e
-        mkdir -p /app/logs
-        chmod 777 /app/logs || true
+        mkdir -p /host-logs/nginx
+        mkdir -p /serenity-logs/nginx
+        chmod 777 /host-logs/nginx /serenity-logs/nginx || true
         exec nginx -g 'daemon off;'
 
   certbot-init:
@@ -389,6 +424,8 @@ services:
       CERTBOT_MODE: "init"
       CERTBOT_EMAIL: "yevhen.yezerskyy@gmail.com"
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./config/sh/certbot_run.sh:/usr/local/bin/certbot_run.sh:ro
       - certbot-www:/var/www/certbot
@@ -413,6 +450,8 @@ services:
       CERTBOT_EMAIL: "yevhen.yezerskyy@gmail.com"
       CERTBOT_RENEW_INTERVAL_SECONDS: "43200"
     volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./config/sh/certbot_run.sh:/usr/local/bin/certbot_run.sh:ro
       - certbot-www:/var/www/certbot
@@ -442,5 +481,6 @@ volumes:
       type: tmpfs
       device: tmpfs
       o: "size=16m,uid=0,gid=0,mode=0777"
+  serenity-logs:
   certbot-www:
   certbot-etc:

@@ -1,12 +1,10 @@
-# FILE: engine/common/gpt.py  (обновлено — 2026-02-11)
+# FILE: engine/common/gpt.py  (обновлено — 2026-02-22)
 # PURPOSE: Единая точка общения с OpenAI (Responses API) + IPC-cache через common/cache (daemon).
-#          Изменение: soft-fallback на ошибки OpenAI (без падения Django) + логирование запроса только при error (debug=False).
+#          Логи: host stream (все вызовы, включая cache), host errors (все ошибки), system short (только реальные API-вызовы).
 
 from __future__ import annotations
 
 import hashlib
-import inspect
-import json
 import os
 import time
 from dataclasses import dataclass
@@ -47,10 +45,9 @@ OPENAI_ENV_VAR = "OPENAI_API_KEY"
 
 ALLOWED_SERVICE_TIERS: set[str] = {"flex", "standard", "priority"}
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-LOG_DIR = PROJECT_ROOT / "logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
-LOG_FILE = LOG_DIR / "gpt.requests.log"
+HOST_STREAM_FILE = Path("/host-logs/gpt/stream.log")
+HOST_ERRORS_FILE = Path("/host-logs/gpt/errors.log")
+SYS_REQUESTS_FILE = Path("/serenity-logs/gpt/requests.log")
 
 
 class GptConfigError(RuntimeError):
@@ -85,13 +82,6 @@ class GptResponse:
 
 
 # ---------- INTERNAL UTILS ----------
-
-
-def _truncate(text: str, limit: int = 4000) -> str:
-    text = text or ""
-    if len(text) <= limit:
-        return text
-    return text[:limit] + f"... <truncated {len(text) - limit} chars>"
 
 
 def _soft_error_message(exc: Exception) -> str:
@@ -133,13 +123,6 @@ def _optional_str(value: Any) -> str:
         return ""
 
 
-def _pretty_json(data: Any) -> str:
-    try:
-        return json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True)
-    except Exception:
-        return str(data)
-
-
 def _short_hash(text: str, length: int = 16) -> str:
     if not text:
         return ""
@@ -147,9 +130,9 @@ def _short_hash(text: str, length: int = 16) -> str:
     return h[:length]
 
 
-def _write_log_block(*lines: str) -> None:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
+def _write_log_block(path: Path, *lines: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
         for line in lines:
             f.write(line)
             if not line.endswith("\n"):
@@ -158,9 +141,7 @@ def _write_log_block(*lines: str) -> None:
 
 def _guard_tier_for_engine(service_tier: ServiceTier) -> None:
     """
-    Правило проекта:
-    - debug=True в GPTClient: всегда nano (без web/cache) — enforced в месте вызова (см. engine/common/gpt.py эталон).
-    - здесь guard только для engine: запрещаем standard/priority в engine вызовах, если это не override.
+    Guard только для корректного service_tier (может быть расширен позже).
     """
     # Сейчас просто оставляем как есть (guard может быть расширен).
     if service_tier not in ALLOWED_SERVICE_TIERS:
@@ -170,63 +151,122 @@ def _guard_tier_for_engine(service_tier: ServiceTier) -> None:
 # ---------- LOGGING ----------
 
 
-def _log_platform_call(
+def _log_header(
     *,
     now: datetime,
+    status: str,
+    model_name: str,
+    service_tier: ServiceTier,
+    user_id: str,
+    usage: Optional[GptUsage],
+    cache_hit: bool,
+    real_request: bool,
+) -> str:
+    return (
+        f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] "
+        f"STATUS={status} CACHE={'yes' if cache_hit else 'no'} REAL={'yes' if real_request else 'no'} "
+        f"MODEL={model_name} SERVICE_TIER={service_tier} USER={user_id} "
+        f"TOKENS(in={getattr(usage, 'prompt_tokens', None)},"
+        f"out={getattr(usage, 'completion_tokens', None)},"
+        f"total={getattr(usage, 'total_tokens', None)})"
+    )
+
+
+def _log_host_stream(
+    *,
+    now: datetime,
+    status: str,
     model_name: str,
     service_tier: ServiceTier,
     user_id: str,
     instructions: str,
     input_text: str,
-    usage: Optional[GptUsage],
     output_text: str,
-    raw: Any,
-    status: str,
+    usage: Optional[GptUsage],
+    cache_hit: bool,
+    real_request: bool,
     error_message: Optional[str] = None,
-    debug: bool = False,
 ) -> None:
-    head = (
+    lines: List[str] = [
+        _log_header(
+            now=now,
+            status=status,
+            model_name=model_name,
+            service_tier=service_tier,
+            user_id=user_id,
+            usage=usage,
+            cache_hit=cache_hit,
+            real_request=real_request,
+        ),
+        "INSTRUCTIONS:",
+        instructions or "",
+        "INPUT:",
+        input_text or "",
+        "OUTPUT:",
+        output_text or "",
+    ]
+    if error_message:
+        lines.extend(["ERROR:", error_message])
+    lines.append("-" * 120)
+    _write_log_block(HOST_STREAM_FILE, *lines)
+
+
+def _log_host_error(
+    *,
+    now: datetime,
+    status: str,
+    model_name: str,
+    service_tier: ServiceTier,
+    user_id: str,
+    instructions: str,
+    input_text: str,
+    output_text: str,
+    usage: Optional[GptUsage],
+    cache_hit: bool,
+    real_request: bool,
+    error_message: str,
+) -> None:
+    lines: List[str] = [
+        _log_header(
+            now=now,
+            status=status,
+            model_name=model_name,
+            service_tier=service_tier,
+            user_id=user_id,
+            usage=usage,
+            cache_hit=cache_hit,
+            real_request=real_request,
+        ),
+        "ERROR:",
+        error_message or "",
+        "INSTRUCTIONS:",
+        instructions or "",
+        "INPUT:",
+        input_text or "",
+        "OUTPUT:",
+        output_text or "",
+        "-" * 120,
+    ]
+    _write_log_block(HOST_ERRORS_FILE, *lines)
+
+
+def _log_system_request(
+    *,
+    now: datetime,
+    status: str,
+    model_name: str,
+    service_tier: ServiceTier,
+    user_id: str,
+    usage: Optional[GptUsage],
+) -> None:
+    line = (
         f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] "
         f"STATUS={status} MODEL={model_name} SERVICE_TIER={service_tier} USER={user_id} "
         f"TOKENS(in={getattr(usage, 'prompt_tokens', None)},"
         f"out={getattr(usage, 'completion_tokens', None)},"
         f"total={getattr(usage, 'total_tokens', None)})"
     )
-
-    # debug=False: billing лог — только факт запроса/ответа + error (если есть)
-    # НО: при error дополнительно пишем запрос (instructions/input) с truncate.
-    if not debug:
-        lines: List[str] = [head]
-        if error_message:
-            lines.append(f"ERROR: {error_message}")
-            # On error: also log request payload (truncated) to debug issues without enabling full debug mode.
-            lines.append("INSTRUCTIONS:")
-            lines.append(_truncate(instructions or "", 4000))
-            lines.append("INPUT:")
-            lines.append(_truncate(input_text or "", 4000))
-        lines.append("-" * 120)
-        _write_log_block(*lines)
-        return
-
-    # debug=True: как раньше — полный лог
-    lines = [head]
-    if error_message:
-        lines.append(f"ERROR: {error_message}")
-
-    lines.append("INSTRUCTIONS:")
-    lines.append(instructions or "")
-    lines.append("INPUT:")
-    lines.append(input_text or "")
-
-    if isinstance(raw, (dict, list)):
-        lines.append("RESPONSE_JSON:")
-        lines.append(_pretty_json(raw))
-    else:
-        lines.append("OUTPUT_TEXT:")
-        lines.append(output_text or "")
-
-    lines.append("-" * 120)
-    _write_log_block(*lines)
+    _write_log_block(SYS_REQUESTS_FILE, line)
 
 
 # ---------- OPENAI CLIENT ----------
@@ -274,9 +314,9 @@ def _build_payload(
 
 class GPTClient:
     def __init__(self, debug: bool = False) -> None:
-        # Объект без состояния tier. Ключ проверим по месту вызова.
+        # debug оставлен только для обратной совместимости вызовов.
         _require_api_key()
-        self.debug = bool(debug)
+        _ = debug
 
     def ask(
         self,
@@ -320,18 +360,33 @@ class GPTClient:
                     if str(override.get("service_tier", "")).strip()
                     else effective_tier
                 )
-                _log_platform_call(
-                    now=datetime.now(),
-                    model_name=str(override.get("model", "-")),
-                    service_tier=log_tier if log_tier in ALLOWED_SERVICE_TIERS else effective_tier,
+                now = datetime.now()
+                tier_for_log = log_tier if log_tier in ALLOWED_SERVICE_TIERS else effective_tier
+                model_for_log = str(override.get("model", "-"))
+                instructions_for_log = str(override.get("instructions", ""))
+                input_for_log = str(override.get("input", ""))
+                status_for_log = f"ok ({elapsed_ms} ms)"
+
+                _log_host_stream(
+                    now=now,
+                    status=status_for_log,
+                    model_name=model_for_log,
+                    service_tier=tier_for_log,
                     user_id=user_id_str,
-                    instructions=str(override.get("instructions", "")),
-                    input_text=str(override.get("input", "")),
-                    usage=usage,
+                    instructions=instructions_for_log,
+                    input_text=input_for_log,
                     output_text=content,
-                    raw=raw,
-                    status=f"ok ({elapsed_ms} ms)",
-                    debug=self.debug,
+                    usage=usage,
+                    cache_hit=False,
+                    real_request=True,
+                )
+                _log_system_request(
+                    now=now,
+                    status=status_for_log,
+                    model_name=model_for_log,
+                    service_tier=tier_for_log,
+                    user_id=user_id_str,
+                    usage=usage,
                 )
                 return GptResponse(content=content, raw=raw, usage=usage)
             except Exception as exc:
@@ -340,19 +395,49 @@ class GPTClient:
                     if str(override.get("service_tier", "")).strip()
                     else effective_tier
                 )
-                _log_platform_call(
-                    now=datetime.now(),
-                    model_name=str(override.get("model", "-")),
-                    service_tier=log_tier if log_tier in ALLOWED_SERVICE_TIERS else effective_tier,
-                    user_id=user_id_str,
-                    instructions=str(override.get("instructions", "")),
-                    input_text=str(override.get("input", "")),
-                    usage=None,
-                    output_text="",
-                    raw={},
+                now = datetime.now()
+                tier_for_log = log_tier if log_tier in ALLOWED_SERVICE_TIERS else effective_tier
+                model_for_log = str(override.get("model", "-"))
+                instructions_for_log = str(override.get("instructions", ""))
+                input_for_log = str(override.get("input", ""))
+                error_message = str(exc)
+                output_for_log = _soft_error_message(exc) if _is_openai_related_exception(exc) else ""
+
+                _log_host_stream(
+                    now=now,
                     status="error",
-                    error_message=str(exc),
-                    debug=self.debug,
+                    model_name=model_for_log,
+                    service_tier=tier_for_log,
+                    user_id=user_id_str,
+                    instructions=instructions_for_log,
+                    input_text=input_for_log,
+                    output_text=output_for_log,
+                    usage=None,
+                    cache_hit=False,
+                    real_request=True,
+                    error_message=error_message,
+                )
+                _log_host_error(
+                    now=now,
+                    status="error",
+                    model_name=model_for_log,
+                    service_tier=tier_for_log,
+                    user_id=user_id_str,
+                    instructions=instructions_for_log,
+                    input_text=input_for_log,
+                    output_text=output_for_log,
+                    usage=None,
+                    cache_hit=False,
+                    real_request=True,
+                    error_message=error_message,
+                )
+                _log_system_request(
+                    now=now,
+                    status="error",
+                    model_name=model_for_log,
+                    service_tier=tier_for_log,
+                    user_id=user_id_str,
+                    usage=None,
                 )
                 if _is_openai_related_exception(exc):
                     return GptResponse(content=_soft_error_message(exc), raw={"soft_error": True}, usage=GptUsage())
@@ -406,8 +491,11 @@ class GPTClient:
                 last_raw = raw
                 last_usage = usage
 
-                _log_platform_call(
-                    now=datetime.now(),
+                now = datetime.now()
+                status_for_log = f"ok ({elapsed_ms} ms)"
+                _log_host_stream(
+                    now=now,
+                    status=status_for_log,
                     model_name=m,
                     service_tier=effective_tier,
                     user_id=user_id_str,
@@ -415,31 +503,62 @@ class GPTClient:
                     input_text=inpt,
                     usage=usage,
                     output_text=out_text,
-                    raw=raw,
-                    status=f"ok ({elapsed_ms} ms)",
-                    debug=self.debug,
+                    cache_hit=False,
+                    real_request=True,
+                )
+                _log_system_request(
+                    now=now,
+                    status=status_for_log,
+                    model_name=m,
+                    service_tier=effective_tier,
+                    user_id=user_id_str,
+                    usage=usage,
                 )
                 return out_text
             except Exception as exc:
-                _log_platform_call(
-                    now=datetime.now(),
+                now = datetime.now()
+                error_message = str(exc)
+                output_for_log = _soft_error_message(exc) if _is_openai_related_exception(exc) else ""
+                _log_host_stream(
+                    now=now,
+                    status="error",
                     model_name=m,
                     service_tier=effective_tier,
                     user_id=user_id_str,
                     instructions=ins,
                     input_text=inpt,
                     usage=None,
-                    output_text="",
-                    raw={},
+                    output_text=output_for_log,
+                    cache_hit=False,
+                    real_request=True,
+                    error_message=error_message,
+                )
+                _log_host_error(
+                    now=now,
                     status="error",
-                    error_message=str(exc),
-                    debug=self.debug,
+                    model_name=m,
+                    service_tier=effective_tier,
+                    user_id=user_id_str,
+                    instructions=ins,
+                    input_text=inpt,
+                    output_text=output_for_log,
+                    usage=None,
+                    cache_hit=False,
+                    real_request=True,
+                    error_message=error_message,
+                )
+                _log_system_request(
+                    now=now,
+                    status="error",
+                    model_name=m,
+                    service_tier=effective_tier,
+                    user_id=user_id_str,
+                    usage=None,
                 )
                 if _is_openai_related_exception(exc):
                     raise GptSoftError(_soft_error_message(exc), error_message=str(exc))
                 raise
 
-        # cache-hit не вызывает _fn → логов не будет.
         try:
             if use_cache:
                 content = cache_memo(
@@ -450,7 +569,19 @@ class GPTClient:
                     update=False,
                 )
                 if last_raw is None:
-                    # cache-hit: ничего не логируем
+                    _log_host_stream(
+                        now=datetime.now(),
+                        status="cache",
+                        model_name=model_name,
+                        service_tier=effective_tier,
+                        user_id=user_id_str,
+                        instructions=instr,
+                        input_text=inp,
+                        output_text=str(content or ""),
+                        usage=None,
+                        cache_hit=True,
+                        real_request=False,
+                    )
                     return GptResponse(content=str(content or ""), raw={"cached": True}, usage=GptUsage())
                 return GptResponse(content=str(content or ""), raw=last_raw or {}, usage=last_usage or GptUsage())
 
