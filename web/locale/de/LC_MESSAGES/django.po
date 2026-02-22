@@ -1,0 +1,2179 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-02-11 09:05+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: panel/aap_audience/forms.py:17
+msgid "Ваш продукт / услуга. Что именно продаётся? Суть, бизнес-характеристики"
+msgstr ""
+"Ihr Produkt / Ihre Dienstleistung. Was genau wird verkauft? Kern, "
+"geschäftliche Merkmale"
+
+#: panel/aap_audience/forms.py:24
+msgid ""
+"Кратко опишите продукт / услугу. Что именно продаётся. Что получает "
+"покупатель.."
+msgstr ""
+"Beschreiben Sie kurz das Produkt / die Dienstleistung. Was genau wird "
+"verkauft. Was erhält der Käufer.."
+
+#: panel/aap_audience/forms.py:31
+msgid ""
+"Компания-продавец. Кто Вы? Направление деятельности, опыт, достижения, "
+"репутация."
+msgstr ""
+"Verkaufendes Unternehmen. Wer sind Sie? Tätigkeitsfeld, Erfahrung, Erfolge, "
+"Reputation."
+
+#: panel/aap_audience/forms.py:39
+msgid ""
+"Название компании, страна, адрес, юридическая форма, адрес сайта, размер "
+"компании, специализация, сколько лет на рынке."
+msgstr ""
+"Name des Unternehmens, Land, Adresse, Rechtsform, Website-Adresse, "
+"Unternehmensgröße, Spezialisierung, Wie viele Jahre auf dem Markt"
+
+#: panel/aap_audience/forms.py:46
+msgid ""
+"География работы в Германии. Возможности и ограничения. Территория, "
+"логистика."
+msgstr ""
+"Geografie der Arbeit in Deutschland. Möglichkeiten und Einschränkungen. "
+"Gebiet, Logistik."
+
+#: panel/aap_audience/forms.py:54
+msgid ""
+"Партнеры, дилеры, представители в Германии, их адреса. Логистика поставок. "
+"Территория предоставления услуг. Где продукт применим в Германии."
+msgstr ""
+"Partner, Händler, Vertreter in Deutschland, ihre Adressen. Lieferlogistik. "
+"Gebiet der Dienstleistungserbringung. Wo das Produkt in Deutschland "
+"anwendbar ist."
+
+#: panel/aap_audience/forms.py:68
+msgid "Заполните хотя бы одно поле."
+msgstr "Füllen Sie mindestens ein Feld aus."
+
+#: panel/aap_audience/forms.py:87 panel/aap_audience/forms.py:90
+msgid ""
+"Продукт / услуга. Что именно Вы приобретаете? Суть, бизнес-характеристики"
+msgstr ""
+"Produkt / Dienstleistung. Was genau erwerben Sie? Kern und geschäftliche "
+"Merkmale"
+
+#: panel/aap_audience/forms.py:94
+msgid ""
+"Компания-покупатель. Кто Вы? Направление деятельности, опыт, достижения, "
+"репутация."
+msgstr ""
+"Käuferunternehmen. Wer sind Sie? Tätigkeitsbereich, Erfahrung, Erfolge, "
+"Reputation."
+
+#: panel/aap_audience/forms.py:97
+msgid "Название компании, сайт, страна и краткая информация о покупателе"
+msgstr ""
+"Name des Unternehmens, Website, Land und kurze Informationen über den Käufer"
+
+#: panel/aap_audience/forms.py:101
+msgid ""
+"География покупки в Германии. Возможности и ограничения. Территория, "
+"логистика."
+msgstr ""
+"Geographie des Kaufs in Deutschland. Möglichkeiten und Einschränkungen. "
+"Gebiet, Logistik."
+
+#: panel/aap_audience/forms.py:104
+msgid ""
+"Регионы Германии, допустимая логистика, требования к месту доставки / месту "
+"оказания услуги."
+msgstr ""
+"Regionen Deutschlands, zulässige Logistik, Anforderungen an den Lieferort / "
+"den Ort der Leistungserbringung."
+
+#: panel/aap_audience/forms.py:112 panel/aap_audience/forms.py:115
+#: panel/aap_audience/forms.py:185 panel/aap_audience/forms.py:190
+msgid "Название задачи"
+msgstr "Name der Aufgabe"
+
+#: panel/aap_audience/forms.py:120 panel/aap_audience/forms.py:126
+msgid "КЛИЕНТ: Критерии для ранжирования клиентов"
+msgstr "KUNDE: Kriterien zur Rangfolge von Kunden"
+
+#: panel/aap_audience/forms.py:132 panel/aap_audience/forms.py:138
+#: panel/aap_audience/forms.py:208
+msgid "КАТЕГОРИИ: Критерии для ранжирования бизнес-категорий"
+msgstr "KATEGORIEN: Kriterien zur Rangfolge von Geschäftskategorien"
+
+#: panel/aap_audience/forms.py:144 panel/aap_audience/forms.py:220
+msgid "ГЕОГРАФИЯ: Критерии для ранжирования городов (Германия)"
+msgstr "Geographie: Ranking-Kriterien für Städte (Deutschland)"
+
+#: panel/aap_audience/forms.py:150
+msgid "Какая география подходит."
+msgstr "Welche Geografie passt."
+
+#: panel/aap_audience/forms.py:176 panel/aap_audience/forms.py:251
+#: panel/aap_audience/forms.py:307 panel/aap_lists/forms.py:40
+msgid "Заполните все поля."
+msgstr "Füllen Sie alle Felder aus."
+
+#: panel/aap_audience/forms.py:196
+msgid "ПРОДАВЕЦ: Критерии для ранжирования продавцов"
+msgstr "VERKÄUFER: Kriterien zur Rangfolge von Verkäufern"
+
+#: panel/aap_audience/forms.py:202
+msgid "Критерии для ранжирования продавцов."
+msgstr "Kriterien zur Rangfolge von Verkäufern."
+
+#: panel/aap_audience/forms.py:214
+msgid "Какие типы компаний/специализаций подходят."
+msgstr "Welche Arten von Unternehmen/Spezialisierungen eignen sich?"
+
+#: panel/aap_audience/forms.py:226
+msgid "Регионы Германии, логистика, удаленная/локальная работа."
+msgstr "Regionen Deutschlands, Logistik, Remote-/lokale Arbeit."
+
+#: panel/aap_audience/forms.py:268 templates/panels/aap_audience/how.html:217
+msgid "Задача"
+msgstr "Aufgabe"
+
+#: panel/aap_audience/forms.py:269
+msgid "Опишите основную задачу."
+msgstr "Beschreiben Sie die Hauptaufgabe."
+
+#: panel/aap_audience/forms.py:319
+msgid "Задача. Что продаём и кого хотим привлечь"
+msgstr "Aufgabe. Was wir verkaufen und wen wir ansprechen wollen"
+
+#: panel/aap_audience/forms.py:321
+msgid ""
+"1–2 предложения: что продаёте (суть), кто целевой клиент в Германии и какой "
+"результат нужен (лиды/встречи/заявки)."
+msgstr ""
+"Wir verkaufen eine SaaS-Mailer-App zur Automatisierung und Optimierung von E-"
+"Mail-Kampagnen. Unsere Zielkunden in Deutschland sind B2B-Unternehmen "
+"(vorzugsweise KMU), und als Ergebnis benötigen wir qualifizierte Leads/"
+"Meetings/Anfragen."
+
+#: panel/aap_audience/forms.py:323
+msgid "Нужно найти клиентов: "
+msgstr "Wir müssen Kunden finden:"
+
+#: panel/aap_audience/forms.py:331
+msgid "Задача. Что нужно купить и какой подрядчик подходит"
+msgstr ""
+"Aufgabe. Was gekauft werden muss und welcher Auftragnehmer geeignet ist"
+
+#: panel/aap_audience/forms.py:333
+msgid ""
+"1–2 предложения: что нужно купить/заказать, ключевые требования и какой "
+"поставщик/подрядчик нужен (тип, опыт, условия)."
+msgstr ""
+"1–2 Sätze: was gekauft/bestellt werden muss, die wichtigsten Anforderungen "
+"und welcher Anbieter/Auftragnehmer benötigt wird (Typ, Erfahrung, "
+"Konditionen)."
+
+#: panel/aap_audience/forms.py:335
+msgid "Нужно найти поставщиков / подрядчиков: "
+msgstr "Es müssen Lieferanten / Auftragnehmer gefunden werden:"
+
+#: panel/aap_audience/views/modal_clar.py:70
+#: templates/panels/aap_audience/clar.html:172
+msgid "Города"
+msgstr "Städte"
+
+#: panel/aap_audience/views/modal_clar.py:74
+#: templates/panels/aap_audience/clar.html:164
+#: templates/panels/aap_audience/clar.html:364
+#: templates/panels/aap_audience/how.html:264
+#: templates/panels/aap_audience/status.html:68
+#: templates/panels/aap_audience/status_task.html:232
+#: templates/panels/aap_audience/status_task.html:350
+#: templates/panels/aap_lists/contacts.html:147
+#: templates/panels/aap_lists/lists_list.html:157
+msgid "Категории"
+msgstr "Kategorien"
+
+#: panel/aap_campaigns/views/campaigns.py:349
+#: panel/aap_campaigns/views/campaigns.py:446
+msgid "Шаблон удален"
+msgstr "Vorlage gelöscht"
+
+#: panel/aap_campaigns/views/campaigns.py:521
+msgid "Письмо ещё не создано — сначала откройте редактор письма и сохраните."
+msgstr ""
+"Die E-Mail wurde noch nicht erstellt — öffnen Sie zuerst den E-Mail-Editor "
+"und speichern Sie."
+
+#: panel/aap_campaigns/views/campaigns.py:614
+msgid "Пожалуйста, заполните все обязательные поля"
+msgstr "Bitte füllen Sie alle Pflichtfelder aus."
+
+#: panel/aap_campaigns/views/campaigns.py:641
+msgid "Некорректные значения формы"
+msgstr "Ungültige Formularwerte"
+
+#: panel/aap_campaigns/views/campaigns.py:702
+msgid "Этот список рассылки уже используется в другой кампании"
+msgstr "Diese Mailingliste wird bereits in einer anderen Kampagne verwendet."
+
+#: panel/aap_campaigns/views/templates.py:200
+msgid "Имя шаблона обязательно."
+msgstr "Der Name der Vorlage ist erforderlich."
+
+#: panel/aap_campaigns/views/templates.py:217
+#: panel/aap_campaigns/views/templates.py:255
+msgid "Шаблон с таким именем уже существует."
+msgstr "Eine Vorlage mit diesem Namen existiert bereits."
+
+#: panel/aap_lists/forms.py:10 panel/aap_lists/forms.py:13
+msgid "Название списка"
+msgstr "Name der Liste"
+
+#: panel/aap_lists/forms.py:18 templates/panels/aap_audience/clar.html:316
+#: templates/panels/aap_audience/status.html:21
+#: templates/panels/aap_lists/lists.html:50
+#: templates/panels/aap_lists/lists.html:117
+#: templates/panels/aap_lists/lists_list.html:18
+msgid "Аудитория"
+msgstr "Zielgruppe"
+
+#: panel/aap_settings/forms.py:85 panel/aap_settings/forms.py:270
+msgid "Email"
+msgstr "Email"
+
+#: panel/aap_settings/forms.py:99
+msgid "Заполните Email."
+msgstr "Bitte geben Sie die Email ein."
+
+#: panel/aap_settings/forms.py:106
+msgid "Этот Email уже используется."
+msgstr "Diese Email wird bereits verwendet."
+
+#: panel/aap_settings/forms.py:133
+msgid "Отправитель:"
+msgstr "Absender:"
+
+#: panel/aap_settings/forms.py:135 panel/aap_settings/forms.py:264
+#: templates/panels/aap_settings/smtp_server.html:38
+msgid "Отправитель"
+msgstr "Absender"
+
+#: panel/aap_settings/forms.py:139 panel/aap_settings/forms.py:276
+msgid "Лимит/час"
+msgstr "Limit/Stunde"
+
+#: panel/aap_settings/forms.py:183
+msgid "Заполните все поля SMTP."
+msgstr "Füllen Sie alle SMTP-Felder aus."
+
+#: panel/aap_settings/forms.py:191 panel/aap_settings/forms.py:316
+msgid "Лимит должен быть не меньше 1 письма в час."
+msgstr "Das Limit muss mindestens 1 E-Mail pro Stunde betragen."
+
+#: panel/aap_settings/forms.py:194 panel/aap_settings/forms.py:319
+msgid "Максимум 300 писем в час."
+msgstr "Maximal 300 E-Mails pro Stunde."
+
+#: panel/aap_settings/forms.py:199 panel/aap_settings/forms.py:247
+#: panel/aap_settings/forms.py:334
+msgid "Некорректное значение шифрования."
+msgstr "Ungültiger Verschlüsselungswert."
+
+#: panel/aap_settings/forms.py:242
+msgid "Заполните все поля IMAP."
+msgstr "Füllen Sie alle IMAP-Felder aus."
+
+#: panel/aap_settings/forms.py:329
+msgid "Заполните все поля SMTP (LOGIN)."
+msgstr "Füllen Sie alle SMTP-Felder (LOGIN) aus."
+
+#: panel/aap_settings/views/sending.py:70
+msgid "Неверный JSON."
+msgstr "Ungültiges JSON."
+
+#: panel/aap_settings/views/sending.py:82
+#: templates/panels/aap_campaigns/campaigns.html:186
+#: templates/panels/aap_settings/sending.html:28
+msgid "Понедельник"
+msgstr "Montag"
+
+#: panel/aap_settings/views/sending.py:83
+#: templates/panels/aap_campaigns/campaigns.html:193
+#: templates/panels/aap_settings/sending.html:34
+msgid "Вторник"
+msgstr "Dienstag"
+
+#: panel/aap_settings/views/sending.py:84
+#: templates/panels/aap_campaigns/campaigns.html:200
+#: templates/panels/aap_settings/sending.html:41
+msgid "Среда"
+msgstr "Mittwoch"
+
+#: panel/aap_settings/views/sending.py:85
+#: templates/panels/aap_campaigns/campaigns.html:207
+#: templates/panels/aap_settings/sending.html:48
+msgid "Четверг"
+msgstr "Donnerstag"
+
+#: panel/aap_settings/views/sending.py:86
+#: templates/panels/aap_campaigns/campaigns.html:214
+#: templates/panels/aap_settings/sending.html:55
+msgid "Пятница"
+msgstr "Freitag"
+
+#: panel/aap_settings/views/sending.py:87
+#: templates/panels/aap_campaigns/campaigns.html:221
+#: templates/panels/aap_settings/sending.html:61
+msgid "Суббота"
+msgstr "Samstag"
+
+#: panel/aap_settings/views/sending.py:88
+#: templates/panels/aap_campaigns/campaigns.html:228
+#: templates/panels/aap_settings/sending.html:67
+msgid "Воскресенье"
+msgstr "Sonntag"
+
+#: panel/aap_settings/views/sending.py:89
+#: templates/panels/aap_campaigns/campaigns.html:235
+#: templates/panels/aap_settings/sending.html:73
+msgid "Праздники"
+msgstr "Feiertage"
+
+#: panel/aap_settings/views/url_stats.py:34
+msgid "Настройки : Учет переходов URL"
+msgstr "Einstellungen: Verfolgung von URL-Klicks"
+
+#: panel/menu.py:13 panel/menu.py:14
+msgid "Панель управления"
+msgstr "Dashboard"
+
+#: panel/menu.py:18
+msgid "Обзор"
+msgstr "Übersicht"
+
+#: panel/menu.py:19
+msgid "Обзор : Панель управления"
+msgstr "Übersicht: Dashboard"
+
+#: panel/menu.py:27
+msgid "Управление аудиториями"
+msgstr "Zielgruppenverwaltung"
+
+#: panel/menu.py:31
+msgid "Создание аудиторий"
+msgstr "Erstellung von Zielgruppen"
+
+#: panel/menu.py:32
+msgid "Аудитории : создание"
+msgstr "Zielgruppen: Erstellung"
+
+#: panel/menu.py:37
+msgid "Города и категории"
+msgstr "Städte und Kategorien"
+
+#: panel/menu.py:38
+msgid "Города и бизнес-категории"
+msgstr "Städte und Geschäftskategorien"
+
+#: panel/menu.py:43
+msgid "Сбор контактов / Рейтинг"
+msgstr "Kontakterfassung / Bewertung"
+
+#: panel/menu.py:44
+msgid "Аудитории : Сбор контактов"
+msgstr "Zielgruppen: Kontakte sammeln"
+
+#: panel/menu.py:52 templates/panels/aap_lists/contacts.html:172
+msgid "Списки рассылок"
+msgstr "Mailinglisten"
+
+#: panel/menu.py:56
+msgid "Управление списками"
+msgstr "Listenverwaltung"
+
+#: panel/menu.py:57
+msgid "Контакты : Списки рассылок"
+msgstr "Kontakte: Verteilerlisten"
+
+#: panel/menu.py:62
+msgid "Все контакты списков"
+msgstr "Alle Kontakte aus den Listen"
+
+#: panel/menu.py:63
+msgid "Контакты : Все контакты"
+msgstr "Kontakte: Alle Kontakte"
+
+#: panel/menu.py:71
+msgid "Кампании и рассылки"
+msgstr "Kampagnen und Mailings"
+
+#: panel/menu.py:75
+msgid "Кампании / письма"
+msgstr "Kampagnen / E-Mails"
+
+#: panel/menu.py:76
+msgid "Кампании : рассылки и письма"
+msgstr "Kampagnen: Mailings und E-Mails"
+
+#: panel/menu.py:81
+msgid "Шаблоны писем"
+msgstr "E-Mail-Vorlagen"
+
+#: panel/menu.py:82
+msgid "Кампании : Шаблоны писем"
+msgstr "Kampagnen: E-Mail-Vorlagen"
+
+#: panel/menu.py:90
+msgid "Настройки"
+msgstr "Einstellungen"
+
+#: panel/menu.py:94
+msgid "'Окна' отправки"
+msgstr "'Fenster' für den Versand"
+
+#: panel/menu.py:95
+msgid "Настройки : 'Окна' отправки"
+msgstr "Einstellungen: 'Sendezeitfenster'"
+
+#: panel/menu.py:100
+msgid "Почтовые серверы"
+msgstr "Mailserver"
+
+#: panel/menu.py:101
+msgid "Настройки : Почтовые серверы"
+msgstr "Einstellungen: Mailserver"
+
+#: panel/menu.py:106 templates/panels/aap_settings/url_stats.html:14
+msgid "Учет переходов"
+msgstr "Klickverfolgung"
+
+#: panel/menu.py:107
+msgid "Настройки : Учет переходов"
+msgstr "Einstellungen: Klickverfolgung"
+
+#: templates/admin/index.html:25
+msgid "Recent actions"
+msgstr "Letzte Aktionen"
+
+#: templates/admin/index.html:26
+msgid "My actions"
+msgstr "Meine Aktionen"
+
+#: templates/admin/index.html:30
+msgid "None available"
+msgstr "Keine vorhanden"
+
+#: templates/admin/index.html:44
+msgid "Unknown content"
+msgstr "Unbekannter Inhalt"
+
+#: templates/admin/nav_sidebar.html:5
+msgid "Toggle navigation"
+msgstr "Navigation umschalten"
+
+#: templates/admin/nav_sidebar.html:6
+msgid "Sidebar"
+msgstr "Seitenleiste"
+
+#: templates/admin/nav_sidebar.html:8
+msgid "Start typing to filter…"
+msgstr "Geben Sie Text ein, um zu filtern…"
+
+#: templates/admin/nav_sidebar.html:9
+msgid "Filter navigation items"
+msgstr "Navigationselemente filtern"
+
+#: templates/admin/serenity/branches_11880.html:9
+#: templates/admin/serenity/branches_gs.html:8
+#: templates/admin/serenity/branches_sys_edit.html:8
+#: templates/admin/serenity/branches_sys_list.html:8
+#: templates/admin/serenity/branches_sys_new.html:8
+msgid "Home"
+msgstr "Startseite"
+
+#: templates/panels/aap_audience/clar.html:25
+#: templates/panels/aap_audience/clar.html:328
+#: templates/panels/aap_audience/how.html:22
+#: templates/panels/aap_audience/how.html:35
+#: templates/panels/aap_audience/how.html:160
+#: templates/panels/aap_audience/how.html:228
+#: templates/panels/aap_audience/status.html:32
+#: templates/panels/aap_audience/status_task.html:18
+msgid "Поиск клиентов"
+msgstr "Kundensuche"
+
+#: templates/panels/aap_audience/clar.html:29
+#: templates/panels/aap_audience/clar.html:332
+#: templates/panels/aap_audience/how.html:29
+#: templates/panels/aap_audience/how.html:39
+#: templates/panels/aap_audience/how.html:164
+#: templates/panels/aap_audience/how.html:232
+#: templates/panels/aap_audience/status.html:36
+#: templates/panels/aap_audience/status_task.html:23
+msgid "Поиск поставщиков / подрядчиков"
+msgstr "Suche nach Anbietern / Auftragnehmern"
+
+#: templates/panels/aap_audience/clar.html:58
+#: templates/panels/aap_audience/how.html:195
+#: templates/panels/aap_campaigns/campaigns.html:154
+#: templates/panels/aap_lists/lists.html:61
+#: templates/panels/aap_settings/mail_servers.html:174
+msgid "Сохранить изменения"
+msgstr "Änderungen speichern"
+
+#: templates/panels/aap_audience/clar.html:61
+#: templates/panels/aap_audience/how.html:198
+#: templates/panels/aap_lists/lists.html:64
+#: templates/panels/aap_settings/sending.html:86
+msgid "Отменить"
+msgstr "Abbrechen"
+
+#: templates/panels/aap_audience/clar.html:76
+msgid "Категории и география не обрабатываются"
+msgstr "Kategorien und Geografie werden nicht verarbeitet."
+
+#: templates/panels/aap_audience/clar.html:79
+msgid "Запустить обработку географии и категории"
+msgstr "Verarbeitung von Geografie und Kategorie starten"
+
+#: templates/panels/aap_audience/clar.html:85
+msgid "Бизнес-категории: обрабатываются"
+msgstr "Geschäftskategorien: werden verarbeitet"
+
+#: templates/panels/aap_audience/clar.html:91
+msgid "Бизнес-категории: обработаны"
+msgstr "Business-Kategorien: verarbeitet"
+
+#: templates/panels/aap_audience/clar.html:95
+msgid "Бизнес-категории: задача изменилась"
+msgstr "Geschäftskategorien: Aufgabe wurde geändert"
+
+#: templates/panels/aap_audience/clar.html:102
+msgid "Обработать категории снова"
+msgstr "Kategorien erneut verarbeiten"
+
+#: templates/panels/aap_audience/clar.html:107
+msgid "Бизнес-категории: не обработаны"
+msgstr "Business-Kategorien: nicht verarbeitet"
+
+#: templates/panels/aap_audience/clar.html:114
+msgid "Обработать категории"
+msgstr "Kategorien verarbeiten"
+
+#: templates/panels/aap_audience/clar.html:120
+msgid "География: обрабатывается"
+msgstr "Geografie: wird verarbeitet"
+
+#: templates/panels/aap_audience/clar.html:126
+msgid "География: обработана"
+msgstr "Geografie: verarbeitet"
+
+#: templates/panels/aap_audience/clar.html:130
+msgid "География: задача изменилась"
+msgstr "Geographie: die Aufgabe hat sich geändert"
+
+#: templates/panels/aap_audience/clar.html:137
+msgid "Обработать географию снова"
+msgstr "Geographie erneut verarbeiten"
+
+#: templates/panels/aap_audience/clar.html:142
+msgid "География: не обработана"
+msgstr "Geographie: nicht verarbeitet"
+
+#: templates/panels/aap_audience/clar.html:149
+msgid "Обработать географию"
+msgstr "Geodaten verarbeiten"
+
+#: templates/panels/aap_audience/clar.html:223
+msgid "Бизнес-категории не обработаны"
+msgstr "Business-Kategorien wurden nicht verarbeitet"
+
+#: templates/panels/aap_audience/clar.html:228
+#: templates/panels/aap_audience/clar.html:290
+#: templates/panels/aap_audience/status_task.html:234
+#: templates/panels/aap_audience/status_task.html:352
+#: templates/panels/aap_lists/lists_list.html:158
+msgid "Поиск"
+msgstr "Suche"
+
+#: templates/panels/aap_audience/clar.html:232
+#: templates/panels/aap_audience/clar.html:294
+msgid "Начните вводить."
+msgstr "Beginnen Sie mit der Eingabe."
+
+#: templates/panels/aap_audience/clar.html:285
+msgid "Города не обработаны"
+msgstr "Städte wurden nicht verarbeitet"
+
+#: templates/panels/aap_audience/clar.html:317
+#: templates/panels/aap_audience/status.html:22
+msgid "Критерии"
+msgstr "Kriterien"
+
+#: templates/panels/aap_audience/clar.html:318
+msgid "Статус / Действия"
+msgstr "Status / Aktionen"
+
+#: templates/panels/aap_audience/clar.html:354
+#: templates/panels/aap_audience/how.html:253
+#: templates/panels/aap_audience/status.html:57
+#: templates/panels/aap_audience/status_task.html:235
+#: templates/panels/aap_lists/lists_list.html:159
+msgid "Клиент"
+msgstr "Kunde"
+
+#: templates/panels/aap_audience/clar.html:356
+#: templates/panels/aap_audience/how.html:255
+#: templates/panels/aap_audience/status.html:59
+msgid "Поставщик"
+msgstr "Anbieter"
+
+#: templates/panels/aap_audience/clar.html:371
+#: templates/panels/aap_audience/how.html:272
+#: templates/panels/aap_audience/status.html:76
+msgid "География"
+msgstr "Geographie"
+
+#: templates/panels/aap_audience/clar.html:389
+#: templates/panels/aap_lists/lists.html:181
+msgid "Управлять"
+msgstr "Verwalten"
+
+#: templates/panels/aap_audience/clar.html:394
+msgid "Категории: обработка"
+msgstr "Kategorien: Verarbeitung"
+
+#: templates/panels/aap_audience/clar.html:400
+msgid "Категории: обработаны"
+msgstr "Kategorien: verarbeitet"
+
+#: templates/panels/aap_audience/clar.html:405
+msgid "Посмотреть категории"
+msgstr "Kategorien ansehen"
+
+#: templates/panels/aap_audience/clar.html:409
+#: templates/panels/aap_audience/clar.html:414
+msgid "Категории не обработаны"
+msgstr "Kategorien wurden nicht verarbeitet."
+
+#: templates/panels/aap_audience/clar.html:421
+msgid "Города: обработка"
+msgstr "Städte: Verarbeitung"
+
+#: templates/panels/aap_audience/clar.html:427
+msgid "Города: обработаны"
+msgstr "Städte: verarbeitet"
+
+#: templates/panels/aap_audience/clar.html:432
+msgid "Посмотреть города"
+msgstr "Städte anzeigen"
+
+#: templates/panels/aap_audience/clar.html:436
+#: templates/panels/aap_audience/clar.html:441
+msgid "Города: не обработаны"
+msgstr "Städte: nicht verarbeitet"
+
+#: templates/panels/aap_audience/clar.html:456
+#: templates/panels/aap_audience/how.html:324
+#: templates/panels/aap_audience/modal_status_task.html:80
+#: templates/panels/aap_audience/status.html:172
+#: templates/panels/aap_audience/status_task.html:300
+#: templates/panels/aap_audience/status_task.html:416
+#: templates/panels/aap_campaigns/campaigns.html:482
+#: templates/panels/aap_campaigns/modal_full_preview.html:53
+#: templates/panels/aap_campaigns/modal_preview.html:50
+#: templates/panels/aap_campaigns/templates.html:215
+#: templates/panels/aap_lists/contacts.html:254
+#: templates/panels/aap_lists/lists.html:193
+#: templates/panels/aap_lists/lists_list.html:265
+#: templates/panels/aap_lists/modal_contacts.html:90
+#: templates/panels/aap_lists/modal_lists_list.html:74
+#: templates/panels/aap_settings/mail_servers.html:395
+#: templates/panels/overview.html:49
+msgid "Здесь пока нет данных"
+msgstr "Hier sind noch keine Daten."
+
+#: templates/panels/aap_audience/how.html:86
+msgid "Обработать"
+msgstr "Verarbeiten"
+
+#: templates/panels/aap_audience/how.html:89
+msgid "Очистить"
+msgstr "Leeren"
+
+#: templates/panels/aap_audience/how.html:92
+#: templates/panels/aap_campaigns/campaigns.html:342
+#: templates/panels/aap_campaigns/templates.html:142
+#: templates/panels/aap_settings/imap_server.html:129
+#: templates/panels/aap_settings/mail_servers.html:174
+#: templates/panels/aap_settings/sending.html:82
+#: templates/panels/aap_settings/smtp_server.html:146
+msgid "Сохранить"
+msgstr "Speichern"
+
+#: templates/panels/aap_audience/how.html:127
+msgid ""
+"Предоставленная Вами информация является непубличной и не передаётся третьим "
+"лицам."
+msgstr ""
+"Die von Ihnen bereitgestellten Informationen sind nicht öffentlich und "
+"werden nicht an Dritte weitergegeben."
+
+#: templates/panels/aap_audience/how.html:128
+msgid ""
+"Она используется исключительно для оценки вероятности заключения сделки с "
+"контрагентами."
+msgstr ""
+"Sie wird ausschließlich dazu verwendet, die Wahrscheinlichkeit eines "
+"Geschäftsabschlusses mit Geschäftspartnern zu bewerten."
+
+#: templates/panels/aap_audience/how.html:129
+msgid ""
+"Недостоверные данные искажают результат и снижают эффективность подбора "
+"контрагентов."
+msgstr ""
+"Unzuverlässige Daten verfälschen das Ergebnis und verringern die Effizienz "
+"bei der Auswahl von Geschäftspartnern."
+
+#: templates/panels/aap_audience/how.html:130
+msgid ""
+"Поэтому указывайте реальные факты, а не маркетинговые формулировки — это в "
+"Ваших интересах."
+msgstr ""
+"Geben Sie deshalb reale Fakten an, keine werblichen Formulierungen — das "
+"liegt in Ihrem Interesse."
+
+#: templates/panels/aap_audience/how.html:134
+msgid ""
+"Это вспомогательный ассистент для формулирования критериев отбора и "
+"ранжирования контрагентов."
+msgstr ""
+"Dies ist ein Hilfsassistent zur Formulierung von Kriterien für die Auswahl "
+"und Priorisierung von Kontrahenten."
+
+#: templates/panels/aap_audience/how.html:135
+msgid ""
+"Ответственность за сохранённые данные лежит на Вас: Вы должны исправлять "
+"ошибки, удалять неверные предположения и добавлять корректные факты. "
+"Недостоверная информация искажает оценку вероятности сделки."
+msgstr ""
+"Die Verantwortung für die gespeicherten Daten liegt bei Ihnen: Sie müssen "
+"Fehler korrigieren, falsche Annahmen entfernen und korrekte Fakten ergänzen. "
+"Falsche Informationen verfälschen die Bewertung der Wahrscheinlichkeit eines "
+"Geschäftsabschlusses."
+
+#: templates/panels/aap_audience/how.html:140
+msgid ""
+"Ассистент задаёт вопросы, чтобы подсказать, какую информацию ещё можно "
+"добавить."
+msgstr ""
+"Der Assistent stellt Fragen, um vorzuschlagen, welche Informationen noch "
+"hinzugefügt werden können."
+
+#: templates/panels/aap_audience/how.html:141
+msgid ""
+"Отвечать на них не обязательно. Если вопрос кажется лишним или у Вас нет "
+"ответа, просто пропустите его. Вопросы будут появляться постоянно. Когда "
+"результат Вас устроит, сохраните его."
+msgstr ""
+"Auf sie zu antworten ist nicht erforderlich. Wenn eine Frage überflüssig "
+"erscheint oder Sie keine Antwort haben, überspringen Sie sie einfach. Fragen "
+"werden ständig auftauchen. Wenn Sie mit dem Ergebnis zufrieden sind, "
+"speichern Sie es."
+
+#: templates/panels/aap_audience/how.html:145
+msgid ""
+"«Обработать» — вызвать ассистента для корректировки и дополнения введённой "
+"Вами информации."
+msgstr ""
+"„Verarbeiten“ — den Assistenten aufrufen, um die von Ihnen eingegebenen "
+"Informationen zu korrigieren und zu ergänzen."
+
+#: templates/panels/aap_audience/how.html:146
+msgid ""
+"При сохранении формируются критерии выбора контрагентов, бизнес-категорий и "
+"городов Германии. Вы сможете отредактировать эти данные. Сбор и ранжирование "
+"контрагентов запускаются отдельно."
+msgstr ""
+"Beim Speichern werden Auswahlkriterien für Kontrahenten, Geschäftskategorien "
+"und Städte in Deutschland erstellt. Sie können diese Daten bearbeiten. Das "
+"Sammeln und die Rangfolge der Kontrahenten werden separat gestartet."
+
+#: templates/panels/aap_audience/how.html:150
+msgid "Указывайте интернет-адреса в виде ссылок (https://mysite.com)."
+msgstr "Geben Sie Internetadressen als Links an (https://mysite.com)."
+
+#: templates/panels/aap_audience/how.html:151
+msgid ""
+"Если сомневаетесь, скопируйте адрес из строки браузера. Иначе ассистент не "
+"распознает, что это ссылка."
+msgstr ""
+"Wenn Sie unsicher sind, kopieren Sie die Adresse aus der Adressleiste des "
+"Browsers. Andernfalls erkennt der Assistent nicht, dass es sich um einen "
+"Link handelt."
+
+#: templates/panels/aap_audience/how.html:218
+msgid "Критерии выбора"
+msgstr "Auswahlkriterien"
+
+#: templates/panels/aap_audience/how.html:219
+msgid "Действия / Статус"
+msgstr "Aktionen / Status"
+
+#: templates/panels/aap_audience/how.html:292
+#: templates/panels/aap_campaigns/campaigns.html:463
+#: templates/panels/aap_campaigns/templates.html:204
+#: templates/panels/aap_lists/lists.html:168
+#: templates/panels/aap_settings/mail_servers.html:375
+msgid "Изменить"
+msgstr "Bearbeiten"
+
+#: templates/panels/aap_audience/how.html:296
+msgid "Удалить задачу?"
+msgstr "Aufgabe löschen?"
+
+#: templates/panels/aap_audience/how.html:301
+#: templates/panels/aap_campaigns/campaigns.html:471
+#: templates/panels/aap_campaigns/templates.html:192
+#: templates/panels/aap_lists/lists.html:176
+#: templates/panels/aap_settings/mail_servers.html:382
+msgid "Удалить"
+msgstr "Löschen"
+
+#: templates/panels/aap_audience/how.html:308
+msgid "Обработка включена"
+msgstr "Verarbeitung aktiviert"
+
+#: templates/panels/aap_audience/how.html:312
+msgid "Обработка отключена"
+msgstr "Verarbeitung deaktiviert"
+
+#: templates/panels/aap_audience/modal_status_task.html:22
+#: templates/panels/aap_lists/modal_lists_list.html:19
+msgid "Рейтинг компании"
+msgstr "Unternehmensbewertung"
+
+#: templates/panels/aap_audience/modal_status_task.html:23
+#: templates/panels/aap_lists/modal_lists_list.html:20
+msgid "Рейтинг не присвоен"
+msgstr "Bewertung nicht zugewiesen"
+
+#: templates/panels/aap_audience/modal_status_task.html:27
+#: templates/panels/aap_lists/modal_lists_list.html:24
+msgid "Рейтинг поиска"
+msgstr "Suchranking"
+
+#: templates/panels/aap_audience/modal_status_task.html:28
+#: templates/panels/aap_audience/status_task.html:233
+#: templates/panels/aap_audience/status_task.html:351
+#: templates/panels/aap_lists/modal_lists_list.html:25
+msgid "Город"
+msgstr "Stadt"
+
+#: templates/panels/aap_audience/modal_status_task.html:29
+#: templates/panels/aap_lists/contacts.html:76
+#: templates/panels/aap_lists/lists_list.html:82
+#: templates/panels/aap_lists/modal_lists_list.html:26
+msgid "Категория"
+msgstr "Kategorie"
+
+#: templates/panels/aap_audience/modal_status_task.html:33
+#: templates/panels/aap_lists/modal_contacts.html:46
+#: templates/panels/aap_lists/modal_lists_list.html:30
+msgid "Категории / отрасли:"
+msgstr "Kategorien / Branchen:"
+
+#: templates/panels/aap_audience/modal_status_task.html:38
+#: templates/panels/aap_lists/modal_contacts.html:51
+#: templates/panels/aap_lists/modal_lists_list.html:35
+msgid "Теги / направления деятельности:"
+msgstr "Tags / Tätigkeitsbereiche:"
+
+#: templates/panels/aap_audience/modal_status_task.html:43
+#: templates/panels/aap_lists/modal_contacts.html:55
+#: templates/panels/aap_lists/modal_lists_list.html:39
+msgid "Адрес:"
+msgstr "Adresse:"
+
+#: templates/panels/aap_audience/modal_status_task.html:49
+#: templates/panels/aap_lists/modal_contacts.html:60
+#: templates/panels/aap_lists/modal_lists_list.html:44
+msgid "Телефон:"
+msgstr "Telefon:"
+
+#: templates/panels/aap_audience/modal_status_task.html:54
+#: templates/panels/aap_lists/modal_contacts.html:65
+#: templates/panels/aap_lists/modal_lists_list.html:49
+msgid "Email:"
+msgstr "Email:"
+
+#: templates/panels/aap_audience/modal_status_task.html:59
+#: templates/panels/aap_lists/modal_contacts.html:70
+#: templates/panels/aap_lists/modal_lists_list.html:54
+msgid "Web-site:"
+msgstr "Website:"
+
+#: templates/panels/aap_audience/modal_status_task.html:64
+#: templates/panels/aap_lists/modal_contacts.html:75
+#: templates/panels/aap_lists/modal_lists_list.html:59
+msgid "Социальные сети:"
+msgstr "Soziale Netzwerke:"
+
+#: templates/panels/aap_audience/modal_status_task.html:69
+#: templates/panels/aap_lists/modal_contacts.html:80
+#: templates/panels/aap_lists/modal_lists_list.html:64
+msgid "Описание:"
+msgstr "Beschreibung:"
+
+#: templates/panels/aap_audience/modal_status_task.html:74
+#: templates/panels/aap_lists/modal_contacts.html:85
+#: templates/panels/aap_lists/modal_lists_list.html:69
+msgid "Источник:"
+msgstr "Quelle:"
+
+#: templates/panels/aap_audience/status.html:23
+#: templates/panels/aap_campaigns/campaigns.html:387
+msgid "Статус"
+msgstr "Status"
+
+#: templates/panels/aap_audience/status.html:95
+#: templates/panels/aap_audience/status_task.html:53
+msgid "Сбор контактов включён"
+msgstr "Kontaktsammlung ist aktiviert"
+
+#: templates/panels/aap_audience/status.html:98
+#: templates/panels/aap_audience/status.html:113
+#: templates/panels/aap_audience/status_task.html:33
+#: templates/panels/aap_lists/lists.html:81
+msgid "Всего собрано контактов"
+msgstr "Insgesamt gesammelte Kontakte"
+
+#: templates/panels/aap_audience/status.html:105
+msgid "Отключить сбор контактов"
+msgstr "Kontakterfassung deaktivieren"
+
+#: templates/panels/aap_audience/status.html:110
+#: templates/panels/aap_audience/status_task.html:63
+msgid "Сбор контактов отключён"
+msgstr "Kontakterfassung deaktiviert"
+
+#: templates/panels/aap_audience/status.html:120
+msgid "Включить сбор контактов"
+msgstr "Kontakterfassung aktivieren"
+
+#: templates/panels/aap_audience/status.html:127
+msgid "Рейтингование запущено"
+msgstr "Bewertung gestartet"
+
+#: templates/panels/aap_audience/status.html:132
+#: templates/panels/aap_audience/status_task.html:29
+#: templates/panels/aap_audience/status_task.html:137
+#: templates/panels/aap_audience/status_task.html:176
+msgid "Контакты: присвоен рейтинг"
+msgstr "Kontakte: Bewertung zugewiesen"
+
+#: templates/panels/aap_audience/status.html:137
+#: templates/panels/aap_audience/status_task.html:143
+#: templates/panels/aap_lists/lists.html:90
+#: templates/panels/aap_lists/lists.html:152
+msgid "Рейтинг 1-30"
+msgstr "Bewertung 1-30"
+
+#: templates/panels/aap_audience/status.html:141
+#: templates/panels/aap_audience/status_task.html:148
+#: templates/panels/aap_lists/lists.html:94
+#: templates/panels/aap_lists/lists.html:156
+msgid "Рейтинг 31-70"
+msgstr "Bewertung 31-70"
+
+#: templates/panels/aap_audience/status.html:145
+#: templates/panels/aap_audience/status_task.html:153
+#: templates/panels/aap_lists/lists.html:98
+#: templates/panels/aap_lists/lists.html:160
+msgid "Рейтинг 71-100"
+msgstr "Bewertung 71-100"
+
+#: templates/panels/aap_audience/status.html:153
+#: templates/panels/aap_audience/status_task.html:82
+msgid "Критерии оценки изменены"
+msgstr "Bewertungskriterien wurden geändert"
+
+#: templates/panels/aap_audience/status.html:159
+msgid "Смотреть / управлять"
+msgstr "Anzeigen / Verwalten"
+
+#: templates/panels/aap_audience/status_task.html:37
+msgid "Контактов к рейтингованию"
+msgstr "Kontakte zur Bewertung"
+
+#: templates/panels/aap_audience/status_task.html:41
+msgid "Вернуться к аудиториям"
+msgstr "Zurück zu Zielgruppen"
+
+#: templates/panels/aap_audience/status_task.html:58
+#: templates/panels/aap_campaigns/campaigns.html:445
+msgid "Отключить"
+msgstr "Deaktivieren"
+
+#: templates/panels/aap_audience/status_task.html:68
+#: templates/panels/aap_campaigns/campaigns.html:455
+#: templates/panels/aap_lists/lists_list.html:219
+msgid "Включить"
+msgstr "Aktivieren"
+
+#: templates/panels/aap_audience/status_task.html:76
+msgid "Рейтингование контактов запущено"
+msgstr "Kontaktbewertung gestartet"
+
+#: templates/panels/aap_audience/status_task.html:88
+msgid "Провести повторное рейтингование"
+msgstr "Erneute Bewertung durchführen"
+
+#: templates/panels/aap_audience/status_task.html:94
+msgid "Присвоить рейтинг"
+msgstr "Bewertung zuweisen"
+
+#: templates/panels/aap_audience/status_task.html:100
+msgid "+ 100"
+msgstr "+ 100"
+
+#: templates/panels/aap_audience/status_task.html:107
+msgid "+ 200"
+msgstr "+ 200"
+
+#: templates/panels/aap_audience/status_task.html:114
+msgid "+ 500"
+msgstr "+ 500"
+
+#: templates/panels/aap_audience/status_task.html:121
+msgid "+ 1 000"
+msgstr "+ 1 000"
+
+#: templates/panels/aap_audience/status_task.html:132
+msgid "Удалить все рейтинги"
+msgstr "Alle Bewertungen löschen"
+
+#: templates/panels/aap_audience/status_task.html:184
+msgid "Контакты: все собранные"
+msgstr "Kontakte: alle gesammelten"
+
+#: templates/panels/aap_audience/status_task.html:209
+#: templates/panels/aap_audience/status_task.html:280
+#: templates/panels/aap_audience/status_task.html:327
+#: templates/panels/aap_audience/status_task.html:396
+#: templates/panels/aap_lists/contacts.html:127
+#: templates/panels/aap_lists/contacts.html:237
+#: templates/panels/aap_lists/lists_list.html:137
+#: templates/panels/aap_lists/lists_list.html:248
+msgid "Страницы"
+msgstr "Seiten"
+
+#: templates/panels/aap_audience/status_task.html:231
+#: templates/panels/aap_audience/status_task.html:349
+#: templates/panels/aap_lists/contacts.html:71
+#: templates/panels/aap_lists/contacts.html:146
+#: templates/panels/aap_lists/lists_list.html:77
+#: templates/panels/aap_lists/lists_list.html:156
+#: templates/panels/aap_lists/modal_contacts.html:37
+#: templates/panels/overview.html:23
+msgid "Компания"
+msgstr "Unternehmen"
+
+#: templates/panels/aap_audience/status_task.html:254
+#: templates/panels/aap_audience/status_task.html:370
+#: templates/panels/aap_lists/contacts.html:214
+#: templates/panels/aap_lists/lists_list.html:226
+msgid "Больше"
+msgstr "Mehr"
+
+#: templates/panels/aap_campaigns/campaigns.html:24
+msgid "Ваши кампании:"
+msgstr "Ihre Kampagnen:"
+
+#: templates/panels/aap_campaigns/campaigns.html:32
+msgid "Добавить кампанию"
+msgstr "Kampagne hinzufügen"
+
+#: templates/panels/aap_campaigns/campaigns.html:56
+msgid "Название кампании"
+msgstr "Kampagnenname"
+
+#: templates/panels/aap_campaigns/campaigns.html:59
+#: templates/panels/aap_campaigns/campaigns.html:403
+#: templates/panels/aap_lists/contacts.html:26
+#: templates/panels/aap_lists/lists_list.html:17
+msgid "Список рассылки"
+msgstr "Mailingliste"
+
+#: templates/panels/aap_campaigns/campaigns.html:64
+#: templates/panels/aap_campaigns/campaigns.html:86
+msgid "— не выбран —"
+msgstr "— nicht ausgewählt —"
+
+#: templates/panels/aap_campaigns/campaigns.html:73
+#: templates/panels/aap_campaigns/campaigns.html:404
+msgid "Отправка"
+msgstr "Senden"
+
+#: templates/panels/aap_campaigns/campaigns.html:75
+msgid "— не выбрано —"
+msgstr "— nicht ausgewählt —"
+
+#: templates/panels/aap_campaigns/campaigns.html:84
+msgid "Шаблон письма"
+msgstr "E-Mail-Vorlage"
+
+#: templates/panels/aap_campaigns/campaigns.html:97
+msgid "Дата начала кампании"
+msgstr "Startdatum der Kampagne"
+
+#: templates/panels/aap_campaigns/campaigns.html:116
+msgid "Дата конца компании"
+msgstr "Enddatum der Kampagne"
+
+#: templates/panels/aap_campaigns/campaigns.html:136
+msgid "Следуем за кампанией"
+msgstr "Wir folgen der Kampagne"
+
+#: templates/panels/aap_campaigns/campaigns.html:138
+msgid "Отправлять письма через (дней)"
+msgstr "E-Mails versenden in (Tagen)"
+
+#: templates/panels/aap_campaigns/campaigns.html:150
+#: templates/panels/aap_lists/lists.html:68
+#: templates/panels/aap_lists/lists_list.html:32
+#: templates/panels/aap_settings/mail_servers.html:223
+msgid "Добавить"
+msgstr "Hinzufügen"
+
+#: templates/panels/aap_campaigns/campaigns.html:158
+#: templates/panels/aap_campaigns/campaigns.html:413
+msgid "Изменить письмо"
+msgstr "E-Mail bearbeiten"
+
+#: templates/panels/aap_campaigns/campaigns.html:162
+#: templates/panels/aap_campaigns/campaigns.html:345
+#: templates/panels/aap_campaigns/templates.html:146
+#: templates/panels/aap_settings/imap_server.html:134
+#: templates/panels/aap_settings/mail_servers.html:177
+#: templates/panels/aap_settings/smtp_server.html:151
+msgid "Закрыть"
+msgstr "Schließen"
+
+#: templates/panels/aap_campaigns/campaigns.html:175
+msgid "Использовать глобальные настройки окна отправки"
+msgstr "Globale Einstellungen des Sendedialogs verwenden"
+
+#: templates/panels/aap_campaigns/campaigns.html:303
+#: templates/panels/aap_campaigns/templates.html:64
+msgid "Экспертный режим"
+msgstr "Expertenmodus"
+
+#: templates/panels/aap_campaigns/campaigns.html:306
+#: templates/panels/aap_campaigns/campaigns.html:317
+#: templates/panels/aap_campaigns/campaigns.html:410
+#: templates/panels/aap_campaigns/templates.html:67
+#: templates/panels/aap_campaigns/templates.html:128
+#: templates/panels/aap_campaigns/templates.html:198
+msgid "Предпросмотр"
+msgstr "Vorschau"
+
+#: templates/panels/aap_campaigns/campaigns.html:314
+#: templates/panels/aap_campaigns/templates.html:125
+msgid "Визуальный режим"
+msgstr "Visueller Modus"
+
+#: templates/panels/aap_campaigns/campaigns.html:322
+msgid "Дополнительные заголовки JSON"
+msgstr "Zusätzliche JSON-Header"
+
+#: templates/panels/aap_campaigns/campaigns.html:328
+msgid "Тема письма 1 (ротация)"
+msgstr "E-Mail-Betreff 1 (Rotation)"
+
+#: templates/panels/aap_campaigns/campaigns.html:331
+msgid "Тема письма 2 (ротация)"
+msgstr "E-Mail-Betreff 2 (Rotation)"
+
+#: templates/panels/aap_campaigns/campaigns.html:334
+msgid "Тема письма 3 (ротация)"
+msgstr "E-Mail-Betreff 3 (Rotation)"
+
+#: templates/panels/aap_campaigns/campaigns.html:358
+#: templates/panels/aap_settings/smtp_server.html:179
+msgid "Отправить тестовое письмо по адресу:"
+msgstr "Test-E-Mail senden an:"
+
+#: templates/panels/aap_campaigns/campaigns.html:361
+msgid "Отправить тестовое письмо"
+msgstr "Test-E-Mail senden"
+
+#: templates/panels/aap_campaigns/campaigns.html:385
+#: templates/panels/overview.html:22
+msgid "Кампания"
+msgstr "Kampagne"
+
+#: templates/panels/aap_campaigns/campaigns.html:386
+msgid "Письмо"
+msgstr "E-Mail"
+
+#: templates/panels/aap_campaigns/campaigns.html:388
+msgid "Состояние"
+msgstr "Status"
+
+#: templates/panels/aap_campaigns/campaigns.html:398
+msgid "Активна с"
+msgstr "Aktiv seit"
+
+#: templates/panels/aap_campaigns/campaigns.html:400
+msgid "по"
+msgstr "per"
+
+#: templates/panels/aap_campaigns/campaigns.html:405
+msgid "Шаблон письма:"
+msgstr "E-Mail-Vorlage:"
+
+#: templates/panels/aap_campaigns/campaigns.html:420
+msgid "Писем к отправке"
+msgstr "Zu versendende E-Mails"
+
+#: templates/panels/aap_campaigns/campaigns.html:423
+msgid "Отправлено"
+msgstr "Gesendet"
+
+#: templates/panels/aap_campaigns/campaigns.html:426
+msgid "Осталось"
+msgstr "Verbleibend"
+
+#: templates/panels/aap_campaigns/campaigns.html:434
+msgid "Кампания включена"
+msgstr "Kampagne aktiviert"
+
+#: templates/panels/aap_campaigns/campaigns.html:436
+msgid "Идет рассылка"
+msgstr "Versand läuft"
+
+#: templates/panels/aap_campaigns/campaigns.html:438
+msgid "Ждем окно отправки"
+msgstr "Warten auf das Versandfenster"
+
+#: templates/panels/aap_campaigns/campaigns.html:449
+msgid "Кампания отключена"
+msgstr "Kampagne deaktiviert"
+
+#: templates/panels/aap_campaigns/campaigns.html:466
+#: templates/panels/aap_campaigns/templates.html:187
+#: templates/panels/aap_lists/lists.html:171
+#: templates/panels/aap_settings/mail_servers.html:377
+msgid "Вы уверены?"
+msgstr "Sind Sie sicher?"
+
+#: templates/panels/aap_campaigns/modal_full_preview.html:16
+#: templates/panels/aap_campaigns/modal_preview.html:16
+msgid "VIEW"
+msgstr "ANSEHEN"
+
+#: templates/panels/aap_campaigns/modal_full_preview.html:17
+#: templates/panels/aap_campaigns/modal_preview.html:17
+#: templates/panels/aap_campaigns/modal_preview.html:39
+msgid "HTML"
+msgstr "HTML"
+
+#: templates/panels/aap_campaigns/modal_full_preview.html:18
+#: templates/panels/aap_campaigns/modal_preview.html:18
+msgid "HTML EMAIL"
+msgstr "HTML-Email"
+
+#: templates/panels/aap_campaigns/modal_full_preview.html:36
+msgid "CONTENT HTML (inner)"
+msgstr "HTML-Inhalt (innen)"
+
+#: templates/panels/aap_campaigns/modal_full_preview.html:39
+#: templates/panels/aap_campaigns/modal_preview.html:36
+msgid "CSS"
+msgstr "CSS"
+
+#: templates/panels/aap_campaigns/modal_full_preview.html:42
+msgid "TEMPLATE HTML (outer)"
+msgstr "HTML-VORLAGE (außen)"
+
+#: templates/panels/aap_campaigns/modal_full_preview.html:48
+#: templates/panels/aap_campaigns/modal_preview.html:45
+msgid "HTML EMAIL (no vars)"
+msgstr "HTML EMAIL (keine Variablen)"
+
+#: templates/panels/aap_campaigns/templates.html:36
+msgid "Ваш шаблон: название"
+msgstr "Ihre Vorlage: Name"
+
+#: templates/panels/aap_campaigns/templates.html:51
+msgid "Ваши шаблоны:"
+msgstr "Ihre Vorlagen:"
+
+#: templates/panels/aap_campaigns/templates.html:72
+msgid "Глобальные шаблоны"
+msgstr "Globale Vorlagen"
+
+#: templates/panels/aap_campaigns/templates.html:79
+#: templates/panels/aap_campaigns/templates.html:83
+msgid "Шаблон"
+msgstr "Vorlage"
+
+#: templates/panels/aap_campaigns/templates.html:93
+msgid "Цвета"
+msgstr "Farben"
+
+#: templates/panels/aap_campaigns/templates.html:107
+msgid "Шрифты"
+msgstr "Schriftarten"
+
+#: templates/panels/aap_campaigns/templates.html:151
+msgid "Добавить шаблон"
+msgstr "Vorlage hinzufügen"
+
+#: templates/panels/aap_campaigns/templates.html:174
+msgid "Список шаблонов:"
+msgstr "Liste der Vorlagen:"
+
+#: templates/panels/aap_campaigns/templates.html:245
+msgid "Пожалуйста, заполните название шаблона"
+msgstr "Bitte geben Sie den Namen der Vorlage ein."
+
+#: templates/panels/aap_lists/contacts.html:20
+msgid "Контакты. Списки рассылок:"
+msgstr "Kontakte. Mailinglisten:"
+
+#: templates/panels/aap_lists/contacts.html:26
+msgid "Контакты"
+msgstr "Kontakte"
+
+#: templates/panels/aap_lists/contacts.html:32
+msgid "Список рассылки: Без списка, Контакты"
+msgstr "Mailingliste: Keine Liste, Kontakte"
+
+#: templates/panels/aap_lists/contacts.html:37
+msgid "Неподписанные"
+msgstr "Nicht signiert"
+
+#: templates/panels/aap_lists/contacts.html:43
+msgid "Все контакты"
+msgstr "Alle Kontakte"
+
+#: templates/panels/aap_lists/contacts.html:81
+#: templates/panels/aap_lists/lists_list.html:87
+msgid "Адрес, город"
+msgstr "Adresse, Stadt"
+
+#: templates/panels/aap_lists/contacts.html:94
+#: templates/panels/aap_lists/lists_list.html:105
+msgid "Искать"
+msgstr "Suchen"
+
+#: templates/panels/aap_lists/contacts.html:99
+#: templates/panels/aap_lists/lists_list.html:109
+msgid "Очистить поиск"
+msgstr "Suche löschen"
+
+#: templates/panels/aap_lists/contacts.html:176
+msgid "Списки рассылок: нет"
+msgstr "Mailinglisten: keine"
+
+#: templates/panels/aap_lists/contacts.html:184
+msgid "Забыть контакт? Он будет удалён из контактов workspace."
+msgstr "Kontakt vergessen? Er wird aus den Kontakten des Workspaces gelöscht."
+
+#: templates/panels/aap_lists/contacts.html:188
+msgid "Забыть"
+msgstr "Vergessen"
+
+#: templates/panels/aap_lists/contacts.html:198
+#: templates/panels/aap_lists/lists_list.html:201
+msgid "Отписать"
+msgstr "Abbestellen"
+
+#: templates/panels/aap_lists/contacts.html:206
+#: templates/panels/aap_lists/lists_list.html:209
+msgid "Подписать"
+msgstr "Signieren"
+
+#: templates/panels/aap_lists/lists.html:21
+msgid "Редактирование списка"
+msgstr "Liste bearbeiten"
+
+#: templates/panels/aap_lists/lists.html:25
+msgid "Новый список рассылки"
+msgstr "Neue Mailingliste"
+
+#: templates/panels/aap_lists/lists.html:42
+msgid "Название"
+msgstr "Name"
+
+#: templates/panels/aap_lists/lists.html:85
+#: templates/panels/aap_lists/lists.html:147
+msgid "Отрейтинговано"
+msgstr "Bewertet"
+
+#: templates/panels/aap_lists/lists.html:116
+msgid "Список"
+msgstr "Liste"
+
+#: templates/panels/aap_lists/lists.html:131
+msgid "Контактов в списке"
+msgstr "Kontakte in der Liste"
+
+#: templates/panels/aap_lists/lists.html:141
+msgid "Всего собрано"
+msgstr "Insgesamt gesammelt"
+
+#: templates/panels/aap_lists/lists_list.html:22
+msgid "Включено в список"
+msgstr "In die Liste aufgenommen"
+
+#: templates/panels/aap_lists/lists_list.html:28
+msgid "Добавить контакты с рейтингом от 1 до:"
+msgstr "Kontakte mit Bewertung von 1 bis:"
+
+#: templates/panels/aap_lists/lists_list.html:37
+msgid "Точно очистить список? Будут удалены все контакты из этого списка."
+msgstr "Liste wirklich leeren? Alle Kontakte aus dieser Liste werden gelöscht."
+
+#: templates/panels/aap_lists/lists_list.html:40
+msgid "Очистить список"
+msgstr "Liste leeren"
+
+#: templates/panels/aap_lists/lists_list.html:43
+msgid "Вернуться к спискам"
+msgstr "Zurück zu den Listen"
+
+#: templates/panels/aap_lists/lists_list.html:50
+msgid "Контакты - Список рассылки"
+msgstr "Kontakte - Mailingliste"
+
+#: templates/panels/aap_lists/lists_list.html:54
+msgid "Контакты - Аудитория"
+msgstr "Kontakte - Zielgruppe"
+
+#: templates/panels/aap_lists/lists_list.html:97
+#: templates/panels/aap_lists/lists_list.html:183
+msgid "В списке"
+msgstr "In der Liste"
+
+#: templates/panels/aap_lists/lists_list.html:185
+msgid "Отписан"
+msgstr "Abbestellt"
+
+#: templates/panels/aap_lists/lists_list.html:192
+msgid "Исключить"
+msgstr "Ausschließen"
+
+#: templates/panels/aap_lists/lists_list.html:214
+msgid "Не в списке"
+msgstr "Nicht in der Liste"
+
+#: templates/panels/aap_lists/modal_contacts.html:17
+msgid "Списки рассылки"
+msgstr "Verteilerlisten"
+
+#: templates/panels/aap_lists/modal_contacts.html:28
+msgid "Нет в списках рассылок"
+msgstr "Nicht in Mailinglisten"
+
+#: templates/panels/aap_lists/modal_contacts.html:32
+msgid "Аудитории"
+msgstr "Zielgruppen"
+
+#: templates/panels/aap_lists/modal_contacts.html:37
+msgid "Рейтинги: Поиск"
+msgstr "Bewertungen: Suche"
+
+#: templates/panels/aap_lists/modal_contacts.html:42
+msgid "нет"
+msgstr "nein"
+
+#: templates/panels/aap_settings/imap_server.html:32
+msgid "сервер (входящие)"
+msgstr "Server (eingehend)"
+
+#: templates/panels/aap_settings/imap_server.html:35
+#: templates/panels/aap_settings/imap_server.html:41
+#: templates/panels/aap_settings/smtp_server.html:57
+#: templates/panels/aap_settings/smtp_server.html:63
+msgid "ЛОГИН (Стандарт)"
+msgstr "Login (Standard)"
+
+#: templates/panels/aap_settings/imap_server.html:36
+#: templates/panels/aap_settings/smtp_server.html:58
+msgid "Google OAuth 2.0"
+msgstr "Google OAuth 2.0"
+
+#: templates/panels/aap_settings/imap_server.html:37
+#: templates/panels/aap_settings/smtp_server.html:59
+msgid "Microsoft OAuth 2.0"
+msgstr "Microsoft OAuth 2.0"
+
+#: templates/panels/aap_settings/imap_server.html:45
+#: templates/panels/aap_settings/smtp_server.html:67
+msgid "Провайдер"
+msgstr "Anbieter"
+
+#: templates/panels/aap_settings/imap_server.html:48
+#: templates/panels/aap_settings/smtp_server.html:70
+msgid "— выберите провайдера —"
+msgstr "— Anbieter auswählen —"
+
+#: templates/panels/aap_settings/imap_server.html:58
+#: templates/panels/aap_settings/smtp_server.html:80
+msgid "Шифрование"
+msgstr "Verschlüsselung"
+
+#: templates/panels/aap_settings/imap_server.html:64
+#: templates/panels/aap_settings/smtp_server.html:85
+msgid "Сервер"
+msgstr "Server"
+
+#: templates/panels/aap_settings/imap_server.html:70
+#: templates/panels/aap_settings/smtp_server.html:90
+msgid "Порт"
+msgstr "Port"
+
+#: templates/panels/aap_settings/imap_server.html:78
+#: templates/panels/aap_settings/smtp_server.html:96
+msgid "Логин / Имя пользователя"
+msgstr "Login / Benutzername"
+
+#: templates/panels/aap_settings/imap_server.html:84
+#: templates/panels/aap_settings/smtp_server.html:101
+msgid "Пароль / Токен"
+msgstr "Passwort / Token"
+
+#: templates/panels/aap_settings/imap_server.html:107
+#: templates/panels/aap_settings/imap_server.html:116
+#: templates/panels/aap_settings/smtp_server.html:123
+#: templates/panels/aap_settings/smtp_server.html:133
+msgid "Автоматически пока не реализовано."
+msgstr "Automatisch noch nicht implementiert."
+
+#: templates/panels/aap_settings/imap_server.html:108
+#: templates/panels/aap_settings/imap_server.html:117
+#: templates/panels/aap_settings/smtp_server.html:124
+#: templates/panels/aap_settings/smtp_server.html:134
+msgid "Реализация автоматики до 1 апреля 2026 г."
+msgstr "Umsetzung der Automatisierung bis zum 1. April 2026"
+
+#: templates/panels/aap_settings/imap_server.html:109
+#: templates/panels/aap_settings/imap_server.html:118
+#: templates/panels/aap_settings/smtp_server.html:125
+#: templates/panels/aap_settings/smtp_server.html:135
+msgid "Обратитесь к менеджеру для подключения вручную."
+msgstr ""
+"Wenden Sie sich an Ihren Manager, um die Verbindung manuell herzustellen."
+
+#: templates/panels/aap_settings/imap_server.html:146
+msgid "Добавление IMAP сервера"
+msgstr "Hinzufügen eines IMAP-Servers"
+
+#: templates/panels/aap_settings/imap_server.html:154
+msgid "Проверить IMAP авторизацию"
+msgstr "IMAP-Authentifizierung überprüfen"
+
+#: templates/panels/aap_settings/imap_server.html:160
+#: templates/panels/aap_settings/smtp_server.html:177
+msgid "Результат проверки"
+msgstr "Ergebnis der Überprüfung"
+
+#: templates/panels/aap_settings/imap_server.html:164
+msgid "Последняя проверка"
+msgstr "Letzte Überprüfung"
+
+#: templates/panels/aap_settings/imap_server.html:171
+#: templates/panels/aap_settings/mail_servers.html:66
+#: templates/panels/aap_settings/mail_servers.html:121
+#: templates/panels/aap_settings/mail_servers.html:163
+#: templates/panels/aap_settings/mail_servers.html:278
+#: templates/panels/aap_settings/mail_servers.html:295
+#: templates/panels/aap_settings/mail_servers.html:326
+#: templates/panels/aap_settings/mail_servers.html:367
+#: templates/panels/aap_settings/smtp_server.html:215
+msgid "Не проверено"
+msgstr "Nicht verifiziert"
+
+#: templates/panels/aap_settings/mail_servers.html:34
+msgid "Электронная почта почтового сервиса"
+msgstr "E-Mail des Maildienstes"
+
+#: templates/panels/aap_settings/mail_servers.html:46
+#: templates/panels/aap_settings/mail_servers.html:242
+msgid "Домен"
+msgstr "Domain"
+
+#: templates/panels/aap_settings/mail_servers.html:49
+#: templates/panels/aap_settings/mail_servers.html:198
+#: templates/panels/aap_settings/mail_servers.html:261
+msgid "Публичный сервис-провайдер"
+msgstr "Öffentlicher Service-Provider"
+
+#: templates/panels/aap_settings/mail_servers.html:49
+#: templates/panels/aap_settings/mail_servers.html:198
+#: templates/panels/aap_settings/mail_servers.html:261
+msgid "Проверка домена не нужна"
+msgstr "Die Überprüfung der Domain ist nicht erforderlich"
+
+#: templates/panels/aap_settings/mail_servers.html:84
+msgid "Домен не проверен"
+msgstr "Domain nicht verifiziert"
+
+#: templates/panels/aap_settings/mail_servers.html:90
+#: templates/panels/aap_settings/mail_servers.html:207
+msgid "Проверить домен"
+msgstr "Domain überprüfen"
+
+#: templates/panels/aap_settings/mail_servers.html:98
+#: templates/panels/aap_settings/mail_servers.html:306
+msgid "Настроить SMTP сервер"
+msgstr "SMTP-Server einrichten"
+
+#: templates/panels/aap_settings/mail_servers.html:101
+#: templates/panels/aap_settings/mail_servers.html:308
+msgid "SMTP не настроен"
+msgstr "SMTP ist nicht konfiguriert"
+
+#: templates/panels/aap_settings/mail_servers.html:104
+#: templates/panels/aap_settings/mail_servers.html:311
+msgid "Изменить SMTP сервер"
+msgstr "SMTP-Server ändern"
+
+#: templates/panels/aap_settings/mail_servers.html:142
+#: templates/panels/aap_settings/mail_servers.html:347
+msgid "Настроить IMAP сервер"
+msgstr "IMAP-Server einrichten"
+
+#: templates/panels/aap_settings/mail_servers.html:144
+#: templates/panels/aap_settings/mail_servers.html:349
+msgid "IMAP не настроен"
+msgstr "IMAP ist nicht konfiguriert"
+
+#: templates/panels/aap_settings/mail_servers.html:147
+#: templates/panels/aap_settings/mail_servers.html:352
+msgid "Изменить IMAP сервер"
+msgstr "IMAP-Server ändern"
+
+#: templates/panels/aap_settings/mail_servers.html:185
+msgid "Ваши почтовые сервисы (SMTP / IMAP серверы):"
+msgstr "Ihre E-Mail-Dienste (SMTP/IMAP-Server):"
+
+#: templates/panels/aap_settings/mail_servers.html:220
+msgid "Добавление почтового ящика"
+msgstr "E-Mail-Postfach hinzufügen"
+
+#: templates/panels/aap_settings/mail_servers.html:299
+msgid "Домен не протестирован"
+msgstr "Domain nicht getestet"
+
+#: templates/panels/aap_settings/partials/mail_secret_modal.html:12
+msgid "Показать пароль?"
+msgstr "Passwort anzeigen?"
+
+#: templates/panels/aap_settings/partials/mail_secret_modal.html:15
+msgid "Пароль будет показан на экране."
+msgstr "Das Passwort wird auf dem Bildschirm angezeigt."
+
+#: templates/panels/aap_settings/partials/mail_secret_modal.html:19
+#: templates/public/login.html:31
+msgid "Отмена"
+msgstr "Abbrechen"
+
+#: templates/panels/aap_settings/partials/mail_secret_modal.html:22
+msgid "Показать"
+msgstr "Anzeigen"
+
+#: templates/panels/aap_settings/sending.html:97
+msgid "Окна для отправки писем - глобальная настройка"
+msgstr "Zeitfenster für das Versenden von E-Mails - globale Einstellung"
+
+#: templates/panels/aap_settings/sending.html:99
+msgid ""
+"Отправка писем не всегда одинаково эффективна. Если отправить письмо в "
+"субботу утром, до понедельника оно будет перекрыто другими письмами. "
+"Вероятность того, что его прочтут и обратят внимание, снижается."
+msgstr ""
+"Das Versenden von E-Mails ist nicht immer gleich effektiv. Wenn man eine E-"
+"Mail am Samstagmorgen verschickt, wird sie bis Montag von anderen E-Mails "
+"überdeckt. Die Wahrscheinlichkeit, dass sie gelesen und beachtet wird, sinkt."
+
+#: templates/panels/aap_settings/sending.html:100
+#, python-format
+msgid ""
+"По опыту рассылок, самое эффективное время для рассылки - с 09:00 по 12:00 "
+"со вторника по четверг. В пятницу в то же время эффективность существенно "
+"снижается, а понедельник еще ниже. В праздники и выходные дни обычно "
+"эффективность составляет 5-10%% от возможной."
+msgstr ""
+"Aus Erfahrung mit Mailings ist die effektivste Zeit für den Versand von "
+"09:00 bis 12:00 Uhr von Dienstag bis Donnerstag. Am Freitag zur gleichen "
+"Zeit sinkt die Effektivität deutlich, und am Montag noch weiter. An "
+"Feiertagen und Wochenenden liegt die Effektivität normalerweise bei 5-10%% "
+"der möglichen."
+
+#: templates/panels/aap_settings/sending.html:101
+msgid "Мы рекомендуем учитывать это при настройке окон для отправки."
+msgstr ""
+"Wir empfehlen, dies bei der Konfiguration der Versandfenster zu "
+"berücksichtigen."
+
+#: templates/panels/aap_settings/sending.html:102
+msgid ""
+"Эти настройки - глобальные для Вашей учетной записи. Для конкретной кампании "
+"это может быть переопределено. Тогда глобальные настройки на настройки "
+"отправки кампании больше не влияют."
+msgstr ""
+"Diese Einstellungen sind global für Ihr Konto. Für eine bestimmte Kampagne "
+"können diese Einstellungen überschrieben werden. Dann wirken sich die "
+"globalen Einstellungen nicht mehr auf die Sendeeinstellungen der Kampagne "
+"aus."
+
+#: templates/panels/aap_settings/sending.html:103
+msgid ""
+"Окна - это отрезки времени, когда письма отправляться будут. Вне окон "
+"рассылка не осуществляется. Время (часовой пояс) - Берлин, Германия"
+msgstr ""
+"Zeitfenster sind Zeitabschnitte, in denen E-Mails versendet werden. "
+"Außerhalb der Zeitfenster erfolgt kein Versand. Zeit (Zeitzone) - Berlin, "
+"Deutschland"
+
+#: templates/panels/aap_settings/smtp_server.html:34
+msgid "сервер (отправка)"
+msgstr "Server (Versand)"
+
+#: templates/panels/aap_settings/smtp_server.html:44
+msgid "From Email"
+msgstr "Absender-Email"
+
+#: templates/panels/aap_settings/smtp_server.html:50
+msgid "Лимит / час"
+msgstr "Limit / Stunde"
+
+#: templates/panels/aap_settings/smtp_server.html:163
+msgid "Добавление SMTP сервера"
+msgstr "SMTP-Server hinzufügen"
+
+#: templates/panels/aap_settings/smtp_server.html:171
+msgid "Проверить SMTP авторизацию"
+msgstr "SMTP-Authentifizierung überprüfen"
+
+#: templates/panels/aap_settings/smtp_server.html:193
+msgid "Отправить письмо"
+msgstr "E-Mail senden"
+
+#: templates/panels/aap_settings/smtp_server.html:199
+msgid "Результат отправки"
+msgstr "Sendeergebnis"
+
+#: templates/panels/aap_settings/smtp_server.html:202
+msgid "Проверки SMTP сервера (отправка)"
+msgstr "SMTP-Serverprüfungen (Versand)"
+
+#: templates/panels/aap_settings/url_stats.html:17
+msgid ""
+"Выберите ОДИН из двух вариантов кода и установите его на Ваш интернет-сайт."
+msgstr ""
+"Wählen Sie EINE der beiden Codevarianten und installieren Sie sie auf Ihrer "
+"Website."
+
+#: templates/panels/aap_settings/url_stats.html:22
+msgid "Вариант 1 — stat.serenity-mail.de"
+msgstr "Variante 1 — stat.serenity-mail.de"
+
+#: templates/panels/aap_settings/url_stats.html:29
+msgid "Вариант 2 — stat.serenity-mail.com"
+msgstr "Variante 2 — stat.serenity-mail.com"
+
+#: templates/panels/aap_settings/url_stats.html:39
+msgid "Инструкция по установке кода"
+msgstr "Anleitung zur Installation des Codes"
+
+#: templates/panels/aap_settings/url_stats.html:42
+msgid "Выберите ОДИН из двух вариантов кода слева (любой)."
+msgstr "Wählen Sie eine der beiden Code-Varianten links (beliebig)."
+
+#: templates/panels/aap_settings/url_stats.html:43
+msgid ""
+"Установите код на Ваш в раздел &lt;head&gt; (перед закрывающим тегом &lt;/"
+"head&gt;)."
+msgstr ""
+"Fügen Sie den Code auf Ihrer Website in den <head>-Bereich ein (vor dem "
+"schließenden Tag </head>)."
+
+#: templates/panels/aap_settings/url_stats.html:44
+msgid ""
+"Если используется Google Tag Manager — добавьте как Custom HTML и включите "
+"на всех страницах."
+msgstr ""
+"Wenn Google Tag Manager verwendet wird — fügen Sie ihn als Custom HTML hinzu "
+"und aktivieren Sie ihn auf allen Seiten."
+
+#: templates/panels/aap_settings/url_stats.html:45
+msgid ""
+"Скрипт (код) учитывает (срабатывает) ТОЛЬКО если в URL страницы есть "
+"параметр smrel=... , или ТОЛЬКО при переходах из рассылки, сделанной через "
+"Serenity Mailer"
+msgstr ""
+"Das Skript (der Code) greift NUR, wenn in der URL der Seite der Parameter "
+"smrel=... vorhanden ist, oder NUR bei Klicks/Weiterleitungen aus einer mit "
+"Serenity Mailer versendeten Kampagne."
+
+#: templates/panels/aap_settings/url_stats.html:46
+msgid ""
+"Параметр устанавливается к ссылке на Ваш сайт в письмах рассылки "
+"автоматически."
+msgstr ""
+"Der Parameter wird automatisch an den Link zu Ihrer Website in den "
+"Newsletter-E-Mails angehängt."
+
+#: templates/panels/base.html:133
+msgid "Выйти"
+msgstr "Abmelden"
+
+#: templates/panels/overview.html:20
+msgid "Первое посещение"
+msgstr "Erster Besuch"
+
+#: templates/panels/overview.html:21
+msgid "Переходов"
+msgstr "Klicks"
+
+#: templates/panels/overview.html:24
+msgid "Действие"
+msgstr "Aktion"
+
+#: templates/panels/overview.html:38
+msgid "Показать компанию"
+msgstr "Unternehmen anzeigen"
+
+#: templates/public/base.html:11 templates/public/index.html:6
+msgid "Интеллектуальные email-коммуникации"
+msgstr "Intelligente Email-Kommunikationen"
+
+#: templates/public/base.html:12
+msgid ""
+"Интеллектуальная система email-коммуникаций для малого и среднего бизнеса."
+msgstr ""
+"Intelligentes Email-Kommunikationssystem für kleine und mittlere Unternehmen."
+
+#: templates/public/index.html:14 templates/public/login.html:13
+msgid "Интеллектуальные"
+msgstr "Intelligente"
+
+#: templates/public/index.html:14 templates/public/login.html:14
+msgid "email-коммуникации"
+msgstr "E-Mail-Kommunikationen"
+
+#: templates/public/index.html:18
+msgid "Вход для клиентов:"
+msgstr "Login für Kunden:"
+
+#: templates/public/index.html:19
+msgid "Перейти"
+msgstr "Weiter"
+
+#: templates/public/index.html:30
+msgid ""
+"интеллектуальная система email-коммуникаций для малого и среднего бизнеса, "
+"ориентированная на работу на рынке Германии."
+msgstr ""
+"Intelligentes System für E-Mail-Kommunikation für kleine und mittlere "
+"Unternehmen, ausgerichtet auf den deutschen Markt."
+
+#: templates/public/index.html:34
+msgid ""
+"Платформа предназначена для компаний, которые регулярно взаимодействуют с "
+"другими предприятиями в рамках делового сотрудничества — как в продажах, так "
+"и в закупках."
+msgstr ""
+"Die Plattform richtet sich an Unternehmen, die regelmäßig mit anderen "
+"Unternehmen im Rahmen geschäftlicher Zusammenarbeit interagieren — sowohl im "
+"Vertrieb als auch im Einkauf."
+
+#: templates/public/index.html:37
+msgid "Функциональные возможности:"
+msgstr "Funktionen:"
+
+#: templates/public/index.html:39
+msgid "Интеллектуальный подбор и приоритизация деловых контактов для продаж."
+msgstr ""
+"Intelligente Auswahl und Priorisierung von Geschäftskontakten für den "
+"Vertrieb."
+
+#: templates/public/index.html:40
+msgid "Интеллектуальный подбор и приоритизация деловых контактов для закупок."
+msgstr ""
+"Intelligente Auswahl und Priorisierung von Geschäftskontakten für "
+"Beschaffungen."
+
+#: templates/public/index.html:41
+msgid "Отправка коммерческих предложений целевым и релевантным получателям."
+msgstr ""
+"Versand kommerzieller Angebote an zielgerichtete und relevante Empfänger."
+
+#: templates/public/index.html:42
+msgid "Отправка запросов поставщикам и подрядчикам по заданным критериям."
+msgstr ""
+"Versenden von Anfragen an Lieferanten und Auftragnehmer nach festgelegten "
+"Kriterien."
+
+#: templates/public/index.html:43
+msgid "Отслеживание отклика и последующих взаимодействий."
+msgstr "Nachverfolgung von Antworten und anschließenden Interaktionen."
+
+#: templates/public/index.html:44
+msgid "Информационные рассылки для существующих клиентов и партнёров."
+msgstr "Informations-Mailings für bestehende Kunden und Partner."
+
+#: templates/public/index.html:56
+msgid "Вы получаете"
+msgstr "Sie erhalten"
+
+#: templates/public/index.html:57
+msgid "понятный"
+msgstr "verständlich"
+
+#: templates/public/index.html:58
+msgid "и"
+msgstr "und"
+
+#: templates/public/index.html:59
+msgid "управляемый"
+msgstr "verwaltet"
+
+#: templates/public/index.html:60
+msgid ""
+"инструмент для автоматизации привлечения клиентов, а также поиска "
+"поставщиков и подрядчиков в B2B-сегменте."
+msgstr ""
+"Ein Tool zur Automatisierung der Kundengewinnung sowie der Suche nach "
+"Lieferanten und Auftragnehmern im B2B-Segment."
+
+#: templates/public/index.html:64
+msgid ""
+"С помощью искусственного интеллекта вы формируете точные критерии того, что "
+"хотите продать или приобрести. AI не принимает решений за вас, а помогает "
+"корректно сформулировать запрос, убрать неточности и упростить процесс."
+msgstr ""
+"Mithilfe künstlicher Intelligenz formulieren Sie präzise Kriterien dafür, "
+"was Sie verkaufen oder erwerben möchten. KI trifft keine Entscheidungen für "
+"Sie, sondern hilft dabei, die Anfrage korrekt zu formulieren, "
+"Ungenauigkeiten zu beseitigen und den Prozess zu vereinfachen."
+
+#: templates/public/index.html:68
+msgid ""
+"Вы указываете информацию о своей компании, о товаре или услуге, а также "
+"задаёте географические условия работы на рынке Германии."
+msgstr ""
+"Sie geben Informationen über Ihr Unternehmen, über das Produkt oder die "
+"Dienstleistung an und legen außerdem die geografischen Bedingungen für die "
+"Tätigkeit auf dem deutschen Markt fest."
+
+#: templates/public/index.html:72
+msgid ""
+"На основе этих данных система анализирует и ранжирует города Германии и "
+"категории компаний, в которых вероятность заключения сделки наиболее высока. "
+"Сортировка выполняется с использованием AI и опирается на базу из 790 бизнес-"
+"категорий и 1 326 городов Германии с населением от 12 000 человек. Эти "
+"данные могут использоваться как для продаж, так и для закупок."
+msgstr ""
+"Auf Basis dieser Daten analysiert und rankt das System deutsche Städte und "
+"Unternehmenskategorien, in denen die Wahrscheinlichkeit eines "
+"Geschäftsabschlusses am höchsten ist. Die Sortierung erfolgt unter Einsatz "
+"von AI und stützt sich auf eine Datenbank mit 790 Geschäftskategorien und "
+"1.326 deutschen Städten mit einer Einwohnerzahl ab 12.000. Diese Daten "
+"können sowohl für den Vertrieb als auch für den Einkauf genutzt werden."
+
+#: templates/public/index.html:84
+msgid "На основании сформированной задачи система собирает"
+msgstr "Auf Grundlage der erstellten Aufgabe sammelt das System"
+
+#: templates/public/index.html:85
+msgid "контактные данные"
+msgstr "Kontaktdaten"
+
+#: templates/public/index.html:86
+msgid ""
+"компаний в соответствии с заданными приоритетами. Используются открытые "
+"источники: немецкие «Жёлтые страницы», бизнес-справочник 11880 и другие "
+"публичные базы. Совокупный охват этих источников превышает 4 млн компаний, "
+"работающих в Германии."
+msgstr ""
+"Unternehmen entsprechend den vorgegebenen Prioritäten. Es werden offene "
+"Quellen genutzt: die deutschen „Gelben Seiten“, das Branchenverzeichnis "
+"11880 und weitere öffentliche Datenbanken. Die Gesamtabdeckung dieser "
+"Quellen übersteigt 4 Mio. Unternehmen, die in Deutschland tätig sind."
+
+#: templates/public/index.html:90
+msgid "Далее каждая компания оценивается индивидуально с применением"
+msgstr "Anschließend wird jedes Unternehmen individuell unter Anwendung von"
+
+#: templates/public/index.html:91
+msgid "AI"
+msgstr "KI"
+
+#: templates/public/index.html:92
+msgid ""
+"Анализируется вероятность успешного заключения сделки и ожидаемая скорость "
+"её достижения. Проводится многофакторная оценка и отбор, в результате чего "
+"формируется целевая аудитория под конкретное деловое предложение или запрос."
+msgstr ""
+"Die Wahrscheinlichkeit eines erfolgreichen Geschäftsabschlusses und die "
+"erwartete Zeit bis zu dessen Erreichung werden analysiert. Es wird eine "
+"multifaktorielle Bewertung und Auswahl durchgeführt, wodurch eine Zielgruppe "
+"für ein konkretes geschäftliches Angebot oder eine Anfrage gebildet wird."
+
+#: templates/public/index.html:96
+msgid ""
+"Все этапы работы системы прозрачны: вы можете корректировать как исходную "
+"задачу, так и промежуточные результаты."
+msgstr ""
+"Alle Arbeitsschritte des Systems sind transparent: Sie können sowohl die "
+"Ausgangsaufgabe als auch Zwischenergebnisse korrigieren."
+
+#: templates/public/index.html:108
+msgid "После отбора формируется"
+msgstr "Nach der Auswahl wird gebildet"
+
+#: templates/public/index.html:109
+msgid "готовая аудитория"
+msgstr "fertige Zielgruppe"
+
+#: templates/public/index.html:110
+msgid ""
+"— список адресатов для деловой email-коммуникации. С помощью AI и "
+"подготовленных шаблонов вы формируете коммерческое предложение или деловой "
+"запрос, адаптированные под выбранную аудиторию."
+msgstr ""
+"— Eine Empfängerliste für geschäftliche Email-Kommunikation. Mithilfe von AI "
+"und vorbereiteten Vorlagen formulieren Sie ein kommerzielles Angebot oder "
+"eine geschäftliche Anfrage, angepasst an die ausgewählte Zielgruppe."
+
+#: templates/public/index.html:114
+msgid "Рассылка выполняется исключительно от вашего имени и с использованием"
+msgstr "Der Versand erfolgt ausschließlich in Ihrem Namen und unter Verwendung"
+
+#: templates/public/index.html:115
+msgid "корпоративного адреса"
+msgstr "Firmenadresse"
+
+#: templates/public/index.html:116
+msgid ""
+"электронной почты. Благодаря предварительной фильтрации и приоритизации "
+"контактов объём рассылки ограничивается 50–100 письмами в час (в зависимости "
+"от используемого почтового провайдера)."
+msgstr ""
+"E-Mails. Dank der Vorausfilterung und Priorisierung der Kontakte ist das "
+"Versandvolumen auf 50–100 E-Mails pro Stunde begrenzt (abhängig vom "
+"verwendeten E-Mail-Anbieter)."
+
+#: templates/public/index.html:120
+msgid ""
+"Такой формат коммуникации основан на законном деловом интересе (berechtigtes "
+"Interesse) и соответствует требованиям UWG и DSGVO."
+msgstr ""
+"Dieses Kommunikationsformat basiert auf einem rechtmäßigen geschäftlichen "
+"Interesse (berechtigtes Interesse) und entspricht den Anforderungen des UWG "
+"und der DSGVO."
+
+#: templates/public/index.html:132
+msgid "В процессе рассылки система фиксирует"
+msgstr "Während des Versands protokolliert das System"
+
+#: templates/public/index.html:133
+msgid "реакцию адресатов"
+msgstr "Reaktion der Empfänger"
+
+#: templates/public/index.html:134
+msgid ""
+"на ваше сообщение. В режиме реального времени отображается, какие компании "
+"перешли на ваш сайт по ссылкам из отправленных писем. Для каждого такого "
+"перехода доступна информация о компании, связанная с конкретным отправленным "
+"сообщением."
+msgstr ""
+"auf Ihre Nachricht. In Echtzeit wird angezeigt, welche Unternehmen über "
+"Links in versendeten E-Mails auf Ihre Website gelangt sind. Für jeden "
+"solchen Übergang sind Unternehmensinformationen verfügbar, die mit der "
+"jeweiligen versendeten Nachricht verknüpft sind."
+
+#: templates/public/index.html:138
+msgid ""
+"Также автоматически учитываются ответы на письма, жалобы на рассылку и "
+"другие реакции. На основе этих данных формируется статистика и уточняются "
+"алгоритмы приоритизации для последующих коммуникаций."
+msgstr ""
+"Automatisch werden auch Antworten auf E-Mails, Beschwerden über Mailings und "
+"andere Reaktionen berücksichtigt. Auf Basis dieser Daten werden Statistiken "
+"erstellt und die Priorisierungsalgorithmen für nachfolgende Kommunikation "
+"verfeinert."
+
+#: templates/public/index.html:142
+msgid "Мы — предприниматели с"
+msgstr "Wir sind Unternehmer mit"
+
+#: templates/public/index.html:143
+msgid "практическим опытом"
+msgstr "mit praktischer Erfahrung"
+
+#: templates/public/index.html:144
+msgid ""
+"ведения бизнеса. Эта система была создана для решения собственных задач, "
+"поскольку на рынке не существовало решения с сопоставимой логикой и уровнем "
+"прозрачности. Сервис ориентирован на пользователей без технической "
+"подготовки и максимально упрощён в использовании. После подтверждения "
+"эффективности на практике мы приняли решение предложить этот инструмент "
+"другим предпринимателям."
+msgstr ""
+"Für die Führung eines Unternehmens. Dieses System wurde zur Lösung unserer "
+"eigenen Aufgaben entwickelt, da es auf dem Markt keine Lösung mit "
+"vergleichbarer Logik und Transparenz gab. Der Service richtet sich an Nutzer "
+"ohne technische Vorkenntnisse und ist in der Anwendung maximal vereinfacht. "
+"Nach der Bestätigung der Wirksamkeit in der Praxis haben wir beschlossen, "
+"dieses Werkzeug auch anderen Unternehmern anzubieten."
+
+#: templates/public/login.html:4 templates/public/login.html:17
+msgid "Вход"
+msgstr "Anmelden"
+
+#: templates/public/login.html:19
+msgid "Неверный логин или пароль"
+msgstr "Ungültiger Benutzername oder Passwort"
+
+#: templates/public/login.html:25
+msgid "Имя пользователя:"
+msgstr "Benutzername:"
+
+#: templates/public/login.html:28
+msgid "Пароль:"
+msgstr "Passwort:"
+
+#: templates/public/login.html:31
+msgid "Войти"
+msgstr "Anmelden"
+
+#~ msgid "Необходимо приобрести: "
+#~ msgstr "Muss erworben werden:"
+
+#~ msgid "Покупатель:"
+#~ msgstr "Käufer:"
+
+#~ msgid "География:"
+#~ msgstr "Geographie:"
