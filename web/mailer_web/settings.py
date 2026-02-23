@@ -42,7 +42,6 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 # --- APPLICATIONS ---
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -58,7 +57,7 @@ INSTALLED_APPS = [
     "panel.aap_campaigns",
 ]
 
-AUTH_USER_MODEL = "public.ClientUser"
+AUTH_USER_MODEL = "mailer_web.ClientUser"
 
 # --- MIDDLEWARE ---
 

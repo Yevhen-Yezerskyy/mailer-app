@@ -126,8 +126,6 @@ services:
       - ./:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
-    ports:
-      - "8000:8000"
     command: ["/app/config/sh/with-secrets.sh", "python", "manage.py", "runserver", "0.0.0.0:8000"]
 
   mailer-web-prod:
@@ -154,8 +152,6 @@ services:
       - mailer-media:/app/web/media
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
-    ports:
-      - "8001:8000"
     command:
       - /app/config/sh/with-secrets.sh
       - /bin/sh
@@ -195,8 +191,6 @@ services:
       - ./:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
-    ports:
-      - "8002:8000"
     command: ["/app/config/sh/with-secrets.sh", "python", "manage.py", "runserver", "0.0.0.0:8000"]
 
   mailer-web-admin-prod:
@@ -221,8 +215,6 @@ services:
       - mailer-app-prod:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
-    ports:
-      - "8003:8000"
     command:
       - /app/config/sh/with-secrets.sh
       - /bin/sh

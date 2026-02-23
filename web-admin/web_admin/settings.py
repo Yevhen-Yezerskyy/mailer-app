@@ -48,12 +48,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "admin_portal",
-    "panel",
-    "panel.aap_audience",
-    "panel.aap_settings",
-    "panel.aap_lists",
-    "panel.aap_campaigns",
+    "public",
+    "mailer_web",
 ]
 
 MIDDLEWARE = [
@@ -72,10 +68,7 @@ ROOT_URLCONF = "web_admin.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [
-            WEB_DIR / "templates",
-            BASE_DIR / "templates",
-        ],
+        "DIRS": [],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -121,16 +114,12 @@ LANGUAGES = [
 TIME_ZONE = "Europe/Berlin"
 USE_I18N = True
 USE_TZ = True
-LOCALE_PATHS = [
-    WEB_DIR / "locale",
-]
+LOCALE_PATHS = []
 
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [
-    WEB_DIR / "static",
-]
+STATICFILES_DIRS = []
 
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -149,4 +138,3 @@ LOGGING = {
         "level": "INFO",
     },
 }
-
