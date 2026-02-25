@@ -114,6 +114,9 @@ class SMTPConn:
         if auth_type == "LOGIN":
             return self._conn_LOGIN()
 
+        if auth_type == "RELAY_NOAUTH":
+            return self._conn_RELAY_NOAUTH()
+
         if auth_type in ("GOOGLE_OAUTH_2_0", "MICROSOFT_OAUTH_2_0"):
             self._set_log("AUTH", STATUS_FAILED, {"error": "not_supported", "auth_type": auth_type})
             return False
@@ -295,6 +298,13 @@ class SMTPConn:
     # Internal: connect handlers
     # -------------------------
 
+    def _build_ehlo_hostname(self) -> Optional[str]:
+        em = (self.from_email or "").strip().lower()
+        if "@" not in em:
+            return None
+        dom = em.split("@", 1)[1].strip()
+        return dom or None
+
     def _conn_LOGIN(self) -> bool:
         assert self.creds is not None
 
@@ -303,15 +313,16 @@ class SMTPConn:
         security_mode = cast(str, self.creds["security"])
         username = cast(str, self.creds["username"])
         password = cast(str, self.creds["password"])
+        ehlo_host = self._build_ehlo_hostname()
 
         base = {"auth_type": "LOGIN", "host": host, "port": port, "security": security_mode}
 
         c: Optional[smtplib.SMTP] = None
         try:
             if security_mode == "ssl":
-                c = smtplib.SMTP_SSL(host=host, port=port, timeout=10)
+                c = smtplib.SMTP_SSL(host=host, port=port, local_hostname=ehlo_host, timeout=10)
             else:
-                c = smtplib.SMTP(host=host, port=port, timeout=10)
+                c = smtplib.SMTP(host=host, port=port, local_hostname=ehlo_host, timeout=10)
 
             diag: Dict[str, Any] = {**base, "server_reply": {}}
 
@@ -330,6 +341,61 @@ class SMTPConn:
 
             a_code, a_msg = c.login(username, password)
             self._set_log("AUTH", STATUS_OK, {**base, "server_reply": {"login": {"code": a_code, "msg": _b2s(a_msg)}}})
+
+            self.conn_obj = c
+            return True
+
+        except Exception as e:
+            if c is not None:
+                try:
+                    c.quit()
+                except Exception:
+                    try:
+                        c.close()
+                    except Exception:
+                        pass
+            self.conn_obj = None
+
+            if (self.log or {}).get("action") == "CONNECT" and (self.log or {}).get("status") == STATUS_OK:
+                self._set_log("AUTH", STATUS_FAILED, {**base, "detail": str(e)})
+            else:
+                self._set_log("CONNECT", STATUS_FAILED, {**base, "detail": str(e)})
+            return False
+
+    def _conn_RELAY_NOAUTH(self) -> bool:
+        assert self.creds is not None
+
+        host = cast(str, self.creds["host"])
+        port = cast(int, self.creds["port"])
+        security_mode = cast(str, self.creds["security"])
+        ehlo_host = self._build_ehlo_hostname()
+
+        base = {"auth_type": "RELAY_NOAUTH", "host": host, "port": port, "security": security_mode}
+        if ehlo_host:
+            base["ehlo_host"] = ehlo_host
+
+        c: Optional[smtplib.SMTP] = None
+        try:
+            if security_mode == "ssl":
+                c = smtplib.SMTP_SSL(host=host, port=port, local_hostname=ehlo_host, timeout=10)
+            else:
+                c = smtplib.SMTP(host=host, port=port, local_hostname=ehlo_host, timeout=10)
+
+            diag: Dict[str, Any] = {**base, "server_reply": {}}
+
+            ehlo_code, ehlo_msg = c.ehlo()
+            diag["server_reply"]["ehlo"] = {"code": ehlo_code, "msg": _b2s(ehlo_msg)}
+
+            if security_mode == "starttls":
+                ctx = ssl.create_default_context()
+                tls_code, tls_msg = c.starttls(context=ctx)
+                diag["server_reply"]["starttls"] = {"code": tls_code, "msg": _b2s(tls_msg)}
+
+                ehlo2_code, ehlo2_msg = c.ehlo()
+                diag["server_reply"]["ehlo_after_tls"] = {"code": ehlo2_code, "msg": _b2s(ehlo2_msg)}
+
+            self._set_log("CONNECT", STATUS_OK, diag)
+            self._set_log("AUTH", STATUS_OK, {**base, "server_reply": {"auth": "skipped_noauth"}})
 
             self.conn_obj = c
             return True

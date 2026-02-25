@@ -1,9 +1,6 @@
 // FILE: web/static/js/aap_settings/smtp_server.js
-// DATE: 2026-01-26
-// PURPOSE: SMTP server page: auth_type tabs + apply preset to LOGIN fields via [name="..."].
-// CHANGE:
-// - Active tab highlight via inline styles (bg/text/border) because YY-* class expansion happens server-side.
-// - OAuth stubs are separate top-level blocks: yyOauthGoogleBlock / yyOauthMicrosoftBlock (no yyOauthBlock wrapper).
+// DATE: 2026-02-25
+// PURPOSE: SMTP server page: auth_type tabs + presets for LOGIN and RELAY_NOAUTH.
 
 (function () {
   function byId(id) { return document.getElementById(id); }
@@ -17,16 +14,15 @@
 
   function setBtnActiveStyle(btn, active) {
     if (!btn) return;
-
     if (active) {
       btn.style.backgroundColor = ACTIVE.bg;
       btn.style.color = ACTIVE.text;
       btn.style.borderColor = ACTIVE.border;
-    } else {
-      btn.style.backgroundColor = "";
-      btn.style.color = "";
-      btn.style.borderColor = "";
+      return;
     }
+    btn.style.backgroundColor = "";
+    btn.style.color = "";
+    btn.style.borderColor = "";
   }
 
   function show(el, yes) {
@@ -34,64 +30,122 @@
     el.classList.toggle("hidden", !yes);
   }
 
-  function setAuth(v) {
-    const auth = qByName("auth_type");
-    if (auth) auth.value = v;
-
-    const login = byId("yyLoginBlock");
-    const save  = byId("yySaveWrap");
-
-    const oauthG = byId("yyOauthGoogleBlock");
-    const oauthM = byId("yyOauthMicrosoftBlock");
-
-    const btnL = byId("yyAuthBtnLogin");
-    const btnG = byId("yyAuthBtnGoogle");
-    const btnM = byId("yyAuthBtnMicrosoft");
-
-    if (v === "LOGIN") {
-      show(login, true);
-      show(save, true);
-      show(oauthG, false);
-      show(oauthM, false);
-
-      setBtnActiveStyle(btnL, true);
-      setBtnActiveStyle(btnG, false);
-      setBtnActiveStyle(btnM, false);
-      return;
-    }
-
-    show(login, false);
-    show(save, false);
-
-    const isG = (v === "GOOGLE_OAUTH_2_0");
-    const isM = (v === "MICROSOFT_OAUTH_2_0");
-
-    show(oauthG, isG);
-    show(oauthM, isM);
-
-    setBtnActiveStyle(btnL, false);
-    setBtnActiveStyle(btnG, isG);
-    setBtnActiveStyle(btnM, isM);
+  function normSecurity(v) {
+    const s = String(v || "").trim().toLowerCase();
+    if (s === "tls") return "ssl";
+    return s;
   }
 
-  function getPresets() {
-    const el = byId("yyPresets");
+  function parseJsonEl(id) {
+    const el = byId(id);
     if (!el) return {};
-    try { return JSON.parse(el.textContent || "{}"); } catch (e) { return {}; }
+    try {
+      const obj = JSON.parse(el.textContent || "{}");
+      return obj && typeof obj === "object" ? obj : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function activePresetMap(authType) {
+    if (authType === "RELAY_NOAUTH") return parseJsonEl("yyRelayPresets");
+    return parseJsonEl("yyLoginPresets");
+  }
+
+  function refillPresetOptions(authType) {
+    const sel = byId("yyPresetSelect");
+    if (!sel) return;
+
+    const oldValue = (sel.value || "").trim();
+    const map = activePresetMap(authType);
+    const keys = Object.keys(map || {});
+
+    sel.innerHTML = "";
+    const ph = document.createElement("option");
+    ph.value = "";
+    ph.textContent = "— выберите провайдера —";
+    sel.appendChild(ph);
+
+    for (const k of keys) {
+      const p = map[k] || {};
+      const opt = document.createElement("option");
+      opt.value = String(k);
+      opt.textContent = String(p.name || k);
+      sel.appendChild(opt);
+    }
+
+    if (oldValue && map[oldValue]) {
+      sel.value = oldValue;
+    } else {
+      sel.value = "";
+    }
   }
 
   function applyPreset(presetId) {
     if (!presetId) return;
-    const p = getPresets()[presetId];
+
+    const auth = qByName("auth_type");
+    const authType = (auth ? auth.value : "") || "LOGIN";
+    const map = activePresetMap(authType);
+    const p = map[presetId];
     if (!p) return;
 
     const host = qByName("host");
     const port = qByName("port");
-    const sec  = qByName("security");
+    const sec = qByName("security");
 
     if (host && p.host != null) host.value = String(p.host);
     if (port && p.port != null) port.value = String(p.port);
-    if (sec && p.security != null) sec.value = String(p.security);
+    if (sec && p.security != null) sec.value = normSecurity(p.security);
+  }
+
+  function setAuth(v) {
+    const auth = qByName("auth_type");
+    if (auth) auth.value = v;
+
+    const manual = byId("yyLoginBlock");
+    const save = byId("yySaveWrap");
+    const oauthG = byId("yyOauthGoogleBlock");
+    const oauthM = byId("yyOauthMicrosoftBlock");
+
+    const btnL = byId("yyAuthBtnLogin");
+    const btnR = byId("yyAuthBtnRelay");
+    const btnG = byId("yyAuthBtnGoogle");
+    const btnM = byId("yyAuthBtnMicrosoft");
+
+    const title = byId("yyManualModeTitle");
+    const userPassRow = byId("yyLoginUserPassRow");
+
+    const isLogin = (v === "LOGIN");
+    const isRelay = (v === "RELAY_NOAUTH");
+    const isManual = isLogin || isRelay;
+    const isG = (v === "GOOGLE_OAUTH_2_0");
+    const isM = (v === "MICROSOFT_OAUTH_2_0");
+
+    show(manual, isManual);
+    show(save, isManual);
+    show(oauthG, isG);
+    show(oauthM, isM);
+    show(userPassRow, isLogin);
+
+    if (title) {
+      title.textContent = isRelay ? "RELAY NOAUTH" : "ЛОГИН (Стандарт)";
+    }
+
+    setBtnActiveStyle(btnL, isLogin);
+    setBtnActiveStyle(btnR, isRelay);
+    setBtnActiveStyle(btnG, isG);
+    setBtnActiveStyle(btnM, isM);
+
+    if (isManual) refillPresetOptions(v);
+
+    if (isRelay) {
+      const sel = byId("yyPresetSelect");
+      const sec = qByName("security");
+      if (sec && sel && !String(sel.value || "").trim()) {
+        sec.value = "none";
+      }
+    }
   }
 
   window.addEventListener("DOMContentLoaded", () => {
@@ -99,10 +153,12 @@
     setAuth(auth ? (auth.value || "LOGIN") : "LOGIN");
 
     const btnL = byId("yyAuthBtnLogin");
+    const btnR = byId("yyAuthBtnRelay");
     const btnG = byId("yyAuthBtnGoogle");
     const btnM = byId("yyAuthBtnMicrosoft");
 
     if (btnL) btnL.addEventListener("click", () => setAuth("LOGIN"));
+    if (btnR) btnR.addEventListener("click", () => setAuth("RELAY_NOAUTH"));
     if (btnG) btnG.addEventListener("click", () => setAuth("GOOGLE_OAUTH_2_0"));
     if (btnM) btnM.addEventListener("click", () => setAuth("MICROSOFT_OAUTH_2_0"));
 

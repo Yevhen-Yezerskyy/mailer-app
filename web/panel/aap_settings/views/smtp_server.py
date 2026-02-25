@@ -12,6 +12,7 @@ import json
 from typing import Any, Dict, List, Type
 from zoneinfo import ZoneInfo
 
+from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -22,7 +23,7 @@ from engine.common.mail import types as mail_types
 from engine.common.mail.types import SMTP_CREDENTIALS_FORMAT
 from mailer_web.access import decode_id, encode_id
 from panel.aap_settings.forms import SmtpServerForm
-from panel.aap_settings.models import Mailbox, ProviderPreset, SmtpMailbox
+from panel.aap_settings.models import Mailbox, ProviderPreset, ProviderPresetNoAuth, SmtpMailbox
 
 SECRET_MASK = "********"
 
@@ -39,6 +40,13 @@ def _td_keys(td: Any) -> List[str]:
 
 
 SMTP_AUTH_TYPES = set(SMTP_CREDENTIALS_FORMAT.keys())
+
+
+def _norm_security(v: Any) -> str:
+    s = (v or "").strip().lower()
+    if s == "tls":
+        return "ssl"
+    return s
 
 
 def _mask_password_widget(form: SmtpServerForm) -> None:
@@ -124,19 +132,57 @@ def smtp_server_view(request, id: str):
     # -------------------------
     # Presets (UI only)
     # -------------------------
-    preset_items = list(ProviderPreset.objects.filter(is_active=True).order_by("order", "name"))
-    preset_choices = [(str(p.id), p.name) for p in preset_items]
+    login_preset_items = list(ProviderPreset.objects.filter(is_active=True).order_by("order", "name"))
 
-    presets_map: Dict[str, Dict[str, Any]] = {}
-    for p in preset_items:
+    relay_preset_items = []
+    try:
+        tables = set(connection.introspection.table_names())
+    except Exception:
+        tables = set()
+    if ProviderPresetNoAuth._meta.db_table in tables:
+        relay_preset_items = list(ProviderPresetNoAuth.objects.filter(is_active=True).order_by("order", "name"))
+
+    login_presets_map: Dict[str, Dict[str, Any]] = {}
+    for p in login_preset_items:
         pj = p.preset_json or {}
         login = ((pj.get("smtp") or {}).get("login") or {}) if isinstance(pj, dict) else {}
         if isinstance(login, dict):
             host = (login.get("host") or "").strip()
             port = login.get("port")
-            sec = (login.get("security") or "").strip()
+            sec = _norm_security(login.get("security"))
             if host and port and sec:
-                presets_map[str(p.id)] = {"host": host, "port": int(port), "security": sec}
+                login_presets_map[str(p.id)] = {
+                    "name": p.name,
+                    "host": host,
+                    "port": int(port),
+                    "security": sec,
+                }
+
+    relay_presets_map: Dict[str, Dict[str, Any]] = {}
+    for p in relay_preset_items:
+        pj = p.preset_json or {}
+        relay = ((pj.get("smtp") or {}).get("relay_noauth") or {}) if isinstance(pj, dict) else {}
+        if isinstance(relay, dict):
+            host = (relay.get("host") or "").strip()
+            port = relay.get("port")
+            sec = _norm_security(relay.get("security"))
+            if host and port and sec:
+                relay_presets_map[str(p.id)] = {
+                    "name": p.name,
+                    "host": host,
+                    "port": int(port),
+                    "security": sec,
+                }
+
+    relay_presets_map.setdefault(
+        "builtin_google_relay",
+        {
+            "name": "Google SMTP Relay",
+            "host": "smtp-relay.gmail.com",
+            "port": 587,
+            "security": "starttls",
+        },
+    )
 
     # -------------------------
     # Last checks (mailbox_events)
@@ -195,8 +241,10 @@ def smtp_server_view(request, id: str):
         stored_auth_type = "LOGIN"
 
     stored_creds_enc = smtp.credentials_json if (smtp and isinstance(smtp.credentials_json, dict)) else {}
-    stored_password_enc = (stored_creds_enc.get("password") or "").strip()
-    require_password = not bool(stored_password_enc)
+    stored_password_enc = ""
+    if stored_auth_type == "LOGIN" and isinstance(stored_creds_enc, dict):
+        stored_password_enc = (stored_creds_enc.get("password") or "").strip()
+    require_password = stored_auth_type == "LOGIN" and not bool(stored_password_enc)
 
     stored_password_plain = ""
     if smtp and stored_auth_type == "LOGIN" and stored_password_enc:
@@ -225,8 +273,19 @@ def smtp_server_view(request, id: str):
             initial["username"] = (mb.email or "").strip()
         initial["security"] = "starttls"
         
-    if not require_password:
+    if stored_auth_type == "LOGIN" and not require_password:
         initial["password"] = SECRET_MASK
+
+    def _ctx(form_obj: SmtpServerForm) -> Dict[str, Any]:
+        return {
+            "state": state,
+            "mailbox": mb,
+            "mailbox_ui_id": encode_id(mb.id),
+            "form": form_obj,
+            "login_presets_json": json.dumps(login_presets_map, ensure_ascii=False),
+            "relay_presets_json": json.dumps(relay_presets_map, ensure_ascii=False),
+            "last_checks": last_checks,
+        }
 
     # -------------------------
     # POST
@@ -237,25 +296,19 @@ def smtp_server_view(request, id: str):
             return redirect(reverse("settings:mail_servers"))
 
         form = SmtpServerForm(request.POST, require_password=require_password)
-        if not require_password:
+        if stored_auth_type == "LOGIN" and not require_password:
             _mask_password_widget(form)
 
         if not form.is_valid():
             return render(
                 request,
                 "panels/aap_settings/smtp_server.html",
-                {
-                    "state": state,
-                    "mailbox": mb,
-                    "mailbox_ui_id": encode_id(mb.id),
-                    "form": form,
-                    "preset_choices": preset_choices,
-                    "presets_json": json.dumps(presets_map, ensure_ascii=False),
-                    "last_checks": last_checks,
-                },
+                _ctx(form),
             )
 
-        auth_type = form.cleaned_data["auth_type"]
+        auth_type = (form.cleaned_data.get("auth_type") or "LOGIN").strip().upper()
+        if auth_type not in SMTP_AUTH_TYPES:
+            auth_type = "LOGIN"
         td = SMTP_CREDENTIALS_FORMAT[auth_type]
 
         creds_plain = {}
@@ -269,15 +322,7 @@ def smtp_server_view(request, id: str):
                     return render(
                         request,
                         "panels/aap_settings/smtp_server.html",
-                        {
-                            "state": state,
-                            "mailbox": mb,
-                            "mailbox_ui_id": encode_id(mb.id),
-                            "form": form,
-                            "preset_choices": preset_choices,
-                            "presets_json": json.dumps(presets_map, ensure_ascii=False),
-                            "last_checks": last_checks,
-                        },
+                        _ctx(form),
                     )
                 creds_plain[k] = v
             else:
@@ -305,19 +350,11 @@ def smtp_server_view(request, id: str):
         return redirect(reverse("settings:mail_servers_smtp", kwargs={"id": encode_id(mb.id)}))
 
     form = SmtpServerForm(initial=initial, require_password=require_password)
-    if not require_password:
+    if stored_auth_type == "LOGIN" and not require_password:
         _mask_password_widget(form)
 
     return render(
         request,
         "panels/aap_settings/smtp_server.html",
-        {
-            "state": state,
-            "mailbox": mb,
-            "mailbox_ui_id": encode_id(mb.id),
-            "form": form,
-            "preset_choices": preset_choices,
-            "presets_json": json.dumps(presets_map, ensure_ascii=False),
-            "last_checks": last_checks,
-        },
+        _ctx(form),
     )

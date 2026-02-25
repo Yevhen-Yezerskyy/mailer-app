@@ -41,6 +41,12 @@ class SmtpCredsLogin(TypedDict):
     password: EncryptStr
 
 
+class SmtpCredsRelayNoAuth(TypedDict):
+    host: str
+    port: int
+    security: ConnSecurity
+
+
 class SmtpCredsGoogleOAuth2(TypedDict):
     host: str
     port: int
@@ -79,6 +85,7 @@ ImapCredsMicrosoftOAuth2 = SmtpCredsMicrosoftOAuth2
 
 SMTP_CREDENTIALS_FORMAT = {
     "LOGIN": SmtpCredsLogin,
+    "RELAY_NOAUTH": SmtpCredsRelayNoAuth,
     "GOOGLE_OAUTH_2_0": SmtpCredsGoogleOAuth2,
     "MICROSOFT_OAUTH_2_0": SmtpCredsMicrosoftOAuth2,
 }

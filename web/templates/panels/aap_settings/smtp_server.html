@@ -13,7 +13,8 @@
 
 {% block content %}
 
-<script type="application/json" id="yyPresets">{{ presets_json|safe }}</script>
+<script type="application/json" id="yyLoginPresets">{{ login_presets_json|safe }}</script>
+<script type="application/json" id="yyRelayPresets">{{ relay_presets_json|safe }}</script>
 
 <table class="YY-MAIN_TABLE">
   <tr>
@@ -55,12 +56,13 @@
 
           <div class="flex items-center gap-6 mb-12">
             <button type="button" id="yyAuthBtnLogin" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "ЛОГИН (Стандарт)" %}</button>
+            <button type="button" id="yyAuthBtnRelay" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "RELAY NOAUTH" %}</button>
             <button type="button" id="yyAuthBtnGoogle" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "Google OAuth 2.0" %}</button>
             <button type="button" id="yyAuthBtnMicrosoft" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "Microsoft OAuth 2.0" %}</button>
           </div>
 
           <div id="yyLoginBlock">
-            <div class="YY-STATUS_GREEN mb-8">{% trans "ЛОГИН (Стандарт)" %}</div>
+            <div id="yyManualModeTitle" class="YY-STATUS_GREEN mb-8">{% trans "ЛОГИН (Стандарт)" %}</div>
 
             <div class="grid grid-cols-[1fr_130px_250px] gap-6 items-center mb-4">
               <div>&nbsp;</div>
@@ -68,9 +70,6 @@
               <div>
                 <select id="yyPresetSelect" class="YY-INPUT !px-1">
                   <option value="">{% trans "— выберите провайдера —" %}</option>
-                  {% for pid, pname in preset_choices %}
-                    <option value="{{ pid }}">{{ pname }}</option>
-                  {% endfor %}
                 </select>
               </div>
             </div>
@@ -91,7 +90,7 @@
                 {{ form.port }}
               </div>
             </div>
-              <div class="grid grid-cols-2 gap-6 items-center mb-12">
+              <div id="yyLoginUserPassRow" class="grid grid-cols-2 gap-6 items-center mb-12">
                 <div>
                   <label class="YY-LABEL">{% trans "Логин / Имя пользователя" %}:</label>
                   {{ form.username }}
@@ -202,12 +201,12 @@
           <label class="YY-LABEL mb-4">{% trans "Проверки SMTP сервера (отправка)" %}</label>
 
           {% if last_checks %}
-            <div class="YY-INPUT grid grid-cols-[130px_1fr_100px] gap-3 py-3">
+            <div class="YY-INPUT grid grid-cols-[130px_1fr_100px] gap-3 py-3 text-[10px] leading-tight">
               {% for c in last_checks %}
               
-              <div class="text-sm">{{ c.dt }}</div>
-              <div class="text-sm"><b>{{ c.action }}</b></div>
-              <div class="text-sm"><b>{{ c.status }}</b></div> 
+              <div>{{ c.dt }}</div>
+              <div><b>{{ c.action }}</b></div>
+              <div><b>{{ c.status }}</b></div> 
 
             {% endfor %}
           </div>

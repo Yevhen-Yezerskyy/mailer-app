@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, List, get_args
 from django import forms
 from django.utils.translation import gettext_lazy as _
 
-from engine.common.mail.types import ConnSecurity, ImapCredsLogin, SmtpCredsLogin
+from engine.common.mail.types import ConnSecurity, ImapCredsLogin, SmtpCredsLogin, SmtpCredsRelayNoAuth
 from panel.aap_settings.models import Mailbox
 
 
@@ -22,6 +22,7 @@ def _typed_dict_keys(td: Any) -> List[str]:
 
 
 SMTP_LOGIN_KEYS = _typed_dict_keys(SmtpCredsLogin)  # canonical keys
+SMTP_RELAY_NOAUTH_KEYS = _typed_dict_keys(SmtpCredsRelayNoAuth)
 IMAP_LOGIN_KEYS = _typed_dict_keys(ImapCredsLogin)  # canonical keys (alias today)
 
 
@@ -161,7 +162,9 @@ class SmtpConnForm(forms.Form, _LoginFieldsFromTypesMixin):
         if "security" in self.fields:
             self.fields["security"].initial = "starttls"
 
-        if not self.require_password:
+        if "username" in self.fields:
+            self.fields["username"].required = False
+        if "password" in self.fields:
             self.fields["password"].required = False
 
         if password_masked:
@@ -176,9 +179,13 @@ class SmtpConnForm(forms.Form, _LoginFieldsFromTypesMixin):
         if not touched:
             return cleaned
 
-        required = ["from_name", "limit_hour_sent", "host", "port", "security", "username"]
-        if self.require_password:
-            required.append("password")
+        auth_type = (cleaned.get("auth_type") or "LOGIN").strip().upper()
+
+        required = ["from_name", "limit_hour_sent"] + SMTP_RELAY_NOAUTH_KEYS
+        if auth_type != "RELAY_NOAUTH":
+            required.append("username")
+            if self.require_password:
+                required.append("password")
 
         if not _require_all_or_error(self, cleaned, required, _("Заполните все поля SMTP.")):
             return cleaned
@@ -298,12 +305,15 @@ class SmtpServerForm(forms.Form, _LoginFieldsFromTypesMixin):
         if "security" in self.fields:
             self.fields["security"].initial = "starttls"
 
-        for k in ("host", "port", "security", "username"):
+        for k in ("host", "port", "security"):
             if k in self.fields:
                 self.fields[k].required = True
 
+        if "username" in self.fields:
+            self.fields["username"].required = False
+
         if "password" in self.fields:
-            self.fields["password"].required = bool(self.require_password)
+            self.fields["password"].required = False
 
     def clean(self):
         cleaned = super().clean()
@@ -319,14 +329,17 @@ class SmtpServerForm(forms.Form, _LoginFieldsFromTypesMixin):
             self.add_error(None, _("Максимум 300 писем в час."))
             return cleaned
 
-        if not _any_filled(cleaned, self.login_keys):
-            return cleaned
+        auth_type = (cleaned.get("auth_type") or "LOGIN").strip().upper()
 
-        required = ["host", "port", "security", "username"]
-        if self.require_password:
-            required.append("password")
+        required = list(SMTP_RELAY_NOAUTH_KEYS)
+        err_msg = _("Заполните все поля SMTP (RELAY NOAUTH).")
+        if auth_type != "RELAY_NOAUTH":
+            required.append("username")
+            if self.require_password:
+                required.append("password")
+            err_msg = _("Заполните все поля SMTP (LOGIN).")
 
-        if not _require_all_or_error(self, cleaned, required, _("Заполните все поля SMTP (LOGIN).")):
+        if not _require_all_or_error(self, cleaned, required, err_msg):
             return cleaned
 
         sec = (cleaned.get("security") or "").strip()

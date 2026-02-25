@@ -127,6 +127,33 @@ class ProviderPreset(models.Model):
         return self.name
 
 
+class ProviderPresetNoAuth(models.Model):
+    """
+    UI-only presets for SMTP relay without authentication.
+    preset_json may contain:
+    {
+      "smtp": {"relay_noauth": {"host": "...", "port": 587, "security": "starttls"}, "auth_type": "RELAY_NOAUTH"},
+    }
+    """
+
+    name = models.CharField(max_length=255)
+    preset_json = models.JSONField(
+        default=dict,
+        help_text="Произвольные подсказки для UI (smtp relay noauth host/ports/security/auth_type/etc.)",
+    )
+
+    is_active = models.BooleanField(default=True)
+    order = models.IntegerField(default=0)
+
+    class Meta:
+        app_label = "aap_settings"
+        db_table = "aap_settings_provider_presets_noauth"
+        ordering = ["order", "name"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class SendingSettings(models.Model):
     workspace_id = models.UUIDField(unique=True, db_index=True)
     value_json = models.JSONField(default=dict, blank=True)
