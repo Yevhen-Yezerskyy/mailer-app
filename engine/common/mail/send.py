@@ -391,6 +391,7 @@ def send_one(
         for k, v in letter_headers.items():
             if k and v:
                 headers[str(k)] = str(v)
+    headers["X-Mailer-Id"] = str(smrel_id)
 
     smtp = SMTPConn(mailbox_id)
     ok = smtp.send_mail(
