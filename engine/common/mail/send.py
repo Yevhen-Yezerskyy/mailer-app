@@ -65,6 +65,43 @@ DEFAULT_VARS: Dict[str, str] = {
 }
 
 
+def _aggr_contact_id_by_rate_contact(rate_contact_id: Optional[int]) -> Optional[int]:
+    if rate_contact_id is None:
+        return None
+    row = db.fetch_one(
+        """
+        SELECT contact_id
+        FROM public.rate_contacts
+        WHERE id = %s
+        LIMIT 1
+        """,
+        [int(rate_contact_id)],
+    )
+    if not row or row[0] is None:
+        return None
+    return int(row[0])
+
+
+def _blocked_recipient_info(aggr_contact_id: Optional[int]) -> Optional[Tuple[Optional[int], str]]:
+    if aggr_contact_id is None:
+        return None
+    row = db.fetch_one(
+        """
+        SELECT mailbox_sent_id, reason_code
+        FROM public.mail_blocked_recipients
+        WHERE aggr_contact_id = %s
+          AND active = true
+        LIMIT 1
+        """,
+        [int(aggr_contact_id)],
+    )
+    if not row:
+        return None
+    mailbox_sent_id = int(row[0]) if row[0] is not None else None
+    reason_code = str(row[1] or "").strip() or "BLOCKED"
+    return mailbox_sent_id, reason_code
+
+
 # ============================================================
 # VarsContext (shared for UI + send)
 # ============================================================
@@ -302,6 +339,7 @@ def send_one(
         if row[0] is None:
             raise RuntimeError("LIST_CONTACT_RATE_CONTACT_ID_NULL")
         rate_contact_id = int(row[0])
+    aggr_contact_id = _aggr_contact_id_by_rate_contact(rate_contact_id)
 
     rows = db.fetch_all(
         """
@@ -385,6 +423,39 @@ def send_one(
     if not isinstance(subjects, list) or len(subjects) < 3:
         raise RuntimeError("SUBJECTS_BAD")
     subj = random.choice([str(x).strip() for x in subjects if x][:3])
+
+    blocked_info = _blocked_recipient_info(aggr_contact_id)
+    if blocked_info is not None:
+        if not record_sent:
+            return
+        blocked_mailbox_sent_id, blocked_reason_code = blocked_info
+        payload = {
+            "mailbox_id": mailbox_id,
+            "to": to_email,
+            "subject": subj,
+            "utm": utm,
+            "blocked": True,
+            "blocked_aggr_contact_id": aggr_contact_id,
+            "blocked_mailbox_sent_id": blocked_mailbox_sent_id,
+            "blocked_reason_code": blocked_reason_code,
+        }
+        db.execute(
+            """
+            INSERT INTO public.mailbox_sent (
+              id, campaign_id, list_contact_id, rate_contact_id,
+              processed, status, data, processed_at
+            )
+            VALUES (%s,%s,%s,%s,true,'BAD_ADDRESS',%s::jsonb,now())
+            """,
+            (
+                smrel_id,
+                int(campaign_id),
+                int(list_contact_id),
+                int(rate_contact_id),
+                json.dumps(payload, ensure_ascii=False),
+            ),
+        )
+        return
 
     headers: Dict[str, str] = {}
     if isinstance(letter_headers, dict):

@@ -3,7 +3,7 @@
 # DATE: 2026-01-25
 # SUMMARY:
 # - IMAPConn(mailbox_id, cache_key=None): stateful object with .conn(), .close(), and IMAP ops returning result-or-None.
-# - Actions list at top: CONNECT/AUTH/SELECT/FETCH/LOGOUT. Status: OK/FAILED only.
+# - Actions list at top: CONNECT/AUTH/SELECT/FETCH/LIST/CREATE/MOVE/EXPUNGE/LOGOUT. Status: OK/FAILED only.
 # - Reads auth_type + credentials_json from DB (optional cache if cache_key provided) and validates+decrypts via engine.common.mail.types.get(fmt).
 # - LOGIN works; OAUTH types -> FAILED (not_supported) with log.
 # - Log/trace always include timestamp + server replies/diagnostics in data.
@@ -20,7 +20,7 @@ from engine.common.cache.client import memo as cache_memo
 from engine.common.mail import types
 from engine.common.mail.types import IMAP_CREDENTIALS_FORMAT
 
-IMAP_ACTIONS = ("CONNECT", "AUTH", "SELECT", "FETCH", "LOGOUT")
+IMAP_ACTIONS = ("CONNECT", "AUTH", "SELECT", "FETCH", "LIST", "CREATE", "MOVE", "EXPUNGE", "LOGOUT")
 STATUS_OK = "OK"
 STATUS_FAILED = "FAILED"
 
@@ -186,6 +186,112 @@ class IMAPConn:
         except Exception as e:
             self._set_log("FETCH", STATUS_FAILED, {"op": "UID_STORE_FLAGS", "uid": uid, "cmd": cmd, "flags": flags, "detail": str(e)})
             return None
+
+    def list_mailboxes(self) -> Optional[list[str]]:
+        if not self.conn_obj:
+            self._set_log("LIST", STATUS_FAILED, {"error": "not_connected"})
+            return None
+        try:
+            typ, data = self.conn_obj.list()
+            rep = {"typ": typ, "data": _b2s_list(data)}
+            if typ != "OK":
+                self._set_log("LIST", STATUS_FAILED, {"server_reply": rep})
+                return None
+            rows = [str(x) for x in (_b2s_list(data) or [])]
+            self._set_log("LIST", STATUS_OK, {"count": len(rows), "server_reply": rep})
+            return rows
+        except Exception as e:
+            self._set_log("LIST", STATUS_FAILED, {"detail": str(e)})
+            return None
+
+    def create_mailbox(self, mailbox: str) -> Optional[Dict[str, Any]]:
+        if not self.conn_obj:
+            self._set_log("CREATE", STATUS_FAILED, {"error": "not_connected", "mailbox": mailbox})
+            return None
+        try:
+            typ, data = self.conn_obj.create(mailbox)
+            rep = {"typ": typ, "data": _b2s_list(data)}
+            if typ != "OK":
+                self._set_log("CREATE", STATUS_FAILED, {"mailbox": mailbox, "server_reply": rep})
+                return None
+            out = {"mailbox": mailbox, "server_reply": rep}
+            self._set_log("CREATE", STATUS_OK, out)
+            return out
+        except Exception as e:
+            self._set_log("CREATE", STATUS_FAILED, {"mailbox": mailbox, "detail": str(e)})
+            return None
+
+    def uid_copy(self, uid: str, mailbox: str) -> Optional[Dict[str, Any]]:
+        if not self.conn_obj:
+            self._set_log("MOVE", STATUS_FAILED, {"error": "not_connected", "op": "UID_COPY", "uid": uid, "mailbox": mailbox})
+            return None
+        try:
+            typ, data = self.conn_obj.uid("COPY", uid, mailbox)
+            rep = {"typ": typ, "data": _b2s_list(data)}
+            if typ != "OK":
+                self._set_log("MOVE", STATUS_FAILED, {"op": "UID_COPY", "uid": uid, "mailbox": mailbox, "server_reply": rep})
+                return None
+            out = {"op": "UID_COPY", "uid": uid, "mailbox": mailbox, "server_reply": rep}
+            self._set_log("MOVE", STATUS_OK, out)
+            return out
+        except Exception as e:
+            self._set_log("MOVE", STATUS_FAILED, {"op": "UID_COPY", "uid": uid, "mailbox": mailbox, "detail": str(e)})
+            return None
+
+    def expunge(self) -> Optional[Dict[str, Any]]:
+        if not self.conn_obj:
+            self._set_log("EXPUNGE", STATUS_FAILED, {"error": "not_connected"})
+            return None
+        try:
+            typ, data = self.conn_obj.expunge()
+            rep = {"typ": typ, "data": _b2s_list(data)}
+            if typ != "OK":
+                self._set_log("EXPUNGE", STATUS_FAILED, {"server_reply": rep})
+                return None
+            out = {"server_reply": rep}
+            self._set_log("EXPUNGE", STATUS_OK, out)
+            return out
+        except Exception as e:
+            self._set_log("EXPUNGE", STATUS_FAILED, {"detail": str(e)})
+            return None
+
+    def uid_move(self, uid: str, mailbox: str) -> Optional[Dict[str, Any]]:
+        if not self.conn_obj:
+            self._set_log("MOVE", STATUS_FAILED, {"error": "not_connected", "uid": uid, "mailbox": mailbox})
+            return None
+        try:
+            typ, data = self.conn_obj.uid("MOVE", uid, mailbox)
+            rep = {"typ": typ, "data": _b2s_list(data)}
+            if typ == "OK":
+                out = {"uid": uid, "mailbox": mailbox, "via": "UID MOVE", "server_reply": rep}
+                self._set_log("MOVE", STATUS_OK, out)
+                return out
+        except Exception:
+            rep = None
+
+        copy_res = self.uid_copy(uid, mailbox)
+        if copy_res is None:
+            self._set_log("MOVE", STATUS_FAILED, {"uid": uid, "mailbox": mailbox, "via": "COPY_DELETE_EXPUNGE", "server_reply": rep})
+            return None
+        del_res = self.uid_store_flags(uid, r"(\Deleted)", mode="+")
+        if del_res is None:
+            self._set_log("MOVE", STATUS_FAILED, {"uid": uid, "mailbox": mailbox, "via": "COPY_DELETE_EXPUNGE", "server_reply": rep})
+            return None
+        exp_res = self.expunge()
+        if exp_res is None:
+            self._set_log("MOVE", STATUS_FAILED, {"uid": uid, "mailbox": mailbox, "via": "COPY_DELETE_EXPUNGE", "server_reply": rep})
+            return None
+        out = {
+            "uid": uid,
+            "mailbox": mailbox,
+            "via": "COPY_DELETE_EXPUNGE",
+            "copy": copy_res,
+            "delete": del_res,
+            "expunge": exp_res,
+            "server_reply": rep,
+        }
+        self._set_log("MOVE", STATUS_OK, out)
+        return out
 
     # -------------------------
     # Internal: DB
