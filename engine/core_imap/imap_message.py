@@ -6,139 +6,113 @@ from __future__ import annotations
 
 import re
 from email import policy
+from email.message import Message
 from email.parser import BytesParser
+from email.utils import parseaddr
 from typing import Any, Dict, Optional
 
 from engine.common import db
 
-_RE_EMAIL = re.compile(r"(?i)\b([a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,})\b")
-_RE_X_MAILER_ID = re.compile(r"(?im)^x-mailer-id:\s*([0-9]+)\s*$")
-_RE_SMREL = re.compile(r"(?i)(?:\bsmrel=)([0-9]+)")
-_RE_DSN_EMAIL_PATTERNS = (
-    re.compile(r"(?im)^final-recipient:\s*rfc822;\s*([^\s<>;]+@[^\s<>;]+)\s*$"),
-    re.compile(r"(?im)^original-recipient:\s*rfc822;\s*([^\s<>;]+@[^\s<>;]+)\s*$"),
-    re.compile(r"(?im)^x-failed-recipients:\s*([^\s,<>;]+@[^\s,<>;]+)\s*$"),
+_SYSTEM_FROM_MARKERS = (
+    "mailer-daemon",
+    "mail delivery subsystem",
+    "mail delivery system",
+    "mail delivery",
+    "postmaster",
 )
-_RE_DSN_ACTION = re.compile(r"(?im)^action:\s*([a-z]+)\s*$")
-_RE_DSN_STATUS = re.compile(r"(?im)^status:\s*([245]\.[0-9]+\.[0-9]+)\s*$")
-
-_AUTO_PATTERNS = (
-    re.compile(r"(?i)\bout of office\b"),
-    re.compile(r"(?i)\bauto(?:matic)? reply\b"),
-    re.compile(r"(?i)\bautoreply\b"),
-    re.compile(r"(?i)\bvacation\b"),
-    re.compile(r"(?i)\babwesen"),
-)
-_TEMP_PATTERNS = (
-    re.compile(r"(?i)\bmailbox full\b"),
-    re.compile(r"(?i)\bover quota\b"),
-    re.compile(r"(?i)\btemporar(?:y|ily)\b"),
-    re.compile(r"(?i)\bgreylist"),
-)
-_HARD_RULES = (
-    (
-        "USER_UNKNOWN",
-        (
-            re.compile(r"(?i)\buser unknown\b"),
-            re.compile(r"(?i)\bunknown user\b"),
-            re.compile(r"(?i)\bno such user\b"),
-            re.compile(r"(?i)\bunknown recipient\b"),
-            re.compile(r"(?i)\brecipient address rejected\b"),
-            re.compile(r"(?i)\bmailbox not found\b"),
-            re.compile(r"(?i)\bdoes not exist\b"),
-            re.compile(r"(?i)\b5\.1\.1\b"),
-        ),
-    ),
-    (
-        "MAILBOX_DISABLED",
-        (
-            re.compile(r"(?i)\bmailbox disabled\b"),
-            re.compile(r"(?i)\baccount (?:has been )?disabled\b"),
-            re.compile(r"(?i)\baccount closed\b"),
-            re.compile(r"(?i)\bno longer accepts mail\b"),
-            re.compile(r"(?i)\bmailbox unavailable\b"),
-            re.compile(r"(?i)\brecipient inactive\b"),
-        ),
-    ),
-)
-_BOUNCE_FROM_PATTERNS = (
-    re.compile(r"(?i)mailer-daemon"),
-    re.compile(r"(?i)postmaster"),
-)
-_BOUNCE_SUBJECT_PATTERNS = (
-    re.compile(r"(?i)delivery status notification"),
-    re.compile(r"(?i)undeliver"),
-    re.compile(r"(?i)failure notice"),
-    re.compile(r"(?i)returned mail"),
-)
+_DSN_CONTENT_TYPES = ("message/delivery-status", "message/rfc822")
 
 
-def _extract_x_mailer_id(raw_text: str) -> Optional[int]:
-    m = _RE_X_MAILER_ID.search(raw_text)
-    if m:
-        return int(m.group(1))
-    m = _RE_SMREL.search(raw_text)
-    if m:
-        return int(m.group(1))
-    return None
+def _extract_email(value: str) -> Optional[str]:
+    raw = (value or "").strip()
+    if ";" in raw:
+        raw = raw.split(";", 1)[1].strip()
+    _name, addr = parseaddr(raw)
+    addr = (addr or "").strip().lower()
+    if not addr or "@" not in addr or " " in addr:
+        return None
+    local, _, domain = addr.partition("@")
+    if not local or not domain or "." not in domain:
+        return None
+    return addr
 
 
-def _extract_failed_email(raw_text: str) -> Optional[str]:
-    for rx in _RE_DSN_EMAIL_PATTERNS:
-        m = rx.search(raw_text)
-        if m:
-            return m.group(1).strip().lower()
-    hinted = re.search(
-        r"(?is)(?:user unknown|unknown user|no such user|recipient(?: address)? rejected|mailbox unavailable).*?([a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,})",
-        raw_text,
-    )
-    if hinted:
-        return hinted.group(1).strip().lower()
-    emails = sorted({m.group(1).strip().lower() for m in _RE_EMAIL.finditer(raw_text)})
-    if len(emails) == 1:
-        return emails[0]
-    return None
+def _has_dsn_part(msg: Message) -> bool:
+    for part in msg.walk():
+        ctype = (part.get_content_type() or "").lower()
+        if ctype in _DSN_CONTENT_TYPES:
+            return True
+    return False
 
 
-def _classify_message(msg, raw_text: str) -> tuple[Optional[str], bool]:
-    subj = (msg.get("Subject") or "").strip()
-    from_hdr = (msg.get("From") or "").strip()
-    auto_submitted = (msg.get("Auto-Submitted") or "").strip().lower()
-    low = raw_text.lower()
+def _is_candidate_message(msg: Message) -> bool:
+    from_hdr = (msg.get("From") or "").strip().lower()
+    from_name, from_email = parseaddr(from_hdr)
+    from_mix = f"{from_name} {from_email}".strip().lower()
 
-    for reason_code, rules in _HARD_RULES:
-        for rx in rules:
-            if rx.search(raw_text):
-                return reason_code, True
+    if any(marker in from_mix for marker in _SYSTEM_FROM_MARKERS):
+        return True
+    return _has_dsn_part(msg)
 
-    action_m = _RE_DSN_ACTION.search(raw_text)
-    status_m = _RE_DSN_STATUS.search(raw_text)
-    status_code = status_m.group(1) if status_m else ""
-    if action_m and action_m.group(1).lower() == "failed" and status_code.startswith("5."):
-        return "HARD_BOUNCE_OTHER", True
-    if status_code.startswith("5."):
+
+def _parse_dsn_fields(raw_text: str) -> Dict[str, Optional[str]]:
+    action: Optional[str] = None
+    status: Optional[str] = None
+    failed_email: Optional[str] = None
+
+    for line in (raw_text or "").splitlines():
+        low = line.strip().lower()
+        if not low:
+            continue
+
+        if low.startswith("action:") and action is None:
+            action = low.split(":", 1)[1].strip()
+            continue
+
+        if low.startswith("status:") and status is None:
+            status = low.split(":", 1)[1].strip()
+            continue
+
+        if failed_email is None and low.startswith("final-recipient:"):
+            failed_email = _extract_email(low.split(":", 1)[1])
+            continue
+
+        if failed_email is None and low.startswith("original-recipient:"):
+            failed_email = _extract_email(low.split(":", 1)[1])
+            continue
+
+        if failed_email is None and low.startswith("x-failed-recipients:"):
+            failed_email = _extract_email(low.split(":", 1)[1].split(",", 1)[0])
+
+    return {"action": action, "status": status, "failed_email": failed_email}
+
+
+def _classify_from_dsn(dsn: Dict[str, Optional[str]]) -> tuple[Optional[str], bool]:
+    action = (dsn.get("action") or "").lower()
+    status = (dsn.get("status") or "").lower()
+
+    if (action == "failed" and status.startswith("5.")) or status.startswith("5."):
         return "HARD_BOUNCE_OTHER", True
 
-    if auto_submitted and auto_submitted != "no":
-        return "AUTO_REPLY", False
-    for rx in _AUTO_PATTERNS:
-        if rx.search(subj) or rx.search(raw_text):
-            return "AUTO_REPLY", False
-
-    if status_code.startswith("4."):
+    if status.startswith("4.") or action == "delayed":
         return "TEMP_BOUNCE", False
-    if action_m and action_m.group(1).lower() == "delayed":
-        return "TEMP_BOUNCE", False
-    for rx in _TEMP_PATTERNS:
-        if rx.search(raw_text):
-            return "TEMP_BOUNCE", False
-
-    if any(rx.search(from_hdr) for rx in _BOUNCE_FROM_PATTERNS) or any(rx.search(subj) for rx in _BOUNCE_SUBJECT_PATTERNS):
-        return "MAILER_NOISE", False
-    if "message/delivery-status" in low:
-        return "MAILER_NOISE", False
 
     return None, False
+
+
+def _classify_message(msg: Message, raw_text: str) -> tuple[Optional[str], bool, Optional[str]]:
+    # Stage 1: candidate filter (system sender or DSN attachment only).
+    if not _is_candidate_message(msg):
+        return None, False, None
+
+    # Stage 2: deterministic DSN parse -> classify.
+    dsn = _parse_dsn_fields(raw_text)
+    reason_code, should_block = _classify_from_dsn(dsn)
+    if reason_code is not None:
+        return reason_code, should_block, dsn.get("failed_email")
+
+    # Candidate mail without clear DSN status is service noise.
+    return "MAILER_NOISE", False, dsn.get("failed_email")
 
 
 def _unique_aggr_contact_id_by_email(email_value: str) -> Optional[int]:
@@ -155,27 +129,6 @@ def _unique_aggr_contact_id_by_email(email_value: str) -> Optional[int]:
     if len(rows) != 1 or rows[0][0] is None:
         return None
     return int(rows[0][0])
-
-
-def _resolve_mailbox_sent(match_mailbox_sent_id: int, mailbox_id: int) -> tuple[Optional[int], Optional[int]]:
-    row = db.fetch_one(
-        """
-        SELECT rc.contact_id, ms.id
-        FROM public.mailbox_sent ms
-        JOIN public.rate_contacts rc
-          ON rc.id = ms.rate_contact_id
-        WHERE ms.id = %s
-          AND COALESCE(ms.data->>'mailbox_id', '') ~ '^[0-9]+$'
-          AND (ms.data->>'mailbox_id')::bigint = %s
-        LIMIT 1
-        """,
-        [int(match_mailbox_sent_id), int(mailbox_id)],
-    )
-    if not row:
-        return None, None
-    aggr_contact_id = int(row[0]) if row[0] is not None else None
-    mailbox_sent_id = int(row[1]) if row[1] is not None else None
-    return aggr_contact_id, mailbox_sent_id
 
 
 def _upsert_blocked_recipient(
@@ -213,26 +166,20 @@ def _upsert_blocked_recipient(
 def process_imap_message(mailbox_id: int, folder: str, uid: str, raw_msg: bytes) -> Dict[str, Any]:
     raw_text = raw_msg.decode("utf-8", errors="replace")
     msg = BytesParser(policy=policy.default).parsebytes(raw_msg)
-    reason_code, should_block = _classify_message(msg, raw_text)
+    reason_code, should_block, parsed_failed_email = _classify_message(msg, raw_text)
     if reason_code is None:
         return {"kind": "skip", "moved": False, "blocked": False}
 
-    x_mailer_id = _extract_x_mailer_id(raw_text)
-    failed_email = _extract_failed_email(raw_text)
+    failed_email = parsed_failed_email
 
     aggr_contact_id: Optional[int] = None
-    mailbox_sent_id: Optional[int] = None
-
-    if x_mailer_id is not None:
-        aggr_contact_id, mailbox_sent_id = _resolve_mailbox_sent(x_mailer_id, mailbox_id)
-
-    if aggr_contact_id is None and failed_email:
+    if failed_email:
         aggr_contact_id = _unique_aggr_contact_id_by_email(failed_email)
 
     if should_block and aggr_contact_id is not None:
         _upsert_blocked_recipient(
             aggr_contact_id=aggr_contact_id,
-            mailbox_sent_id=mailbox_sent_id,
+            mailbox_sent_id=None,
             reason_code=reason_code,
             source_eml=raw_text,
         )
@@ -241,7 +188,7 @@ def process_imap_message(mailbox_id: int, folder: str, uid: str, raw_msg: bytes)
         "kind": reason_code,
         "moved": True,
         "blocked": bool(should_block and aggr_contact_id is not None),
-        "mailbox_sent_id": mailbox_sent_id,
+        "mailbox_sent_id": None,
         "aggr_contact_id": aggr_contact_id,
         "failed_email": failed_email,
         "folder": folder,

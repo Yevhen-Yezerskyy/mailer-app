@@ -1,6 +1,6 @@
 # FILE: engine/core_imap/imap_bounce.py
 # DATE: 2026-03-04
-# PURPOSE: Scan recent IMAP mailboxes, move obvious mailer trash into "Serenity Mailer",
+# PURPOSE: Scan recent IMAP mailboxes, move obvious mailer trash into "SerenityMailer",
 #          and upsert global blocked recipients for hard bounces.
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from engine.common import db
 from engine.common.mail.imap import IMAPConn
 from engine.core_imap.imap_message import process_imap_message
 
-SERENITY_FOLDER = "Serenity Mailer"
+SERENITY_FOLDER = "SerenityMailer"
 DEFAULT_WINDOW_DAYS = 60
 DEFAULT_MAX_UIDS_PER_FOLDER = 200
 

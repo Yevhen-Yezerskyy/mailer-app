@@ -58,6 +58,12 @@ def _imap_load_from_db_uncached(q: Tuple[Optional[str], int]) -> Tuple[str, Dict
     return auth_type, cast(Dict[str, Any], creds)
 
 
+def _quote_mailbox_name(mailbox: str) -> str:
+    # IMAP mailbox argument must be quoted when it contains spaces/special chars.
+    s = str(mailbox or "")
+    return '"' + s.replace("\\", "\\\\").replace('"', r"\"") + '"'
+
+
 class IMAPConn:
     def __init__(self, mailbox_id: int, cache_key: Optional[str] = None) -> None:
         self.mailbox_id = int(mailbox_id)
@@ -209,7 +215,7 @@ class IMAPConn:
             self._set_log("CREATE", STATUS_FAILED, {"error": "not_connected", "mailbox": mailbox})
             return None
         try:
-            typ, data = self.conn_obj.create(mailbox)
+            typ, data = self.conn_obj.create(_quote_mailbox_name(mailbox))
             rep = {"typ": typ, "data": _b2s_list(data)}
             if typ != "OK":
                 self._set_log("CREATE", STATUS_FAILED, {"mailbox": mailbox, "server_reply": rep})
@@ -226,7 +232,7 @@ class IMAPConn:
             self._set_log("MOVE", STATUS_FAILED, {"error": "not_connected", "op": "UID_COPY", "uid": uid, "mailbox": mailbox})
             return None
         try:
-            typ, data = self.conn_obj.uid("COPY", uid, mailbox)
+            typ, data = self.conn_obj.uid("COPY", uid, _quote_mailbox_name(mailbox))
             rep = {"typ": typ, "data": _b2s_list(data)}
             if typ != "OK":
                 self._set_log("MOVE", STATUS_FAILED, {"op": "UID_COPY", "uid": uid, "mailbox": mailbox, "server_reply": rep})
@@ -260,7 +266,7 @@ class IMAPConn:
             self._set_log("MOVE", STATUS_FAILED, {"error": "not_connected", "uid": uid, "mailbox": mailbox})
             return None
         try:
-            typ, data = self.conn_obj.uid("MOVE", uid, mailbox)
+            typ, data = self.conn_obj.uid("MOVE", uid, _quote_mailbox_name(mailbox))
             rep = {"typ": typ, "data": _b2s_list(data)}
             if typ == "OK":
                 out = {"uid": uid, "mailbox": mailbox, "via": "UID MOVE", "server_reply": rep}
