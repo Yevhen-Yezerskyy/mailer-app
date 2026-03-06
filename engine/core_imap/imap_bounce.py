@@ -16,7 +16,7 @@ from engine.common.mail.imap import IMAPConn
 from engine.core_imap.imap_message import process_imap_message
 
 SERENITY_FOLDER = "SerenityMailer"
-DEFAULT_WINDOW_DAYS = 60
+DEFAULT_WINDOW_DAYS = 3
 DEFAULT_MAX_UIDS_PER_FOLDER = 200
 
 def _window_days() -> int:
