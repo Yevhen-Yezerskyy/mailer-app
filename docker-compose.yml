@@ -162,7 +162,7 @@ services:
         exec gunicorn mailer_web.wsgi:application \
           --bind 0.0.0.0:8000 \
           --workers 2 \
-          --timeout 120 \
+          --timeout 420 \
           --access-logfile /host-logs/django-prod/access.log \
           --error-logfile /host-logs/django-prod/error.log \
           --capture-output \
@@ -225,7 +225,7 @@ services:
         exec gunicorn web_admin.wsgi:application \
           --bind 0.0.0.0:8000 \
           --workers 2 \
-          --timeout 120 \
+          --timeout 420 \
           --access-logfile /host-logs/django-admin-prod/access.log \
           --error-logfile /host-logs/django-admin-prod/error.log \
           --capture-output \
@@ -432,6 +432,35 @@ services:
         "python",
         "-m",
         "engine.core_sender.sender"
+      ]
+
+  mailer-engine-imap-prod:
+    image: mailer-python:latest
+    container_name: mailer-engine-imap-prod
+    working_dir: /app
+    restart: unless-stopped
+    depends_on:
+      mailer-set-env:
+        condition: service_started
+      mailer-db:
+        condition: service_started
+      mailer-redis:
+        condition: service_started
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
+      - mailer-app-prod:/app
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
+    cpus: "0.10"
+    command:
+      [
+        "/app/config/sh/with-secrets.sh",
+        "python",
+        "-m",
+        "engine.core_imap.imap_bounce_processor"
       ]
 
   nginx:

@@ -5,6 +5,7 @@
 
 (function () {
   function byId(id) { return document.getElementById(id); }
+  function byName(name) { return document.querySelector('[name="' + name + '"]'); }
 
   function getPresets() {
     const el = byId("yyPresets");
@@ -18,18 +19,15 @@
     const p = presets[code];
     if (!p) return;
 
-    const host = byId("yyHost");
-    const port = byId("yyPort");
-    const sec  = byId("yySecurity");
-    const auth = byId("yyAuthType");
+    const host = byName("host");
+    const port = byName("port");
+    const sec  = byName("security");
+    const auth = byName("auth_type");
 
-    if (host && !host.value) host.value = p.host || "";
-    if (port && !port.value) {
-      const ports = Array.isArray(p.ports) ? p.ports : [];
-      if (ports.length) port.value = String(ports[0]);
-    }
-    if (sec && (!sec.value || sec.value === "none")) sec.value = p.security || sec.value;
-    if (auth && (!auth.value || auth.value === "login")) auth.value = p.auth_type || auth.value;
+    if (host) host.value = p.host || "";
+    if (port) port.value = p.port != null ? String(p.port) : "";
+    if (sec) sec.value = p.security || "";
+    if (auth) auth.value = p.auth_type || auth.value;
 
     // триггерим change, чтобы auth-js мог скрыть/показать блоки
     if (auth) {
