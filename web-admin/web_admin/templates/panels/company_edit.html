@@ -1,0 +1,48 @@
+{% extends "panels/base.html" %}
+
+{% block title %}{% if is_create %}Добавить компанию{% else %}Изменение компании{% endif %}{% endblock %}
+
+{% block content %}
+<!-- FILE: web-admin/web_admin/templates/panels/company_edit.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: Company edit form. -->
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <div class="YY-CARD_WHITE max-w-[900px]">
+        {% if form.non_field_errors %}
+          <div class="YY-CARD_IN_FORM_ERROR">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <form method="post">
+          {% csrf_token %}
+          <label class="YY-LABEL" for="{{ form.access_type.id_for_label }}">{{ form.access_type.label }}</label>
+          {{ form.access_type }}
+          {% if form.access_type.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.access_type.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.company_name.id_for_label }}">{{ form.company_name.label }}</label>
+          {{ form.company_name }}
+          {% if form.company_name.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.company_name.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.company_email.id_for_label }}">{{ form.company_email.label }}</label>
+          {{ form.company_email }}
+          {% if form.company_email.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.company_email.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.company_phone.id_for_label }}">{{ form.company_phone.label }}</label>
+          {{ form.company_phone }}
+          {% if form.company_phone.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.company_phone.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.company_address.id_for_label }}">{{ form.company_address.label }}</label>
+          {{ form.company_address }}
+          {% if form.company_address.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.company_address.errors }}</div>{% endif %}
+
+          <div class="flex gap-3 mt-4">
+            <button type="submit" class="YY-BUTTON_GREEN">{% if is_create %}Создать{% else %}Сохранить{% endif %}</button>
+            <a href="{% url 'companies' %}" class="YY-BUTTON_MAIN">Назад</a>
+          </div>
+        </form>
+      </div>
+    </td>
+  </tr>
+</table>
+{% endblock %}

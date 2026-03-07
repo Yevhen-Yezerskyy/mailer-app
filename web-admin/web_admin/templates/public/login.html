@@ -1,0 +1,38 @@
+{% extends "public/base.html" %}
+{% load i18n %}
+
+{% block title %}Вход — Serenity{% endblock %}
+
+{% block content %}
+<!-- FILE: web-admin/web_admin/templates/public/login.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: Login page in style of main web login template; auth by default Django users. -->
+<div class="box" style="flex-direction: column;">
+  <h2 style="margin-bottom: 20px;">
+    Интеллектуальные<br>
+    email-коммуникации
+  </h2>
+
+  <h2>Вход</h2>
+  {% if form.errors %}
+    <p style="color:#750b00;margin-top:20px;">Неверный логин или пароль</p>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.GET.next|default:'' }}" />
+
+    <p style="margin-top:20px;">Email:</p>
+    <p>{{ form.username }}</p>
+
+    <p style="margin-top:20px;">Пароль:</p>
+    {{ form.password }}
+
+    <p class="buttons" style="margin-top:20px;margin-bottom: 20px;">
+      <a href="{% url 'index' %}" class="btn">&nbsp;&nbsp;&nbsp;&nbsp;Отмена&nbsp;&nbsp;&nbsp;&nbsp;</a>
+      &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+      <button type="submit" class="btn">&nbsp;&nbsp;&nbsp;&nbsp;Войти&nbsp;&nbsp;&nbsp;&nbsp;</button>
+    </p>
+  </form>
+</div>
+{% endblock %}

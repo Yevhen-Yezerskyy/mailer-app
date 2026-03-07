@@ -1,0 +1,37 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+
+<!-- FILE: web-admin/web_admin/templates/panels/aap_settings/mail_letter_edit.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: Mail letter base fields edit form. -->
+
+{% block content %}
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <div class="YY-CARD_WHITE max-w-[900px]">
+        {% if form.non_field_errors %}
+          <div class="YY-CARD_IN_FORM_ERROR">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <form method="post">
+          {% csrf_token %}
+
+          <label class="YY-LABEL" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>
+          {{ form.name }}
+          {% if form.name.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.name.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.slug.id_for_label }}">{{ form.slug.label }}</label>
+          {{ form.slug }}
+          {% if form.slug.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.slug.errors }}</div>{% endif %}
+
+          <div class="flex gap-3 mt-4">
+            <button type="submit" class="YY-BUTTON_GREEN">{% if is_create %}{% trans "Создать" %}{% else %}{% trans "Сохранить" %}{% endif %}</button>
+            <a href="{% url 'settings:mail_letters' %}" class="YY-BUTTON_MAIN">{% trans "Назад" %}</a>
+          </div>
+        </form>
+      </div>
+    </td>
+  </tr>
+</table>
+{% endblock %}

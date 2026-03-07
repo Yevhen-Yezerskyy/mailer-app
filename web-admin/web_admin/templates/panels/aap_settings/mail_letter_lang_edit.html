@@ -1,0 +1,121 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+
+<!-- FILE: web-admin/web_admin/templates/panels/aap_settings/mail_letter_lang_edit.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: Per-language letter editor using campaigns letter editor mechanics. -->
+
+{% block content %}
+<form method="post" id="yySendingForm">
+  {% csrf_token %}
+
+  <input type="hidden" id="yyCampaignId" value="{{ lang_row.ui_id }}">
+  <input type="hidden" name="editor_mode" id="yyEditorMode" value="user">
+  <input type="hidden" name="editor_html" id="yyEditorHtml">
+
+  <textarea id="yyInitHtml" class="hidden">{{ letter_init_html }}</textarea>
+  <textarea id="yyInitCss" class="hidden">{{ letter_init_css }}</textarea>
+  <textarea id="yyTemplateHtml" class="hidden">{{ letter_template_html }}</textarea>
+
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD w-[60%]">
+        <div class="YY-CARD_WHITE">
+          <div class="YY-STATUS_BLUE mb-3">{{ letter.name }} / {{ lang }}</div>
+          <label class="YY-LABEL">{% trans "Тема письма" %}</label>
+          <input type="text" name="subject" class="YY-INPUT !mb-6" value="{{ lang_row.subject|default:'' }}">
+
+          <div id="yyUserModeLeft">
+            <textarea id="yyTinyEditor" class="border border-[#cbcbcb] bg-white w-full" style="height:800px;" spellcheck="false"></textarea>
+          </div>
+
+          <div id="yyAdvancedModeLeft" class="hidden">
+            <textarea id="yyAdvHtml" style="height:900px;" spellcheck="false"></textarea>
+          </div>
+        </div>
+      </td>
+
+      <td class="YY-MAIN_TOP_RIGHT_TD w-[40%]">
+        <div class="YY-CARD_WHITE">
+          <div id="yyUserModeRight">
+            <div class="grid grid-cols-2 gap-3 mb-10">
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampSwitchToAdvanced()">{% trans "Экспертный режим" %}</button>
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampPreviewCurrent()">{% trans "Предпросмотр" %}</button>
+            </div>
+          </div>
+
+          <div id="yyAdvancedModeRight" class="hidden mb-6">
+            <div class="grid grid-cols-2 gap-3 mb-5">
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampSwitchToUser()">{% trans "Визуальный режим" %}</button>
+              <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampPreviewCurrent()">{% trans "Предпросмотр" %}</button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mt-5">
+            <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">{% trans "Сохранить" %}</button>
+            <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN" formnovalidate>{% trans "Закрыть" %}</button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script src="/static/js/campaign_templates/modal_preview.js"></script>
+
+  <link rel="stylesheet" href="/static/vendor/codemirror/codemirror.css">
+  <link rel="stylesheet" href="/static/vendor/codemirror/theme/material-darker.css">
+  <script src="/static/vendor/codemirror/codemirror.js"></script>
+  <script src="/static/vendor/codemirror/mode/xml/xml.js"></script>
+  <script src="/static/vendor/codemirror/mode/javascript/javascript.js"></script>
+  <script src="/static/vendor/codemirror/mode/css/css.js"></script>
+  <script src="/static/vendor/codemirror/mode/htmlmixed/htmlmixed.js"></script>
+
+  <script src="/static/vendor/tinymce/tinymce.min.js"></script>
+  <script src="/static/js/campaign_templates/campaign_letters/tinymce_config.js"></script>
+  <script src="/static/js/campaign_templates/campaign_letters/tinymce.js"></script>
+  <script src="/static/js/campaign_templates/campaign_letters/codemirror.js"></script>
+  <script src="/static/js/campaign_templates/campaign_letters/mode_switch.js"></script>
+  <script src="/static/js/campaign_templates/campaign_letters/preview.js"></script>
+
+  <script>
+    (function () {
+      const form = document.getElementById("yySendingForm");
+      if (!form) return;
+
+      function getMode() {
+        const el = document.getElementById("yyEditorMode");
+        const v = el ? String(el.value || "").trim() : "user";
+        return v === "advanced" ? "advanced" : "user";
+      }
+
+      function getUserEditorHtml() {
+        try {
+          const ed = window.tinymce ? window.tinymce.get("yyTinyEditor") : null;
+          return ed ? (ed.getContent({ format: "html" }) || "") : "";
+        } catch (_) {
+          return "";
+        }
+      }
+
+      function getAdvHtml() {
+        try {
+          if (typeof window.yyCampEnsureCodeMirror === "function") window.yyCampEnsureCodeMirror();
+          return typeof window.yyCampAdvGetHtml === "function" ? (window.yyCampAdvGetHtml() || "") : "";
+        } catch (_) {
+          return "";
+        }
+      }
+
+      form.addEventListener("submit", function () {
+        const mode = getMode();
+        const hidden = document.getElementById("yyEditorHtml");
+        if (!hidden) return;
+        hidden.value = mode === "advanced" ? getAdvHtml() : getUserEditorHtml();
+      });
+    })();
+  </script>
+{% endblock %}

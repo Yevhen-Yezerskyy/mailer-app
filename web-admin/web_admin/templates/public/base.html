@@ -1,0 +1,55 @@
+{% load static %}
+{% load i18n %}
+<!doctype html>
+<!-- FILE: web-admin/web_admin/templates/public/base.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: Public base layout for admin contour (moved from main web public base). -->
+<html lang="{{ request.LANGUAGE_CODE|default:'ru' }}">
+<head>
+  <meta charset="utf-8" />
+  <title>{% block title %}Serenity{% endblock %}</title>
+
+  {% trans "Интеллектуальные email-коммуникации" as og_title %}
+  {% trans "Интеллектуальная система email-коммуникаций для малого и среднего бизнеса." as og_description %}
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Serenity Mail" />
+  <meta property="og:title" content="{{ og_title }}" />
+  <meta property="og:description" content="{{ og_description }}" />
+  <meta property="og:url" content="{{ request.build_absolute_uri }}" />
+  <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'img/og/mail-og.jpg' %}" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{{ og_title }}" />
+  <meta name="twitter:description" content="{{ og_description }}" />
+  <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'img/og/mail-og.jpg' %}" />
+
+  <link rel="icon" href="{% static 'img/favicon.ico' %}" />
+  <link rel="stylesheet" href="{% static 'css/public.css' %}" />
+</head>
+<body>
+  <div class="page">
+    <div class="box header">
+      <form method="post" action="{% url 'set_language' %}" class="lang" aria-label="Language switch">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button type="submit" name="language" value="de" class="lang__item" style="background:none;border:0;padding:0;cursor:pointer;">DEU</button>
+        <span class="lang__sep">|</span>
+        <button type="submit" name="language" value="uk" class="lang__item" style="background:none;border:0;padding:0;cursor:pointer;">UKR</button>
+        <span class="lang__sep">|</span>
+        <button type="submit" name="language" value="ru" class="lang__item" style="background:none;border:0;padding:0;cursor:pointer;">RUS</button>
+        <span class="lang__sep">|</span>
+        <button type="submit" name="language" value="en" class="lang__item" style="background:none;border:0;padding:0;cursor:pointer;">ENG</button>
+      </form>
+
+      <img
+        class="header__logo"
+        src="{% static 'img/logo.main.svg' %}"
+        alt="Serenity"
+      />
+    </div>
+
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

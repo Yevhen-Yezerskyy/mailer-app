@@ -1,0 +1,188 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+
+<!-- FILE: web-admin/web_admin/templates/panels/aap_settings/system_mail_template_edit.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: System mail template editor (Tiny + advanced + preview). -->
+
+{% block content %}
+
+<form method="post" id="yyTplForm">
+  {% csrf_token %}
+  <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
+
+  <input type="hidden" name="editor_mode" id="yyEditorMode" value="user">
+  <input type="hidden" name="editor_html" id="yyEditorHtml">
+  <input type="hidden" name="css_text" id="yyCssText">
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-[70%]">
+      <div class="YY-CARD_WHITE">
+
+        {% if messages %}
+          {% for m in messages %}
+            <div class="YY-CARD_IN_FORM_ERROR">{{ m }}</div>
+          {% endfor %}
+        {% endif %}
+
+        <input type="text" name="template_name" class="YY-INPUT !mb-3" value="{{ edit_obj.template_name|default:'' }}" placeholder="{% trans "Ваш шаблон: название" %}">
+
+        <div id="yyUserModeLeft">
+          <textarea id="yyTinyEditor"
+                    class="border border-[#cbcbcb] bg-white w-full"
+                    style="height:800px;"
+                    spellcheck="false"></textarea>
+        </div>
+
+        <div id="yyAdvancedModeLeft" class="hidden">
+          <textarea id="yyAdvHtml"
+                    style="height:900px;"
+                    spellcheck="false"></textarea>
+        </div>
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-[30%]">
+      <div class="YY-CARD_WHITE">
+        <div id="yyUserModeRight">
+          <div class="grid grid-cols-2 gap-3 mb-10">
+            <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToAdvanced()">
+              {% trans "Экспертный режим" %}
+            </button>
+            <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplPreviewCurrent()">
+              {% trans "Предпросмотр" %}
+            </button>
+          </div>
+
+          {% if global_tpl_items %}
+            <div class="YY-STATUS_YELLOW mb-2">{% trans "Глобальные шаблоны" %}:</div>
+            <div class="grid grid-cols-2 gap-3 mb-10">
+              {% for gt in global_tpl_items %}
+                <div>
+                  {% if gt.is_current %}
+                    <button type="button"
+                            class="YY-BUTTON_GREEN yy-tpl-global-btn w-full"
+                            data-gid="{{ gt.id }}">{% trans "Шаблон" %} - {{ gt.template_name }}</button>
+                  {% else %}
+                    <button type="button"
+                            class="YY-BUTTON_MAIN yy-tpl-global-btn w-full"
+                            data-gid="{{ gt.id }}">{% trans "Шаблон" %} - {{ gt.template_name }}</button>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <div class="grid grid-cols-2 gap-3 mb-10">
+            <div>
+              {% if global_style_gid and global_colors %}
+                <div class="YY-STATUS_YELLOW mb-2">{% trans "Цвета" %}:</div>
+                <div class="flex flex-wrap gap-2 mb-5">
+                  {% for k in global_colors %}
+                    <button type="button"
+                            class="YY-BUTTON_TAB_MAIN yy-tpl-overlay-btn"
+                            data-gid="{{ global_style_gid }}"
+                            data-type="colors"
+                            data-name="{{ k }}">{{ k }}</button>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+            <div>
+              {% if global_style_gid and global_fonts %}
+                <div class="YY-STATUS_YELLOW mb-2">{% trans "Шрифты" %}:</div>
+                <div class="flex flex-wrap gap-2">
+                  {% for k in global_fonts %}
+                    <button type="button"
+                            class="YY-BUTTON_TAB_MAIN yy-tpl-overlay-btn"
+                            data-gid="{{ global_style_gid }}"
+                            data-type="fonts"
+                            data-name="{{ k }}">{{ k }}</button>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div id="yyAdvancedModeRight" class="hidden">
+          <div class="grid grid-cols-2 gap-3 mb-5">
+            <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToUser()">
+              {% trans "Визуальный режим" %}
+            </button>
+            <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplPreviewCurrent()">
+              {% trans "Предпросмотр" %}
+            </button>
+          </div>
+
+          <textarea id="yyAdvCss"
+                    class="YY-INPUT w-full"
+                    style="min-height:700px;"
+                    spellcheck="false"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mt-5">
+          <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">
+            {% trans "Сохранить" %}
+          </button>
+          <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN" formnovalidate>
+            {% trans "Закрыть" %}
+          </button>
+        </div>
+
+      </div>
+    </td>
+  </tr>
+</table>
+
+</form>
+
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+<script>
+  (function () {
+    const form = document.getElementById("yyTplForm");
+    if (!form) return;
+
+    form.addEventListener("submit", function (e) {
+      const btn = e.submitter || document.activeElement;
+      const action = btn && btn.value ? String(btn.value).trim() : "";
+
+      if (action === "close") return;
+
+      if (action === "save") {
+        const inp = form.querySelector('input[name="template_name"]');
+        const name = (inp && inp.value ? inp.value : "").trim();
+        if (!name) {
+          alert("{% trans "Пожалуйста, заполните название шаблона" %}");
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+      }
+    });
+  })();
+</script>
+  <script src="/static/js/campaign_templates/modal_preview.js"></script>
+  <link rel="stylesheet" href="/static/vendor/codemirror/codemirror.css">
+  <link rel="stylesheet" href="/static/vendor/codemirror/theme/material-darker.css">
+  <script src="/static/vendor/codemirror/codemirror.js"></script>
+  <script src="/static/vendor/codemirror/mode/xml/xml.js"></script>
+  <script src="/static/vendor/codemirror/mode/javascript/javascript.js"></script>
+  <script src="/static/vendor/codemirror/mode/css/css.js"></script>
+  <script src="/static/vendor/codemirror/mode/htmlmixed/htmlmixed.js"></script>
+
+  <script src="/static/vendor/tinymce/tinymce.min.js"></script>
+  <script src="/static/js/campaign_templates/tinymce_config.js"></script>
+
+  <script src="/static/js/campaign_templates/state.js"></script>
+  <script src="/static/js/campaign_templates/tinymce.js"></script>
+  <script src="/static/js/campaign_templates/codemirror.js"></script>
+  <script src="/static/js/campaign_templates/mode_switch.js"></script>
+  <script src="/static/js/campaign_templates/preview.js"></script>
+  <script src="/static/js/campaign_templates/submit.js"></script>
+  <script src="/static/js/campaign_templates/main.js"></script>
+{% endblock %}

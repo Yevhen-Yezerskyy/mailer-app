@@ -1,0 +1,51 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+
+<!-- FILE: web-admin/web_admin/templates/panels/aap_settings/system_mail_template.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: Single-line list for system mail template. -->
+
+{% block content %}
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <div class="YY-MAIN_BOTTOM_DIV">
+        <table class="w-full text-left">
+          <thead>
+            <tr class="YY-TH_TR">
+              <th class="YY-TH_TH w-[100%]">{% trans "Системный шаблон" %}</th>
+              <th class="YY-TH_TH">&nbsp;</th>
+              <th class="YY-TH_TH">&nbsp;</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+              <tr class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">
+                  <div class="YY-STATUS_BLUE">{{ it.template_name }}</div>
+                </td>
+                <td class="YY-TB_TD">
+                  <button type="button" class="YY-BUTTON_TAB_MAIN" onclick="yyTplPreviewById('{{ it.ui_id }}')">
+                    {% trans "Предпросмотр" %}
+                  </button>
+                </td>
+                <td class="YY-TB_TD">
+                  <a class="YY-BUTTON_TAB_MAIN" href="{% url 'settings:mail_template_edit' %}?state=edit&id={{ it.ui_id }}">
+                    {% trans "Изменить" %}
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script src="/static/js/campaign_templates/modal_preview.js"></script>
+  <script src="/static/js/campaign_templates/preview.js"></script>
+{% endblock %}

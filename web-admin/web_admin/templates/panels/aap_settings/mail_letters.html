@@ -1,0 +1,78 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+
+<!-- FILE: web-admin/web_admin/templates/panels/aap_settings/mail_letters.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: Letters management list with per-language preview/edit actions. -->
+
+{% block content %}
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD">
+      <div class="YY-CARD_WHITE">
+        <a class="YY-BUTTON_GREEN" href="{% url 'settings:mail_letter_add' %}">{% trans "Создать письмо" %}</a>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <div class="YY-MAIN_BOTTOM_DIV">
+        <table class="w-full text-left">
+          <thead>
+            <tr class="YY-TH_TR">
+              <th class="YY-TH_TH">{% trans "Письмо" %}</th>
+              <th class="YY-TH_TH">{% trans "Слаг" %}</th>
+              {% for code, title in langs %}
+                <th class="YY-TH_TH">{{ title }} ({{ code }})</th>
+              {% endfor %}
+              <th class="YY-TH_TH">&nbsp;</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+              <tr class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">{{ it.name }}</td>
+                <td class="YY-TB_TD">{{ it.slug }}</td>
+                {% for c in it.lang_cells %}
+                  <td class="YY-TB_TD">
+                    <div class="flex flex-col gap-2">
+                      <button class="YY-BUTTON_TAB_MAIN" type="button" onclick="yyLetterPreview('{{ it.id }}','{{ c.code }}')">{% trans "Предпросмотр" %}</button>
+                      <a class="YY-BUTTON_TAB_MAIN" href="{% url 'settings:mail_letter_lang_edit' pk=it.id lang=c.code %}">{% trans "Изменить" %}</a>
+                      {% if not c.has_data %}
+                        <form method="post" action="{% url 'settings:mail_letter_lang_translate' pk=it.id lang=c.code %}">
+                          {% csrf_token %}
+                          <button class="YY-BUTTON_TAB_MAIN w-full" type="submit">{% trans "Перевести" %}</button>
+                        </form>
+                      {% endif %}
+                    </div>
+                  </td>
+                {% endfor %}
+                <td class="YY-TB_TD">
+                  <a class="YY-BUTTON_TAB_MAIN" href="{% url 'settings:mail_letter_edit' pk=it.id %}">{% trans "Изменить письмо" %}</a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD" colspan="100%">{% trans "Здесь пока нет данных" %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </td>
+  </tr>
+</table>
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script>
+    function yyLetterPreview(id, lang) {
+      if (!window.YYModal || typeof window.YYModal.open !== "function") return;
+      window.YYModal.open(`url=/settings/mail-letters/${encodeURIComponent(id)}/lang/${encodeURIComponent(lang)}/preview/`);
+    }
+  </script>
+{% endblock %}

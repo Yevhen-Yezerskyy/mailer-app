@@ -1,9 +1,9 @@
 {% load static %}
 {% load i18n %}
 <!doctype html>
-<!-- FILE: web/templates/panels/base.html -->
-<!-- DATE: 2025-12-26 -->
-<!-- CHANGE: добавлен глобальный контейнер модалки (include components/modal_base.html). -->
+<!-- FILE: web-admin/web_admin/templates/panels/base.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: Panel base synced with main web panel base + managed menu for admin contour. -->
 <html lang="ru">
 <head>
   <meta charset="utf-8">
@@ -34,13 +34,11 @@
 </svg>
 
 <div class="h-screen flex overflow-hidden">
-
-  <!-- SIDEBAR -->
-<aside id="panel-sidebar"
+  <aside id="panel-sidebar"
        class="w-[290px] shrink-0 bg-white border border-[#71d0f4] border-t-0 !border-t-0 flex flex-col">
 
     <div class="h-16 px-3 flex items-center border-b border-[#71d0f4] border-t-0 justify-center">
-      <a href="/">
+      <a href="{% url 'dashboard' %}">
         <img src="{% static 'img/logo.main.svg' %}" alt="Serenity" class="h-6 w-auto">
       </a>
     </div>
@@ -65,21 +63,17 @@
     </nav>
 
     <div class="mt-auto p-2 border-t border-[#71d0f4]">
-
-    <details class="YY-MENU-CARD-BLUE">
+      <details class="YY-MENU-CARD-BLUE">
         <summary class="YY-MENU-SUMMARY">
-            {% if request.user.is_authenticated %}
-              {{ request.user.email }}
-            {% endif %}
+          {% if request.user.is_authenticated %}
+            {{ request.user.email }}
+          {% endif %}
         </summary>
-    </details>
+      </details>
     </div>
   </aside>
 
-  <!-- MAIN -->
   <div class="flex-1 min-w-0 min-h-0 flex flex-col">
-
-    <!-- TOPBAR -->
     <header class="h-16 bg-white border-b border-[#71d0f4] flex items-center">
       <table class="YY-MAIN_TABLE_TOP mt-0 mb-0">
         <tr>
@@ -100,40 +94,28 @@
 
           <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
             <div class="flex items-center justify-end gap-3">
-
               <form method="post" action="{% url 'set_language' %}" class="flex items-center gap-2">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
 
-                <button type="submit" name="language" value="de"
-                  class="YY-BUTTON_MAIN">
-                  DEU
-                </button>
-
-                <button type="submit" name="language" value="uk"
-                  class="YY-BUTTON_MAIN">
-                  UKR
-                </button>
-
-                <button type="submit" name="language" value="ru"
-                  class="YY-BUTTON_MAIN">
-                  RUS
-                </button>
-                <button type="submit" name="language" value="en"
-                  class="YY-BUTTON_MAIN">
-                  ENG
-                </button>
+                <button type="submit" name="language" value="de" class="YY-BUTTON_MAIN">DEU</button>
+                <button type="submit" name="language" value="uk" class="YY-BUTTON_MAIN">UKR</button>
+                <button type="submit" name="language" value="ru" class="YY-BUTTON_MAIN">RUS</button>
+                <button type="submit" name="language" value="en" class="YY-BUTTON_MAIN">ENG</button>
               </form>
+
+              <a href="{% url 'admin:index' %}" class="YY-BUTTON_MAIN">
+                Django Admin
+              </a>
 
               <form method="post" action="{% url 'logout' %}" class="inline">
                 {% csrf_token %}
                 <button
                   type="submit"
-                  class="YY-BUTTON_MAIN ml-6">
-                  {% trans "Выйти" %}
+                  class="YY-BUTTON_MAIN ml-2">
+                  Выйти
                 </button>
               </form>
-
             </div>
           </td>
         </tr>
@@ -143,11 +125,10 @@
     <main class="flex-1 min-h-0 overflow-y-auto">
       {% block content %}{% endblock %}
     </main>
-
   </div>
 </div>
-<script src="{% static 'js/script.js' %}"></script>
 
+<script src="{% static 'js/script.js' %}"></script>
 {% block extra_js %}{% endblock %}
 </body>
 </html>

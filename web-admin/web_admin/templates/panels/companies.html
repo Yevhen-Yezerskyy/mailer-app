@@ -1,0 +1,108 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+
+{% block title %}Компании{% endblock %}
+
+{% block content %}
+<!-- FILE: web-admin/web_admin/templates/panels/companies.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: Companies list with edit links. -->
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <div class="mb-4 flex gap-2">
+        {% if not show_archived %}
+          <a class="YY-BUTTON_GREEN" href="{% url 'company_add' %}">Добавить компанию</a>
+        {% endif %}
+        {% if show_archived %}
+          <a class="YY-BUTTON_MAIN" href="{% url 'companies' %}">Показать активные</a>
+        {% else %}
+          <a class="YY-BUTTON_MAIN" href="{% url 'companies' %}?archived=1">Показать архивные</a>
+        {% endif %}
+      </div>
+
+      <div class="YY-MAIN_BOTTOM_DIV">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr class="YY-TH_TR">
+              <th class="YY-TH_TH">Название</th>
+              <th class="YY-TH_TH">Д-п</th>
+              <th class="YY-TH_TH">Пользователи</th>
+              <th class="YY-TH_TH"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+            <tr class="YY-TB_TR">
+              <td class="YY-TB_TD">
+                <a
+                  href="#"
+                  class="text-[#006991] underline"
+                  data-yy-modal="url={% url 'company_modal' it.id %}">
+                  {{ it.company_name|default:"—" }}
+                </a>
+              </td>
+              <td class="YY-TB_TD">{{ it.access_type }}</td>
+              <td class="YY-TB_TD">
+                {% for u in it.users.all %}
+                  <div class="grid items-center gap-2 px-2 py-2 rounded-md mb-1 {% if forloop.counter0|divisibleby:2 %}bg-[#f8fdff]{% else %}bg-[#f2fff3]{% endif %}" style="grid-template-columns: 300px 200px 80px 120px;">
+                    <div class="YY-TEXT">{{ u.email|default:"—" }}</div>
+                    <div class="YY-TEXT">
+                      {% if u.first_name or u.last_name %}
+                        <a
+                          href="#"
+                          class="text-[#006991] underline"
+                          data-yy-modal="url={% url 'user_modal' u.id %}">
+                          {{ u.first_name }} {{ u.last_name }}
+                        </a>
+                      {% else %}
+                        <a
+                          href="#"
+                          class="text-[#006991] underline"
+                          data-yy-modal="url={% url 'user_modal' u.id %}">
+                          —
+                        </a>
+                      {% endif %}
+                    </div>
+                    <div class="YY-TEXT"><b>{{ u.role }}</b></div>
+                    <a class="YY-BUTTON_MAIN ml-auto" href="{% url 'user_edit' u.id %}">Изменить</a>
+                  </div>
+                {% empty %}
+                  <div class="YY-TEXT mb-1">—</div>
+                {% endfor %}
+                <div class="grid items-center gap-2 px-2 py-1" style="grid-template-columns: 300px 200px 80px 120px;">
+                  <div></div>
+                  <div></div>
+                  <div></div>
+                  <a class="YY-BUTTON_GREEN ml-auto" href="{% url 'user_add' %}?workspace={{ it.id }}">Добавить</a>
+                </div>
+              </td>
+              <td class="YY-TB_TD">
+                <div class="flex flex-col gap-2">
+                  {% if show_archived %}
+                    <form method="post" action="{% url 'company_restore' it.id %}" onsubmit="return confirm('Разархивировать компанию и её пользователей?');">
+                      {% csrf_token %}
+                      <button type="submit" class="YY-BUTTON_GREEN">Разархивировать</button>
+                    </form>
+                  {% else %}
+                    <a class="YY-BUTTON_MAIN" href="{% url 'company_edit' it.id %}">Изменить</a>
+                    <form method="post" action="{% url 'company_delete' it.id %}" onsubmit="return confirm('Архивировать компанию и всех её пользователей?');">
+                      {% csrf_token %}
+                      <button type="submit" class="YY-BUTTON_RED">Архив</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr class="YY-TB_TR">
+              <td class="YY-TB_TD" colspan="4">Нет компаний.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </td>
+  </tr>
+</table>
+{% endblock %}

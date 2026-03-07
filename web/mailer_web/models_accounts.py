@@ -1,70 +1,103 @@
-from uuid import uuid4
-
 from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
-from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.db import models
 from django.utils import timezone
+from uuid import uuid4
+
+
+WORKSPACE_ACCESS_TYPES = {
+    "full": "Full access",
+    "test": "Test mode",
+    "stat_only": "Stats only",
+    "super": "Super",
+}
+WORKSPACE_ACCESS_TYPE_DEFAULT = "full"
+
+CLIENT_USER_ROLES = {
+    "main": "Main",
+    "viewer": "Viewer",
+}
+CLIENT_USER_ROLE_DEFAULT = "main"
 
 
 class ClientUserManager(BaseUserManager):
     use_in_migrations = True
 
-    def _normalize_login(self, username: str) -> str:
-        return (username or "").strip()
+    def _normalize_login(self, email: str) -> str:
+        return (email or "").strip().lower()
 
-    def get_by_natural_key(self, username):
-        login = self._normalize_login(username)
-        if "@" in login:
-            try:
-                return self.get(email__iexact=login)
-            except self.model.DoesNotExist:
-                pass
-        return self.get(username__iexact=login)
+    def get_by_natural_key(self, email):
+        login = self._normalize_login(email)
+        return self.get(email__iexact=login)
 
-    async def aget_by_natural_key(self, username):
-        login = self._normalize_login(username)
-        if "@" in login:
-            try:
-                return await self.aget(email__iexact=login)
-            except self.model.DoesNotExist:
-                pass
-        return await self.aget(username__iexact=login)
+    async def aget_by_natural_key(self, email):
+        login = self._normalize_login(email)
+        return await self.aget(email__iexact=login)
 
-    def create_user(self, username, email="", password=None, **extra_fields):
-        if not username:
-            raise ValueError("The username must be set")
-        username = self.model.normalize_username(username)
+    def create_user(self, email, password=None, **extra_fields):
+        email = self.normalize_email(email or "").strip().lower()
+        if not email:
+            raise ValueError("The email must be set")
         user = self.model(
-            username=username,
-            email=self.normalize_email(email),
+            email=email,
             **extra_fields,
         )
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, username, email="", password=None, **extra_fields):
-        return self.create_user(username=username, email=email, password=password, **extra_fields)
+    def create_superuser(self, email, password=None, **extra_fields):
+        return self.create_user(email=email, password=password, **extra_fields)
+
+
+class Workspace(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    company_name = models.CharField(max_length=255)
+    company_address = models.TextField(blank=True, default="")
+    company_phone = models.CharField(max_length=64, blank=True, default="")
+    company_email = models.EmailField(blank=True, default="")
+    access_type = models.CharField(
+        max_length=32,
+        choices=[(k, k) for k in WORKSPACE_ACCESS_TYPES.keys()],
+        default=WORKSPACE_ACCESS_TYPE_DEFAULT,
+        db_index=True,
+    )
+    archived = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "accounts_workspaces"
+
+    def __str__(self) -> str:
+        company = (self.company_name or "").strip()
+        return company or str(self.id)
 
 
 class ClientUser(AbstractBaseUser):
-    username_validator = UnicodeUsernameValidator()
-
-    username = models.CharField(
-        max_length=150,
-        unique=True,
-        validators=[username_validator],
-        error_messages={"unique": "A user with that username already exists."},
-    )
     first_name = models.CharField(max_length=150, blank=True)
     last_name = models.CharField(max_length=150, blank=True)
-    email = models.EmailField(blank=True)
-    is_active = models.BooleanField(default=True)
+    position = models.CharField(max_length=255, blank=True, default="")
+    email = models.EmailField(unique=True)
+    phone = models.CharField(max_length=64, blank=True, default="")
+    role = models.CharField(
+        max_length=32,
+        choices=[(k, k) for k in CLIENT_USER_ROLES.keys()],
+        default=CLIENT_USER_ROLE_DEFAULT,
+        db_index=True,
+    )
+    archived = models.BooleanField(default=False, db_index=True)
+    workspace = models.ForeignKey(
+        "mailer_web.Workspace",
+        on_delete=models.PROTECT,
+        related_name="users",
+        null=True,
+        blank=True,
+    )
     date_joined = models.DateTimeField(default=timezone.now)
 
     objects = ClientUserManager()
 
-    USERNAME_FIELD = "username"
+    USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
     class Meta:
@@ -75,27 +108,7 @@ class ClientUser(AbstractBaseUser):
         return full_name
 
     def get_short_name(self):
-        return self.first_name or self.username
+        return self.first_name or self.email
 
     def __str__(self) -> str:
-        return self.username
-
-
-class UserWorkspace(models.Model):
-    user = models.OneToOneField(
-        "mailer_web.ClientUser",
-        on_delete=models.CASCADE,
-        related_name="workspace_link",
-    )
-
-    workspace_id = models.UUIDField(
-        default=uuid4,
-        db_index=True,
-        editable=False,
-    )
-
-    class Meta:
-        db_table = "accounts_userworkspace"
-
-    def __str__(self) -> str:
-        return f"{self.user.username} @ {self.workspace_id}"
+        return self.email

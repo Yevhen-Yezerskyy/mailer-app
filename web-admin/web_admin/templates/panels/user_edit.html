@@ -1,0 +1,64 @@
+{% extends "panels/base.html" %}
+
+{% block title %}{% if is_create %}Добавить пользователя{% else %}Изменение пользователя{% endif %}{% endblock %}
+
+{% block content %}
+<!-- FILE: web-admin/web_admin/templates/panels/user_edit.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: Client user edit form. -->
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <div class="YY-CARD_WHITE max-w-[900px]">
+        {% if form.non_field_errors %}
+          <div class="YY-CARD_IN_FORM_ERROR">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <form method="post">
+          {% csrf_token %}
+          <label class="YY-LABEL" for="{{ form.role.id_for_label }}">{{ form.role.label }}</label>
+          {{ form.role }}
+          {% if form.role.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.role.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+          {{ form.email }}
+          {% if form.email.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.email.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.workspace.id_for_label }}">{{ form.workspace.label }}</label>
+          {{ form.workspace }}
+          {% if form.workspace.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.workspace.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>
+          {{ form.first_name }}
+          {% if form.first_name.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.first_name.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>
+          {{ form.last_name }}
+          {% if form.last_name.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.last_name.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.position.id_for_label }}">{{ form.position.label }}</label>
+          {{ form.position }}
+          {% if form.position.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.position.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.phone.id_for_label }}">{{ form.phone.label }}</label>
+          {{ form.phone }}
+          {% if form.phone.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.phone.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.new_password1.id_for_label }}">{{ form.new_password1.label }}</label>
+          {{ form.new_password1 }}
+          {% if form.new_password1.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.new_password1.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.new_password2.id_for_label }}">{{ form.new_password2.label }}</label>
+          {{ form.new_password2 }}
+          {% if form.new_password2.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.new_password2.errors }}</div>{% endif %}
+
+          <div class="flex gap-3 mt-4">
+            <button type="submit" class="YY-BUTTON_GREEN">{% if is_create %}Создать{% else %}Сохранить{% endif %}</button>
+            <a href="{% url 'companies' %}" class="YY-BUTTON_MAIN">Назад</a>
+          </div>
+        </form>
+      </div>
+    </td>
+  </tr>
+</table>
+{% endblock %}

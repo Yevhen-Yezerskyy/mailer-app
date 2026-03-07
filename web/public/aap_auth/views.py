@@ -14,5 +14,6 @@ def login_view(request):
             return redirect("/panel/")
     else:
         form = AuthenticationForm(request)
+    form.fields["username"].label = "Email"
 
     return render(request, "public/login.html", {"form": form})

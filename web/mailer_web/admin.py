@@ -1,11 +1,11 @@
 # FILE: web/mailer_web/admin.py
-# DATE: 2026-03-05
-# PURPOSE: Django admin registration for client users and workspaces with safe password handling.
+# DATE: 2026-03-07
+# PURPOSE: Django admin registration for client users and company workspaces with safe password handling.
 
 from django import forms
 from django.contrib import admin
 
-from .models_accounts import ClientUser, UserWorkspace
+from .models_accounts import ClientUser, Workspace
 
 
 class ClientUserCreationForm(forms.ModelForm):
@@ -14,7 +14,7 @@ class ClientUserCreationForm(forms.ModelForm):
 
     class Meta:
         model = ClientUser
-        fields = ("username", "email", "first_name", "last_name", "is_active")
+        fields = ("workspace", "email", "first_name", "last_name", "position", "phone", "role")
 
     def clean_password2(self):
         password1 = self.cleaned_data.get("password1")
@@ -45,7 +45,7 @@ class ClientUserChangeForm(forms.ModelForm):
 
     class Meta:
         model = ClientUser
-        fields = ("username", "email", "first_name", "last_name", "is_active")
+        fields = ("workspace", "email", "first_name", "last_name", "position", "phone", "role")
 
     def clean(self):
         cleaned_data = super().clean()
@@ -71,9 +71,9 @@ class ClientUserAdmin(admin.ModelAdmin):
     form = ClientUserChangeForm
     add_form = ClientUserCreationForm
 
-    list_display = ("id", "username", "email", "is_active", "date_joined")
-    list_filter = ("is_active",)
-    search_fields = ("username", "email", "first_name", "last_name")
+    list_display = ("id", "email", "workspace", "role", "phone", "date_joined")
+    list_filter = ("role", "workspace")
+    search_fields = ("email", "first_name", "last_name", "position", "phone", "workspace__company_name")
     ordering = ("id",)
     readonly_fields = ("date_joined",)
 
@@ -88,11 +88,13 @@ class ClientUserAdmin(admin.ModelAdmin):
                     None,
                     {
                         "fields": (
-                            "username",
+                            "workspace",
                             "email",
                             "first_name",
                             "last_name",
-                            "is_active",
+                            "position",
+                            "phone",
+                            "role",
                             "password1",
                             "password2",
                         )
@@ -102,15 +104,16 @@ class ClientUserAdmin(admin.ModelAdmin):
         return (
             (
                 None,
-                {"fields": ("username", "email", "first_name", "last_name", "is_active")},
+                {"fields": ("workspace", "email", "first_name", "last_name", "position", "phone", "role")},
             ),
             ("Password", {"fields": ("new_password1", "new_password2")}),
             ("Important dates", {"fields": ("date_joined",)}),
         )
 
 
-@admin.register(UserWorkspace)
-class UserWorkspaceAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "workspace_id")
-    search_fields = ("user__username", "user__email", "workspace_id")
-    ordering = ("id",)
+@admin.register(Workspace)
+class WorkspaceAdmin(admin.ModelAdmin):
+    list_display = ("id", "company_name", "company_email", "company_phone", "access_type", "created_at")
+    list_filter = ("access_type",)
+    search_fields = ("id", "company_name", "company_email", "company_phone", "company_address")
+    ordering = ("-created_at",)

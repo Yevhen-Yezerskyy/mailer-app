@@ -1,0 +1,55 @@
+{% extends "panels/base.html" %}
+
+{% block title %}Пользователи{% endblock %}
+
+{% block content %}
+<!-- FILE: web-admin/web_admin/templates/panels/users.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: Client users list with edit links. -->
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <div class="mb-4 flex gap-2">
+        <a class="YY-BUTTON_GREEN" href="{% url 'user_add' %}">Добавить пользователя</a>
+      </div>
+
+      <div class="YY-MAIN_BOTTOM_DIV">
+        <table class="w-full border-collapse">
+          <thead>
+            <tr class="YY-TH_TR">
+              <th class="YY-TH_TH">ID</th>
+              <th class="YY-TH_TH">Имя</th>
+              <th class="YY-TH_TH">Фамилия</th>
+              <th class="YY-TH_TH">Компания</th>
+              <th class="YY-TH_TH">Роль</th>
+              <th class="YY-TH_TH">Email</th>
+              <th class="YY-TH_TH">Телефон</th>
+              <th class="YY-TH_TH"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+            <tr class="YY-TB_TR">
+              <td class="YY-TB_TD">{{ it.id }}</td>
+              <td class="YY-TB_TD">{{ it.first_name|default:"—" }}</td>
+              <td class="YY-TB_TD">{{ it.last_name|default:"—" }}</td>
+              <td class="YY-TB_TD">{% if it.workspace %}{{ it.workspace.company_name|default:it.workspace.id }}{% else %}—{% endif %}</td>
+              <td class="YY-TB_TD">{{ it.role }}</td>
+              <td class="YY-TB_TD">{{ it.email|default:"—" }}</td>
+              <td class="YY-TB_TD">{{ it.phone|default:"—" }}</td>
+              <td class="YY-TB_TD">
+                <a class="YY-BUTTON_MAIN" href="{% url 'user_edit' it.id %}">Изменить</a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr class="YY-TB_TR">
+              <td class="YY-TB_TD" colspan="8">Нет пользователей.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </td>
+  </tr>
+</table>
+{% endblock %}

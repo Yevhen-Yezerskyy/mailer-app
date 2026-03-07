@@ -1,0 +1,15 @@
+<div class="YY-CARD_WHITE w-[700px] max-w-[95vw]">
+  <div class="flex items-start justify-between gap-3 mb-4">
+    <div class="text-[22px] font-semibold text-[#006991]">Компания</div>
+    <button type="button" class="YY-BUTTON_MAIN" data-yy-modal-close>Закрыть</button>
+  </div>
+
+  <div class="space-y-2">
+    <div><b>Название:</b> {{ obj.company_name|default:"—" }}</div>
+    <div><b>Доступ:</b> {{ obj.access_type|default:"—" }}</div>
+    <div><b>Email:</b> {{ obj.company_email|default:"—" }}</div>
+    <div><b>Телефон:</b> {{ obj.company_phone|default:"—" }}</div>
+    <div><b>Адрес:</b> {{ obj.company_address|default:"—" }}</div>
+    <div><b>Статус:</b> {% if obj.archived %}Архив{% else %}Активная{% endif %}</div>
+  </div>
+</div>

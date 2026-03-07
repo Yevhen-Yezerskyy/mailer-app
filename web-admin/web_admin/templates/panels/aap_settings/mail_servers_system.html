@@ -1,0 +1,126 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+<!-- FILE: web-admin/web_admin/templates/panels/aap_settings/mail_servers_system.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: Settings -> system mailbox only (without mailbox add/edit/delete). -->
+
+{% block content %}
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-full">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-STATUS_BLUE">{% trans "Системный почтовый сервис (SMTP / IMAP)" %}</div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      {% if items %}
+        <div class="YY-MAIN_BOTTOM_DIV">
+
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH w-[20%]">Email</th>
+                <th class="YY-TH_TH w-[30%]">{% trans "Домен" %}</th>
+                <th class="YY-TH_TH w-[25%]">SMTP</th>
+                <th class="YY-TH_TH w-[25%]">IMAP</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for it in items %}
+                <tr class="YY-TB_TR align-top">
+
+                  <td class="YY-TB_TD">
+                    <b>{{ it.email }}</b>
+                  </td>
+
+                  <td class="YY-TB_TD">
+                    <div class="YY-STATUS_BLUE mb-2">{{ it.domain_name }}</div>
+                  </td>
+
+                  <td class="YY-TB_TD">
+                    {% if not it.smtp_configured %}
+                      <a href="{% url 'settings:mail_servers_smtp' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-2">
+                        {% trans "Настроить SMTP сервер" %}
+                      </a>
+                      <div class="YY-STATUS_YELLOW !text-sm">{% trans "SMTP не настроен" %}</div>
+                    {% else %}
+                      <a href="{% url 'settings:mail_servers_smtp' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-2">
+                        {% trans "Изменить SMTP сервер" %}
+                      </a>
+                      {% if it.smtp_auth %}
+                        {% if it.smtp_auth.status == "SUCCESS" %}
+                          <div class="YY-STATUS_GREEN !text-sm !mb-2">
+                        {% elif it.smtp_auth.status == "FAIL" %}
+                          <div class="YY-STATUS_RED !text-sm !mb-2">
+                        {% else %}
+                          <div class="YY-STATUS_GRAY !text-sm !mb-2">
+                        {% endif %}
+                          <div>{{ it.smtp_auth.dt }}</div>
+                          <div>{{ it.smtp_auth.action }}: {{ it.smtp_auth.status }}</div>
+                        </div>
+                      {% else %}
+                        <div class="YY-STATUS_YELLOW !text-sm !mb-2">{% trans "Не проверено" %}</div>
+                      {% endif %}
+
+                      {% if it.smtp_send %}
+                        {% if it.smtp_send.status == "SUCCESS" %}
+                          <div class="YY-STATUS_GREEN !text-sm !mb-2">
+                        {% elif it.smtp_send.status == "FAIL" %}
+                          <div class="YY-STATUS_RED !text-sm !mb-2">
+                        {% else %}
+                          <div class="YY-STATUS_GRAY !text-sm !mb-2">
+                        {% endif %}
+                          <div>{{ it.smtp_send.dt }}</div>
+                          <div>{{ it.smtp_send.action }}: {{ it.smtp_send.status }}</div>
+                        </div>
+                      {% endif %}
+                    {% endif %}
+                  </td>
+
+                  <td class="YY-TB_TD">
+                    {% if not it.imap_configured %}
+                      <a href="{% url 'settings:mail_servers_imap' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-2">
+                        {% trans "Настроить IMAP сервер" %}
+                      </a>
+                      <div class="YY-STATUS_YELLOW !text-sm">{% trans "IMAP не настроен" %}</div>
+                    {% else %}
+                      <a href="{% url 'settings:mail_servers_imap' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-2">
+                        {% trans "Изменить IMAP сервер" %}
+                      </a>
+                      {% if it.imap_check %}
+                        {% if it.imap_check.status == "SUCCESS" %}
+                          <div class="YY-STATUS_GREEN !text-sm !mb-2">
+                        {% elif it.imap_check.status == "FAIL" %}
+                          <div class="YY-STATUS_RED !text-sm !mb-2">
+                        {% else %}
+                          <div class="YY-STATUS_GRAY !text-sm !mb-2">
+                        {% endif %}
+                          <div>{{ it.imap_check.dt }}</div>
+                          <div>{{ it.imap_check.action }}: {{ it.imap_check.status }}</div>
+                        </div>
+                      {% else %}
+                        <div class="YY-STATUS_YELLOW !text-sm !mb-2">{% trans "Не проверено" %}</div>
+                      {% endif %}
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+
+        </div>
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">{% trans "Здесь пока нет данных" %}</div>
+      {% endif %}
+    </td>
+  </tr>
+</table>
+
+{% endblock %}
