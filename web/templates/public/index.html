@@ -19,6 +19,11 @@ Serenity Mail – {% trans "Интеллектуальные email-коммун�
   <a href="/panel/" class="btn">{% trans "Перейти" %}</a>
 </div>
 
+<div class="box enter">
+  <p>{% trans "Регистрация:" %}</p>
+  <a href="{% url 'register' %}" class="btn">{% trans "Зарегистрироваться" %}</a>
+</div>
+
 <div class="box about">
   <div class="about__img">
     <img src="{% static 'img/public/mail-01.jpg' %}" alt="Email">

@@ -1,0 +1,88 @@
+{% extends "public/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Регистрация" %} — Serenity{% endblock %}
+
+{% block content %}
+<!-- FILE: web/templates/public/register.html  (обновлено — 2026-03-07)
+Смысл: публичная регистрация с валидацией, единым блоком ошибок и подсветкой лейблов. -->
+<div class="box" style="flex-direction: column;">
+  <h2>{% if edit_uid %}{% trans "Изменить данные" %}{% else %}{% trans "Регистрация" %}{% endif %}</h2>
+
+  <form method="post" action="" autocomplete="on" style="width: 100%; max-width: 560px; margin-top: 20px;">
+    {% csrf_token %}
+    {% if edit_uid %}<input type="hidden" name="uid" value="{{ edit_uid }}">{% endif %}
+
+    {% if form.errors %}
+      <div style="margin:0 0 18px 0;padding:12px 14px;border:1px solid #a50000;background:#ffeaea;color:#a50000;">
+        <p style="margin:0 0 8px 0;font-size:15px;"><strong>{% trans "Проверьте заполнение формы" %}:</strong></p>
+        {% for field_name, errors in form.errors.items %}
+          {% for error in errors %}
+            <p style="margin:0 0 4px 0;font-size:15px;">• {{ error }}</p>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <p><strong>{% trans "Компания" %}</strong></p>
+
+    <p style="font-size:15px;margin-bottom:3px;color:{% if form.company_name.errors %}#a50000{% else %}#006991{% endif %};">
+      {% trans "Название компании" %} *:
+    </p>
+    <p>{{ form.company_name }}</p>
+
+    <p style="font-size:15px;margin-top:20px;margin-bottom:3px;color:{% if form.company_address.errors %}#a50000{% else %}#006991{% endif %};">
+      {% trans "Адрес компании" %} *:
+    </p>
+    <p>{{ form.company_address }}</p>
+
+    <p style="margin-top:28px;"><strong>{% trans "Пользователь" %}</strong></p>
+
+    <p style="font-size:15px;margin-bottom:3px;color:{% if form.last_name.errors %}#a50000{% else %}#006991{% endif %};">
+      {% trans "Фамилия" %} *:
+    </p>
+    <p>{{ form.last_name }}</p>
+
+    <p style="font-size:15px;margin-top:20px;margin-bottom:3px;color:{% if form.first_name.errors %}#a50000{% else %}#006991{% endif %};">
+      {% trans "Имя" %} *:
+    </p>
+    <p>{{ form.first_name }}</p>
+
+    <p style="font-size:15px;margin-top:20px;margin-bottom:3px;color:{% if form.phone.errors %}#a50000{% else %}#006991{% endif %};">
+      {% trans "Телефон" %} *:
+    </p>
+    <p>{{ form.phone }}</p>
+
+    <p style="font-size:15px;margin-top:20px;margin-bottom:3px;color:{% if form.position.errors %}#a50000{% else %}#006991{% endif %};">
+      {% trans "Должность" %}:
+    </p>
+    <p>{{ form.position }}</p>
+
+    <p style="margin-top:28px;"><strong>{% trans "Логин информация" %}</strong></p>
+
+    <p style="font-size:15px;margin-top:20px;margin-bottom:3px;color:{% if form.email.errors %}#a50000{% else %}#006991{% endif %};">
+      {% trans "Email / Логин" %} *:
+    </p>
+    <p>{{ form.email }}</p>
+
+    <p style="font-size:15px;margin-top:20px;margin-bottom:3px;color:{% if form.password.errors %}#a50000{% else %}#006991{% endif %};">
+      {% trans "Пароль" %}{% if not edit_uid %} *{% endif %}:
+    </p>
+    <p>{{ form.password }}</p>
+
+    <p style="font-size:15px;margin-top:20px;margin-bottom:3px;color:{% if form.password2.errors %}#a50000{% else %}#006991{% endif %};">
+      {% trans "Подтверждение пароля" %}{% if not edit_uid %} *{% endif %}:
+    </p>
+    <p>{{ form.password2 }}</p>
+
+    <p class="buttons" style="margin-top:20px;margin-bottom:20px;display:flex;gap:24px;justify-content:center;align-items:center;">
+      {% if edit_uid %}
+        <a href="{% url 'email_pending' uid=edit_uid %}" class="btn" style="width:240px;">{% trans "Отмена" %}</a>
+      {% else %}
+        <a href="{% url 'public_index' %}" class="btn" style="width:240px;">{% trans "Отмена" %}</a>
+      {% endif %}
+      <button type="submit" class="btn" style="width:240px;">{% if edit_uid %}{% trans "Сохранить" %}{% else %}{% trans "Зарегистрироваться" %}{% endif %}</button>
+    </p>
+  </form>
+</div>
+{% endblock %}

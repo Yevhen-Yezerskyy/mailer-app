@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-02-11 09:05+0100\n"
+"POT-Creation-Date: 2026-03-08 15:08+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -243,56 +243,62 @@ msgstr "List name"
 #: templates/panels/aap_lists/lists.html:50
 #: templates/panels/aap_lists/lists.html:117
 #: templates/panels/aap_lists/lists_list.html:18
+#: templates/panels/overview.html:24 templates/panels/overview.html:181
 msgid "Аудитория"
 msgstr "Audience"
 
-#: panel/aap_settings/forms.py:85 panel/aap_settings/forms.py:270
+#: panel/aap_settings/forms.py:86 panel/aap_settings/forms.py:277
+#: public/aap_auth/views.py:143 public/aap_auth/views.py:166
 msgid "Email"
 msgstr "Email"
 
-#: panel/aap_settings/forms.py:99
+#: panel/aap_settings/forms.py:100
 msgid "Заполните Email."
 msgstr "Fill in the Email."
 
-#: panel/aap_settings/forms.py:106
+#: panel/aap_settings/forms.py:107
 msgid "Этот Email уже используется."
 msgstr "This Email is already in use."
 
-#: panel/aap_settings/forms.py:133
+#: panel/aap_settings/forms.py:134
 msgid "Отправитель:"
 msgstr "Sender:"
 
-#: panel/aap_settings/forms.py:135 panel/aap_settings/forms.py:264
-#: templates/panels/aap_settings/smtp_server.html:38
+#: panel/aap_settings/forms.py:136 panel/aap_settings/forms.py:271
+#: templates/panels/aap_settings/smtp_server.html:39
 msgid "Отправитель"
 msgstr "Sender"
 
-#: panel/aap_settings/forms.py:139 panel/aap_settings/forms.py:276
+#: panel/aap_settings/forms.py:140 panel/aap_settings/forms.py:283
 msgid "Лимит/час"
 msgstr "Limit per hour"
 
-#: panel/aap_settings/forms.py:183
+#: panel/aap_settings/forms.py:190
 msgid "Заполните все поля SMTP."
 msgstr "Fill in all SMTP fields."
 
-#: panel/aap_settings/forms.py:191 panel/aap_settings/forms.py:316
+#: panel/aap_settings/forms.py:198 panel/aap_settings/forms.py:326
 msgid "Лимит должен быть не меньше 1 письма в час."
 msgstr "The limit must be at least 1 email per hour."
 
-#: panel/aap_settings/forms.py:194 panel/aap_settings/forms.py:319
+#: panel/aap_settings/forms.py:201 panel/aap_settings/forms.py:329
 msgid "Максимум 300 писем в час."
 msgstr "Maximum 300 emails per hour."
 
-#: panel/aap_settings/forms.py:199 panel/aap_settings/forms.py:247
-#: panel/aap_settings/forms.py:334
+#: panel/aap_settings/forms.py:206 panel/aap_settings/forms.py:254
+#: panel/aap_settings/forms.py:347
 msgid "Некорректное значение шифрования."
 msgstr "Invalid encryption value."
 
-#: panel/aap_settings/forms.py:242
+#: panel/aap_settings/forms.py:249
 msgid "Заполните все поля IMAP."
 msgstr "Fill in all IMAP fields."
 
-#: panel/aap_settings/forms.py:329
+#: panel/aap_settings/forms.py:335
+msgid "Заполните все поля SMTP (RELAY NOAUTH)."
+msgstr "Fill in all SMTP (LOGIN) fields."
+
+#: panel/aap_settings/forms.py:340
 msgid "Заполните все поля SMTP (LOGIN)."
 msgstr "Fill in all SMTP (LOGIN) fields."
 
@@ -352,153 +358,224 @@ msgstr "Holidays"
 msgid "Настройки : Учет переходов URL"
 msgstr "Settings: URL click tracking"
 
-#: panel/menu.py:13 panel/menu.py:14
+#: panel/context_processors.py:72 panel/context_processors.py:79
+#: panel/menu.py:24 panel/menu.py:25 templates/panels/overview.html:124
+msgid "Статистика"
+msgstr "Statistics"
+
+#: panel/context_processors.py:87
+msgid "SERENITY PANEL"
+msgstr "Serenity Panel"
+
+#: panel/menu.py:10 panel/menu.py:11
 msgid "Панель управления"
 msgstr "Dashboard"
 
-#: panel/menu.py:18
+#: panel/menu.py:15
 msgid "Обзор"
 msgstr "Overview"
 
-#: panel/menu.py:19
+#: panel/menu.py:16
 msgid "Обзор : Панель управления"
 msgstr "Overview: Dashboard"
 
-#: panel/menu.py:27
+#: panel/menu.py:32
 msgid "Управление аудиториями"
 msgstr "Audience management"
 
-#: panel/menu.py:31
+#: panel/menu.py:36
 msgid "Создание аудиторий"
 msgstr "Creating audiences"
 
-#: panel/menu.py:32
+#: panel/menu.py:37
 msgid "Аудитории : создание"
 msgstr "Audiences: creation"
 
-#: panel/menu.py:37
+#: panel/menu.py:42
 msgid "Города и категории"
 msgstr "Cities and categories"
 
-#: panel/menu.py:38
+#: panel/menu.py:43
 msgid "Города и бизнес-категории"
 msgstr "Cities and business categories"
 
-#: panel/menu.py:43
+#: panel/menu.py:48
 msgid "Сбор контактов / Рейтинг"
 msgstr "Contact collection / Rating"
 
-#: panel/menu.py:44
+#: panel/menu.py:49
 msgid "Аудитории : Сбор контактов"
 msgstr "Audiences: Contact collection"
 
-#: panel/menu.py:52 templates/panels/aap_lists/contacts.html:172
+#: panel/menu.py:57 templates/panels/aap_lists/contacts.html:172
 msgid "Списки рассылок"
 msgstr "Mailing lists"
 
-#: panel/menu.py:56
+#: panel/menu.py:61
 msgid "Управление списками"
 msgstr "List management"
 
-#: panel/menu.py:57
+#: panel/menu.py:62
 msgid "Контакты : Списки рассылок"
 msgstr "Contacts: Mailing Lists"
 
-#: panel/menu.py:62
+#: panel/menu.py:67
 msgid "Все контакты списков"
 msgstr "All contacts in lists"
 
-#: panel/menu.py:63
+#: panel/menu.py:68
 msgid "Контакты : Все контакты"
 msgstr "Contacts: All contacts"
 
-#: panel/menu.py:71
+#: panel/menu.py:76
 msgid "Кампании и рассылки"
 msgstr "Campaigns and mailings"
 
-#: panel/menu.py:75
+#: panel/menu.py:80
 msgid "Кампании / письма"
 msgstr "Campaigns / emails"
 
-#: panel/menu.py:76
+#: panel/menu.py:81
 msgid "Кампании : рассылки и письма"
 msgstr "Campaigns: mailings and emails"
 
-#: panel/menu.py:81
+#: panel/menu.py:86
 msgid "Шаблоны писем"
 msgstr "Email templates"
 
-#: panel/menu.py:82
+#: panel/menu.py:87
 msgid "Кампании : Шаблоны писем"
 msgstr "Campaigns: Email Templates"
 
-#: panel/menu.py:90
+#: panel/menu.py:95
 msgid "Настройки"
 msgstr "Settings"
 
-#: panel/menu.py:94
+#: panel/menu.py:99
 msgid "'Окна' отправки"
 msgstr "'Windows' of sending"
 
-#: panel/menu.py:95
+#: panel/menu.py:100
 msgid "Настройки : 'Окна' отправки"
 msgstr "Settings: 'Sending Windows'"
 
-#: panel/menu.py:100
+#: panel/menu.py:105
 msgid "Почтовые серверы"
 msgstr "Mail servers"
 
-#: panel/menu.py:101
+#: panel/menu.py:106
 msgid "Настройки : Почтовые серверы"
 msgstr "Settings: Mail Servers"
 
-#: panel/menu.py:106 templates/panels/aap_settings/url_stats.html:14
+#: panel/menu.py:111 templates/panels/aap_settings/url_stats.html:14
 msgid "Учет переходов"
 msgstr "Click tracking"
 
-#: panel/menu.py:107
+#: panel/menu.py:112
 msgid "Настройки : Учет переходов"
 msgstr "Settings: Click tracking"
 
-#: templates/admin/index.html:25
-msgid "Recent actions"
-msgstr "Recent actions"
+#: public/aap_auth/forms.py:40 templates/public/register.html:30
+msgid "Название компании"
+msgstr "Campaign name"
 
-#: templates/admin/index.html:26
-msgid "My actions"
-msgstr "My actions"
+#: public/aap_auth/forms.py:41 templates/public/register.html:35
+msgid "Адрес компании"
+msgstr "Your campaigns:"
 
-#: templates/admin/index.html:30
-msgid "None available"
-msgstr "None available"
+#: public/aap_auth/forms.py:42 templates/public/register.html:42
+msgid "Фамилия"
+msgstr "Last name"
 
-#: templates/admin/index.html:44
-msgid "Unknown content"
-msgstr "Unknown content"
+#: public/aap_auth/forms.py:43 templates/public/register.html:47
+msgid "Имя"
+msgstr "Name"
 
-#: templates/admin/nav_sidebar.html:5
-msgid "Toggle navigation"
-msgstr "Toggle navigation"
+#: public/aap_auth/forms.py:44 templates/public/register.html:52
+msgid "Телефон"
+msgstr "Phone:"
 
-#: templates/admin/nav_sidebar.html:6
-msgid "Sidebar"
-msgstr "Sidebar"
+#: public/aap_auth/forms.py:45 templates/public/register.html:57
+msgid "Должность"
+msgstr "Job title"
 
-#: templates/admin/nav_sidebar.html:8
-msgid "Start typing to filter…"
-msgstr "Start typing to filter…"
+#: public/aap_auth/forms.py:46 public/aap_auth/forms.py:95
+#: templates/public/register.html:64
+msgid "Email / Логин"
+msgstr "Email / Login"
 
-#: templates/admin/nav_sidebar.html:9
-msgid "Filter navigation items"
-msgstr "Filter navigation items"
+#: public/aap_auth/forms.py:47 templates/public/register.html:69
+msgid "Пароль"
+msgstr "Password:"
 
-#: templates/admin/serenity/branches_11880.html:9
-#: templates/admin/serenity/branches_gs.html:8
-#: templates/admin/serenity/branches_sys_edit.html:8
-#: templates/admin/serenity/branches_sys_list.html:8
-#: templates/admin/serenity/branches_sys_new.html:8
-msgid "Home"
-msgstr "Home"
+#: public/aap_auth/forms.py:48 public/aap_auth/forms.py:109
+#: templates/public/password_reset_confirm.html:48
+#: templates/public/register.html:74
+msgid "Подтверждение пароля"
+msgstr "Invalid login or password"
+
+#: public/aap_auth/forms.py:53
+#| msgid "Неверный логин или пароль"
+msgid "Неверный формат телефона"
+msgstr "Invalid login or password"
+
+#: public/aap_auth/forms.py:62
+#| msgid "Шаблон с таким именем уже существует."
+msgid "Пользователь с таким email уже существует"
+msgstr "A template with that name already exists."
+
+#: public/aap_auth/forms.py:74 public/aap_auth/forms.py:78
+#: public/aap_auth/forms.py:118
+#| msgid "Города не обработаны"
+msgid "Пароли не совпадают"
+msgstr "Cities not processed"
+
+#: public/aap_auth/forms.py:106 templates/public/password_reset_confirm.html:4
+#: templates/public/password_reset_confirm.html:9
+#: templates/public/password_reset_confirm.html:43
+msgid "Новый пароль"
+msgstr "Show password?"
+
+#: public/aap_auth/views.py:32
+#| msgid "Домен не протестирован"
+msgid "Логин заблокирован"
+msgstr "Domain not tested"
+
+#: public/aap_auth/views.py:33
+#| msgid "Логин / Имя пользователя"
+msgid "Логин больше не обслуживается"
+msgstr "Login / Username"
+
+#: public/aap_auth/views.py:34 templates/public/login.html:22
+msgid "Неверный логин или пароль"
+msgstr "Invalid login or password"
+
+#: public/aap_auth/views.py:231
+#| msgid "Отправить письмо"
+msgid "Не удалось отправить письмо"
+msgstr "Send Email"
+
+#: public/aap_auth/views.py:239
+msgid "Ссылка подтверждения недействительна или устарела"
+msgstr "The confirmation link is invalid or has expired"
+
+#: public/aap_auth/views.py:268
+#| msgid "Ничего не найдено"
+msgid "Рабочее пространство не найдено"
+msgstr "Workspace not found"
+
+#: public/aap_auth/views.py:291
+#| msgid "Глобальные шаблоны"
+msgid "Данные обновлены"
+msgstr "Global templates"
+
+#: templates/404.html:19
+msgid "Ничего не найдено"
+msgstr "Nothing found"
+
+#: templates/404.html:21
+msgid "На главную"
+msgstr "To the homepage"
 
 #: templates/panels/aap_audience/clar.html:25
 #: templates/panels/aap_audience/clar.html:328
@@ -698,7 +775,8 @@ msgstr "Cities: not processed"
 #: templates/panels/aap_lists/modal_contacts.html:90
 #: templates/panels/aap_lists/modal_lists_list.html:74
 #: templates/panels/aap_settings/mail_servers.html:395
-#: templates/panels/overview.html:49
+#: templates/panels/overview.html:119 templates/panels/overview.html:171
+#: templates/panels/overview.html:220 templates/panels/stats.html:49
 msgid "Здесь пока нет данных"
 msgstr "No data here yet"
 
@@ -716,7 +794,9 @@ msgstr "Clear"
 #: templates/panels/aap_settings/imap_server.html:129
 #: templates/panels/aap_settings/mail_servers.html:174
 #: templates/panels/aap_settings/sending.html:82
-#: templates/panels/aap_settings/smtp_server.html:146
+#: templates/panels/aap_settings/smtp_server.html:145
+#: templates/public/password_reset_confirm.html:54
+#: templates/public/register.html:84
 msgid "Сохранить"
 msgstr "Save"
 
@@ -910,6 +990,7 @@ msgstr "Phone:"
 #: templates/panels/aap_audience/modal_status_task.html:54
 #: templates/panels/aap_lists/modal_contacts.html:65
 #: templates/panels/aap_lists/modal_lists_list.html:49
+#: templates/public/login.html:29
 msgid "Email:"
 msgstr "Email:"
 
@@ -939,6 +1020,7 @@ msgstr "Source:"
 
 #: templates/panels/aap_audience/status.html:23
 #: templates/panels/aap_campaigns/campaigns.html:387
+#: templates/panels/overview.html:37 templates/panels/overview.html:184
 msgid "Статус"
 msgstr "Status"
 
@@ -981,21 +1063,21 @@ msgstr "Contacts: rating assigned"
 #: templates/panels/aap_audience/status.html:137
 #: templates/panels/aap_audience/status_task.html:143
 #: templates/panels/aap_lists/lists.html:90
-#: templates/panels/aap_lists/lists.html:152
+#: templates/panels/aap_lists/lists.html:152 templates/panels/overview.html:202
 msgid "Рейтинг 1-30"
 msgstr "Rating 1-30"
 
 #: templates/panels/aap_audience/status.html:141
 #: templates/panels/aap_audience/status_task.html:148
 #: templates/panels/aap_lists/lists.html:94
-#: templates/panels/aap_lists/lists.html:156
+#: templates/panels/aap_lists/lists.html:156 templates/panels/overview.html:203
 msgid "Рейтинг 31-70"
 msgstr "Rating 31-70"
 
 #: templates/panels/aap_audience/status.html:145
 #: templates/panels/aap_audience/status_task.html:153
 #: templates/panels/aap_lists/lists.html:98
-#: templates/panels/aap_lists/lists.html:160
+#: templates/panels/aap_lists/lists.html:160 templates/panels/overview.html:204
 msgid "Рейтинг 71-100"
 msgstr "Rating 71-100"
 
@@ -1081,7 +1163,8 @@ msgstr "Pages"
 #: templates/panels/aap_lists/lists_list.html:77
 #: templates/panels/aap_lists/lists_list.html:156
 #: templates/panels/aap_lists/modal_contacts.html:37
-#: templates/panels/overview.html:23
+#: templates/panels/modals/switch_user.html:17 templates/panels/stats.html:23
+#: templates/public/register.html:27
 msgid "Компания"
 msgstr "Company"
 
@@ -1097,6 +1180,7 @@ msgid "Ваши кампании:"
 msgstr "Your campaigns:"
 
 #: templates/panels/aap_campaigns/campaigns.html:32
+#: templates/panels/overview.html:230
 msgid "Добавить кампанию"
 msgstr "Add campaign"
 
@@ -1162,7 +1246,8 @@ msgstr "Edit email"
 #: templates/panels/aap_campaigns/templates.html:146
 #: templates/panels/aap_settings/imap_server.html:134
 #: templates/panels/aap_settings/mail_servers.html:177
-#: templates/panels/aap_settings/smtp_server.html:151
+#: templates/panels/aap_settings/smtp_server.html:150
+#: templates/panels/modals/switch_user.html:7
 msgid "Закрыть"
 msgstr "Close"
 
@@ -1206,7 +1291,7 @@ msgid "Тема письма 3 (ротация)"
 msgstr "Email subject 3 (rotation)"
 
 #: templates/panels/aap_campaigns/campaigns.html:358
-#: templates/panels/aap_settings/smtp_server.html:179
+#: templates/panels/aap_settings/smtp_server.html:178
 msgid "Отправить тестовое письмо по адресу:"
 msgstr "Send a test email to:"
 
@@ -1215,7 +1300,8 @@ msgid "Отправить тестовое письмо"
 msgstr "Send test email"
 
 #: templates/panels/aap_campaigns/campaigns.html:385
-#: templates/panels/overview.html:22
+#: templates/panels/overview.html:21 templates/panels/overview.html:129
+#: templates/panels/stats.html:22
 msgid "Кампания"
 msgstr "Campaign"
 
@@ -1244,10 +1330,14 @@ msgid "Писем к отправке"
 msgstr "Emails to send"
 
 #: templates/panels/aap_campaigns/campaigns.html:423
+#: templates/panels/overview.html:58 templates/panels/overview.html:135
+#: templates/panels/stats_campaign.html:20
+#: templates/panels/stats_campaign.html:45
 msgid "Отправлено"
 msgstr "Sent"
 
 #: templates/panels/aap_campaigns/campaigns.html:426
+#: templates/panels/overview.html:59
 msgid "Осталось"
 msgstr "Remaining"
 
@@ -1415,11 +1505,11 @@ msgid "Название"
 msgstr "Name"
 
 #: templates/panels/aap_lists/lists.html:85
-#: templates/panels/aap_lists/lists.html:147
+#: templates/panels/aap_lists/lists.html:147 templates/panels/overview.html:196
 msgid "Отрейтинговано"
 msgstr "Rated"
 
-#: templates/panels/aap_lists/lists.html:116
+#: templates/panels/aap_lists/lists.html:116 templates/panels/overview.html:27
 msgid "Список"
 msgstr "List"
 
@@ -1504,74 +1594,74 @@ msgstr "server (incoming)"
 
 #: templates/panels/aap_settings/imap_server.html:35
 #: templates/panels/aap_settings/imap_server.html:41
-#: templates/panels/aap_settings/smtp_server.html:57
-#: templates/panels/aap_settings/smtp_server.html:63
+#: templates/panels/aap_settings/smtp_server.html:58
+#: templates/panels/aap_settings/smtp_server.html:65
 msgid "ЛОГИН (Стандарт)"
 msgstr "LOGIN (Standard)"
 
 #: templates/panels/aap_settings/imap_server.html:36
-#: templates/panels/aap_settings/smtp_server.html:58
+#: templates/panels/aap_settings/smtp_server.html:60
 msgid "Google OAuth 2.0"
 msgstr "Google OAuth 2.0"
 
 #: templates/panels/aap_settings/imap_server.html:37
-#: templates/panels/aap_settings/smtp_server.html:59
+#: templates/panels/aap_settings/smtp_server.html:61
 msgid "Microsoft OAuth 2.0"
 msgstr "Microsoft OAuth 2.0"
 
 #: templates/panels/aap_settings/imap_server.html:45
-#: templates/panels/aap_settings/smtp_server.html:67
+#: templates/panels/aap_settings/smtp_server.html:69
 msgid "Провайдер"
 msgstr "Provider"
 
 #: templates/panels/aap_settings/imap_server.html:48
-#: templates/panels/aap_settings/smtp_server.html:70
+#: templates/panels/aap_settings/smtp_server.html:72
 msgid "— выберите провайдера —"
 msgstr "— select a provider —"
 
 #: templates/panels/aap_settings/imap_server.html:58
-#: templates/panels/aap_settings/smtp_server.html:80
+#: templates/panels/aap_settings/smtp_server.html:79
 msgid "Шифрование"
 msgstr "Encryption"
 
 #: templates/panels/aap_settings/imap_server.html:64
-#: templates/panels/aap_settings/smtp_server.html:85
+#: templates/panels/aap_settings/smtp_server.html:84
 msgid "Сервер"
 msgstr "Server"
 
 #: templates/panels/aap_settings/imap_server.html:70
-#: templates/panels/aap_settings/smtp_server.html:90
+#: templates/panels/aap_settings/smtp_server.html:89
 msgid "Порт"
 msgstr "Port"
 
 #: templates/panels/aap_settings/imap_server.html:78
-#: templates/panels/aap_settings/smtp_server.html:96
+#: templates/panels/aap_settings/smtp_server.html:95
 msgid "Логин / Имя пользователя"
 msgstr "Login / Username"
 
 #: templates/panels/aap_settings/imap_server.html:84
-#: templates/panels/aap_settings/smtp_server.html:101
+#: templates/panels/aap_settings/smtp_server.html:100
 msgid "Пароль / Токен"
 msgstr "Password / Token"
 
 #: templates/panels/aap_settings/imap_server.html:107
 #: templates/panels/aap_settings/imap_server.html:116
-#: templates/panels/aap_settings/smtp_server.html:123
-#: templates/panels/aap_settings/smtp_server.html:133
+#: templates/panels/aap_settings/smtp_server.html:122
+#: templates/panels/aap_settings/smtp_server.html:132
 msgid "Автоматически пока не реализовано."
 msgstr "Automatic functionality is not implemented yet."
 
 #: templates/panels/aap_settings/imap_server.html:108
 #: templates/panels/aap_settings/imap_server.html:117
-#: templates/panels/aap_settings/smtp_server.html:124
-#: templates/panels/aap_settings/smtp_server.html:134
+#: templates/panels/aap_settings/smtp_server.html:123
+#: templates/panels/aap_settings/smtp_server.html:133
 msgid "Реализация автоматики до 1 апреля 2026 г."
 msgstr "Implementation of automation by April 1, 2026."
 
 #: templates/panels/aap_settings/imap_server.html:109
 #: templates/panels/aap_settings/imap_server.html:118
-#: templates/panels/aap_settings/smtp_server.html:125
-#: templates/panels/aap_settings/smtp_server.html:135
+#: templates/panels/aap_settings/smtp_server.html:124
+#: templates/panels/aap_settings/smtp_server.html:134
 msgid "Обратитесь к менеджеру для подключения вручную."
 msgstr "Contact your manager to connect manually."
 
@@ -1584,7 +1674,7 @@ msgid "Проверить IMAP авторизацию"
 msgstr "Verify IMAP authorization"
 
 #: templates/panels/aap_settings/imap_server.html:160
-#: templates/panels/aap_settings/smtp_server.html:177
+#: templates/panels/aap_settings/smtp_server.html:176
 msgid "Результат проверки"
 msgstr "Verification result"
 
@@ -1600,7 +1690,7 @@ msgstr "Final check"
 #: templates/panels/aap_settings/mail_servers.html:295
 #: templates/panels/aap_settings/mail_servers.html:326
 #: templates/panels/aap_settings/mail_servers.html:367
-#: templates/panels/aap_settings/smtp_server.html:215
+#: templates/panels/aap_settings/smtp_server.html:214
 msgid "Не проверено"
 msgstr "Not verified"
 
@@ -1685,7 +1775,10 @@ msgid "Пароль будет показан на экране."
 msgstr "The password will be shown on the screen."
 
 #: templates/panels/aap_settings/partials/mail_secret_modal.html:19
-#: templates/public/login.html:31
+#: templates/public/login.html:35
+#: templates/public/password_reset_confirm.html:53
+#: templates/public/password_reset_request.html:26
+#: templates/public/register.html:80 templates/public/register.html:82
 msgid "Отмена"
 msgstr "Cancel"
 
@@ -1742,35 +1835,39 @@ msgstr ""
 "Windows are time intervals during which emails will be sent. Outside the "
 "windows, sending does not occur. Time (time zone) - Berlin, Germany"
 
-#: templates/panels/aap_settings/smtp_server.html:34
+#: templates/panels/aap_settings/smtp_server.html:35
 msgid "сервер (отправка)"
 msgstr "server (sending)"
 
-#: templates/panels/aap_settings/smtp_server.html:44
+#: templates/panels/aap_settings/smtp_server.html:45
 msgid "From Email"
 msgstr "From Email"
 
-#: templates/panels/aap_settings/smtp_server.html:50
+#: templates/panels/aap_settings/smtp_server.html:51
 msgid "Лимит / час"
 msgstr "Limit per hour"
 
-#: templates/panels/aap_settings/smtp_server.html:163
+#: templates/panels/aap_settings/smtp_server.html:59
+msgid "RELAY NOAUTH"
+msgstr "RELAY NOAUTH"
+
+#: templates/panels/aap_settings/smtp_server.html:162
 msgid "Добавление SMTP сервера"
 msgstr "Adding an SMTP server"
 
-#: templates/panels/aap_settings/smtp_server.html:171
+#: templates/panels/aap_settings/smtp_server.html:170
 msgid "Проверить SMTP авторизацию"
 msgstr "Check SMTP authentication"
 
-#: templates/panels/aap_settings/smtp_server.html:193
+#: templates/panels/aap_settings/smtp_server.html:192
 msgid "Отправить письмо"
 msgstr "Send Email"
 
-#: templates/panels/aap_settings/smtp_server.html:199
+#: templates/panels/aap_settings/smtp_server.html:198
 msgid "Результат отправки"
 msgstr "Sending result"
 
-#: templates/panels/aap_settings/smtp_server.html:202
+#: templates/panels/aap_settings/smtp_server.html:201
 msgid "Проверки SMTP сервера (отправка)"
 msgstr "SMTP server checks (sending)"
 
@@ -1829,25 +1926,105 @@ msgstr ""
 "The parameter is automatically added to the link to your website in mailing "
 "emails."
 
-#: templates/panels/base.html:133
+#: templates/panels/base.html:86 templates/panels/modals/switch_user.html:6
+#| msgid "Логин / Имя пользователя"
+msgid "Сменить пользователя"
+msgstr "Switch user"
+
+#: templates/panels/base.html:157
 msgid "Выйти"
 msgstr "Log out"
 
-#: templates/panels/overview.html:20
+#: templates/panels/modals/switch_user.html:11
+#| msgid "Результат отправки"
+msgid "Недостаточно прав"
+msgstr "Insufficient permissions"
+
+#: templates/panels/modals/switch_user.html:19
+#| msgid "Фамилия"
+msgid "Имя Фамилия"
+msgstr "First name Last name"
+
+#: templates/panels/modals/switch_user.html:20
+msgid "Роль"
+msgstr "Role"
+
+#: templates/panels/modals/switch_user.html:35 templates/public/login.html:35
+msgid "Войти"
+msgstr "Sign in"
+
+#: templates/panels/modals/switch_user.html:41
+#| msgid "Логин / Имя пользователя"
+msgid "Нет доступных пользователей"
+msgstr "No available users"
+
+#: templates/panels/overview.html:16
+msgid "Кампании"
+msgstr "Campaigns"
+
+#: templates/panels/overview.html:30
+msgid "Даты"
+msgstr "Dates"
+
+#: templates/panels/overview.html:60 templates/panels/overview.html:64
+#: templates/panels/overview.html:142 templates/panels/stats_campaign.html:27
+msgid "Всего"
+msgstr "Total"
+
+#: templates/panels/overview.html:80 templates/panels/overview.html:155
+#: templates/panels/stats_campaign.html:53
+msgid "Сегодня"
+msgstr "Today"
+
+#: templates/panels/overview.html:136 templates/panels/stats_campaign.html:21
+#: templates/panels/stats_campaign.html:46
+msgid "Доставлено"
+msgstr "Sent"
+
+#: templates/panels/overview.html:137 templates/panels/stats_campaign.html:22
+#: templates/panels/stats_campaign.html:47
+msgid "Переходы"
+msgstr "Clicks"
+
+#: templates/panels/overview.html:176
+msgid "Активные аудитории"
+msgstr "Active audiences"
+
+#: templates/panels/overview.html:193
+msgid "Собрано"
+msgstr "Total collected"
+
+#: templates/panels/overview.html:225
+msgid "Ссылки"
+msgstr "Links"
+
+#: templates/panels/overview.html:228
+msgid "Добавить аудиторию"
+msgstr "Add audience"
+
+#: templates/panels/overview.html:229
+msgid "Добавить список рассылки"
+msgstr "Add mailing list"
+
+#: templates/panels/stats.html:20
 msgid "Первое посещение"
 msgstr "First visit"
 
-#: templates/panels/overview.html:21
+#: templates/panels/stats.html:21
 msgid "Переходов"
 msgstr "Clicks"
 
-#: templates/panels/overview.html:24
+#: templates/panels/stats.html:24
 msgid "Действие"
 msgstr "Action"
 
-#: templates/panels/overview.html:38
+#: templates/panels/stats.html:38
 msgid "Показать компанию"
 msgstr "Show company"
+
+#: templates/panels/stats_campaign.html:100
+msgid "Переходов нет"
+msgstr "No clicks"
 
 #: templates/public/base.html:11 templates/public/index.html:6
 msgid "Интеллектуальные email-коммуникации"
@@ -1858,6 +2035,23 @@ msgid ""
 "Интеллектуальная система email-коммуникаций для малого и среднего бизнеса."
 msgstr ""
 "Intelligent email communication system for small and medium-sized businesses."
+
+#: templates/public/confirm_email_done.html:4
+#: templates/public/confirm_email_done.html:9
+msgid "Email подтверждён"
+msgstr "Email confirmed"
+
+#: templates/public/confirm_email_done.html:15
+#| msgid "Введите адрес электронной почты"
+msgid "Ваш адрес электронной почты подтвержден"
+msgstr "Your email address has been confirmed"
+
+#: templates/public/confirm_email_done.html:20 templates/public/login.html:40
+#: templates/public/password_reset_confirm.html:62
+#: templates/public/password_reset_done.html:17
+#: templates/public/register_email_pending.html:46
+msgid "Вернуться к логину"
+msgstr "Back to login"
 
 #: templates/public/index.html:14 templates/public/login.html:13
 msgid "Интеллектуальные"
@@ -1875,7 +2069,15 @@ msgstr "Client login:"
 msgid "Перейти"
 msgstr "Go to"
 
-#: templates/public/index.html:30
+#: templates/public/index.html:23
+msgid "Регистрация:"
+msgstr "Registration:"
+
+#: templates/public/index.html:24 templates/public/register.html:84
+msgid "Зарегистрироваться"
+msgstr "Sign up"
+
+#: templates/public/index.html:35
 msgid ""
 "интеллектуальная система email-коммуникаций для малого и среднего бизнеса, "
 "ориентированная на работу на рынке Германии."
@@ -1883,7 +2085,7 @@ msgstr ""
 "An intelligent email communication system for small and medium-sized "
 "businesses, designed for the German market."
 
-#: templates/public/index.html:34
+#: templates/public/index.html:39
 msgid ""
 "Платформа предназначена для компаний, которые регулярно взаимодействуют с "
 "другими предприятиями в рамках делового сотрудничества — как в продажах, так "
@@ -1893,55 +2095,55 @@ msgstr ""
 "businesses as part of commercial cooperation — both in sales and in "
 "procurement."
 
-#: templates/public/index.html:37
+#: templates/public/index.html:42
 msgid "Функциональные возможности:"
 msgstr "Features:"
 
-#: templates/public/index.html:39
+#: templates/public/index.html:44
 msgid "Интеллектуальный подбор и приоритизация деловых контактов для продаж."
 msgstr ""
 "Intelligent selection and prioritization of business contacts for sales."
 
-#: templates/public/index.html:40
+#: templates/public/index.html:45
 msgid "Интеллектуальный подбор и приоритизация деловых контактов для закупок."
 msgstr ""
 "Intelligent selection and prioritization of business contacts for "
 "procurement."
 
-#: templates/public/index.html:41
+#: templates/public/index.html:46
 msgid "Отправка коммерческих предложений целевым и релевантным получателям."
 msgstr "Sending commercial offers to targeted and relevant recipients."
 
-#: templates/public/index.html:42
+#: templates/public/index.html:47
 msgid "Отправка запросов поставщикам и подрядчикам по заданным критериям."
 msgstr ""
 "Sending requests to suppliers and contractors based on specified criteria."
 
-#: templates/public/index.html:43
+#: templates/public/index.html:48
 msgid "Отслеживание отклика и последующих взаимодействий."
 msgstr "Tracking responses and subsequent interactions."
 
-#: templates/public/index.html:44
+#: templates/public/index.html:49
 msgid "Информационные рассылки для существующих клиентов и партнёров."
 msgstr "Informational mailings for existing clients and partners."
 
-#: templates/public/index.html:56
+#: templates/public/index.html:61
 msgid "Вы получаете"
 msgstr "You are receiving"
 
-#: templates/public/index.html:57
+#: templates/public/index.html:62
 msgid "понятный"
 msgstr "clear"
 
-#: templates/public/index.html:58
+#: templates/public/index.html:63
 msgid "и"
 msgstr "and"
 
-#: templates/public/index.html:59
+#: templates/public/index.html:64
 msgid "управляемый"
 msgstr "managed"
 
-#: templates/public/index.html:60
+#: templates/public/index.html:65
 msgid ""
 "инструмент для автоматизации привлечения клиентов, а также поиска "
 "поставщиков и подрядчиков в B2B-сегменте."
@@ -1949,7 +2151,7 @@ msgstr ""
 "A tool for automating customer acquisition, as well as finding suppliers and "
 "contractors in the B2B segment."
 
-#: templates/public/index.html:64
+#: templates/public/index.html:69
 msgid ""
 "С помощью искусственного интеллекта вы формируете точные критерии того, что "
 "хотите продать или приобрести. AI не принимает решений за вас, а помогает "
@@ -1960,7 +2162,7 @@ msgstr ""
 "helps correctly formulate the request, remove inaccuracies, and simplify the "
 "process."
 
-#: templates/public/index.html:68
+#: templates/public/index.html:73
 msgid ""
 "Вы указываете информацию о своей компании, о товаре или услуге, а также "
 "задаёте географические условия работы на рынке Германии."
@@ -1968,7 +2170,7 @@ msgstr ""
 "You provide information about your company, the product or service, and set "
 "the geographic operating conditions for the German market."
 
-#: templates/public/index.html:72
+#: templates/public/index.html:77
 msgid ""
 "На основе этих данных система анализирует и ранжирует города Германии и "
 "категории компаний, в которых вероятность заключения сделки наиболее высока. "
@@ -1982,15 +2184,15 @@ msgstr ""
 "1,326 German cities with populations of at least 12,000. This data can be "
 "used both for sales and for procurement."
 
-#: templates/public/index.html:84
+#: templates/public/index.html:89
 msgid "На основании сформированной задачи система собирает"
 msgstr "Based on the created task, the system collects"
 
-#: templates/public/index.html:85
+#: templates/public/index.html:90
 msgid "контактные данные"
 msgstr "contact details"
 
-#: templates/public/index.html:86
+#: templates/public/index.html:91
 msgid ""
 "компаний в соответствии с заданными приоритетами. Используются открытые "
 "источники: немецкие «Жёлтые страницы», бизнес-справочник 11880 и другие "
@@ -2002,15 +2204,15 @@ msgstr ""
 "databases. The combined coverage of these sources exceeds 4 million "
 "companies operating in Germany."
 
-#: templates/public/index.html:90
+#: templates/public/index.html:95
 msgid "Далее каждая компания оценивается индивидуально с применением"
 msgstr "Next, each company is evaluated individually using"
 
-#: templates/public/index.html:91
+#: templates/public/index.html:96
 msgid "AI"
 msgstr "AI"
 
-#: templates/public/index.html:92
+#: templates/public/index.html:97
 msgid ""
 "Анализируется вероятность успешного заключения сделки и ожидаемая скорость "
 "её достижения. Проводится многофакторная оценка и отбор, в результате чего "
@@ -2021,7 +2223,7 @@ msgstr ""
 "resulting in a target audience being formed for a specific business offer or "
 "inquiry."
 
-#: templates/public/index.html:96
+#: templates/public/index.html:101
 msgid ""
 "Все этапы работы системы прозрачны: вы можете корректировать как исходную "
 "задачу, так и промежуточные результаты."
@@ -2029,15 +2231,15 @@ msgstr ""
 "All stages of the system's operation are transparent: you can modify both "
 "the original task and the intermediate results."
 
-#: templates/public/index.html:108
+#: templates/public/index.html:113
 msgid "После отбора формируется"
 msgstr "After selection, it is generated."
 
-#: templates/public/index.html:109
+#: templates/public/index.html:114
 msgid "готовая аудитория"
 msgstr "ready-made audience"
 
-#: templates/public/index.html:110
+#: templates/public/index.html:115
 msgid ""
 "— список адресатов для деловой email-коммуникации. С помощью AI и "
 "подготовленных шаблонов вы формируете коммерческое предложение или деловой "
@@ -2047,15 +2249,15 @@ msgstr ""
 "prepared templates, you create a commercial proposal or a business inquiry "
 "adapted to the selected audience."
 
-#: templates/public/index.html:114
+#: templates/public/index.html:119
 msgid "Рассылка выполняется исключительно от вашего имени и с использованием"
 msgstr "The mailing is carried out exclusively on your behalf and using"
 
-#: templates/public/index.html:115
+#: templates/public/index.html:120
 msgid "корпоративного адреса"
 msgstr "corporate email address"
 
-#: templates/public/index.html:116
+#: templates/public/index.html:121
 msgid ""
 "электронной почты. Благодаря предварительной фильтрации и приоритизации "
 "контактов объём рассылки ограничивается 50–100 письмами в час (в зависимости "
@@ -2065,7 +2267,7 @@ msgstr ""
 "volume is limited to 50–100 emails per hour (depending on the mail provider "
 "used)."
 
-#: templates/public/index.html:120
+#: templates/public/index.html:125
 msgid ""
 "Такой формат коммуникации основан на законном деловом интересе (berechtigtes "
 "Interesse) и соответствует требованиям UWG и DSGVO."
@@ -2074,15 +2276,15 @@ msgstr ""
 "(berechtigtes Interesse) and complies with the requirements of the UWG and "
 "the DSGVO."
 
-#: templates/public/index.html:132
+#: templates/public/index.html:137
 msgid "В процессе рассылки система фиксирует"
 msgstr "During the mailing process, the system logs"
 
-#: templates/public/index.html:133
+#: templates/public/index.html:138
 msgid "реакцию адресатов"
 msgstr "recipients' reactions"
 
-#: templates/public/index.html:134
+#: templates/public/index.html:139
 msgid ""
 "на ваше сообщение. В режиме реального времени отображается, какие компании "
 "перешли на ваш сайт по ссылкам из отправленных писем. Для каждого такого "
@@ -2093,7 +2295,7 @@ msgstr ""
 "website via links in the sent emails. For each such visit, company "
 "information related to the specific sent message is available."
 
-#: templates/public/index.html:138
+#: templates/public/index.html:143
 msgid ""
 "Также автоматически учитываются ответы на письма, жалобы на рассылку и "
 "другие реакции. На основе этих данных формируется статистика и уточняются "
@@ -2104,15 +2306,15 @@ msgstr ""
 "compiled and prioritization algorithms are refined for subsequent "
 "communications."
 
-#: templates/public/index.html:142
+#: templates/public/index.html:147
 msgid "Мы — предприниматели с"
 msgstr "We are entrepreneurs with"
 
-#: templates/public/index.html:143
+#: templates/public/index.html:148
 msgid "практическим опытом"
 msgstr "practical experience"
 
-#: templates/public/index.html:144
+#: templates/public/index.html:149
 msgid ""
 "ведения бизнеса. Эта система была создана для решения собственных задач, "
 "поскольку на рынке не существовало решения с сопоставимой логикой и уровнем "
@@ -2131,21 +2333,124 @@ msgstr ""
 msgid "Вход"
 msgstr "Sign in"
 
-#: templates/public/login.html:19
-msgid "Неверный логин или пароль"
-msgstr "Invalid login or password"
-
-#: templates/public/login.html:25
-msgid "Имя пользователя:"
-msgstr "Username:"
-
-#: templates/public/login.html:28
+#: templates/public/login.html:32
 msgid "Пароль:"
 msgstr "Password:"
 
-#: templates/public/login.html:31
-msgid "Войти"
-msgstr "Sign in"
+#: templates/public/login.html:36
+msgid "Забыли пароль?"
+msgstr "Show password?"
+
+#: templates/public/password_reset_confirm.html:21
+msgid "Ссылка для смены пароля недействительна или устарела."
+msgstr "The password reset link is invalid or has expired."
+
+#: templates/public/password_reset_confirm.html:25
+#| msgid "Пароль будет показан на экране."
+msgid "Пароль успешно изменен."
+msgstr "Password changed successfully."
+
+#: templates/public/password_reset_done.html:4
+#: templates/public/password_reset_done.html:9
+#: templates/public/password_reset_request.html:4
+#: templates/public/password_reset_request.html:9
+msgid "Сброс пароля"
+msgstr "Show password?"
+
+#: templates/public/password_reset_done.html:12
+msgid "Если такой адрес есть, на него отправлена ссылка для смены пароля."
+msgstr "If that address exists, a password reset link has been sent to it."
+
+#: templates/public/password_reset_request.html:16
+msgid "Введите корректный email"
+msgstr "Enter a valid email."
+
+#: templates/public/password_reset_request.html:21
+msgid "Введите адрес электронной почты"
+msgstr "Enter your email address"
+
+#: templates/public/password_reset_request.html:27
+msgid "Отправить"
+msgstr "Sender"
+
+#: templates/public/register.html:4 templates/public/register.html:10
+msgid "Регистрация"
+msgstr "Email subject 1 (rotation)"
+
+#: templates/public/register.html:10
+#: templates/public/register_email_pending.html:41
+msgid "Изменить данные"
+msgstr "Edit email"
+
+#: templates/public/register.html:18
+msgid "Проверьте заполнение формы"
+msgstr "Invalid form values"
+
+#: templates/public/register.html:39
+msgid "Пользователь"
+msgstr "Username:"
+
+#: templates/public/register.html:61
+msgid "Логин информация"
+msgstr "Login information"
+
+#: templates/public/register_email_pending.html:4
+#: templates/public/register_email_pending.html:9
+msgid "Подтверждение email"
+msgstr "Email confirmation"
+
+#: templates/public/register_email_pending.html:13
+msgid "Спасибо за регистрацию в системе Serenity Mailer."
+msgstr "Thank you for registering with Serenity Mailer."
+
+#: templates/public/register_email_pending.html:14
+msgid "Для начала работы необходимо подтвердить Ваш электронный адрес."
+msgstr "To get started, you must confirm your email address."
+
+#: templates/public/register_email_pending.html:15
+#, python-format
+msgid ""
+"Подтвердите адрес электронной почты %(email)s как Ваш идентификатор и логин "
+"в систему."
+msgstr "Confirm the email address %(email)s as your identifier and login to the system."
+
+#: templates/public/register_email_pending.html:30
+#, python-format
+msgid ""
+"Ссылка для подтверждения адреса электронной почты отправлена вам по адресу "
+"%(email)s"
+msgstr "A link to confirm your email address has been sent to %(email)s."
+
+#: templates/public/register_email_pending.html:36
+msgid "Подтвердить email"
+msgstr "Confirm email"
+
+#~ msgid "Recent actions"
+#~ msgstr "Recent actions"
+
+#~ msgid "My actions"
+#~ msgstr "My actions"
+
+#~ msgid "None available"
+#~ msgstr "None available"
+
+#~ msgid "Unknown content"
+#~ msgstr "Unknown content"
+
+#~ msgid "Toggle navigation"
+#~ msgstr "Toggle navigation"
+
+#~ msgid "Sidebar"
+#~ msgstr "Sidebar"
+
+#~ msgid "Start typing to filter…"
+#~ msgstr "Start typing to filter…"
+
+#~ msgid "Filter navigation items"
+#~ msgstr "Filter navigation items"
+
+#~ msgid "Home"
+#~ msgstr "Home"
 
 #~ msgid "Необходимо приобрести: "
 #~ msgstr "You need to purchase:"

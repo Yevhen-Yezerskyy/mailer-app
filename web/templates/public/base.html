@@ -27,6 +27,29 @@
 
   <link rel="icon" href="{% static 'img/favicon.ico' %}" />
   <link rel="stylesheet" href="{% static 'css/public.css' %}" />
+  <style>
+    .lang button.lang__item {
+      background: transparent;
+      border: 0;
+      padding: 0;
+      margin: 0;
+      color: inherit;
+      font: inherit;
+      line-height: 1;
+      cursor: pointer;
+      text-decoration: none;
+      vertical-align: baseline;
+      display: inline;
+    }
+    .lang .lang__item--active {
+      background: #006991;
+      color: #fff;
+      padding: 0 6px;
+      border-radius: 2px;
+      display: inline-block;
+      line-height: 1;
+    }
+  </style>
   <script>
 (function () {
   var v = (new URLSearchParams(window.location.search)).get('smrel');
@@ -42,15 +65,23 @@
   <div class="page">
 
     <div class="box header">
-      <nav class="lang" aria-label="Language switch">
-        <a class="lang__item" href="/de/">DEU</a>
-        <span class="lang__sep">|</span>
-        <a class="lang__item" href="/uk/">UKR</a>
-        <span class="lang__sep">|</span>
-        <a class="lang__item" href="/ru/">RUS</a>
-        <span class="lang__sep">|</span>
-        <a class="lang__item" href="/en/">ENG</a>        
-      </nav>
+      <form method="post" action="{% url 'set_language' %}" class="lang" aria-label="Language switch">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        {% for lang in language_switcher %}
+          {% if lang.active %}
+            <span class="lang__item lang__item--active">{{ lang.label }}</span>
+          {% else %}
+            <button
+              type="submit"
+              name="language"
+              value="{{ lang.code }}"
+              class="lang__item"
+            >{{ lang.label }}</button>
+          {% endif %}
+          {% if not forloop.last %}<span class="lang__sep">|</span>{% endif %}
+        {% endfor %}
+      </form>
 
       <img
         class="header__logo"

@@ -1,0 +1,112 @@
+<!-- FILE: web/templates/panels/stats_campaign.html -->
+<!-- DATE: 2026-03-08 -->
+<!-- PURPOSE: Статистика по одной кампании с дневными блоками и таблицами переходов. -->
+
+{% extends "panels/base.html" %}
+{% load i18n audience_extras %}
+
+{% block content %}
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <div class="YY-CARD_WHITE mb-10">
+        <div class="YY-STATUS_BLUE mb-3"><strong>{{ stats_title }}</strong></div>
+
+        <div class="mb-3 px-1 py-1">
+          <div class="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1">
+            <div class="mt-8">&nbsp;</div>
+            <div class="mt-8">
+              <div class="grid grid-cols-4 gap-2">
+                <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Отправлено" %}</div>
+                <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Доставлено" %}</div>
+                <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Переходы" %}</div>
+                <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">%</div>
+              </div>
+            </div>
+
+            <div><strong>{% trans "Всего" %}:</strong></div>
+            <div>
+              <div class="grid grid-cols-4 gap-2">
+                <div class="YY-STATUS_BLUE !py-1 !px-1 text-center">{{ stats_total.sent|group_int:lang_code }}</div>
+                <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">{{ stats_total.delivered|group_int:lang_code }}</div>
+                <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">{{ stats_total.views|group_int:lang_code }}</div>
+                <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{{ stats_total.pct }}%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {% for d in day_sections %}
+          <div class="mb-4 px-1 py-1">
+            <div class="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1">
+              <div class="mt-8">&nbsp;</div>
+              <div class="mt-8">
+                <div class="grid grid-cols-4 gap-2">
+                  <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Отправлено" %}</div>
+                  <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Доставлено" %}</div>
+                  <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Переходы" %}</div>
+                  <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">%</div>
+                </div>
+              </div>
+
+              <div>
+                <strong>{% if d.is_today %}{% trans "Сегодня" %}{% else %}{{ d.day|date:"d.m.Y" }}{% endif %}:</strong>
+              </div>
+              <div>
+                <div class="grid grid-cols-4 gap-2">
+                  <div class="YY-STATUS_BLUE !py-1 !px-1 text-center">{{ d.sent|group_int:lang_code }}</div>
+                  <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">{{ d.delivered|group_int:lang_code }}</div>
+                  <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">{{ d.views|group_int:lang_code }}</div>
+                  <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{{ d.pct }}%</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3 border-t-2 border-b-2 border-[#71d0f4]">
+              <table class="w-full text-left table-fixed">
+                <colgroup>
+                  <col class="w-[72px]">
+                  <col class="w-[170px]">
+                  <col>
+                  <col>
+                </colgroup>
+                <tbody>
+                  {% if d.visitors %}
+                    {% for it in d.visitors %}
+                      <tr class="YY-TB_TR align-top">
+                        <td class="YY-TB_TD text-center">
+                          {{ it.visits|group_int:lang_code }}
+                        </td>
+                        <td class="YY-TB_TD whitespace-nowrap">
+                          {{ it.first_time|date:"d.m.Y H:i:s" }}
+                        </td>
+                        <td class="YY-TB_TD">
+                          {% if it.ui_id %}
+                            <a href="#" class="underline" data-yy-modal="url=/panel/lists/contacts/modal/?id={{ it.ui_id }}">
+                              {{ it.company_name }}
+                            </a>
+                          {% else %}
+                            {{ it.company_name }}
+                          {% endif %}
+                          {% if it.address %}
+                            <div class="YY-TEXT !mb-0">{{ it.address }}</div>
+                          {% endif %}
+                        </td>
+                        <td class="YY-TB_TD">{{ it.branches|default:"-" }}</td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr class="YY-TB_TR">
+                      <td class="YY-TB_TD" colspan="4">{% trans "Переходов нет" %}</td>
+                    </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </td>
+  </tr>
+</table>
+{% endblock %}

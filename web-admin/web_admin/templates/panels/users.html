@@ -23,6 +23,7 @@
               <th class="YY-TH_TH">Компания</th>
               <th class="YY-TH_TH">Роль</th>
               <th class="YY-TH_TH">Email</th>
+              <th class="YY-TH_TH">Мыло подтверждено</th>
               <th class="YY-TH_TH">Телефон</th>
               <th class="YY-TH_TH"></th>
             </tr>
@@ -36,6 +37,7 @@
               <td class="YY-TB_TD">{% if it.workspace %}{{ it.workspace.company_name|default:it.workspace.id }}{% else %}—{% endif %}</td>
               <td class="YY-TB_TD">{{ it.role }}</td>
               <td class="YY-TB_TD">{{ it.email|default:"—" }}</td>
+              <td class="YY-TB_TD">{% if it.email_confirmed %}Да{% else %}Нет{% endif %}</td>
               <td class="YY-TB_TD">{{ it.phone|default:"—" }}</td>
               <td class="YY-TB_TD">
                 <a class="YY-BUTTON_MAIN" href="{% url 'user_edit' it.id %}">Изменить</a>
@@ -43,7 +45,7 @@
             </tr>
             {% empty %}
             <tr class="YY-TB_TR">
-              <td class="YY-TB_TD" colspan="8">Нет пользователей.</td>
+              <td class="YY-TB_TD" colspan="9">Нет пользователей.</td>
             </tr>
             {% endfor %}
           </tbody>

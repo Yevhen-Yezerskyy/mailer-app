@@ -6,6 +6,7 @@
 
   <div class="space-y-2">
     <div><b>Email:</b> {{ obj.email|default:"—" }}</div>
+    <div><b>Мыло подтверждено:</b> {% if obj.email_confirmed %}Да{% else %}Нет{% endif %}</div>
     <div><b>Имя:</b> {{ obj.first_name|default:"—" }}</div>
     <div><b>Фамилия:</b> {{ obj.last_name|default:"—" }}</div>
     <div><b>Роль:</b> {{ obj.role|default:"—" }}</div>

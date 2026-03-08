@@ -1,9 +1,6 @@
 # FILE: web/panel/menu.py
-# PATH: web/panel/menu.py
-# DATE: 2026-01-31
-# SUMMARY:
-# - Вернул пункт "Почтовые серверы" в "Настройки"
-# - Оставил пункт "Учет переходов"
+# DATE: 2026-03-08
+# PURPOSE: panel sidebar sections/items.
 
 from django.utils.translation import gettext_lazy as _
 
@@ -21,6 +18,14 @@ PANEL_MENU = [
                 "active_prefixes": ["/panel/overview/"],
             },
         ],
+    },
+    {
+        # STATS
+        "title": _("Статистика"),
+        "page_title": _("Статистика"),
+        "open_prefixes": ["/panel/stats/"],
+        "items": [],
+        "dynamic_stats_campaigns": True,
     },
     {
         # AUDIENCE

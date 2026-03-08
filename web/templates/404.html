@@ -1,0 +1,26 @@
+<!-- FILE: web/templates/404.html -->
+<!-- DATE: 2026-03-07 -->
+<!-- PURPOSE: custom 404 page for main (non-admin) Django app. -->
+{% load i18n %}
+{% load static %}
+<!doctype html>
+<html lang="{{ request.LANGUAGE_CODE|default:'de' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>404 - Serenity</title>
+  <link rel="icon" href="{% static 'img/favicon.ico' %}">
+  <link rel="stylesheet" href="{% static 'css/public.css' %}">
+</head>
+<body>
+  <div class="page">
+    <div class="box" style="flex-direction: column; text-align: center; gap: 16px;">
+      <h1>404</h1>
+      <p>{% trans "Ничего не найдено" %}</p>
+      <p>
+        <a href="/" class="btn">{% trans "На главную" %}</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>

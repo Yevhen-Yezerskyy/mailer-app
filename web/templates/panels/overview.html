@@ -1,9 +1,9 @@
 <!-- FILE: web/templates/panels/overview.html -->
-<!-- DATE: 2026-02-06 -->
-<!-- PURPOSE: Таблица кликов: DISTINCT по aggr_id, count и время первого посещения. -->
+<!-- DATE: 2026-03-08 -->
+<!-- PURPOSE: Обзор: дашборд-карточки 2x2. -->
 
 {% extends "panels/base.html" %}
-{% load i18n %}
+{% load i18n audience_extras %}
 
 {% block content %}
 
@@ -11,44 +11,226 @@
   <tr>
     <td class="YY-MAIN_BOTTOM_TD">
 
-      {% if stats %}
-        <div class="YY-MAIN_BOTTOM_DIV">
+      <div class="grid grid-cols-2 gap-4 mb-10">
+        <div class="YY-CARD_WHITE">
+          <div class="YY-STATUS_BLUE mb-3">{% trans "Кампании" %}</div>
+          {% if card_campaigns %}
+            {% for it in card_campaigns %}
+              <div class="YY-MAIN_BOTTOM_DIV mb-3 px-4 py-3">
+                <div class="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1">
+                  <div class="my-1">{% trans "Кампания" %}:</div>
+                  <div class="my-1"><strong>{{ it.title }}</strong></div>
 
-          <table class="w-full text-left">
-            <thead>
-              <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[220px]">{% trans "Первое посещение" %}</th>
-                <th class="YY-TH_TH w-[120px]">{% trans "Переходов" %}</th>
-                <th class="YY-TH_TH w-[35%]">{% trans "Кампания" %}</th>
-                <th class="YY-TH_TH">{% trans "Компания" %}</th>
-                <th class="YY-TH_TH w-[200px]">{% trans "Действие" %}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for it in stats %}
-                <tr class="YY-TB_TR align-top">
-                  <td class="YY-TB_TD">{{ it.first_time|date:"d.m.Y H:i:s" }}</td>
-                  <td class="YY-TB_TD">{{ it.visits }}</td>
-                  <td class="YY-TB_TD">{{ it.campaign_title }}</td>
-                  <td class="YY-TB_TD">{{ it.company_name }}</td>
-                  <td class="YY-TB_TD">
-                    <a href="#"
-                      class="YY-BUTTON_TAB_MAIN w-full inline-block text-center"
-                      data-yy-modal="url=/panel/lists/contacts/modal/?id={{ it.ui_id }}">
-                      {% trans "Показать компанию" %}
-                    </a>
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+                  <div class="my-1">{% trans "Аудитория" %}:</div>
+                  <div class="my-1">{{ it.audience }}</div>
 
+                  <div class="my-1">{% trans "Список" %}:</div>
+                  <div class="my-1">{{ it.mailing_list }}</div>
+
+                  <div class="my-1">{% trans "Даты" %}:</div>
+                  <div class="my-1">
+                    {% if it.start_at %}{{ it.start_at|date:"d.m.Y" }}{% else %}-{% endif %}
+                    -
+                    {% if it.end_at %}{{ it.end_at|date:"d.m.Y" }}{% else %}-{% endif %}
+                  </div>
+
+                  <div class="my-1">{% trans "Статус" %}:</div>
+                  <div class="my-1">
+                    <div class="grid grid-cols-2 gap-2">
+                      {% if it.campaign_status == "Кампания включена" %}
+                        <div class="YY-STATUS_GREEN !py-1 w-full text-center whitespace-nowrap">{{ it.campaign_status }}</div>
+                      {% else %}
+                        <div class="YY-STATUS_GRAY !py-1 w-full text-center whitespace-nowrap">{{ it.campaign_status }}</div>
+                      {% endif %}
+                      {% if it.work_status == "Идет рассылка" %}
+                        <div class="YY-STATUS_GREEN !py-1 w-full text-center whitespace-nowrap">{{ it.work_status }}</div>
+                      {% elif it.work_status == "Ждем окно отправки" %}
+                        <div class="YY-STATUS_YELLOW !py-1 w-full text-center whitespace-nowrap">{{ it.work_status }}</div>
+                      {% else %}
+                        <div class="YY-STATUS_GRAY !py-1 w-full text-center whitespace-nowrap">{{ it.work_status }}</div>
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="mt-4 !py-1">&nbsp;</div>
+                  <div class="mt-4 !py-1">
+                    <div class="grid grid-cols-3 gap-2">
+                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Отправлено" %}</div>
+                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Осталось" %}</div>
+                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Всего" %}</div>
+                    </div>
+                  </div>
+
+                  <div class="mb-4">{% trans "Всего" %}:</div>
+                  <div class="mb-4">
+                    <div class="grid grid-cols-3 gap-2">
+                      <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">
+                        {{ it.sent|group_int:lang_code }} <span class="font-normal">({{ it.sent_pct }}%)</span>
+                      </div>
+                      <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">
+                        {{ it.left|group_int:lang_code }} <span class="font-normal">({{ it.left_pct }}%)</span>
+                      </div>
+                      <div class="YY-STATUS_BLUE !py-1 !px-1 text-center">
+                        {{ it.total|group_int:lang_code }} <span class="font-normal">({{ it.total_pct }}%)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {% if it.is_active and it.left > 0 %}
+                    <div>{% trans "Сегодня" %}:</div>
+                    <div>
+                      <div class="grid grid-cols-3 gap-2">
+                        <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">
+                          {{ it.today_sent|group_int:lang_code }} <span class="font-normal">({{ it.today_sent_pct }}%)</span>
+                        </div>
+                        <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">
+                          {{ it.today_left|group_int:lang_code }} <span class="font-normal">({{ it.today_left_pct }}%)</span>
+                        </div>
+                        <div class="YY-STATUS_BLUE !py-1 !px-1 text-center">
+                          {{ it.today_total|group_int:lang_code }} <span class="font-normal">({% if it.today_total %}100{% else %}0{% endif %}%)</span>
+                        </div>
+                      </div>
+                    </div>
+                  {% endif %}
+
+                  {% if it.is_active and it.left > 0 %}
+                    {% for row in it.future_rows %}
+                      <div>{{ row.day|date:"d.m.Y" }}:</div>
+                      <div>
+                        <div class="grid grid-cols-3 gap-2">
+                          <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">
+                            -
+                          </div>
+                          <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">
+                            {{ row.left|group_int:lang_code }}
+                          </div>
+                          <div class="YY-STATUS_BLUE !py-1 !px-1 text-center">
+                            {{ row.total|group_int:lang_code }}
+                          </div>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="YY-STATUS_GRAY">{% trans "Здесь пока нет данных" %}</div>
+          {% endif %}
         </div>
-      {% else %}
-        <div class="YY-CARD_WHITE mb-10">
-          {% trans "Здесь пока нет данных" %}
+
+        <div class="YY-CARD_WHITE">
+          <div class="YY-STATUS_BLUE mb-3">{% trans "Статистика" %}</div>
+          {% if card_stats %}
+            {% for it in card_stats %}
+              <div class="YY-MAIN_BOTTOM_DIV mb-3 px-4 py-3">
+                <div class="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1">
+                  <div>{% trans "Кампания" %}:</div>
+                  <div><strong>{{ it.title }}</strong></div>
+
+                  <div class="mt-4 !py-1">&nbsp;</div>
+                  <div class="mt-4 !py-1">
+                    <div class="grid grid-cols-4 gap-2">
+                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Отправлено" %}</div>
+                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Доставлено" %}</div>
+                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Переходы" %}</div>
+                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">%</div>
+                    </div>
+                  </div>
+
+                  <div class="mb-4">{% trans "Всего" %}:</div>
+                  <div class="mb-4">
+                    <div class="grid grid-cols-4 gap-2">
+                      <div class="YY-STATUS_BLUE !py-1 !px-1 text-center">{{ it.sent|group_int:lang_code }}</div>
+                      <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">{{ it.delivered|group_int:lang_code }}</div>
+                      <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">{{ it.views|group_int:lang_code }}</div>
+                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{{ it.pct }}%</div>
+                    </div>
+                  </div>
+
+                  {% if it.has_recent_sent %}
+                    {% for d in it.days %}
+                      <div>
+                        {% if d.is_today %}{% trans "Сегодня" %}{% else %}{{ d.day|date:"d.m.Y" }}{% endif %}:
+                      </div>
+                      <div>
+                        <div class="grid grid-cols-4 gap-2">
+                          <div class="YY-STATUS_BLUE !py-1 !px-1 text-center">{{ d.sent|group_int:lang_code }}</div>
+                          <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">{{ d.delivered|group_int:lang_code }}</div>
+                          <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">{{ d.views|group_int:lang_code }}</div>
+                          <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{{ d.pct }}%</div>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="YY-STATUS_GRAY">{% trans "Здесь пока нет данных" %}</div>
+          {% endif %}
         </div>
-      {% endif %}
+
+        <div class="YY-CARD_WHITE">
+          <div class="YY-STATUS_BLUE mb-3">{% trans "Активные аудитории" %}</div>
+          {% if card_audiences %}
+            {% for it in card_audiences %}
+              <div class="YY-MAIN_BOTTOM_DIV mb-3 px-4 py-3">
+                <div class="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1">
+                  <div class="my-1">{% trans "Аудитория" %}:</div>
+                  <div class="my-1"><strong>{{ it.title }}</strong></div>
+
+                  <div class="my-1">{% trans "Статус" %}:</div>
+                  <div class="my-1">
+                    {% if it.status_on %}
+                      <span class="YY-STATUS_GREEN !py-1 !px-2">{{ it.status }}</span>
+                    {% else %}
+                      <span class="YY-STATUS_GRAY !py-1 !px-2">{{ it.status }}</span>
+                    {% endif %}
+                  </div>
+
+                  <div class="my-1">{% trans "Собрано" %}:</div>
+                  <div class="my-1"><span class="YY-STATUS_GRAY !py-1 !px-2">{{ it.total|group_int:lang_code }}</span></div>
+
+                  <div class="my-1 mb-3">{% trans "Отрейтинговано" %}:</div>
+                  <div class="my-1 mb-3"><span class="YY-STATUS_BLUE !py-1 !px-2">{{ it.rated|group_int:lang_code }}</span></div>
+
+                  <div class="!py-1">&nbsp;</div>
+                  <div class="!py-1">
+                    <div class="grid grid-cols-3 gap-2">
+                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Рейтинг 1-30" %}</div>
+                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Рейтинг 31-70" %}</div>
+                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Рейтинг 71-100" %}</div>
+                    </div>
+                  </div>
+
+                  <div>&nbsp;</div>
+                  <div>
+                    <div class="grid grid-cols-3 gap-2">
+                      <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">{{ it.b1|group_int:lang_code }}</div>
+                      <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">{{ it.b2|group_int:lang_code }}</div>
+                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{{ it.b3|group_int:lang_code }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="YY-STATUS_GRAY">{% trans "Здесь пока нет данных" %}</div>
+          {% endif %}
+        </div>
+
+        <div class="YY-CARD_WHITE">
+          <div class="YY-STATUS_BLUE mb-3">{% trans "Ссылки" %}</div>
+
+          <div class="grid grid-cols-1 gap-2">
+            <a href="{% url 'audience:index' %}" class="YY-BUTTON_TAB_MAIN">{% trans "Добавить аудиторию" %}</a>
+            <a href="{% url 'lists:lists' %}" class="YY-BUTTON_TAB_MAIN">{% trans "Добавить список рассылки" %}</a>
+            <a href="{% url 'campaigns:campaigns' %}" class="YY-BUTTON_TAB_MAIN">{% trans "Добавить кампанию" %}</a>
+          </div>
+        </div>
+      </div>
 
     </td>
   </tr>

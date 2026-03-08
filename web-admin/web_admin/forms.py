@@ -64,6 +64,7 @@ class ClientUserForm(forms.ModelForm):
             "last_name",
             "position",
             "email",
+            "email_confirmed",
             "phone",
             "role",
         ]
@@ -73,6 +74,7 @@ class ClientUserForm(forms.ModelForm):
             "last_name": "Фамилия",
             "position": "Должность",
             "email": "Мыло / логин",
+            "email_confirmed": "Мыло подтверждено",
             "phone": "Телефон",
             "role": "Роль",
         }

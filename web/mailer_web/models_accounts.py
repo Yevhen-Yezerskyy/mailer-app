@@ -8,15 +8,21 @@ WORKSPACE_ACCESS_TYPES = {
     "full": "Full access",
     "test": "Test mode",
     "stat_only": "Stats only",
+    "closed": "Closed",
     "super": "Super",
 }
-WORKSPACE_ACCESS_TYPE_DEFAULT = "full"
+WORKSPACE_ACCESS_TYPE_DEFAULT = "test"
 
 CLIENT_USER_ROLES = {
     "main": "Main",
     "viewer": "Viewer",
 }
 CLIENT_USER_ROLE_DEFAULT = "main"
+
+USER_ACTION_TYPES = {
+    "email_confirm": "Email confirm",
+    "password_reset": "Password reset",
+}
 
 
 class ClientUserManager(BaseUserManager):
@@ -79,6 +85,7 @@ class ClientUser(AbstractBaseUser):
     position = models.CharField(max_length=255, blank=True, default="")
     email = models.EmailField(unique=True)
     phone = models.CharField(max_length=64, blank=True, default="")
+    email_confirmed = models.BooleanField(default=False, db_index=True)
     role = models.CharField(
         max_length=32,
         choices=[(k, k) for k in CLIENT_USER_ROLES.keys()],
@@ -112,3 +119,28 @@ class ClientUser(AbstractBaseUser):
 
     def __str__(self) -> str:
         return self.email
+
+
+class UserActionToken(models.Model):
+    user = models.ForeignKey(
+        "mailer_web.ClientUser",
+        on_delete=models.CASCADE,
+        related_name="action_tokens",
+    )
+    action = models.CharField(
+        max_length=32,
+        choices=[(k, k) for k in USER_ACTION_TYPES.keys()],
+        db_index=True,
+    )
+    token = models.CharField(max_length=128, unique=True)
+    expires_at = models.DateTimeField(db_index=True)
+    used_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    meta = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "accounts_user_action_token"
+        indexes = [
+            models.Index(fields=["user", "action", "created_at"]),
+            models.Index(fields=["action", "used_at", "expires_at"]),
+        ]

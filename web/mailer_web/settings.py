@@ -68,6 +68,8 @@ MIDDLEWARE = [
     "django.middleware.locale.LocaleMiddleware",
     # ТВОЯ логика выбора языка (cookie / geo / url)
     "mailer_web.middleware_public_lang.PublicLangMiddleware",
+    # Всегда рендерим project 404.html даже при DEBUG=True
+    "mailer_web.middleware_not_found.ForceCustom404Middleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -94,6 +96,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "public.context_processors.language_switcher",
                 "panel.context_processors.panel_context",
             ],
         },

@@ -69,6 +69,7 @@
 
 {% block extra_js %}
   {{ block.super }}
+  <script src="/static/js/campaign_templates/modal_preview.js"></script>
   <script>
     function yyLetterPreview(id, lang) {
       if (!window.YYModal || typeof window.YYModal.open !== "function") return;

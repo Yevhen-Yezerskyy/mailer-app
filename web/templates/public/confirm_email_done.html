@@ -1,0 +1,24 @@
+{% extends "public/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Email подтверждён" %} — Serenity{% endblock %}
+
+{% block content %}
+<!-- FILE: web/templates/public/confirm_email_done.html -->
+<div class="box" style="flex-direction: column;">
+  <h2>{% trans "Email подтверждён" %}</h2>
+
+  <div style="margin-top:22px;color:#006991;line-height:1.6;width:100%;max-width:560px;">
+    <p style="margin:0 0 8px 0;">{{ company_name }}</p>
+    <p style="margin:0 0 8px 0;">{{ full_name }}</p>
+    <p style="margin:0 0 24px 0;">{{ email }}</p>
+    <p style="margin:0;font-weight:600;">{% trans "Ваш адрес электронной почты подтвержден" %}</p>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;justify-content:center;align-items:stretch;margin:32px 0 10px 0;width:100%;max-width:560px;">
+    <form method="get" action="{% url 'login' %}" style="margin:0;">
+      <button type="submit" class="btn" style="width:100%;font-size:20px;padding:12px 40px;line-height:1;">{% trans "Вернуться к логину" %}</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

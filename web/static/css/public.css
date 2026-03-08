@@ -113,11 +113,18 @@ p, ul, li{
   align-items: center;
   justify-content: center;
   line-height: 1;
+  cursor: pointer;
 }
 
 button.btn {
   appearance: none;
   -webkit-appearance: none;
+  cursor: pointer;
+}
+
+button.btn:disabled,
+.btn[aria-disabled="true"] {
+  cursor: default;
 }
 
 /* белая стрелка псевдографикой */
@@ -174,6 +181,7 @@ button.btn {
 }
 
 input[type="text"],
+input[type="email"],
 input[type="password"] {
   width: 100%;
   box-sizing: border-box;
@@ -189,18 +197,25 @@ input[type="password"] {
 
 /* hover */
 input[type="text"]:hover,
+input[type="email"]:hover,
 input[type="password"]:hover {
   border-color: #022a39;
 }
 
 /* focus */
 input[type="text"]:focus,
+input[type="email"]:focus,
 input[type="password"]:focus {
   border-color: #0a5f85;
+}
+
+input[type="text"]::placeholder,
+input[type="email"]::placeholder,
+input[type="password"]::placeholder {
+  color: #b9c8cf;
+  opacity: 1;
 }
 
 .buttons, .buttons button{
   font-size:20px;
 }
-
-

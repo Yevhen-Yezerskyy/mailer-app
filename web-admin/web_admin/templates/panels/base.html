@@ -63,6 +63,17 @@
     </nav>
 
     <div class="mt-auto p-2 border-t border-[#71d0f4]">
+      <details class="YY-MENU-CARD-BLUE mb-2" open>
+        <summary class="YY-MENU-SUMMARY">
+          Django Admin
+        </summary>
+        <div class="px-0">
+          <a href="{% url 'admin:index' %}" class="YY-MENU-DETAIL">
+            Открыть Django Admin
+          </a>
+        </div>
+      </details>
+
       <details class="YY-MENU-CARD-BLUE">
         <summary class="YY-MENU-SUMMARY">
           {% if request.user.is_authenticated %}
@@ -103,10 +114,6 @@
                 <button type="submit" name="language" value="ru" class="YY-BUTTON_MAIN">RUS</button>
                 <button type="submit" name="language" value="en" class="YY-BUTTON_MAIN">ENG</button>
               </form>
-
-              <a href="{% url 'admin:index' %}" class="YY-BUTTON_MAIN">
-                Django Admin
-              </a>
 
               <form method="post" action="{% url 'logout' %}" class="inline">
                 {% csrf_token %}

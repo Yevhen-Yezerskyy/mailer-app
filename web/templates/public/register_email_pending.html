@@ -1,0 +1,50 @@
+{% extends "public/base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Подтверждение email" %} — Serenity{% endblock %}
+
+{% block content %}
+<!-- FILE: web/templates/public/register_email_pending.html -->
+<div class="box" style="flex-direction: column;">
+  <h2>{% trans "Подтверждение email" %}</h2>
+
+  {% if not email_sent %}
+    <div style="margin-top:20px;color:#006991;line-height:1.5;width:100%;max-width:560px;">
+      <p style="margin:0 0 8px 0;">{% trans "Спасибо за регистрацию в системе Serenity Mailer." %}</p>
+      <p style="margin:0 0 8px 0;">{% trans "Для начала работы необходимо подтвердить Ваш электронный адрес." %}</p>
+      <p style="margin:0;">{% blocktrans with email=user.email %}Подтвердите адрес электронной почты {{ email }} как Ваш идентификатор и логин в систему.{% endblocktrans %}</p>
+    </div>
+  {% endif %}
+
+  {% if messages %}
+    <div style="margin-top:16px;color:#006991;">
+      {% for message in messages %}
+        <p style="margin:0 0 6px 0;">{{ message }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div style="display:flex;flex-direction:column;gap:12px;justify-content:center;align-items:stretch;margin:22px 0 10px 0;width:100%;max-width:560px;">
+    {% if email_sent %}
+      <div style="margin-top:42px;color:#006991;line-height:1.5;width:100%;max-width:560px;">
+        <p style="margin:0;">{% blocktrans with email=user.email %}Ссылка для подтверждения адреса электронной почты отправлена вам по адресу {{ email }}{% endblocktrans %}</p>
+      </div>
+    {% else %}
+      <form method="post" action="{% url 'resend_email_confirm' %}" style="margin:0;">
+        {% csrf_token %}
+        <input type="hidden" name="uid" value="{{ user_uid }}">
+        <button type="submit" class="btn" style="width:100%;font-size:20px;padding:12px 40px;line-height:1;">{% trans "Подтвердить email" %}</button>
+      </form>
+
+      <form method="get" action="{% url 'edit_registration' %}" style="margin:0;">
+        <input type="hidden" name="uid" value="{{ user_uid }}">
+        <button type="submit" class="btn" style="width:100%;font-size:20px;padding:12px 40px;line-height:1;">{% trans "Изменить данные" %}</button>
+      </form>
+    {% endif %}
+
+    <form method="get" action="{% url 'login' %}" style="margin:30px 0 0 0;">
+      <button type="submit" class="btn" style="width:100%;font-size:20px;padding:12px 40px;line-height:1;">{% trans "Вернуться к логину" %}</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

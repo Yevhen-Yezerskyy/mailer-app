@@ -1,21 +1,16 @@
-# FILE: web/aap_audience/templatetags/audience_extras.py  (новое) 2025-12-15
-# Add: template filter get_item для доступа к dict по ключу в шаблонах.
+# FILE: web/panel/templatetags/panel_extras.py
+# DATE: 2026-03-08
+# PURPOSE: Numeric formatting helpers for panel templates.
+
+from __future__ import annotations
 
 from django import template
 
 register = template.Library()
 
 
-@register.filter
-def get_item(d, key):
-    try:
-        return (d or {}).get(key)
-    except Exception:
-        return None
-
-
 @register.filter(name="group_int")
-def group_int(value, lang_code=""):
+def group_int(value, lang_code: str = "") -> str:
     try:
         n = int(value)
     except Exception:
@@ -28,3 +23,4 @@ def group_int(value, lang_code=""):
         parts.append(s[-3:])
         s = s[:-3]
     return sign + sep.join(reversed(parts or ["0"]))
+

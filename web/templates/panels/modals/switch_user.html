@@ -1,0 +1,48 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/modals/switch_user.html -->
+
+<div class="YY-CARD_WHITE" style="width:1100px;max-width:95vw;">
+  <div class="flex items-center justify-between mb-3">
+    <div class="YY-STATUS_BLUE">{% trans "Сменить пользователя" %}</div>
+    <button type="button" class="YY-BUTTON_MAIN" data-yy-modal-close>{% trans "Закрыть" %}</button>
+  </div>
+
+  {% if forbidden %}
+    <div class="YY-STATUS_RED">{% trans "Недостаточно прав" %}</div>
+  {% else %}
+    <div class="YY-MAIN_BOTTOM_DIV">
+      <table class="w-full text-left">
+        <thead>
+          <tr class="YY-TH_TR">
+            <th class="YY-TH_TH">{% trans "Компания" %}</th>
+            <th class="YY-TH_TH">Email</th>
+            <th class="YY-TH_TH">{% trans "Имя Фамилия" %}</th>
+            <th class="YY-TH_TH">{% trans "Роль" %}</th>
+            <th class="YY-TH_TH">&nbsp;</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items %}
+            <tr class="YY-TB_TR">
+              <td class="YY-TB_TD">{{ it.company_name }}</td>
+              <td class="YY-TB_TD">{{ it.email }}</td>
+              <td class="YY-TB_TD">{{ it.full_name }}</td>
+              <td class="YY-TB_TD">{{ it.role }}</td>
+              <td class="YY-TB_TD">
+                <form method="post" action="{% url 'switch_user_login' %}" style="margin:0;">
+                  {% csrf_token %}
+                  <input type="hidden" name="uid" value="{{ it.ui_id }}">
+                  <button type="submit" class="YY-BUTTON_TAB_MAIN">{% trans "Войти" %}</button>
+                </form>
+              </td>
+            </tr>
+          {% empty %}
+            <tr class="YY-TB_TR">
+              <td class="YY-TB_TD" colspan="5">{% trans "Нет доступных пользователей" %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>

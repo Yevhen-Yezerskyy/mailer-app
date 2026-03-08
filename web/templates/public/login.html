@@ -4,8 +4,8 @@
 {% block title %}{% trans "Вход" %} — Serenity{% endblock %}
 
 {% block content %}
-<!-- FILE: web/templates/public/login.html  (обновлено — 2025-12-18)
-Смысл: публичный логин, центрированный box, заголовок + вход -->
+<!-- FILE: web/templates/public/login.html  (обновлено — 2026-03-07)
+Смысл: публичный логин с проверками статусов workspace/user/email_confirmed. -->
 <div class="box" style="flex-direction: column;">
 
 
@@ -15,21 +15,31 @@
     </h2>
 
     <h2>{% trans "Вход" %}</h2>
-    {% if form.errors %}
+
+    {% if auth_error %}
+      <p style="color:#750b00;margin-top:20px;">{{ auth_error }}</p>
+    {% elif form.errors %}
       <p style="color:#750b00;margin-top:20px;">{% trans "Неверный логин или пароль" %}</p>
     {% endif %}
 
-    <form method="post">
-      {% csrf_token %}
+    {% if not auth_error or auth_error_code == "invalid_credentials" %}
+      <form method="post">
+        {% csrf_token %}
 
-      <p style="margin-top:20px;">Email:</p>
-      <p>{{ form.username }}</p>
-      
-      <p style="margin-top:20px;">{% trans "Пароль:" %}</p>
-      <p>{{ form.password }}</p>
+        <p style="margin-top:20px;">{% trans "Email:" %}</p>
+        <p>{{ form.username }}</p>
 
-       <p class="buttons" style="margin-top:20px;margin-bottom: 20px;"><a href="{% url 'public_index' %}" class="btn">&nbsp;&nbsp;&nbsp;&nbsp;{% trans "Отмена" %}&nbsp;&nbsp;&nbsp;&nbsp;</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<button type="submit" class="btn">&nbsp;&nbsp;&nbsp;&nbsp;{% trans "Войти" %}&nbsp;&nbsp;&nbsp;&nbsp;</button></p>
-   </form>
+        <p style="margin-top:20px;">{% trans "Пароль:" %}</p>
+        <p>{{ form.password }}</p>
+
+         <p class="buttons" style="margin-top:20px;margin-bottom: 20px;"><a href="{% url 'public_index' %}" class="btn">&nbsp;&nbsp;&nbsp;&nbsp;{% trans "Отмена" %}&nbsp;&nbsp;&nbsp;&nbsp;</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<button type="submit" class="btn">&nbsp;&nbsp;&nbsp;&nbsp;{% trans "Войти" %}&nbsp;&nbsp;&nbsp;&nbsp;</button></p>
+         <p style="margin:0 0 10px 0;"><a href="{% url 'password_reset_request' %}" style="color:#006991;text-decoration:underline;">{% trans "Забыли пароль?" %}</a></p>
+     </form>
+    {% else %}
+      <p class="buttons" style="margin-top:40px;margin-bottom:20px;">
+        <a href="{% url 'login' %}" class="btn">{% trans "Вернуться к логину" %}</a>
+      </p>
+    {% endif %}
 
 
 </div>

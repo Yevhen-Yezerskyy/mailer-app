@@ -13,6 +13,21 @@
 
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="{% static 'css/panel.css' %}">
+  <style>
+    .lang-active {
+      background: #006991 !important;
+      color: #fff !important;
+    }
+    .yy-user-summary {
+      list-style: none;
+    }
+    .yy-user-summary::-webkit-details-marker {
+      display: none;
+    }
+    .yy-user-summary::marker {
+      content: "";
+    }
+  </style>
 </head>
 
 <body class="min-h-screen bg-[#f9fafb]">
@@ -65,14 +80,23 @@
     </nav>
 
     <div class="mt-auto p-2 border-t border-[#71d0f4]">
+    {% if request.user.is_authenticated and request.user.workspace and request.user.workspace.access_type == "super" %}
+    <div class="mb-2">
+      <button type="button" class="YY-BUTTON_MAIN w-full" data-yy-modal="url=/panel/switch-user/modal/">
+        {% trans "Сменить пользователя" %}
+      </button>
+    </div>
+    {% endif %}
 
-    <details class="YY-MENU-CARD-BLUE">
-        <summary class="YY-MENU-SUMMARY">
-            {% if request.user.is_authenticated %}
-              {{ request.user.email }}
-            {% endif %}
-        </summary>
-    </details>
+    <div class="YY-MENU-CARD-BLUE">
+      <div class="YY-MENU-SUMMARY !block !font-normal leading-snug cursor-default">
+        {% if request.user.is_authenticated %}
+          <span class="font-bold mb-2 inline-block">{{ request.user.workspace.company_name|default:"-" }}</span><br>
+          {{ request.user.first_name|default:"-" }} {{ request.user.last_name|default:"-" }}<br>
+          {{ request.user.email|default:"-" }}
+        {% endif %}
+      </div>
+    </div>
     </div>
   </aside>
 
@@ -106,21 +130,21 @@
                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
 
                 <button type="submit" name="language" value="de"
-                  class="YY-BUTTON_MAIN">
+                  class="YY-BUTTON_MAIN{% if request.LANGUAGE_CODE|slice:':2' == 'de' %} lang-active{% endif %}">
                   DEU
                 </button>
 
                 <button type="submit" name="language" value="uk"
-                  class="YY-BUTTON_MAIN">
+                  class="YY-BUTTON_MAIN{% if request.LANGUAGE_CODE|slice:':2' == 'uk' %} lang-active{% endif %}">
                   UKR
                 </button>
 
                 <button type="submit" name="language" value="ru"
-                  class="YY-BUTTON_MAIN">
+                  class="YY-BUTTON_MAIN{% if request.LANGUAGE_CODE|slice:':2' == 'ru' %} lang-active{% endif %}">
                   RUS
                 </button>
                 <button type="submit" name="language" value="en"
-                  class="YY-BUTTON_MAIN">
+                  class="YY-BUTTON_MAIN{% if request.LANGUAGE_CODE|slice:':2' == 'en' %} lang-active{% endif %}">
                   ENG
                 </button>
               </form>

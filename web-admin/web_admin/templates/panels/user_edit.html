@@ -24,6 +24,12 @@
           {{ form.email }}
           {% if form.email.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.email.errors }}</div>{% endif %}
 
+          <div class="flex items-center gap-2 mt-2 mb-2">
+            <label class="YY-LABEL !mb-0" for="{{ form.email_confirmed.id_for_label }}">{{ form.email_confirmed.label }}</label>
+            {{ form.email_confirmed }}
+          </div>
+          {% if form.email_confirmed.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.email_confirmed.errors }}</div>{% endif %}
+
           <label class="YY-LABEL" for="{{ form.workspace.id_for_label }}">{{ form.workspace.label }}</label>
           {{ form.workspace }}
           {% if form.workspace.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.workspace.errors }}</div>{% endif %}
