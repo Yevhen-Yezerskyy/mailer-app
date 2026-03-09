@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-08 15:08+0100\n"
+"POT-Creation-Date: 2026-03-08 15:38+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -477,11 +477,11 @@ msgstr "Settings: Click tracking"
 
 #: public/aap_auth/forms.py:40 templates/public/register.html:30
 msgid "Название компании"
-msgstr "Campaign name"
+msgstr "Company name"
 
 #: public/aap_auth/forms.py:41 templates/public/register.html:35
 msgid "Адрес компании"
-msgstr "Your campaigns:"
+msgstr "Company address"
 
 #: public/aap_auth/forms.py:42 templates/public/register.html:42
 msgid "Фамилия"
@@ -512,62 +512,54 @@ msgstr "Password:"
 #: templates/public/password_reset_confirm.html:48
 #: templates/public/register.html:74
 msgid "Подтверждение пароля"
-msgstr "Invalid login or password"
+msgstr "Confirm password"
 
 #: public/aap_auth/forms.py:53
-#| msgid "Неверный логин или пароль"
 msgid "Неверный формат телефона"
-msgstr "Invalid login or password"
+msgstr "Invalid phone format"
 
 #: public/aap_auth/forms.py:62
-#| msgid "Шаблон с таким именем уже существует."
 msgid "Пользователь с таким email уже существует"
-msgstr "A template with that name already exists."
+msgstr "A user with this email already exists."
 
 #: public/aap_auth/forms.py:74 public/aap_auth/forms.py:78
 #: public/aap_auth/forms.py:118
-#| msgid "Города не обработаны"
 msgid "Пароли не совпадают"
-msgstr "Cities not processed"
+msgstr "Passwords do not match"
 
 #: public/aap_auth/forms.py:106 templates/public/password_reset_confirm.html:4
 #: templates/public/password_reset_confirm.html:9
 #: templates/public/password_reset_confirm.html:43
 msgid "Новый пароль"
-msgstr "Show password?"
+msgstr "New password"
 
 #: public/aap_auth/views.py:32
-#| msgid "Домен не протестирован"
 msgid "Логин заблокирован"
-msgstr "Domain not tested"
+msgstr "Login is blocked"
 
 #: public/aap_auth/views.py:33
-#| msgid "Логин / Имя пользователя"
 msgid "Логин больше не обслуживается"
-msgstr "Login / Username"
+msgstr "This login is no longer serviced"
 
 #: public/aap_auth/views.py:34 templates/public/login.html:22
 msgid "Неверный логин или пароль"
 msgstr "Invalid login or password"
 
 #: public/aap_auth/views.py:231
-#| msgid "Отправить письмо"
 msgid "Не удалось отправить письмо"
-msgstr "Send Email"
+msgstr "Failed to send email"
 
 #: public/aap_auth/views.py:239
 msgid "Ссылка подтверждения недействительна или устарела"
 msgstr "The confirmation link is invalid or has expired"
 
 #: public/aap_auth/views.py:268
-#| msgid "Ничего не найдено"
 msgid "Рабочее пространство не найдено"
 msgstr "Workspace not found"
 
 #: public/aap_auth/views.py:291
-#| msgid "Глобальные шаблоны"
 msgid "Данные обновлены"
-msgstr "Global templates"
+msgstr "Data updated"
 
 #: templates/404.html:19
 msgid "Ничего не найдено"
@@ -1927,7 +1919,6 @@ msgstr ""
 "emails."
 
 #: templates/panels/base.html:86 templates/panels/modals/switch_user.html:6
-#| msgid "Логин / Имя пользователя"
 msgid "Сменить пользователя"
 msgstr "Switch user"
 
@@ -1936,12 +1927,10 @@ msgid "Выйти"
 msgstr "Log out"
 
 #: templates/panels/modals/switch_user.html:11
-#| msgid "Результат отправки"
 msgid "Недостаточно прав"
 msgstr "Insufficient permissions"
 
 #: templates/panels/modals/switch_user.html:19
-#| msgid "Фамилия"
 msgid "Имя Фамилия"
 msgstr "First name Last name"
 
@@ -1954,7 +1943,6 @@ msgid "Войти"
 msgstr "Sign in"
 
 #: templates/panels/modals/switch_user.html:41
-#| msgid "Логин / Имя пользователя"
 msgid "Нет доступных пользователей"
 msgstr "No available users"
 
@@ -2042,7 +2030,6 @@ msgid "Email подтверждён"
 msgstr "Email confirmed"
 
 #: templates/public/confirm_email_done.html:15
-#| msgid "Введите адрес электронной почты"
 msgid "Ваш адрес электронной почты подтвержден"
 msgstr "Your email address has been confirmed"
 
@@ -2339,14 +2326,13 @@ msgstr "Password:"
 
 #: templates/public/login.html:36
 msgid "Забыли пароль?"
-msgstr "Show password?"
+msgstr "Forgot password?"
 
 #: templates/public/password_reset_confirm.html:21
 msgid "Ссылка для смены пароля недействительна или устарела."
 msgstr "The password reset link is invalid or has expired."
 
 #: templates/public/password_reset_confirm.html:25
-#| msgid "Пароль будет показан на экране."
 msgid "Пароль успешно изменен."
 msgstr "Password changed successfully."
 
@@ -2355,7 +2341,7 @@ msgstr "Password changed successfully."
 #: templates/public/password_reset_request.html:4
 #: templates/public/password_reset_request.html:9
 msgid "Сброс пароля"
-msgstr "Show password?"
+msgstr "Password reset"
 
 #: templates/public/password_reset_done.html:12
 msgid "Если такой адрес есть, на него отправлена ссылка для смены пароля."
@@ -2371,24 +2357,24 @@ msgstr "Enter your email address"
 
 #: templates/public/password_reset_request.html:27
 msgid "Отправить"
-msgstr "Sender"
+msgstr "Send"
 
 #: templates/public/register.html:4 templates/public/register.html:10
 msgid "Регистрация"
-msgstr "Email subject 1 (rotation)"
+msgstr "Registration"
 
 #: templates/public/register.html:10
 #: templates/public/register_email_pending.html:41
 msgid "Изменить данные"
-msgstr "Edit email"
+msgstr "Edit data"
 
 #: templates/public/register.html:18
 msgid "Проверьте заполнение формы"
-msgstr "Invalid form values"
+msgstr "Please check the form"
 
 #: templates/public/register.html:39
 msgid "Пользователь"
-msgstr "Username:"
+msgstr "User"
 
 #: templates/public/register.html:61
 msgid "Логин информация"
@@ -2412,7 +2398,9 @@ msgstr "To get started, you must confirm your email address."
 msgid ""
 "Подтвердите адрес электронной почты %(email)s как Ваш идентификатор и логин "
 "в систему."
-msgstr "Confirm the email address %(email)s as your identifier and login to the system."
+msgstr ""
+"Confirm the email address %(email)s as your identifier and login to the "
+"system."
 
 #: templates/public/register_email_pending.html:30
 #, python-format

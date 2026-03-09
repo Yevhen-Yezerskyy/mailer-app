@@ -399,7 +399,8 @@ def dashboard(request):
         active_mb_cnt = int(active_today_by_mailbox.get(mb_id, 0))
         today_minutes = int(_window_minutes_today(getattr(camp, "window", None)))
         today_hours = float(today_minutes) / 60.0
-        today_total = int((today_hours * float(mb_limit)) / float(active_mb_cnt)) if active_mb_cnt > 0 else 0
+        today_plan = int((today_hours * float(mb_limit)) / float(active_mb_cnt)) if active_mb_cnt > 0 else 0
+        today_total = min(today_plan, left) if left > 0 else 0
         today_left = today_total - today_sent
         if today_left < 0:
             today_left = 0
@@ -438,7 +439,7 @@ def dashboard(request):
                     "total_pct": (100 if day_total > 0 else 0),
                 }
             )
-            rolling_left = max(rolling_left - day_total, 0)
+            rolling_left = int(day_left)
 
         valid_cnt = int(campaign_delivered.get(cid, 0))
         views_cnt = int(campaign_views.get(cid, 0))

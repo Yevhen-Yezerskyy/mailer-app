@@ -13,7 +13,7 @@ from panel.aap_audience.models import AudienceTask
 
 
 def _prompt_text() -> str:
-    p = Path(__file__).resolve().parents[4] / "engine" / "common" / "prompts" / "create_sell_product_01.txt"
+    p = Path(__file__).resolve().parents[4] / "engine" / "common" / "prompts" / "create_sell_product_02.txt"
     try:
         return p.read_text(encoding="utf-8").strip()
     except Exception:
@@ -142,6 +142,15 @@ def create_edit_sell_view(request):
             else:
                 status_text = "Продукт/услуга не сохранены: новая форма без записи."
 
+        elif action == "reset_context":
+            request.session.pop(state_key, None)
+            request.session.modified = True
+            title_text = ""
+            product_text = ""
+            instruction_text = ""
+            ai_advice_text = ""
+            status_text = "Контекст и форма очищены."
+
         elif action == "close":
             return redirect("audience:create_list")
 
@@ -157,6 +166,7 @@ def create_edit_sell_view(request):
             "source_product": product_text,
             "ai_instruction": instruction_text,
             "ai_advice": ai_advice_text,
+            "ai_placeholder_text": "Пусто. Введите продукт и нажмите «Обработать».",
             "status_text": status_text,
         },
     )

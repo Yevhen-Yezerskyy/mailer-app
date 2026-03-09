@@ -74,6 +74,11 @@
                   {% trans "Сохранить" %}
                 </button>
               </div>
+              <div class="mt-3">
+                <button type="submit" name="action" value="reset_context" class="YY-BUTTON_MAIN w-full">
+                  {% trans "Сбросить контекст" %}
+                </button>
+              </div>
             </div>
           </td>
         </tr>
@@ -94,6 +99,10 @@
               {% if ai_advice %}
                 <div class="YY-CARD_IN_FORM mt-4 mb-0">
                   {{ ai_advice|linebreaksbr }}
+                </div>
+              {% else %}
+                <div class="YY-CARD_IN_FORM mt-4 mb-0 text-gray-500">
+                  {{ ai_placeholder_text }}
                 </div>
               {% endif %}
             </div>

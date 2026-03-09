@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-08 15:08+0100\n"
+"POT-Creation-Date: 2026-03-08 15:38+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -483,11 +483,11 @@ msgstr "Einstellungen: Klickverfolgung"
 
 #: public/aap_auth/forms.py:40 templates/public/register.html:30
 msgid "Название компании"
-msgstr "Kampagnenname"
+msgstr "Firmenname"
 
 #: public/aap_auth/forms.py:41 templates/public/register.html:35
 msgid "Адрес компании"
-msgstr "Ihre Kampagnen:"
+msgstr "Firmenadresse"
 
 #: public/aap_auth/forms.py:42 templates/public/register.html:42
 msgid "Фамилия"
@@ -518,62 +518,54 @@ msgstr "Passwort:"
 #: templates/public/password_reset_confirm.html:48
 #: templates/public/register.html:74
 msgid "Подтверждение пароля"
-msgstr "Ungültiger Benutzername oder Passwort"
+msgstr "Passwort bestätigen"
 
 #: public/aap_auth/forms.py:53
-#| msgid "Неверный логин или пароль"
 msgid "Неверный формат телефона"
-msgstr "Ungültiger Benutzername oder Passwort"
+msgstr "Ungültiges Telefonformat"
 
 #: public/aap_auth/forms.py:62
-#| msgid "Шаблон с таким именем уже существует."
 msgid "Пользователь с таким email уже существует"
-msgstr "Eine Vorlage mit diesem Namen existiert bereits."
+msgstr "Ein Benutzer mit dieser Email existiert bereits."
 
 #: public/aap_auth/forms.py:74 public/aap_auth/forms.py:78
 #: public/aap_auth/forms.py:118
-#| msgid "Города не обработаны"
 msgid "Пароли не совпадают"
-msgstr "Städte wurden nicht verarbeitet"
+msgstr "Die Passwörter stimmen nicht überein."
 
 #: public/aap_auth/forms.py:106 templates/public/password_reset_confirm.html:4
 #: templates/public/password_reset_confirm.html:9
 #: templates/public/password_reset_confirm.html:43
 msgid "Новый пароль"
-msgstr "Passwort anzeigen?"
+msgstr "Neues Passwort"
 
 #: public/aap_auth/views.py:32
-#| msgid "Домен не протестирован"
 msgid "Логин заблокирован"
-msgstr "Domain nicht getestet"
+msgstr "Login gesperrt"
 
 #: public/aap_auth/views.py:33
-#| msgid "Логин / Имя пользователя"
 msgid "Логин больше не обслуживается"
-msgstr "Login / Benutzername"
+msgstr "Dieser Login wird nicht mehr bedient"
 
 #: public/aap_auth/views.py:34 templates/public/login.html:22
 msgid "Неверный логин или пароль"
 msgstr "Ungültiger Benutzername oder Passwort"
 
 #: public/aap_auth/views.py:231
-#| msgid "Отправить письмо"
 msgid "Не удалось отправить письмо"
-msgstr "E-Mail senden"
+msgstr "E-Mail konnte nicht gesendet werden"
 
 #: public/aap_auth/views.py:239
 msgid "Ссылка подтверждения недействительна или устарела"
 msgstr "Der Bestätigungslink ist ungültig oder abgelaufen"
 
 #: public/aap_auth/views.py:268
-#| msgid "Ничего не найдено"
 msgid "Рабочее пространство не найдено"
 msgstr "Arbeitsbereich nicht gefunden."
 
 #: public/aap_auth/views.py:291
-#| msgid "Глобальные шаблоны"
 msgid "Данные обновлены"
-msgstr "Globale Vorlagen"
+msgstr "Daten wurden aktualisiert"
 
 #: templates/404.html:19
 msgid "Ничего не найдено"
@@ -1942,7 +1934,6 @@ msgstr ""
 "Newsletter-E-Mails angehängt."
 
 #: templates/panels/base.html:86 templates/panels/modals/switch_user.html:6
-#| msgid "Логин / Имя пользователя"
 msgid "Сменить пользователя"
 msgstr "Benutzer wechseln"
 
@@ -1951,12 +1942,10 @@ msgid "Выйти"
 msgstr "Abmelden"
 
 #: templates/panels/modals/switch_user.html:11
-#| msgid "Результат отправки"
 msgid "Недостаточно прав"
 msgstr "Nicht genügend Rechte"
 
 #: templates/panels/modals/switch_user.html:19
-#| msgid "Фамилия"
 msgid "Имя Фамилия"
 msgstr "Vorname Nachname"
 
@@ -1969,7 +1958,6 @@ msgid "Войти"
 msgstr "Anmelden"
 
 #: templates/panels/modals/switch_user.html:41
-#| msgid "Логин / Имя пользователя"
 msgid "Нет доступных пользователей"
 msgstr "Keine verfügbaren Benutzer"
 
@@ -2057,7 +2045,6 @@ msgid "Email подтверждён"
 msgstr "Email bestätigt"
 
 #: templates/public/confirm_email_done.html:15
-#| msgid "Введите адрес электронной почты"
 msgid "Ваш адрес электронной почты подтвержден"
 msgstr "Ihre E-Mail-Adresse wurde bestätigt"
 
@@ -2361,14 +2348,13 @@ msgstr "Passwort:"
 
 #: templates/public/login.html:36
 msgid "Забыли пароль?"
-msgstr "Passwort anzeigen?"
+msgstr "Passwort vergessen?"
 
 #: templates/public/password_reset_confirm.html:21
 msgid "Ссылка для смены пароля недействительна или устарела."
 msgstr "Der Link zum Zurücksetzen des Passworts ist ungültig oder abgelaufen."
 
 #: templates/public/password_reset_confirm.html:25
-#| msgid "Пароль будет показан на экране."
 msgid "Пароль успешно изменен."
 msgstr "Das Passwort wurde erfolgreich geändert."
 
@@ -2377,11 +2363,13 @@ msgstr "Das Passwort wurde erfolgreich geändert."
 #: templates/public/password_reset_request.html:4
 #: templates/public/password_reset_request.html:9
 msgid "Сброс пароля"
-msgstr "Passwort anzeigen?"
+msgstr "Passwort zurücksetzen"
 
 #: templates/public/password_reset_done.html:12
 msgid "Если такой адрес есть, на него отправлена ссылка для смены пароля."
-msgstr "Wenn eine solche Adresse existiert, wurde ein Link zum Zurücksetzen des Passworts an diese Adresse gesendet."
+msgstr ""
+"Wenn eine solche Adresse existiert, wurde ein Link zum Zurücksetzen des "
+"Passworts an diese Adresse gesendet."
 
 #: templates/public/password_reset_request.html:16
 msgid "Введите корректный email"
@@ -2393,24 +2381,24 @@ msgstr "Geben Sie die E-Mail-Adresse ein"
 
 #: templates/public/password_reset_request.html:27
 msgid "Отправить"
-msgstr "Absender"
+msgstr "Senden"
 
 #: templates/public/register.html:4 templates/public/register.html:10
 msgid "Регистрация"
-msgstr "E-Mail-Betreff 1 (Rotation)"
+msgstr "Registrierung"
 
 #: templates/public/register.html:10
 #: templates/public/register_email_pending.html:41
 msgid "Изменить данные"
-msgstr "E-Mail bearbeiten"
+msgstr "Daten ändern"
 
 #: templates/public/register.html:18
 msgid "Проверьте заполнение формы"
-msgstr "Ungültige Formularwerte"
+msgstr "Bitte überprüfen Sie das Formular"
 
 #: templates/public/register.html:39
 msgid "Пользователь"
-msgstr "Benutzername:"
+msgstr "Benutzer"
 
 #: templates/public/register.html:61
 msgid "Логин информация"
@@ -2434,14 +2422,17 @@ msgstr "Um loszulegen, müssen Sie Ihre E-Mail-Adresse bestätigen."
 msgid ""
 "Подтвердите адрес электронной почты %(email)s как Ваш идентификатор и логин "
 "в систему."
-msgstr "Bestätigen Sie die E-Mail-Adresse %(email)s als Ihre Kennung und Ihren Login im System."
+msgstr ""
+"Bestätigen Sie die E-Mail-Adresse %(email)s als Ihre Kennung und Ihren Login "
+"im System."
 
 #: templates/public/register_email_pending.html:30
 #, python-format
 msgid ""
 "Ссылка для подтверждения адреса электронной почты отправлена вам по адресу "
 "%(email)s"
-msgstr "Der Link zur Bestätigung Ihrer E-Mail-Adresse wurde an %(email)s gesendet."
+msgstr ""
+"Der Link zur Bestätigung Ihrer E-Mail-Adresse wurde an %(email)s gesendet."
 
 #: templates/public/register_email_pending.html:36
 msgid "Подтвердить email"

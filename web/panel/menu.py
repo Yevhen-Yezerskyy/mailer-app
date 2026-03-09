@@ -50,12 +50,6 @@ PANEL_MENU = [
                 "url_name": "audience:status",
                 "active_prefixes": ["/panel/audience/status/"],
             },
-            {
-                "title": _("Постановка задачи"),
-                "page_title": _("Аудитории : Постановка задачи"),
-                "url_name": "audience:create_list",
-                "active_prefixes": ["/panel/audience/create/"],
-            },
         ],
     },
     {
