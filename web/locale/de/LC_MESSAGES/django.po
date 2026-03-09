@@ -1982,7 +1982,7 @@ msgstr "Heute"
 #: templates/panels/overview.html:136 templates/panels/stats_campaign.html:21
 #: templates/panels/stats_campaign.html:46
 msgid "Доставлено"
-msgstr "Gesendet"
+msgstr "Zugestellt"
 
 #: templates/panels/overview.html:137 templates/panels/stats_campaign.html:22
 #: templates/panels/stats_campaign.html:47
