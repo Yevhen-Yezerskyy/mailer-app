@@ -1,0 +1,47 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/create_edit_buy.html -->
+<!-- DATE: 2026-03-08 -->
+<!-- PURPOSE: Placeholder create/edit page for buy mode. -->
+
+{% block content %}
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-CARD_IN_FORM_BLANK mb-5">
+          <div class="flex gap-3">
+            <a href="{% url 'audience:create_edit_sell' %}" class="YY-BUTTON_MAIN">
+              {% trans "Поиск клиентов / покупателей" %}
+            </a>
+            <a href="{% url 'audience:create_edit_buy' %}" class="YY-BUTTON_GREEN">
+              {% trans "Поиск поставщиков / подрядчиков" %}
+            </a>
+          </div>
+        </div>
+
+        <div class="YY-STATUS_YELLOW mb-5">{% trans "Поиск поставщиков / подрядчиков" %}</div>
+
+        <div class="YY-CARD_IN_FORM">
+          {% trans "Заглушка: форма создания/редактирования (buy) будет добавлена следующим шагом." %}
+        </div>
+
+        <div class="flex gap-3 mt-3">
+          <a href="{% url 'audience:create_list' %}" class="YY-BUTTON_MAIN">
+            {% trans "Назад к списку" %}
+          </a>
+        </div>
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+      <div class="YY-CARD_BLUE">
+        <p class="YY-TEXT"><strong>{% trans "Постановка задачи" %}</strong></p>
+        <p class="YY-TEXT">{% trans "Эта страница пока в режиме заглушки." %}</p>
+      </div>
+    </td>
+  </tr>
+</table>
+
+{% endblock %}

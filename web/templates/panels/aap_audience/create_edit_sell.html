@@ -1,0 +1,121 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/create_edit_sell.html -->
+<!-- DATE: 2026-03-08 -->
+<!-- PURPOSE: Placeholder create/edit page for sell mode. -->
+
+{% block content %}
+
+<form method="post">
+  {% csrf_token %}
+  {% if task_id_token %}
+    <input type="hidden" name="id" value="{{ task_id_token }}">
+  {% endif %}
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+      <div class="YY-CARD_WHITE min-h-[82px]">
+        <div class="YY-STATUS_GREEN mb-3">
+          {% trans "Поиск клиентов / покупателей" %}
+        </div>
+        <div class="flex gap-3">
+          <button type="button" class="YY-BUTTON_MAIN flex-1">
+            {% trans "Продукт/услуга" %}
+          </button>
+          <button type="button" class="YY-BUTTON_MAIN flex-1">
+            {% trans "Компания" %}
+          </button>
+          <button type="button" class="YY-BUTTON_MAIN flex-1">
+            {% trans "География" %}
+          </button>
+        </div>
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+      <div class="YY-CARD_WHITE min-h-[82px]">
+        <input
+          type="text"
+          name="audience_title"
+          value="{{ audience_title }}"
+          class="YY-INPUT w-full"
+          placeholder="{% trans 'Название аудитории' %}">
+        <div class="flex gap-3 -mt-2">
+          <button type="button" class="YY-BUTTON_MAIN flex-1">
+            {% trans "Предложить название" %}
+          </button>
+          <button type="submit" name="action" value="save_title" class="YY-BUTTON_MAIN flex-1">
+            {% trans "Сохранить название" %}
+          </button>
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+      <table class="w-full table-fixed border-collapse">
+        <tr>
+          <td class="align-top">
+            <div class="YY-CARD_WHITE min-h-[360px]">
+              <label class="YY-LABEL">
+                {% trans "Продукт / услуга. Что продаётся? Где применяется? Кто покупатель?" %}
+              </label>
+              <textarea name="source_product" class="YY-INPUT w-full" rows="12">{{ source_product }}</textarea>
+
+              <div class="flex gap-3 -mt-2">
+                <button type="submit" name="action" value="process_product" class="YY-BUTTON_MAIN flex-1">
+                  {% trans "Обработать" %}
+                </button>
+                <button type="submit" name="action" value="save_product" class="YY-BUTTON_MAIN flex-1">
+                  {% trans "Сохранить" %}
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+      <table class="w-full table-fixed border-collapse">
+        <tr>
+          <td class="align-top">
+            <div class="YY-CARD_WHITE min-h-[360px]">
+              <label class="YY-LABEL">{% trans "Указание для ИИ" %}</label>
+              <textarea name="ai_instruction" class="YY-INPUT w-full" rows="2">{{ ai_instruction }}</textarea>
+              <div class="flex justify-end -mt-2">
+                <button type="submit" name="action" value="run_ai" class="YY-BUTTON_MAIN w-1/2">{% trans "Выполнить" %}</button>
+              </div>
+              <input type="hidden" name="ai_advice" value="{{ ai_advice }}">
+              {% if ai_advice %}
+                <div class="YY-CARD_IN_FORM mt-4 mb-0">
+                  {{ ai_advice|linebreaksbr }}
+                </div>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+
+{% if status_text %}
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_BOTTOM_TD">
+        <div class="YY-CARD_WHITE">
+          <div class="YY-CARD_IN_FORM mb-0">{{ status_text }}</div>
+        </div>
+      </td>
+    </tr>
+  </table>
+{% endif %}
+
+</form>
+
+{% endblock %}

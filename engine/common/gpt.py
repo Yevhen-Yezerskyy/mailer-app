@@ -599,3 +599,55 @@ class GPTClient:
             completion_tokens=usage.get("completion_tokens") or usage.get("output_tokens"),
             total_tokens=usage.get("total_tokens"),
         )
+
+    def ask_dialog(
+        self,
+        *,
+        model: str,
+        input: str,
+        instructions: str = "",
+        user_id: Any = "SET USER URGENTLY",
+        service_tier: Optional[ServiceTier] = None,
+        conversation: Optional[str] = None,
+        previous_response_id: Optional[str] = None,
+    ) -> GptResponse:
+        """
+        Dialog branch (platform-managed context):
+        - always store=True
+        - no local cache/history
+        - caller keeps only key ids (conversation/response)
+        """
+        model_name = _optional_str(model)
+        if not model_name:
+            raise GptValidationError("model is required for ask_dialog.")
+
+        payload: Dict[str, Any] = {
+            "model": MODEL_ALIASES.get(model_name, model_name),
+            "input": _optional_str(input),
+            "store": True,
+            "service_tier": "default" if (service_tier or "flex") == "standard" else (service_tier or "flex"),
+        }
+
+        instr = _optional_str(instructions)
+        if instr:
+            payload["instructions"] = instr
+
+        conv = _optional_str(conversation)
+        if conv:
+            payload["conversation"] = conv
+
+        prev = _optional_str(previous_response_id)
+        if prev:
+            payload["previous_response_id"] = prev
+
+        web_tool = MODEL_WEB_TOOL.get(payload["model"])
+        if web_tool:
+            payload["tools"] = [{"type": web_tool}]
+            payload["tool_choice"] = "auto"
+
+        return self.ask(
+            override=payload,
+            use_cache=False,
+            user_id=user_id,
+            service_tier=service_tier or "flex",
+        )

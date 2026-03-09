@@ -1,0 +1,88 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/create_list.html -->
+<!-- DATE: 2026-03-08 -->
+<!-- PURPOSE: "Постановка задачи" list page with create buttons and source fields table. -->
+
+{% block content %}
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+        <button
+          type="button"
+          onclick="location.href='{% url 'audience:create_edit_sell' %}'"
+          class="YY-BUTTON_GREEN w-full">
+          {% trans "Создать аудиторию" %}<br>{% trans "поиск клиентов / покупателей" %}
+        </button>
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+        <button
+          type="button"
+          onclick="location.href='{% url 'audience:create_edit_buy' %}'"
+          class="YY-BUTTON_GREEN w-full">
+          {% trans "Создать аудиторию" %}<br>{% trans "поиск поставщиков / подрядчиков" %}
+        </button>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      {% if tasks %}
+        <div class="YY-MAIN_BOTTOM_DIV">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH w-[30%]">source_product</th>
+                <th class="YY-TH_TH w-[30%]">source_company</th>
+                <th class="YY-TH_TH w-[30%]">source_geo</th>
+                <th class="YY-TH_TH">{% trans "Действия" %}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in tasks %}
+                <tr class="YY-TB_TR">
+                  <td class="YY-TB_TD">{{ t.source_product|default:"" }}</td>
+                  <td class="YY-TB_TD">{{ t.source_company|default:"" }}</td>
+                  <td class="YY-TB_TD">{{ t.source_geo|default:"" }}</td>
+                  <td class="YY-TB_TD">
+                    {% if t.type == "buy" %}
+                      <a href="{% url 'audience:create_edit_buy' %}?id={{ t.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
+                        {% trans "Изменить" %}
+                      </a>
+                    {% else %}
+                      <a href="{% url 'audience:create_edit_sell' %}?id={{ t.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
+                        {% trans "Изменить" %}
+                      </a>
+                    {% endif %}
+                    <form method="post" onsubmit="return confirm('{% trans "Удалить задачу?" %}')">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete">
+                      <input type="hidden" name="id" value="{{ t.ui_id }}">
+                      <button type="submit" class="YY-BUTTON_TAB_RED">
+                        {% trans "Удалить" %}
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
+      {% endif %}
+    </td>
+  </tr>
+</table>
+
+{% endblock %}

@@ -14,6 +14,12 @@ class AudienceTask(models.Model):
     task_branches = models.TextField()
     task_geo = models.TextField()
     task_client = models.TextField(blank=True, default="")
+    source_product = models.TextField(blank=True, default="")
+    source_company = models.TextField(blank=True, default="")
+    source_geo = models.TextField(blank=True, default="")
+    target_branches = models.TextField(blank=True, default="")
+    target_geo = models.TextField(blank=True, default="")
+    target_contact = models.TextField(blank=True, default="")
 
     type = models.CharField(
         max_length=4,
