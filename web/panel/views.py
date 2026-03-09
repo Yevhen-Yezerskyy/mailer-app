@@ -728,10 +728,6 @@ def stats_campaign_view(request, uid: str):
               COUNT(id) AS sent_cnt
             FROM public.mailbox_sent
             WHERE campaign_id = %s
-              AND (created_at AT TIME ZONE 'Europe/Berlin')::date BETWEEN
-                  ((NOW() AT TIME ZONE 'Europe/Berlin')::date - 4)
-                  AND
-                  ((NOW() AT TIME ZONE 'Europe/Berlin')::date)
             GROUP BY day_de
             """,
             [campaign_id],
@@ -751,10 +747,6 @@ def stats_campaign_view(request, uid: str):
              AND mbr.active = true
             WHERE s.campaign_id = %s
               AND mbr.aggr_contact_id IS NULL
-              AND (s.created_at AT TIME ZONE 'Europe/Berlin')::date BETWEEN
-                  ((NOW() AT TIME ZONE 'Europe/Berlin')::date - 4)
-                  AND
-                  ((NOW() AT TIME ZONE 'Europe/Berlin')::date)
             GROUP BY day_de
             """,
             [campaign_id],
@@ -770,10 +762,6 @@ def stats_campaign_view(request, uid: str):
             FROM public.mailbox_stats ms
             JOIN public.mailbox_sent s ON s.id = ms.letter_id
             WHERE s.campaign_id = %s
-              AND (s.created_at AT TIME ZONE 'Europe/Berlin')::date BETWEEN
-                  ((NOW() AT TIME ZONE 'Europe/Berlin')::date - 4)
-                  AND
-                  ((NOW() AT TIME ZONE 'Europe/Berlin')::date)
             GROUP BY day_de
             """,
             [campaign_id],
@@ -795,10 +783,6 @@ def stats_campaign_view(request, uid: str):
             JOIN public.rate_contacts rc ON rc.id = s.rate_contact_id
             JOIN public.raw_contacts_aggr ag ON ag.id = rc.contact_id
             WHERE s.campaign_id = %s
-              AND (ms.time AT TIME ZONE 'Europe/Berlin')::date BETWEEN
-                  ((NOW() AT TIME ZONE 'Europe/Berlin')::date - 4)
-                  AND
-                  ((NOW() AT TIME ZONE 'Europe/Berlin')::date)
             GROUP BY day_de, rc.contact_id
             ORDER BY day_de DESC, first_time DESC
             """,
@@ -846,25 +830,29 @@ def stats_campaign_view(request, uid: str):
             )
 
     pct = int(round((views * 100.0) / delivered)) if delivered else 0
-    today_de = timezone.localtime().date()
     day_sections = []
-    for day_offset in range(0, 5):
-        day = today_de - timedelta(days=day_offset)
-        day_sent = int(days_sent.get(day, 0))
-        day_delivered = int(days_delivered.get(day, 0))
-        day_views = int(days_views.get(day, 0))
-        day_pct = int(round((day_views * 100.0) / day_delivered)) if day_delivered else 0
-        day_sections.append(
-            {
-                "day": day,
-                "is_today": (day_offset == 0),
-                "sent": day_sent,
-                "delivered": day_delivered,
-                "views": day_views,
-                "pct": day_pct,
-                "visitors": visitors_by_day.get(day, []),
-            }
-        )
+    activity_days = sorted(set(days_sent.keys()) | set(days_views.keys()))
+    if activity_days:
+        day = max(activity_days)
+        min_day = min(activity_days)
+        today_de = timezone.localtime().date()
+        while day >= min_day:
+            day_sent = int(days_sent.get(day, 0))
+            day_delivered = int(days_delivered.get(day, 0))
+            day_views = int(days_views.get(day, 0))
+            day_pct = int(round((day_views * 100.0) / day_delivered)) if day_delivered else 0
+            day_sections.append(
+                {
+                    "day": day,
+                    "is_today": (day == today_de),
+                    "sent": day_sent,
+                    "delivered": day_delivered,
+                    "views": day_views,
+                    "pct": day_pct,
+                    "visitors": visitors_by_day.get(day, []),
+                }
+            )
+            day = day - timedelta(days=1)
 
     return render(
         request,
