@@ -1972,7 +1972,7 @@ msgstr "Delivered"
 #: templates/panels/overview.html:137 templates/panels/stats_campaign.html:22
 #: templates/panels/stats_campaign.html:47
 msgid "Переходы"
-msgstr "Clicks"
+msgstr "Visits"
 
 #: templates/panels/overview.html:176
 msgid "Активные аудитории"
