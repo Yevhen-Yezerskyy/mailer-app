@@ -1,130 +1,365 @@
 {% extends "panels/base.html" %}
 {% load i18n %}
+{% load static %}
 <!-- FILE: web/templates/panels/aap_audience/create_edit_sell.html -->
-<!-- DATE: 2026-03-08 -->
-<!-- PURPOSE: Placeholder create/edit page for sell mode. -->
+<!-- DATE: 2026-03-13 -->
+<!-- PURPOSE: Create/edit sell page with independent title/product/company/geo forms. -->
 
 {% block content %}
 
-<form method="post">
+{% include "panels/modals/system/unsaved_changes.html" %}
+
+<form method="post" data-dirty-form="title" data-submit-role="title">
   {% csrf_token %}
-  {% if task_id_token %}
-    <input type="hidden" name="id" value="{{ task_id_token }}">
-  {% endif %}
-
-<table class="YY-MAIN_TABLE">
-  <tr>
-    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
-      <div class="YY-CARD_WHITE min-h-[82px]">
-        <div class="YY-STATUS_GREEN mb-3">
-          {% trans "Поиск клиентов / покупателей" %}
-        </div>
-        <div class="flex gap-3">
-          <button type="button" class="YY-BUTTON_MAIN flex-1">
-            {% trans "Продукт/услуга" %}
-          </button>
-          <button type="button" class="YY-BUTTON_MAIN flex-1">
-            {% trans "Компания" %}
-          </button>
-          <button type="button" class="YY-BUTTON_MAIN flex-1">
-            {% trans "География" %}
-          </button>
-        </div>
-      </div>
-    </td>
-
-    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
-      <div class="YY-CARD_WHITE min-h-[82px]">
-        <input
-          type="text"
-          name="audience_title"
-          value="{{ audience_title }}"
-          class="YY-INPUT w-full"
-          placeholder="{% trans 'Название аудитории' %}">
-        <div class="flex gap-3 -mt-2">
-          <button type="button" class="YY-BUTTON_MAIN flex-1">
-            {% trans "Предложить название" %}
-          </button>
-          <button type="submit" name="action" value="save_title" class="YY-BUTTON_MAIN flex-1">
-            {% trans "Сохранить название" %}
-          </button>
-        </div>
-      </div>
-    </td>
-  </tr>
-</table>
-
-<table class="YY-MAIN_TABLE">
-  <tr>
-    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
-      <table class="w-full table-fixed border-collapse">
-        <tr>
-          <td class="align-top">
-            <div class="YY-CARD_WHITE min-h-[360px]">
-              <label class="YY-LABEL">
-                {% trans "Продукт / услуга. Что продаётся? Где применяется? Кто покупатель?" %}
-              </label>
-              <textarea name="source_product" class="YY-INPUT w-full" rows="12">{{ source_product }}</textarea>
-
-              <div class="flex gap-3 -mt-2">
-                <button type="submit" name="action" value="process_product" class="YY-BUTTON_MAIN flex-1">
-                  {% trans "Обработать" %}
-                </button>
-                <button type="submit" name="action" value="save_product" class="YY-BUTTON_MAIN flex-1">
-                  {% trans "Сохранить" %}
-                </button>
-              </div>
-              <div class="mt-3">
-                <button type="submit" name="action" value="reset_context" class="YY-BUTTON_MAIN w-full">
-                  {% trans "Сбросить контекст" %}
-                </button>
-              </div>
-            </div>
-          </td>
-        </tr>
-      </table>
-    </td>
-
-    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
-      <table class="w-full table-fixed border-collapse">
-        <tr>
-          <td class="align-top">
-            <div class="YY-CARD_WHITE min-h-[360px]">
-              <label class="YY-LABEL">{% trans "Указание для ИИ" %}</label>
-              <textarea name="ai_instruction" class="YY-INPUT w-full" rows="2">{{ ai_instruction }}</textarea>
-              <div class="flex justify-end -mt-2">
-                <button type="submit" name="action" value="run_ai" class="YY-BUTTON_MAIN w-1/2">{% trans "Выполнить" %}</button>
-              </div>
-              <input type="hidden" name="ai_advice" value="{{ ai_advice }}">
-              {% if ai_advice %}
-                <div class="YY-CARD_IN_FORM mt-4 mb-0">
-                  {{ ai_advice|linebreaksbr }}
-                </div>
-              {% else %}
-                <div class="YY-CARD_IN_FORM mt-4 mb-0 text-gray-500">
-                  {{ ai_placeholder_text }}
-                </div>
-              {% endif %}
-            </div>
-          </td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>
-
-{% if status_text %}
   <table class="YY-MAIN_TABLE">
     <tr>
-      <td class="YY-MAIN_BOTTOM_TD">
+      <td class="YY-MAIN_TOP_LEFT_TD">
         <div class="YY-CARD_WHITE">
-          <div class="YY-CARD_IN_FORM mb-0">{{ status_text }}</div>
+          <div class="YY-STATUS_GREEN">
+            {% trans "Поиск клиентов / покупателей" %}
+          </div>
+          <div class="YY-STATUS_GREEN !mb-0">
+            {% trans "Создание / редактирование задачи для сбора аудитории" %}
+          </div>
+        </div>
+      </td>
+      <td class="YY-MAIN_TOP_RIGHT_TD">
+        <div class="YY-CARD_WHITE">
+          <input
+            type="text"
+            name="audience_title"
+            value="{{ audience_title }}"
+            class="YY-INPUT"
+            data-track-dirty="1"
+            data-saved-value="{{ saved_title }}"
+            placeholder="{% trans 'Название аудитории' %}">
+          <div class="flex gap-3">
+            <button type="submit" name="action" value="suggest_title" class="YY-BUTTON_MAIN">
+              {% trans "Предложить название" %}
+            </button>
+            <button type="submit" name="action" value="save_title" class="YY-BUTTON_MAIN">
+              {% trans "Сохранить название" %}
+            </button>
+          </div>
         </div>
       </td>
     </tr>
   </table>
+</form>
+
+<form method="get" data-submit-role="nav">
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_TOP_TD">
+        <div class="YY-CARD_WHITE">
+          <div class="flex items-center justify-between gap-3">
+            <div class="grid grid-cols-[minmax(220px,1fr)_auto_minmax(220px,1fr)_auto_minmax(220px,1fr)] items-center gap-3">
+              <div class="w-full">
+                {% if status == "product" %}
+                  <div class="YY-STATUS_GREEN !mb-0 uppercase text-sm text-center justify-center">{% trans "Продукт/Услуга" %}</div>
+                {% else %}
+                  <button type="submit" name="status" value="product" class="YY-BUTTON_MAIN">{% trans "Продукт/Услуга" %}</button>
+                {% endif %}
+              </div>
+              <span class="font-bold text-[170%]">&rarr;</span>
+              <div class="w-full">
+                {% if status == "company" %}
+                  <div class="YY-STATUS_GREEN !mb-0 uppercase text-sm text-center justify-center">{% trans "Компания" %}</div>
+                {% else %}
+                  <button type="submit" name="status" value="company" class="YY-BUTTON_MAIN">{% trans "Компания" %}</button>
+                {% endif %}
+              </div>
+              <span class="font-bold text-[170%]">&rarr;</span>
+              <div class="w-full">
+                {% if status == "geo" %}
+                  <div class="YY-STATUS_GREEN !mb-0 uppercase text-sm text-center justify-center">{% trans "География" %}</div>
+                {% else %}
+                  <button type="submit" name="status" value="geo" class="YY-BUTTON_MAIN">{% trans "География" %}</button>
+                {% endif %}
+              </div>
+            </div>
+            <div>
+              <button
+                type="button"
+                class="YY-BUTTON_MAIN"
+                data-dirty-nav="{% url 'audience:create_list' %}">
+                {% trans "Закрыть / перейти к списку аудиторий" %}
+              </button>
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+</form>
+
+{% if status == "company" %}
+<form method="post" data-dirty-form="company" data-submit-role="company">
+  {% csrf_token %}
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD">
+        <div class="YY-CARD_WHITE">
+          <label class="YY-LABEL">
+            {% trans "Компания-продавец. Кто продаёт продукт/услугу? Какой профиль деятельности, масштаб, специализация?" %}
+          </label>
+          <textarea
+            name="source_company"
+            class="YY-TEXTAREA"
+            rows="18"
+            data-track-dirty="1"
+            data-saved-value="{{ saved_source_company }}"
+            placeholder="{% trans 'Опишите компанию-продавца: профиль, специализацию, масштабы, ключевые компетенции.' %}">{{ source_company }}</textarea>
+          <div class="flex gap-3">
+            <button type="submit" name="action" value="process_company" class="YY-BUTTON_MAIN">
+              {% trans "Обработать" %}
+            </button>
+            <button type="submit" name="action" value="save_company" class="YY-BUTTON_MAIN">
+              {% trans "Сохранить" %}
+            </button>
+          </div>
+        </div>
+      </td>
+      <td class="YY-MAIN_TOP_RIGHT_TD">
+        <div class="YY-CARD_WHITE flex flex-col">
+          <label class="YY-LABEL">{% trans "Указание / вопрос для ИИ ассистента." %}</label>
+          <textarea
+            name="company_ai_instruction"
+            class="YY-TEXTAREA"
+            rows="2"
+            data-track-dirty="1"
+            data-saved-value=""
+            placeholder="{% trans 'Дайте указание и / или задайте вопрос асситенту ИИ. Указание будет применено к описанию, на вопрос предлагается независимый ответ' %}">{{ company_ai_instruction }}</textarea>
+          <div>
+            <button type="submit" name="action" value="process_company" class="YY-BUTTON_MAIN !mb-3">{% trans "Выполнить / задать вопрос" %}</button>
+          </div>
+          <input type="hidden" name="company_ai_advice" value="{{ company_ai_advice }}" data-track-dirty="1" data-saved-value="">
+          <input type="hidden" name="company_ai_question" value="{{ company_ai_question }}" data-track-dirty="1" data-saved-value="">
+          {% if company_ai_instruction %}
+            <div>
+              <div><strong>{% trans "Указание/вопрос:" %}</strong></div>
+              <div class="mb-3">{{ company_ai_instruction|linebreaksbr }}</div>
+              <div><strong>{% trans "Ответ ассистента ИИ:" %}</strong></div>
+              {% if company_ai_advice %}
+                <div class="mb-3">{{ company_ai_advice|linebreaksbr }}</div>
+              {% else %}
+                <div class="mb-3">{% trans "Выполнено" %}</div>
+              {% endif %}
+              {% if company_ai_question %}
+                <div><strong>{% trans "Вопрос от ассистента ИИ:" %}</strong></div>
+                <div class="mb-3">{{ company_ai_question|linebreaksbr }}</div>
+              {% endif %}
+            </div>
+          {% else %}
+            <div>
+              <p>{% trans "Введите инструкцию для работы с описанием продукта или услуги — что нужно добавить, удалить или изменить. Указанная инструкция будет применена к текущему описанию." %}</p>
+              <p>{% trans "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над описанием продукта или услуги. Ответ на вопрос будет дан отдельно и не изменит текст описания." %}</p>
+              <p>{% trans "В процессе обработки ИИ будет задавать вопросы и давать подсказки для уточнения описания. Поскольку основные варианты уже указаны в начальном описании, часть подсказок может быть нерелевантной. При необходимости добавьте информацию в описание или в указание для ассистента ИИ." %}</p>
+            </div>
+          {% endif %}
+          <div class="flex justify-end gap-3 mt-auto">
+            <button type="submit" name="action" value="reset_company_context" class="YY-BUTTON_MAIN">
+              {% trans "Очистить" %}
+            </button>
+            <button
+              type="button"
+              class="YY-BUTTON_MAIN"
+              data-dirty-nav="{% if task_id_token %}{% url 'audience:create_edit_sell_id' task_id_token %}?status=geo{% else %}{% url 'audience:create_edit_sell' %}?status=geo{% endif %}">
+              {% trans "География" %} <span>&rarr;</span>
+            </button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+</form>
+{% elif status == "geo" %}
+<form method="post" data-dirty-form="geo" data-submit-role="geo">
+  {% csrf_token %}
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD">
+        <div class="YY-CARD_WHITE">
+          <label class="YY-LABEL">
+            {% trans "Географические параметры. Где продаётся продукт/услуга и где находятся приоритетные рынки/зоны охвата?" %}
+          </label>
+          <textarea
+            name="source_geo"
+            class="YY-TEXTAREA"
+            rows="18"
+            data-track-dirty="1"
+            data-saved-value="{{ saved_source_geo }}"
+            placeholder="{% trans 'Опишите географические параметры продаж: рынки, зоны охвата, территориальные ограничения.' %}">{{ source_geo }}</textarea>
+          <div class="flex gap-3">
+            <button type="submit" name="action" value="process_geo" class="YY-BUTTON_MAIN">
+              {% trans "Обработать" %}
+            </button>
+            <button type="submit" name="action" value="save_geo" class="YY-BUTTON_MAIN">
+              {% trans "Сохранить" %}
+            </button>
+          </div>
+        </div>
+      </td>
+      <td class="YY-MAIN_TOP_RIGHT_TD">
+        <div class="YY-CARD_WHITE flex flex-col">
+          <label class="YY-LABEL">{% trans "Указание / вопрос для ИИ ассистента." %}</label>
+          <textarea
+            name="geo_ai_instruction"
+            class="YY-TEXTAREA"
+            rows="2"
+            data-track-dirty="1"
+            data-saved-value=""
+            placeholder="{% trans 'Дайте указание и / или задайте вопрос асситенту ИИ. Указание будет применено к описанию, на вопрос предлагается независимый ответ' %}">{{ geo_ai_instruction }}</textarea>
+          <div>
+            <button type="submit" name="action" value="process_geo" class="YY-BUTTON_MAIN !mb-3">{% trans "Выполнить / задать вопрос" %}</button>
+          </div>
+          <input type="hidden" name="geo_ai_advice" value="{{ geo_ai_advice }}" data-track-dirty="1" data-saved-value="">
+          <input type="hidden" name="geo_ai_question" value="{{ geo_ai_question }}" data-track-dirty="1" data-saved-value="">
+          {% if geo_ai_instruction %}
+            <div>
+              <div><strong>{% trans "Указание/вопрос:" %}</strong></div>
+              <div class="mb-3">{{ geo_ai_instruction|linebreaksbr }}</div>
+              <div><strong>{% trans "Ответ ассистента ИИ:" %}</strong></div>
+              {% if geo_ai_advice %}
+                <div class="mb-3">{{ geo_ai_advice|linebreaksbr }}</div>
+              {% else %}
+                <div class="mb-3">{% trans "Выполнено" %}</div>
+              {% endif %}
+              {% if geo_ai_question %}
+                <div><strong>{% trans "Вопрос от ассистента ИИ:" %}</strong></div>
+                <div class="mb-3">{{ geo_ai_question|linebreaksbr }}</div>
+              {% endif %}
+            </div>
+          {% else %}
+            <div>
+              <p>{% trans "Введите инструкцию для работы с описанием продукта или услуги — что нужно добавить, удалить или изменить. Указанная инструкция будет применена к текущему описанию." %}</p>
+              <p>{% trans "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над описанием продукта или услуги. Ответ на вопрос будет дан отдельно и не изменит текст описания." %}</p>
+              <p>{% trans "В процессе обработки ИИ будет задавать вопросы и давать подсказки для уточнения описания. Поскольку основные варианты уже указаны в начальном описании, часть подсказок может быть нерелевантной. При необходимости добавьте информацию в описание или в указание для ассистента ИИ." %}</p>
+            </div>
+          {% endif %}
+          <div class="flex justify-end gap-3 mt-auto">
+            <button type="submit" name="action" value="reset_geo_context" class="YY-BUTTON_MAIN">
+              {% trans "Очистить" %}
+            </button>
+            <button
+              type="button"
+              class="YY-BUTTON_MAIN"
+              data-dirty-nav="{% if task_id_token %}{% url 'audience:create_edit_sell_id' task_id_token %}?status=product{% else %}{% url 'audience:create_edit_sell' %}?status=product{% endif %}">
+              {% trans "Продукт/Услуга" %} <span>&rarr;</span>
+            </button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+</form>
+{% else %}
+<form method="post" data-dirty-form="product" data-submit-role="product">
+  {% csrf_token %}
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD">
+        <div class="YY-CARD_WHITE">
+          <label class="YY-LABEL">
+            {% trans "Продукт / услуга. Что продаётся? Где применяется? Кто покупатель?" %}
+          </label>
+          <textarea
+            name="source_product"
+            class="YY-TEXTAREA"
+            rows="18"
+            data-track-dirty="1"
+            data-saved-value="{{ saved_source_product }}"
+            placeholder="Для корректного выбора бизнес-категорий и рейтингования потенциальных клиентов необходимо сформировать описание продукта или услуги. Введите описание продукта / услуги. Можно использовать ссылку / ссылки в формате https://www.example.com. Можно воспользоваться помощью ИИ-ассистента.&#10;&#10;«Обработать» — помощь ИИ.&#10;При нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, сделает его более подробным, структурированным и удобным для машинной обработки. В дальнейшем любые добавленные вами данные будут автоматически встроены в структуру описания. Удалённые элементы также будут корректно исключены. Результат обработки не сохраняется автоматически.&#10;&#10;«Сохранить» — сохранить описание&#10;Кнопка «Сохранить» записывает текущую версию описания для дальнейшего использования.">{{ source_product }}</textarea>
+          <div class="flex gap-3">
+            <button type="submit" name="action" value="process_product" class="YY-BUTTON_MAIN">
+              {% trans "Обработать" %}
+            </button>
+            <button type="submit" name="action" value="save_product" class="YY-BUTTON_MAIN">
+              {% trans "Сохранить" %}
+            </button>
+          </div>
+        </div>
+      </td>
+      <td class="YY-MAIN_TOP_RIGHT_TD">
+        <div class="YY-CARD_WHITE flex flex-col">
+          <label class="YY-LABEL">{% trans "Указание / вопрос для ИИ ассистента." %}</label>
+          <textarea
+            name="product_ai_instruction"
+            class="YY-TEXTAREA"
+            rows="2"
+            data-track-dirty="1"
+            data-saved-value=""
+            placeholder="{% trans 'Дайте указание и / или задайте вопрос асситенту ИИ. Указание будет применено к описанию, на вопрос предлагается независимый ответ' %}">{{ product_ai_instruction }}</textarea>
+          <div>
+            <button type="submit" name="action" value="process_product" class="YY-BUTTON_MAIN !mb-3">{% trans "Выполнить / задать вопрос" %}</button>
+          </div>
+          <input type="hidden" name="product_ai_advice" value="{{ product_ai_advice }}" data-track-dirty="1" data-saved-value="">
+          <input type="hidden" name="product_ai_question" value="{{ product_ai_question }}" data-track-dirty="1" data-saved-value="">
+          {% if product_ai_instruction %}
+            <div>
+              <div><strong>{% trans "Указание/вопрос:" %}</strong></div>
+              <div class="mb-3">{{ product_ai_instruction|linebreaksbr }}</div>
+              <div><strong>{% trans "Ответ ассистента ИИ:" %}</strong></div>
+              {% if product_ai_advice %}
+                <div class="mb-3">{{ product_ai_advice|linebreaksbr }}</div>
+              {% else %}
+                <div class="mb-3">{% trans "Выполнено" %}</div>
+              {% endif %}
+              {% if product_ai_question %}
+                <div><strong>{% trans "Вопрос от ассистента ИИ:" %}</strong></div>
+                <div class="mb-3">{{ product_ai_question|linebreaksbr }}</div>
+              {% endif %}
+            </div>
+          {% else %}
+            <div>
+              <p>{% trans "Введите инструкцию для работы с описанием продукта или услуги — что нужно добавить, удалить или изменить. Указанная инструкция будет применена к текущему описанию." %}</p>
+              <p>{% trans "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над описанием продукта или услуги. Ответ на вопрос будет дан отдельно и не изменит текст описания." %}</p>
+              <p>{% trans "В процессе обработки ИИ будет задавать вопросы и давать подсказки для уточнения описания. Поскольку основные варианты уже указаны в начальном описании, часть подсказок может быть нерелевантной. При необходимости добавьте информацию в описание или в указание для ассистента ИИ." %}</p>
+            </div>
+          {% endif %}
+          <div class="flex justify-end gap-3 mt-auto">
+            <button type="submit" name="action" value="reset_product_context" class="YY-BUTTON_MAIN">
+              {% trans "Очистить" %}
+            </button>
+            <button
+              type="button"
+              class="YY-BUTTON_MAIN"
+              data-dirty-nav="{% if task_id_token %}{% url 'audience:create_edit_sell_id' task_id_token %}?status=company{% else %}{% url 'audience:create_edit_sell' %}?status=company{% endif %}">
+              {% trans "Компания" %} <span>&rarr;</span>
+            </button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+</form>
 {% endif %}
 
-</form>
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-LABEL">{% trans "Сохранено в базе" %}</div>
+        <div class="YY-LABEL">{% trans "Название аудитории" %}</div>
+        <div class="YY-CARD_IN_FORM mb-3">{{ saved_title|default:""|linebreaksbr }}</div>
+        <div class="YY-LABEL">source_product</div>
+        <div class="YY-CARD_IN_FORM mb-3">{{ saved_source_product|default:""|linebreaksbr }}</div>
+        <div class="YY-LABEL">source_company</div>
+        <div class="YY-CARD_IN_FORM mb-3">{{ saved_source_company|default:""|linebreaksbr }}</div>
+        <div class="YY-LABEL">source_geo</div>
+        <div class="YY-CARD_IN_FORM">{{ saved_source_geo|default:""|linebreaksbr }}</div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<div
+  id="yy-create-edit-sell-config"
+  data-label-title="{% trans 'Название' %}"
+  data-label-product="{% trans 'Продукт/услуга' %}"
+  data-label-company="{% trans 'Компания' %}"
+  data-label-geo="{% trans 'География' %}"
+  class="hidden"></div>
+<script src="{% static 'js/aap_audience/create_edit_sell.js' %}"></script>
 
 {% endblock %}

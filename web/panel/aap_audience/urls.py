@@ -29,4 +29,5 @@ urlpatterns = [
     path("create/", create_list_view, name="create_list"),
     path("create/edit-buy/", create_edit_buy_view, name="create_edit_buy"),
     path("create/edit-sell/", create_edit_sell_view, name="create_edit_sell"),
+    path("create/edit-sell/<str:item_id>/", create_edit_sell_view, name="create_edit_sell_id"),
 ]

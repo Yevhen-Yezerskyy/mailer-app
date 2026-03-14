@@ -5,6 +5,10 @@
   padding-bottom: 3px;
 }
 
+p + p {
+  margin-top: 1.1em;
+}
+
 input[aria-invalid="true"],
 textarea[aria-invalid="true"],
 select[aria-invalid="true"] {
@@ -116,4 +120,3 @@ select[aria-invalid="true"] {
 .bg-100{
   background: #ffd0b6 !important;
 }
-

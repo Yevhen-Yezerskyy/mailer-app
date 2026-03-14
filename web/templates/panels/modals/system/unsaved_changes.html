@@ -1,0 +1,16 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/modals/system/unsaved_changes.html -->
+<!-- DATE: 2026-03-14 -->
+<!-- PURPOSE: Reusable modal body for unsaved changes warning. -->
+
+<div id="yy-unsaved-changes-template" class="hidden">
+  <div class="YY-CARD_WHITE" style="width: 560px; max-width: 92vw;">
+    <div class="YY-TEXT-BOLD mb-3" data-unsaved-title>{% trans "Несохраненные изменения" %}</div>
+    <div class="YY-TEXT mb-3" data-unsaved-text>{% trans "Будут потеряны несохраненные данные:" %}</div>
+    <ul class="YY-TEXT mb-4" data-unsaved-list style="padding-left: 1.25rem; list-style: disc;"></ul>
+    <div class="flex gap-3 justify-end">
+      <button type="button" class="YY-BUTTON_MAIN" data-unsaved-continue>{% trans "Продолжить" %}</button>
+      <button type="button" class="YY-BUTTON_MAIN" data-yy-modal-close>{% trans "Отмена" %}</button>
+    </div>
+  </div>
+</div>

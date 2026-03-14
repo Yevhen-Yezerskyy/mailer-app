@@ -58,7 +58,7 @@
                         {% trans "Изменить" %}
                       </a>
                     {% else %}
-                      <a href="{% url 'audience:create_edit_sell' %}?id={{ t.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
+                      <a href="{% url 'audience:create_edit_sell_id' t.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-2">
                         {% trans "Изменить" %}
                       </a>
                     {% endif %}

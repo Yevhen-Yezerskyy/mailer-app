@@ -1,58 +1,130 @@
 # FILE: web/panel/aap_audience/views/create_edit_sell.py
-# DATE: 2026-03-08
-# PURPOSE: Create/edit sell page with GPT dialog for product refinement.
+# DATE: 2026-03-13
+# PURPOSE: Create/edit sell page with independent title/product/company/geo flows and separate GPT dialogs.
 
 import json
-from pathlib import Path
 
 from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.utils.translation import get_language
 
 from engine.common.gpt import GPTClient
-from mailer_web.access import decode_id
+from engine.common.prompts.process import LANG_MAP, get_prompt
+from mailer_web.access import decode_id, encode_id
 from panel.aap_audience.models import AudienceTask
 
 
-def _prompt_text() -> str:
-    p = Path(__file__).resolve().parents[4] / "engine" / "common" / "prompts" / "create_sell_product_02.txt"
+FORM_CONFIG = {
+    "product": {
+        "field_name": "source_product",
+        "prompt_key": "create_sell_product",
+        "json_key": "product",
+        "input_label": "ПРОДУКТ",
+        "user_id": "panel.audience.create_edit_sell.product",
+    },
+    "company": {
+        "field_name": "source_company",
+        "prompt_key": "create_sell_company",
+        "json_key": "company",
+        "input_label": "COMPANY",
+        "user_id": "panel.audience.create_edit_sell.company",
+    },
+    "geo": {
+        "field_name": "source_geo",
+        "prompt_key": "create_sell_geo",
+        "json_key": "geo",
+        "input_label": "GEO",
+        "user_id": "panel.audience.create_edit_sell.geo",
+    },
+}
+
+
+def _build_edit_url(item_id: str, status: str) -> str:
+    return f"{reverse('audience:create_edit_sell_id', args=[item_id])}?status={status}"
+
+
+def _session_key(request, item_id: str, section: str) -> str:
+    return f"create_edit_sell_dialog:{request.workspace_id}:{request.user.id}:{item_id or 'new'}:{section}"
+
+
+def _fallback_title_from_texts(*values: str) -> str:
+    text = " ".join(" ".join((value or "").split()).strip() for value in values if (value or "").strip()).strip()
+    if not text:
+        return "Новая аудитория"
+    return text[:120].strip() or "Новая аудитория"
+
+
+def _response_language_name(request) -> str:
+    lang_code = (getattr(request, "LANGUAGE_CODE", "") or get_language() or "en").lower()
+    return LANG_MAP.get(lang_code, lang_code)
+
+
+def _prompt_instructions(request, prompt_key: str) -> str:
+    lang_code = (getattr(request, "LANGUAGE_CODE", "") or get_language() or "en").lower()
+    prompt_text = (get_prompt(prompt_key, lang=lang_code) or "").strip()
+    return f"Response Language - {_response_language_name(request)}\n\n{prompt_text}".strip()
+
+
+def _generate_task_title_from_db(
+    *,
+    request,
+    product_text: str,
+    company_text: str,
+    geo_text: str,
+) -> str:
+    payload = (
+        f"PRODUCT:\n{(product_text or '').strip()}\n\n"
+        f"COMPANY:\n{(company_text or '').strip()}\n\n"
+        f"GEO:\n{(geo_text or '').strip()}"
+    )
     try:
-        return p.read_text(encoding="utf-8").strip()
+        resp = GPTClient().ask(
+            model="gpt-5.4",
+            instructions=_prompt_instructions(request, "create_sell_title"),
+            input=payload,
+            user_id="panel.audience.create_edit_sell.title",
+            service_tier="flex",
+            use_cache=False,
+        )
+        title = " ".join((resp.content or "").split()).strip()
+        return title[:255] if title else _fallback_title_from_texts(product_text, company_text, geo_text)
     except Exception:
-        return ""
+        return _fallback_title_from_texts(product_text, company_text, geo_text)
 
 
-def _session_key(request, form_ref: str) -> str:
-    return f"create_sell_product_dialog:{request.workspace_id}:{request.user.id}:{form_ref}"
-
-
-def _parse_ai_json(text: str) -> tuple[str, str]:
+def _parse_ai_json(text: str, main_key: str) -> tuple[str, str, str]:
     raw = (text or "").strip()
     if not raw:
-        return "", ""
+        return "", "", ""
     try:
         data = json.loads(raw)
     except Exception:
         s = raw.find("{")
         e = raw.rfind("}")
         if s == -1 or e == -1 or e <= s:
-            return "", raw
+            return "", raw, ""
         try:
             data = json.loads(raw[s : e + 1])
         except Exception:
-            return "", raw
+            return "", raw, ""
 
     if not isinstance(data, dict):
-        return "", raw
+        return "", raw, ""
 
-    product = str(data.get("product") or "").strip()
-    advice = str(data.get("advice") or "").strip()
-    return product, advice
+    main_value = str(data.get(main_key) or "").strip()
+    advice_answer = str(data.get("advice_answer") or "").strip()
+    advice_question = str(data.get("advice_question") or "").strip()
+    advice_legacy = str(data.get("advice") or "").strip()
+    if advice_answer or advice_question:
+        return main_value, advice_answer, advice_question
+    return main_value, advice_legacy, ""
 
 
-def _resolve_task(request, token: str):
-    if not token:
+def _resolve_task(request, item_id: str):
+    if not item_id:
         return None
     try:
-        pk = int(decode_id(token))
+        pk = int(decode_id(item_id))
     except Exception:
         return None
     return (
@@ -66,93 +138,284 @@ def _resolve_task(request, token: str):
     )
 
 
-def create_edit_sell_view(request):
-    token = (request.GET.get("id") or request.POST.get("id") or "").strip()
-    task = _resolve_task(request, token)
-    form_ref = token or "new"
-
-    title_text = (task.title or "") if task else ""
-    product_text = (task.source_product or "") if task else ""
-    instruction_text = ""
-    ai_advice_text = ""
-    status_text = ""
-
-    state_key = _session_key(request, form_ref)
+def _run_section_dialog(request, *, section: str, item_id: str, value: str, instruction: str):
+    conf = FORM_CONFIG[section]
+    state_key = _session_key(request, item_id, section)
     state = request.session.get(state_key, {}) or {}
+    payload = f"{conf['input_label']}:\n{value}\n\nИНСТРУКЦИЯ:\n{instruction}"
+
+    resp = GPTClient().ask_dialog(
+        model="gpt-5.4",
+        instructions=_prompt_instructions(request, conf["prompt_key"]),
+        input=payload,
+        conversation=str(state.get("conversation_id") or ""),
+        previous_response_id=str(state.get("response_id") or ""),
+        user_id=conf["user_id"],
+        service_tier="flex",
+    )
+    new_value, new_advice, new_question = _parse_ai_json(resp.content or "", conf["json_key"])
+
+    raw = resp.raw if isinstance(resp.raw, dict) else {}
+    response_id = str(raw.get("id") or "").strip()
+    conv_val = raw.get("conversation")
+    conversation_id = ""
+    if isinstance(conv_val, dict):
+        conversation_id = str(conv_val.get("id") or "").strip()
+    elif conv_val is not None:
+        conversation_id = str(conv_val).strip()
+
+    request.session[state_key] = {
+        "conversation_id": conversation_id or str(state.get("conversation_id") or ""),
+        "response_id": response_id or str(state.get("response_id") or ""),
+    }
+    request.session.modified = True
+    return new_value, new_advice, new_question
+
+
+def _reset_section_dialog(request, *, item_id: str, section: str):
+    request.session.pop(_session_key(request, item_id, section), None)
+    request.session.modified = True
+
+
+def create_edit_sell_view(request, item_id: str = ""):
+    status = (request.GET.get("status") or request.POST.get("status") or "product").strip().lower()
+    if status not in FORM_CONFIG:
+        status = "product"
+
+    task = _resolve_task(request, item_id)
+    saved_title = (task.title or "") if task else ""
+    saved_product = (task.source_product or "") if task else ""
+    saved_company = (task.source_company or "") if task else ""
+    saved_geo = (task.source_geo or "") if task else ""
+
+    title_text = saved_title
+    product_text = saved_product
+    company_text = saved_company
+    geo_text = saved_geo
+
+    ai_instruction_map = {"product": "", "company": "", "geo": ""}
+    ai_advice_map = {"product": "", "company": "", "geo": ""}
+    ai_question_map = {"product": "", "company": "", "geo": ""}
+    status_text = ""
+    last_action = ""
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
-        title_text = (request.POST.get("audience_title") or "").strip()
-        product_text = (request.POST.get("source_product") or "").strip()
-        instruction_text = (request.POST.get("ai_instruction") or "").strip()
-        ai_advice_text = (request.POST.get("ai_advice") or "").strip()
+        last_action = action
+        title_text = (request.POST.get("audience_title") or saved_title).strip()
+        product_text = (request.POST.get("source_product") or saved_product).strip()
+        company_text = (request.POST.get("source_company") or saved_company).strip()
+        geo_text = (request.POST.get("source_geo") or saved_geo).strip()
+        ai_instruction_map["product"] = (request.POST.get("product_ai_instruction") or "").strip()
+        ai_instruction_map["company"] = (request.POST.get("company_ai_instruction") or "").strip()
+        ai_instruction_map["geo"] = (request.POST.get("geo_ai_instruction") or "").strip()
+        ai_advice_map["product"] = (request.POST.get("product_ai_advice") or "").strip()
+        ai_advice_map["company"] = (request.POST.get("company_ai_advice") or "").strip()
+        ai_advice_map["geo"] = (request.POST.get("geo_ai_advice") or "").strip()
+        ai_question_map["product"] = (request.POST.get("product_ai_question") or "").strip()
+        ai_question_map["company"] = (request.POST.get("company_ai_question") or "").strip()
+        ai_question_map["geo"] = (request.POST.get("geo_ai_question") or "").strip()
 
-        if action in {"run_ai", "process_product"}:
+        if action == "save_title":
+            if not title_text:
+                status_text = "Название пустое."
+            elif task:
+                task.title = title_text
+                task.save(update_fields=["title", "updated_at"])
+                saved_title = task.title
+                status_text = "Название сохранено."
+            else:
+                task = AudienceTask.objects.create(
+                    workspace_id=request.workspace_id,
+                    user=request.user,
+                    task="",
+                    title=title_text,
+                    task_branches="",
+                    task_geo="",
+                    type="sell",
+                )
+                return redirect(_build_edit_url(encode_id(int(task.id)), status))
+
+        elif action == "suggest_title":
+            if not task:
+                status_text = "Нет сохраненных данных для подбора названия."
+            elif not (saved_product or saved_company or saved_geo):
+                status_text = "Нет сохраненных данных продукта, компании или географии."
+            else:
+                title_text = _generate_task_title_from_db(
+                    request=request,
+                    product_text=saved_product,
+                    company_text=saved_company,
+                    geo_text=saved_geo,
+                )
+                status_text = "Название предложено."
+
+        elif action == "process_product":
             try:
-                prompt = _prompt_text()
-                payload = (
-                    f"ПРОДУКТ:\n{product_text}\n\n"
-                    f"ИНСТРУКЦИЯ:\n{instruction_text}"
+                new_value, new_advice, new_question = _run_section_dialog(
+                    request,
+                    section="product",
+                    item_id=item_id,
+                    value=product_text,
+                    instruction=ai_instruction_map["product"],
                 )
-                resp = GPTClient().ask_dialog(
-                    model="gpt-5.1",
-                    instructions=prompt,
-                    input=payload,
-                    conversation=str(state.get("conversation_id") or ""),
-                    previous_response_id=str(state.get("response_id") or ""),
-                    user_id="panel.audience.create_edit_sell.product",
-                    service_tier="flex",
-                )
-                new_product, new_advice = _parse_ai_json(resp.content or "")
-                if new_product:
-                    product_text = new_product
-                ai_advice_text = new_advice or ai_advice_text
-
-                raw = resp.raw if isinstance(resp.raw, dict) else {}
-                response_id = str(raw.get("id") or "").strip()
-                conv_val = raw.get("conversation")
-                conversation_id = ""
-                if isinstance(conv_val, dict):
-                    conversation_id = str(conv_val.get("id") or "").strip()
-                elif conv_val is not None:
-                    conversation_id = str(conv_val).strip()
-
-                request.session[state_key] = {
-                    "conversation_id": conversation_id or str(state.get("conversation_id") or ""),
-                    "response_id": response_id or str(state.get("response_id") or ""),
-                }
-                request.session.modified = True
+                if new_value:
+                    product_text = new_value
+                ai_advice_map["product"] = new_advice or ai_advice_map["product"]
+                ai_question_map["product"] = new_question or ai_question_map["product"]
                 status_text = "Обработка выполнена."
             except Exception as exc:
                 status_text = f"Ошибка: {exc}"
 
-        elif action == "save_title":
-            if task:
-                task.title = title_text
-                task.save(update_fields=["title", "updated_at"])
-                status_text = "Название сохранено."
-            else:
-                status_text = "Название не сохранено: новая форма без записи."
-
         elif action == "save_product":
-            if task:
+            if not product_text:
+                status_text = "Описание продукта/услуги пустое."
+            elif task:
                 task.source_product = product_text
                 task.save(update_fields=["source_product", "updated_at"])
+                saved_product = task.source_product
                 status_text = "Продукт/услуга сохранены."
             else:
-                status_text = "Продукт/услуга не сохранены: новая форма без записи."
+                title_generated = _generate_task_title_from_db(
+                    request=request,
+                    product_text=product_text,
+                    company_text="",
+                    geo_text="",
+                )
+                task = AudienceTask.objects.create(
+                    workspace_id=request.workspace_id,
+                    user=request.user,
+                    task="",
+                    title=title_generated,
+                    task_branches="",
+                    task_geo="",
+                    type="sell",
+                    source_product=product_text,
+                )
+                return redirect(_build_edit_url(encode_id(int(task.id)), "product"))
 
-        elif action == "reset_context":
-            request.session.pop(state_key, None)
-            request.session.modified = True
-            title_text = ""
-            product_text = ""
-            instruction_text = ""
-            ai_advice_text = ""
-            status_text = "Контекст и форма очищены."
+        elif action == "reset_product_context":
+            _reset_section_dialog(request, item_id=item_id, section="product")
+            product_text = saved_product
+            ai_instruction_map["product"] = ""
+            ai_advice_map["product"] = ""
+            ai_question_map["product"] = ""
+            status_text = "Контекст формы очищен."
+
+        elif action == "process_company":
+            try:
+                new_value, new_advice, new_question = _run_section_dialog(
+                    request,
+                    section="company",
+                    item_id=item_id,
+                    value=company_text,
+                    instruction=ai_instruction_map["company"],
+                )
+                if new_value:
+                    company_text = new_value
+                ai_advice_map["company"] = new_advice or ai_advice_map["company"]
+                ai_question_map["company"] = new_question or ai_question_map["company"]
+                status_text = "Обработка выполнена."
+            except Exception as exc:
+                status_text = f"Ошибка: {exc}"
+
+        elif action == "save_company":
+            if not company_text:
+                status_text = "Описание компании пустое."
+            elif task:
+                task.source_company = company_text
+                task.save(update_fields=["source_company", "updated_at"])
+                saved_company = task.source_company
+                status_text = "Компания сохранена."
+            else:
+                title_generated = _generate_task_title_from_db(
+                    request=request,
+                    product_text="",
+                    company_text=company_text,
+                    geo_text="",
+                )
+                task = AudienceTask.objects.create(
+                    workspace_id=request.workspace_id,
+                    user=request.user,
+                    task="",
+                    title=title_generated,
+                    task_branches="",
+                    task_geo="",
+                    type="sell",
+                    source_company=company_text,
+                )
+                return redirect(_build_edit_url(encode_id(int(task.id)), "company"))
+
+        elif action == "reset_company_context":
+            _reset_section_dialog(request, item_id=item_id, section="company")
+            company_text = saved_company
+            ai_instruction_map["company"] = ""
+            ai_advice_map["company"] = ""
+            ai_question_map["company"] = ""
+            status_text = "Контекст формы очищен."
+
+        elif action == "process_geo":
+            try:
+                new_value, new_advice, new_question = _run_section_dialog(
+                    request,
+                    section="geo",
+                    item_id=item_id,
+                    value=geo_text,
+                    instruction=ai_instruction_map["geo"],
+                )
+                if new_value:
+                    geo_text = new_value
+                ai_advice_map["geo"] = new_advice or ai_advice_map["geo"]
+                ai_question_map["geo"] = new_question or ai_question_map["geo"]
+                status_text = "Обработка выполнена."
+            except Exception as exc:
+                status_text = f"Ошибка: {exc}"
+
+        elif action == "save_geo":
+            if not geo_text:
+                status_text = "Описание географии пустое."
+            elif task:
+                task.source_geo = geo_text
+                task.save(update_fields=["source_geo", "updated_at"])
+                saved_geo = task.source_geo
+                status_text = "География сохранена."
+            else:
+                title_generated = _generate_task_title_from_db(
+                    request=request,
+                    product_text="",
+                    company_text="",
+                    geo_text=geo_text,
+                )
+                task = AudienceTask.objects.create(
+                    workspace_id=request.workspace_id,
+                    user=request.user,
+                    task="",
+                    title=title_generated,
+                    task_branches="",
+                    task_geo="",
+                    type="sell",
+                    source_geo=geo_text,
+                )
+                return redirect(_build_edit_url(encode_id(int(task.id)), "geo"))
+
+        elif action == "reset_geo_context":
+            _reset_section_dialog(request, item_id=item_id, section="geo")
+            geo_text = saved_geo
+            ai_instruction_map["geo"] = ""
+            ai_advice_map["geo"] = ""
+            ai_question_map["geo"] = ""
+            status_text = "Контекст формы очищен."
 
         elif action == "close":
             return redirect("audience:create_list")
+
+        task = _resolve_task(request, item_id) if item_id else task
+        saved_title = (task.title or "") if task else saved_title
+        saved_product = (task.source_product or "") if task else saved_product
+        saved_company = (task.source_company or "") if task else saved_company
+        saved_geo = (task.source_geo or "") if task else saved_geo
+
+    audience_title = title_text if last_action in {"suggest_title", "save_title"} else saved_title
 
     return render(
         request,
@@ -160,13 +423,26 @@ def create_edit_sell_view(request):
         {
             "type": "sell",
             "is_placeholder": False,
+            "status": status,
             "task": task,
-            "task_id_token": token,
-            "audience_title": title_text,
+            "task_id_token": item_id,
+            "audience_title": audience_title,
             "source_product": product_text,
-            "ai_instruction": instruction_text,
-            "ai_advice": ai_advice_text,
-            "ai_placeholder_text": "Пусто. Введите продукт и нажмите «Обработать».",
+            "source_company": company_text,
+            "source_geo": geo_text,
+            "product_ai_instruction": ai_instruction_map["product"],
+            "product_ai_advice": ai_advice_map["product"],
+            "product_ai_question": ai_question_map["product"],
+            "company_ai_instruction": ai_instruction_map["company"],
+            "company_ai_advice": ai_advice_map["company"],
+            "company_ai_question": ai_question_map["company"],
+            "geo_ai_instruction": ai_instruction_map["geo"],
+            "geo_ai_advice": ai_advice_map["geo"],
+            "geo_ai_question": ai_question_map["geo"],
+            "saved_title": saved_title,
+            "saved_source_product": saved_product,
+            "saved_source_company": saved_company,
+            "saved_source_geo": saved_geo,
             "status_text": status_text,
         },
     )

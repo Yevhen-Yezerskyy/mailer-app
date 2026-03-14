@@ -37,6 +37,7 @@ MODEL_ALIASES: dict[str, str] = {
 
 MODEL_WEB_TOOL: dict[str, str] = {
     "gpt-5.1": "web_search_preview",
+    "gpt-5.4": "web_search_preview",
     "gpt-5-mini": "web_search_preview",
     "gpt-5-nano": "web_search_preview",
 }
@@ -103,6 +104,11 @@ def _is_openai_related_exception(exc: Exception) -> bool:
         return True
     s = str(exc) or ""
     return "help.openai.com" in s or "request ID req_" in s or "server_error" in s
+
+
+def _is_retryable_server_error_text(text: str) -> bool:
+    s = _optional_str(text).lower()
+    return "openai internal server error" in s
 
 
 def _require_api_key() -> str:
@@ -645,9 +651,22 @@ class GPTClient:
             payload["tools"] = [{"type": web_tool}]
             payload["tool_choice"] = "auto"
 
-        return self.ask(
+        resp = self.ask(
             override=payload,
             use_cache=False,
             user_id=user_id,
             service_tier=service_tier or "flex",
         )
+        if (
+            isinstance(resp.raw, dict)
+            and resp.raw.get("soft_error") is True
+            and _is_retryable_server_error_text(resp.content)
+        ):
+            time.sleep(0.7)
+            resp = self.ask(
+                override=payload,
+                use_cache=False,
+                user_id=user_id,
+                service_tier=service_tier or "flex",
+            )
+        return resp
