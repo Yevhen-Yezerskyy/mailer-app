@@ -13,7 +13,7 @@
     geo: root.dataset.labelGeo || "Geo",
   };
   const forms = Array.from(document.querySelectorAll("[data-dirty-form]"));
-  let allowUnload = false;
+  const bypassSubmit = new WeakMap();
 
   function isWaitAction(submitter) {
     const action = submitter && submitter.name === "action" ? String(submitter.value || "") : "";
@@ -24,16 +24,40 @@
     return String(value || "").replace(/\r\n/g, "\n").trim();
   }
 
+  function comparableField(form) {
+    return form.querySelector(
+      "input[name='audience_title'], textarea[name='source_product'], textarea[name='source_company'], textarea[name='source_geo']"
+    );
+  }
+
   function fieldDirty(field) {
-    return norm(field.value) !== norm(field.dataset.savedValue || "");
+    return !!field && norm(field.value) !== norm(field.dataset.savedValue || "");
   }
 
   function formDirty(form) {
-    return Array.from(form.querySelectorAll("[data-track-dirty='1']")).some(fieldDirty);
+    return fieldDirty(comparableField(form));
   }
 
-  function anyDirty() {
-    return forms.some(formDirty);
+  function syncActionButtons(form) {
+    const mainField = form.querySelector("textarea[name='source_product'], textarea[name='source_company'], textarea[name='source_geo']");
+    const instructionField = form.querySelector("textarea[name='product_ai_command'], textarea[name='company_ai_command'], textarea[name='geo_ai_command']");
+    const processMainBtn = form.querySelector("[data-process-main='1']");
+    const processInstructionBtn = form.querySelector("[data-process-instruction='1']");
+    const saveMainBtn = form.querySelector("[data-save-main='1']");
+    const hasMainValue = !!(mainField && norm(mainField.value) !== "");
+    const mainChanged = !!(mainField && fieldDirty(mainField));
+
+    if (processMainBtn) {
+      processMainBtn.disabled = !(hasMainValue && mainChanged);
+    }
+
+    if (processInstructionBtn && instructionField) {
+      processInstructionBtn.disabled = norm(instructionField.value) === "";
+    }
+
+    if (saveMainBtn) {
+      saveMainBtn.disabled = !hasMainValue;
+    }
   }
 
   function dirtyFormNames(exceptForm) {
@@ -48,6 +72,17 @@
 
   function dirtyFormNamesForSubmit(form, submitter) {
     const action = submitter && submitter.name === "action" ? String(submitter.value || "") : "";
+
+    if (action === "suggest_title") {
+      return forms
+        .filter(function (candidate) {
+          const key = candidate.getAttribute("data-dirty-form");
+          return key !== "title" && formDirty(candidate);
+        })
+        .map(function (candidate) {
+          return labels[candidate.getAttribute("data-dirty-form")] || candidate.getAttribute("data-dirty-form");
+        });
+    }
 
     if (
       action === "process_product" ||
@@ -80,7 +115,6 @@
     const tpl = document.getElementById("yy-unsaved-changes-template");
     if (!tpl) {
       if (window.confirm(names.join("\n"))) {
-        allowUnload = true;
         onContinue();
       }
       return;
@@ -89,7 +123,6 @@
     const wrapper = document.createElement("div");
     wrapper.innerHTML = tpl.innerHTML;
     const list = wrapper.querySelector("[data-unsaved-list]");
-    const continueBtn = wrapper.querySelector("[data-unsaved-continue]");
 
     if (list) {
       list.innerHTML = names.map(function (name) {
@@ -109,7 +142,6 @@
           if (window.YYModal && typeof window.YYModal.close === "function") {
             window.YYModal.close();
           }
-          allowUnload = true;
           onContinue();
         }, { once: true });
       };
@@ -117,15 +149,31 @@
       return;
     }
 
-    if (window.confirm(modalText + "\n\n" + names.join("\n"))) {
-      allowUnload = true;
+    if (window.confirm(names.join("\n"))) {
       onContinue();
     }
   }
 
   forms.forEach(function (form) {
+    syncActionButtons(form);
+
+    form.querySelectorAll("textarea, input").forEach(function (field) {
+      field.addEventListener("input", function () {
+        syncActionButtons(form);
+      });
+      field.addEventListener("change", function () {
+        syncActionButtons(form);
+      });
+    });
+
     form.addEventListener("submit", function (event) {
       const submitter = event.submitter;
+      if (bypassSubmit.has(form)) {
+        const bypassSubmitter = bypassSubmit.get(form);
+        bypassSubmit.delete(form);
+        if (isWaitAction(bypassSubmitter) && window.YYWaitModal) window.YYWaitModal.open();
+        return;
+      }
       const names = dirtyFormNamesForSubmit(form, event.submitter);
       if (!names.length) {
         if (isWaitAction(submitter) && window.YYWaitModal) window.YYWaitModal.open();
@@ -133,7 +181,11 @@
       }
       event.preventDefault();
       openDirtyModal(names, function () {
-        if (isWaitAction(submitter) && window.YYWaitModal) window.YYWaitModal.open();
+        bypassSubmit.set(form, submitter || null);
+        if (submitter && typeof form.requestSubmit === "function") {
+          form.requestSubmit(submitter);
+          return;
+        }
         form.submit();
       });
     });
@@ -152,13 +204,12 @@
     button.addEventListener("click", function () {
       const names = dirtyFormNames(null);
       if (!names.length) {
-        allowUnload = true;
         window.location.href = button.getAttribute("data-dirty-nav");
         return;
       }
       openDirtyModal(names, function () {
         window.location.href = button.getAttribute("data-dirty-nav");
-        });
+      });
       });
     });
 })();

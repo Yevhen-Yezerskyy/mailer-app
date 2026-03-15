@@ -9,33 +9,42 @@ from django.urls import reverse
 from django.utils.translation import get_language
 
 from engine.common.gpt import GPTClient
-from engine.common.prompts.process import LANG_MAP, get_prompt
+from engine.common.prompts.process import get_prompt
 from mailer_web.access import decode_id, encode_id
 from panel.aap_audience.models import AudienceTask
 
 
 FORM_CONFIG = {
     "product": {
-        "field_name": "source_product",
         "prompt_key": "create_sell_product",
         "json_key": "product",
         "input_label": "ПРОДУКТ",
         "user_id": "panel.audience.create_edit_sell.product",
     },
     "company": {
-        "field_name": "source_company",
         "prompt_key": "create_sell_company",
         "json_key": "company",
         "input_label": "COMPANY",
         "user_id": "panel.audience.create_edit_sell.company",
     },
     "geo": {
-        "field_name": "source_geo",
         "prompt_key": "create_sell_geo",
         "json_key": "geo",
         "input_label": "GEO",
         "user_id": "panel.audience.create_edit_sell.geo",
     },
+}
+
+
+LANG_RESPONSE_PROMPTS = {
+    "ru": "lang_response_rus",
+    "rus": "lang_response_rus",
+    "de": "lang_response_deu",
+    "deu": "lang_response_deu",
+    "uk": "lang_response_ukr",
+    "ukr": "lang_response_ukr",
+    "en": "lang_response_eng",
+    "eng": "lang_response_eng",
 }
 
 
@@ -54,15 +63,12 @@ def _fallback_title_from_texts(*values: str) -> str:
     return text[:120].strip() or "Новая аудитория"
 
 
-def _response_language_name(request) -> str:
-    lang_code = (getattr(request, "LANGUAGE_CODE", "") or get_language() or "en").lower()
-    return LANG_MAP.get(lang_code, lang_code)
-
-
 def _prompt_instructions(request, prompt_key: str) -> str:
     lang_code = (getattr(request, "LANGUAGE_CODE", "") or get_language() or "en").lower()
-    prompt_text = (get_prompt(prompt_key, lang=lang_code) or "").strip()
-    return f"Response Language - {_response_language_name(request)}\n\n{prompt_text}".strip()
+    lang_prompt_key = LANG_RESPONSE_PROMPTS.get(lang_code, "lang_response_eng")
+    lang_prompt = get_prompt(lang_prompt_key).strip()
+    prompt_text = get_prompt(prompt_key).strip()
+    return "\n\n".join(part for part in (lang_prompt, prompt_text) if part).strip()
 
 
 def _generate_task_title_from_db(
@@ -138,11 +144,23 @@ def _resolve_task(request, item_id: str):
     )
 
 
-def _run_section_dialog(request, *, section: str, item_id: str, value: str, instruction: str):
+def _run_section_dialog(request, *, section: str, item_id: str, value: str, command: str):
     conf = FORM_CONFIG[section]
     state_key = _session_key(request, item_id, section)
     state = request.session.get(state_key, {}) or {}
-    payload = f"{conf['input_label']}:\n{value}\n\nИНСТРУКЦИЯ:\n{instruction}"
+    if section == "geo":
+        task = _resolve_task(request, item_id)
+        payload = json.dumps(
+            {
+                "geo": value,
+                "product": (task.source_product or "") if task else "",
+                "company": (task.source_company or "") if task else "",
+                "command": command,
+            },
+            ensure_ascii=False,
+        )
+    else:
+        payload = f"{conf['input_label']}:\n{value}\n\nКОМАНДА:\n{command}"
 
     resp = GPTClient().ask_dialog(
         model="gpt-5.4",
@@ -193,10 +211,9 @@ def create_edit_sell_view(request, item_id: str = ""):
     company_text = saved_company
     geo_text = saved_geo
 
-    ai_instruction_map = {"product": "", "company": "", "geo": ""}
+    ai_command_display_map = {"product": "", "company": "", "geo": ""}
     ai_advice_map = {"product": "", "company": "", "geo": ""}
     ai_question_map = {"product": "", "company": "", "geo": ""}
-    status_text = ""
     last_action = ""
 
     if request.method == "POST":
@@ -206,9 +223,12 @@ def create_edit_sell_view(request, item_id: str = ""):
         product_text = (request.POST.get("source_product") or saved_product).strip()
         company_text = (request.POST.get("source_company") or saved_company).strip()
         geo_text = (request.POST.get("source_geo") or saved_geo).strip()
-        ai_instruction_map["product"] = (request.POST.get("product_ai_instruction") or "").strip()
-        ai_instruction_map["company"] = (request.POST.get("company_ai_instruction") or "").strip()
-        ai_instruction_map["geo"] = (request.POST.get("geo_ai_instruction") or "").strip()
+        posted_product_command = (request.POST.get("product_ai_command") or "").strip()
+        posted_company_command = (request.POST.get("company_ai_command") or "").strip()
+        posted_geo_command = (request.POST.get("geo_ai_command") or "").strip()
+        ai_command_display_map["product"] = posted_product_command
+        ai_command_display_map["company"] = posted_company_command
+        ai_command_display_map["geo"] = posted_geo_command
         ai_advice_map["product"] = (request.POST.get("product_ai_advice") or "").strip()
         ai_advice_map["company"] = (request.POST.get("company_ai_advice") or "").strip()
         ai_advice_map["geo"] = (request.POST.get("geo_ai_advice") or "").strip()
@@ -216,14 +236,11 @@ def create_edit_sell_view(request, item_id: str = ""):
         ai_question_map["company"] = (request.POST.get("company_ai_question") or "").strip()
         ai_question_map["geo"] = (request.POST.get("geo_ai_question") or "").strip()
 
-        if action == "save_title":
-            if not title_text:
-                status_text = "Название пустое."
-            elif task:
+        if action == "save_title" and title_text:
+            if task:
                 task.title = title_text
                 task.save(update_fields=["title", "updated_at"])
                 saved_title = task.title
-                status_text = "Название сохранено."
             else:
                 task = AudienceTask.objects.create(
                     workspace_id=request.workspace_id,
@@ -236,19 +253,13 @@ def create_edit_sell_view(request, item_id: str = ""):
                 )
                 return redirect(_build_edit_url(encode_id(int(task.id)), status))
 
-        elif action == "suggest_title":
-            if not task:
-                status_text = "Нет сохраненных данных для подбора названия."
-            elif not (saved_product or saved_company or saved_geo):
-                status_text = "Нет сохраненных данных продукта, компании или географии."
-            else:
-                title_text = _generate_task_title_from_db(
-                    request=request,
-                    product_text=saved_product,
-                    company_text=saved_company,
-                    geo_text=saved_geo,
-                )
-                status_text = "Название предложено."
+        elif action == "suggest_title" and task and (saved_product or saved_company or saved_geo):
+            title_text = _generate_task_title_from_db(
+                request=request,
+                product_text=saved_product,
+                company_text=saved_company,
+                geo_text=saved_geo,
+            )
 
         elif action == "process_product":
             try:
@@ -257,24 +268,23 @@ def create_edit_sell_view(request, item_id: str = ""):
                     section="product",
                     item_id=item_id,
                     value=product_text,
-                    instruction=ai_instruction_map["product"],
+                    command=posted_product_command,
                 )
                 if new_value:
                     product_text = new_value
                 ai_advice_map["product"] = new_advice or ai_advice_map["product"]
                 ai_question_map["product"] = new_question or ai_question_map["product"]
-                status_text = "Обработка выполнена."
-            except Exception as exc:
-                status_text = f"Ошибка: {exc}"
+            except Exception:
+                pass
 
-        elif action == "save_product":
-            if not product_text:
-                status_text = "Описание продукта/услуги пустое."
-            elif task:
+        elif action == "save_product" and product_text:
+            if task:
                 task.source_product = product_text
                 task.save(update_fields=["source_product", "updated_at"])
                 saved_product = task.source_product
-                status_text = "Продукт/услуга сохранены."
+                ai_command_display_map["product"] = ""
+                ai_advice_map["product"] = "__saved__"
+                ai_question_map["product"] = ""
             else:
                 title_generated = _generate_task_title_from_db(
                     request=request,
@@ -296,11 +306,10 @@ def create_edit_sell_view(request, item_id: str = ""):
 
         elif action == "reset_product_context":
             _reset_section_dialog(request, item_id=item_id, section="product")
-            product_text = saved_product
-            ai_instruction_map["product"] = ""
+            product_text = ""
+            ai_command_display_map["product"] = ""
             ai_advice_map["product"] = ""
             ai_question_map["product"] = ""
-            status_text = "Контекст формы очищен."
 
         elif action == "process_company":
             try:
@@ -309,24 +318,23 @@ def create_edit_sell_view(request, item_id: str = ""):
                     section="company",
                     item_id=item_id,
                     value=company_text,
-                    instruction=ai_instruction_map["company"],
+                    command=posted_company_command,
                 )
                 if new_value:
                     company_text = new_value
                 ai_advice_map["company"] = new_advice or ai_advice_map["company"]
                 ai_question_map["company"] = new_question or ai_question_map["company"]
-                status_text = "Обработка выполнена."
-            except Exception as exc:
-                status_text = f"Ошибка: {exc}"
+            except Exception:
+                pass
 
-        elif action == "save_company":
-            if not company_text:
-                status_text = "Описание компании пустое."
-            elif task:
+        elif action == "save_company" and company_text:
+            if task:
                 task.source_company = company_text
                 task.save(update_fields=["source_company", "updated_at"])
                 saved_company = task.source_company
-                status_text = "Компания сохранена."
+                ai_command_display_map["company"] = ""
+                ai_advice_map["company"] = "__saved__"
+                ai_question_map["company"] = ""
             else:
                 title_generated = _generate_task_title_from_db(
                     request=request,
@@ -348,11 +356,10 @@ def create_edit_sell_view(request, item_id: str = ""):
 
         elif action == "reset_company_context":
             _reset_section_dialog(request, item_id=item_id, section="company")
-            company_text = saved_company
-            ai_instruction_map["company"] = ""
+            company_text = ""
+            ai_command_display_map["company"] = ""
             ai_advice_map["company"] = ""
             ai_question_map["company"] = ""
-            status_text = "Контекст формы очищен."
 
         elif action == "process_geo":
             try:
@@ -361,24 +368,23 @@ def create_edit_sell_view(request, item_id: str = ""):
                     section="geo",
                     item_id=item_id,
                     value=geo_text,
-                    instruction=ai_instruction_map["geo"],
+                    command=posted_geo_command,
                 )
                 if new_value:
                     geo_text = new_value
                 ai_advice_map["geo"] = new_advice or ai_advice_map["geo"]
                 ai_question_map["geo"] = new_question or ai_question_map["geo"]
-                status_text = "Обработка выполнена."
-            except Exception as exc:
-                status_text = f"Ошибка: {exc}"
+            except Exception:
+                pass
 
-        elif action == "save_geo":
-            if not geo_text:
-                status_text = "Описание географии пустое."
-            elif task:
+        elif action == "save_geo" and geo_text:
+            if task:
                 task.source_geo = geo_text
                 task.save(update_fields=["source_geo", "updated_at"])
                 saved_geo = task.source_geo
-                status_text = "География сохранена."
+                ai_command_display_map["geo"] = ""
+                ai_advice_map["geo"] = "__saved__"
+                ai_question_map["geo"] = ""
             else:
                 title_generated = _generate_task_title_from_db(
                     request=request,
@@ -400,11 +406,10 @@ def create_edit_sell_view(request, item_id: str = ""):
 
         elif action == "reset_geo_context":
             _reset_section_dialog(request, item_id=item_id, section="geo")
-            geo_text = saved_geo
-            ai_instruction_map["geo"] = ""
+            geo_text = ""
+            ai_command_display_map["geo"] = ""
             ai_advice_map["geo"] = ""
             ai_question_map["geo"] = ""
-            status_text = "Контекст формы очищен."
 
         elif action == "close":
             return redirect("audience:create_list")
@@ -430,19 +435,21 @@ def create_edit_sell_view(request, item_id: str = ""):
             "source_product": product_text,
             "source_company": company_text,
             "source_geo": geo_text,
-            "product_ai_instruction": ai_instruction_map["product"],
+            "product_ai_command": "",
+            "product_ai_command_display": ai_command_display_map["product"],
             "product_ai_advice": ai_advice_map["product"],
             "product_ai_question": ai_question_map["product"],
-            "company_ai_instruction": ai_instruction_map["company"],
+            "company_ai_command": "",
+            "company_ai_command_display": ai_command_display_map["company"],
             "company_ai_advice": ai_advice_map["company"],
             "company_ai_question": ai_question_map["company"],
-            "geo_ai_instruction": ai_instruction_map["geo"],
+            "geo_ai_command": "",
+            "geo_ai_command_display": ai_command_display_map["geo"],
             "geo_ai_advice": ai_advice_map["geo"],
             "geo_ai_question": ai_question_map["geo"],
             "saved_title": saved_title,
             "saved_source_product": saved_product,
             "saved_source_company": saved_company,
             "saved_source_geo": saved_geo,
-            "status_text": status_text,
         },
     )

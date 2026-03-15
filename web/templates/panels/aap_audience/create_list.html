@@ -40,37 +40,48 @@
           <table class="w-full text-left">
             <thead>
               <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[30%]">source_product</th>
-                <th class="YY-TH_TH w-[30%]">source_company</th>
-                <th class="YY-TH_TH w-[30%]">source_geo</th>
-                <th class="YY-TH_TH">{% trans "Действия" %}</th>
+                <th class="YY-TH_TH w-[30%]">{% trans "Продукт / Услуга" %}</th>
+                <th class="YY-TH_TH w-[30%]">{% trans "Компания" %}</th>
+                <th class="YY-TH_TH w-[30%]">{% trans "География" %}</th>
               </tr>
             </thead>
             <tbody>
               {% for t in tasks %}
                 <tr class="YY-TB_TR">
-                  <td class="YY-TB_TD">{{ t.source_product|default:"" }}</td>
-                  <td class="YY-TB_TD">{{ t.source_company|default:"" }}</td>
-                  <td class="YY-TB_TD">{{ t.source_geo|default:"" }}</td>
-                  <td class="YY-TB_TD">
-                    {% if t.type == "buy" %}
-                      <a href="{% url 'audience:create_edit_buy' %}?id={{ t.ui_id }}" class="YY-BUTTON_TAB_MAIN mb-2">
-                        {% trans "Изменить" %}
-                      </a>
-                    {% else %}
-                      <a href="{% url 'audience:create_edit_sell_id' t.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-2">
-                        {% trans "Изменить" %}
-                      </a>
-                    {% endif %}
-                    <form method="post" onsubmit="return confirm('{% trans "Удалить задачу?" %}')">
-                      {% csrf_token %}
-                      <input type="hidden" name="action" value="delete">
-                      <input type="hidden" name="id" value="{{ t.ui_id }}">
-                      <button type="submit" class="YY-BUTTON_TAB_RED">
-                        {% trans "Удалить" %}
-                      </button>
-                    </form>
+                  <td class="YY-TB_TD" colspan="3">
+                    <div class="flex items-center gap-3">
+                      {% if t.type == "buy" %}
+                        <div class="YY-STATUS_YELLOW !mb-0 !w-fit !min-w-fit">{% trans "Поиск поставщиков / подрядчиков" %}</div>
+                      {% else %}
+                        <div class="YY-STATUS_GREEN !mb-0 !w-fit !min-w-fit">{% trans "Поиск клиентов / покупателей" %}</div>
+                      {% endif %}
+                      <div class="min-w-0 flex-1">{{ t.title|default:""|linebreaksbr }}</div>
+                      <div class="ml-auto flex items-center gap-3">
+                        <form method="post" onsubmit="return confirm('{% trans "Удалить задачу?" %}')">
+                          {% csrf_token %}
+                          <input type="hidden" name="action" value="delete">
+                          <input type="hidden" name="id" value="{{ t.ui_id }}">
+                          <button type="submit" class="YY-BUTTON_TAB_RED">
+                            {% trans "Удалить" %}
+                          </button>
+                        </form>
+                        {% if t.type == "buy" %}
+                          <a href="{% url 'audience:create_edit_buy' %}?id={{ t.ui_id }}" class="YY-BUTTON_TAB_MAIN">
+                            {% trans "Изменить" %}
+                          </a>
+                        {% else %}
+                          <a href="{% url 'audience:create_edit_sell_id' t.ui_id %}" class="YY-BUTTON_TAB_MAIN">
+                            {% trans "Изменить" %}
+                          </a>
+                        {% endif %}
+                      </div>
+                    </div>
                   </td>
+                </tr>
+                <tr class="YY-TB_TR">
+                  <td class="YY-TB_TD">{{ t.source_product|default:""|linebreaksbr }}</td>
+                  <td class="YY-TB_TD">{{ t.source_company|default:""|linebreaksbr }}</td>
+                  <td class="YY-TB_TD">{{ t.source_geo|default:""|linebreaksbr }}</td>
                 </tr>
               {% endfor %}
             </tbody>
