@@ -62,7 +62,7 @@
             <button type="submit" name="action" value="suggest_title" class="YY-BUTTON_MAIN">
               {% trans "Предложить название" %}
             </button>
-            <button type="submit" name="action" value="save_title" class="YY-BUTTON_MAIN">
+            <button type="submit" name="action" value="save_title" class="YY-BUTTON_MAIN disabled:opacity-100 disabled:bg-[#f4f4f4] disabled:text-[#636363] disabled:border-[#636363] disabled:hover:bg-[#f4f4f4]" data-save-title="1" disabled>
               {% trans "Сохранить название" %}
             </button>
           </div>
@@ -136,10 +136,19 @@
             data-saved-value="{{ saved_source_company }}"
             placeholder="{{ company_placeholder }}">{{ source_company }}</textarea>
           <div class="flex gap-3">
-            <button type="submit" name="action" value="process_company" class="YY-BUTTON_MAIN" data-process-main="1" disabled>
+            <button type="submit" name="action" value="process_company" class="YY-BUTTON_MAIN disabled:opacity-100 disabled:bg-[#f4f4f4] disabled:text-[#636363] disabled:border-[#636363] disabled:hover:bg-[#f4f4f4]" data-process-main="1" disabled>
               {% trans "Обработать" %}
             </button>
-            <button type="submit" name="action" value="save_company" class="YY-BUTTON_MAIN" data-save-main="1" disabled>
+            <button
+              type="submit"
+              name="action"
+              value="save_company"
+              class="YY-BUTTON_MAIN"
+              data-save-main="1"
+              data-save-label="{% trans 'Сохранить' %}"
+              data-next-label="{% trans 'География' %}"
+              data-next-url="{% if task_id_token %}{% url 'audience:create_edit_sell_id' task_id_token %}?status=geo{% else %}{% url 'audience:create_edit_sell' %}?status=geo{% endif %}"
+              disabled>
               {% trans "Сохранить" %}
             </button>
           </div>
@@ -156,10 +165,8 @@
             data-saved-value=""
             placeholder="{% trans 'Дайте команду и / или задайте вопрос асситенту ИИ. Команда будет применена к описанию, на вопрос предлагается независимый ответ' %}">{{ company_ai_command }}</textarea>
           <div>
-            <button type="submit" name="action" value="process_company" class="YY-BUTTON_MAIN !mb-3" data-process-instruction="1" disabled>{% trans "Выполнить / задать вопрос" %}</button>
+            <button type="submit" name="action" value="process_company" class="YY-BUTTON_MAIN !mb-3 disabled:opacity-100 disabled:bg-[#f4f4f4] disabled:text-[#636363] disabled:border-[#636363] disabled:hover:bg-[#f4f4f4]" data-process-instruction="1" disabled>{% trans "Выполнить / задать вопрос" %}</button>
           </div>
-          <input type="hidden" name="company_ai_advice" value="{{ company_ai_advice }}" data-track-dirty="1" data-saved-value="">
-          <input type="hidden" name="company_ai_question" value="{{ company_ai_question }}" data-track-dirty="1" data-saved-value="">
           {% if company_ai_advice == "__saved__" %}
             <div>
               <div class="mb-3 font-semibold">{% trans "Изменения сохранены" %}</div>
@@ -169,17 +176,19 @@
                 <p>{% trans "В процессе обработки ИИ будет задавать вопросы и давать подсказки для уточнения описания. Поскольку основные варианты уже указаны в начальном описании, часть подсказок может быть нерелевантной. При необходимости добавьте информацию в описание или в команду для ассистента ИИ." %}</p>
               </div>
             </div>
-          {% elif company_ai_command_display %}
+          {% elif company_ai_command_display or company_ai_question %}
             <div>
               {% if company_ai_command_display %}
                 <div><strong>{% trans "Команда / вопрос:" %}</strong></div>
                 <div class="mb-3">{{ company_ai_command_display|linebreaksbr }}</div>
               {% endif %}
-              <div><strong>{% trans "Ответ ассистента ИИ:" %}</strong></div>
-              {% if company_ai_advice %}
-                <div class="mb-3">{{ company_ai_advice|linebreaksbr }}</div>
-              {% else %}
-                <div class="mb-3">{% trans "Выполнено" %}</div>
+              {% if company_ai_command_display or company_ai_advice %}
+                <div><strong>{% trans "Ответ ассистента ИИ:" %}</strong></div>
+                {% if company_ai_advice %}
+                  <div class="mb-3">{{ company_ai_advice|linebreaksbr }}</div>
+                {% else %}
+                  <div class="mb-3">{% trans "Выполнено" %}</div>
+                {% endif %}
               {% endif %}
               {% if company_ai_question %}
                 <div><strong>{% trans "Вопрос от ассистента ИИ:" %}</strong></div>
@@ -227,10 +236,19 @@
             data-saved-value="{{ saved_source_geo }}"
             placeholder="{{ geo_placeholder }}">{{ source_geo }}</textarea>
           <div class="flex gap-3">
-            <button type="submit" name="action" value="process_geo" class="YY-BUTTON_MAIN" data-process-main="1" disabled>
+            <button type="submit" name="action" value="process_geo" class="YY-BUTTON_MAIN disabled:opacity-100 disabled:bg-[#f4f4f4] disabled:text-[#636363] disabled:border-[#636363] disabled:hover:bg-[#f4f4f4]" data-process-main="1" disabled>
               {% trans "Обработать" %}
             </button>
-            <button type="submit" name="action" value="save_geo" class="YY-BUTTON_MAIN" data-save-main="1" disabled>
+            <button
+              type="submit"
+              name="action"
+              value="save_geo"
+              class="YY-BUTTON_MAIN"
+              data-save-main="1"
+              data-save-label="{% trans 'Сохранить' %}"
+              data-next-label="{% trans 'Продукт / услуга' %}"
+              data-next-url="{% if task_id_token %}{% url 'audience:create_edit_sell_id' task_id_token %}?status=product{% else %}{% url 'audience:create_edit_sell' %}?status=product{% endif %}"
+              disabled>
               {% trans "Сохранить" %}
             </button>
           </div>
@@ -247,10 +265,8 @@
             data-saved-value=""
             placeholder="{% trans 'Дайте команду и / или задайте вопрос асситенту ИИ. Команда будет применена к описанию, на вопрос предлагается независимый ответ' %}">{{ geo_ai_command }}</textarea>
           <div>
-            <button type="submit" name="action" value="process_geo" class="YY-BUTTON_MAIN !mb-3" data-process-instruction="1" disabled>{% trans "Выполнить / задать вопрос" %}</button>
+            <button type="submit" name="action" value="process_geo" class="YY-BUTTON_MAIN !mb-3 disabled:opacity-100 disabled:bg-[#f4f4f4] disabled:text-[#636363] disabled:border-[#636363] disabled:hover:bg-[#f4f4f4]" data-process-instruction="1" disabled>{% trans "Выполнить / задать вопрос" %}</button>
           </div>
-          <input type="hidden" name="geo_ai_advice" value="{{ geo_ai_advice }}" data-track-dirty="1" data-saved-value="">
-          <input type="hidden" name="geo_ai_question" value="{{ geo_ai_question }}" data-track-dirty="1" data-saved-value="">
           {% if geo_ai_advice == "__saved__" %}
             <div>
               <div class="mb-3 font-semibold">{% trans "Изменения сохранены" %}</div>
@@ -260,17 +276,19 @@
                 <p>{% trans "В процессе обработки ИИ будет задавать вопросы и давать подсказки для уточнения описания. Поскольку основные варианты уже указаны в начальном описании, часть подсказок может быть нерелевантной. При необходимости добавьте информацию в описание или в команду для ассистента ИИ." %}</p>
               </div>
             </div>
-          {% elif geo_ai_command_display %}
+          {% elif geo_ai_command_display or geo_ai_question %}
             <div>
               {% if geo_ai_command_display %}
                 <div><strong>{% trans "Команда / вопрос:" %}</strong></div>
                 <div class="mb-3">{{ geo_ai_command_display|linebreaksbr }}</div>
               {% endif %}
-              <div><strong>{% trans "Ответ ассистента ИИ:" %}</strong></div>
-              {% if geo_ai_advice %}
-                <div class="mb-3">{{ geo_ai_advice|linebreaksbr }}</div>
-              {% else %}
-                <div class="mb-3">{% trans "Выполнено" %}</div>
+              {% if geo_ai_command_display or geo_ai_advice %}
+                <div><strong>{% trans "Ответ ассистента ИИ:" %}</strong></div>
+                {% if geo_ai_advice %}
+                  <div class="mb-3">{{ geo_ai_advice|linebreaksbr }}</div>
+                {% else %}
+                  <div class="mb-3">{% trans "Выполнено" %}</div>
+                {% endif %}
               {% endif %}
               {% if geo_ai_question %}
                 <div><strong>{% trans "Вопрос от ассистента ИИ:" %}</strong></div>
@@ -318,10 +336,19 @@
             data-saved-value="{{ saved_source_product }}"
             placeholder="{{ product_placeholder }}">{{ source_product }}</textarea>
           <div class="flex gap-3">
-            <button type="submit" name="action" value="process_product" class="YY-BUTTON_MAIN" data-process-main="1" disabled>
+            <button type="submit" name="action" value="process_product" class="YY-BUTTON_MAIN disabled:opacity-100 disabled:bg-[#f4f4f4] disabled:text-[#636363] disabled:border-[#636363] disabled:hover:bg-[#f4f4f4]" data-process-main="1" disabled>
               {% trans "Обработать" %}
             </button>
-            <button type="submit" name="action" value="save_product" class="YY-BUTTON_MAIN" data-save-main="1" disabled>
+            <button
+              type="submit"
+              name="action"
+              value="save_product"
+              class="YY-BUTTON_MAIN"
+              data-save-main="1"
+              data-save-label="{% trans 'Сохранить' %}"
+              data-next-label="{% trans 'Компания' %}"
+              data-next-url="{% if task_id_token %}{% url 'audience:create_edit_sell_id' task_id_token %}?status=company{% else %}{% url 'audience:create_edit_sell' %}?status=company{% endif %}"
+              disabled>
               {% trans "Сохранить" %}
             </button>
           </div>
@@ -338,10 +365,8 @@
             data-saved-value=""
             placeholder="{% trans 'Дайте команду и / или задайте вопрос асситенту ИИ. Команда будет применена к описанию, на вопрос предлагается независимый ответ' %}">{{ product_ai_command }}</textarea>
           <div>
-            <button type="submit" name="action" value="process_product" class="YY-BUTTON_MAIN !mb-3" data-process-instruction="1" disabled>{% trans "Выполнить / задать вопрос" %}</button>
+            <button type="submit" name="action" value="process_product" class="YY-BUTTON_MAIN !mb-3 disabled:opacity-100 disabled:bg-[#f4f4f4] disabled:text-[#636363] disabled:border-[#636363] disabled:hover:bg-[#f4f4f4]" data-process-instruction="1" disabled>{% trans "Выполнить / задать вопрос" %}</button>
           </div>
-          <input type="hidden" name="product_ai_advice" value="{{ product_ai_advice }}" data-track-dirty="1" data-saved-value="">
-          <input type="hidden" name="product_ai_question" value="{{ product_ai_question }}" data-track-dirty="1" data-saved-value="">
           {% if product_ai_advice == "__saved__" %}
             <div>
               <div class="mb-3 font-semibold">{% trans "Изменения сохранены" %}</div>
@@ -351,17 +376,19 @@
                 <p>{% trans "В процессе обработки ИИ будет задавать вопросы и давать подсказки для уточнения описания. Поскольку основные варианты уже указаны в начальном описании, часть подсказок может быть нерелевантной. При необходимости добавьте информацию в описание или в команду для ассистента ИИ." %}</p>
               </div>
             </div>
-          {% elif product_ai_command_display %}
+          {% elif product_ai_command_display or product_ai_question %}
             <div>
               {% if product_ai_command_display %}
                 <div><strong>{% trans "Команда / вопрос:" %}</strong></div>
                 <div class="mb-3">{{ product_ai_command_display|linebreaksbr }}</div>
               {% endif %}
-              <div><strong>{% trans "Ответ ассистента ИИ:" %}</strong></div>
-              {% if product_ai_advice %}
-                <div class="mb-3">{{ product_ai_advice|linebreaksbr }}</div>
-              {% else %}
-                <div class="mb-3">{% trans "Выполнено" %}</div>
+              {% if product_ai_command_display or product_ai_advice %}
+                <div><strong>{% trans "Ответ ассистента ИИ:" %}</strong></div>
+                {% if product_ai_advice %}
+                  <div class="mb-3">{{ product_ai_advice|linebreaksbr }}</div>
+                {% else %}
+                  <div class="mb-3">{% trans "Выполнено" %}</div>
+                {% endif %}
               {% endif %}
               {% if product_ai_question %}
                 <div><strong>{% trans "Вопрос от ассистента ИИ:" %}</strong></div>
@@ -413,7 +440,7 @@
             <td class="align-top pr-4 pt-8 w-[30%]">
               <div class="YY-LABEL !mb-0">{% trans "Продукт / услуга" %}</div>
             </td>
-            <td class="align-top pt-8 w-[70%]">
+            <td class="align-top pt-8 w-[70%]" data-summary-section="product" data-summary-value="{{ saved_source_product|default:'' }}">
               {{ saved_source_product|default:""|linebreaksbr }}
             </td>
           </tr>
@@ -421,7 +448,7 @@
             <td class="align-top pr-4 pt-8 w-[30%]">
               <div class="YY-LABEL !mb-0">{% trans "Компания" %}</div>
             </td>
-            <td class="align-top pt-8 w-[70%]">
+            <td class="align-top pt-8 w-[70%]" data-summary-section="company" data-summary-value="{{ saved_source_company|default:'' }}">
               {{ saved_source_company|default:""|linebreaksbr }}
             </td>
           </tr>
@@ -429,7 +456,7 @@
             <td class="align-top pr-4 pt-8 w-[30%]">
               <div class="YY-LABEL !mb-0">{% trans "География. Ограничения, предпочтения, приоритеты." %}</div>
             </td>
-            <td class="align-top pt-8 w-[70%]">
+            <td class="align-top pt-8 w-[70%]" data-summary-section="geo" data-summary-value="{{ saved_source_geo|default:'' }}">
               {{ saved_source_geo|default:""|linebreaksbr }}
             </td>
           </tr>
@@ -442,9 +469,12 @@
 <div
   id="yy-create-edit-sell-config"
   data-label-title="{% trans 'Название' %}"
-  data-label-product="{% trans 'Продукт/услуга' %}"
+  data-label-product="{% trans 'Продукт / услуга' %}"
   data-label-company="{% trans 'Компания' %}"
   data-label-geo="{% trans 'География' %}"
+  data-missing-title="{% trans 'Не заполнены обязательные разделы' %}"
+  data-missing-text="{% trans 'Не заполнены или не сохранены разделы:' %}"
+  data-close-label="{% trans 'Отменить' %}"
   class="hidden"></div>
 <script src="{% static 'js/aap_audience/create_edit_sell.js' %}"></script>
 

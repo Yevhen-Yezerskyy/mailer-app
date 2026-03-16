@@ -14,7 +14,7 @@ def _get_tasks(request):
     if not ws_id or not getattr(user, "is_authenticated", False):
         return []
     tasks = list(
-        AudienceTask.objects.filter(workspace_id=ws_id, user=user, archived=False).order_by("-created_at")
+        AudienceTask.objects.filter(workspace_id=ws_id, user=user, archived=False).order_by("-updated_at")
     )
     for t in tasks:
         t.ui_id = encode_id(int(t.id))

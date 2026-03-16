@@ -36,15 +36,15 @@ FORM_CONFIG = {
 }
 
 
-LANG_RESPONSE_PROMPTS = {
-    "ru": "lang_response_rus",
-    "rus": "lang_response_rus",
-    "de": "lang_response_deu",
-    "deu": "lang_response_deu",
-    "uk": "lang_response_ukr",
-    "ukr": "lang_response_ukr",
-    "en": "lang_response_eng",
-    "eng": "lang_response_eng",
+LANG_RESPONSE_NAMES = {
+    "ru": "Russian",
+    "rus": "Russian",
+    "de": "German",
+    "deu": "German",
+    "uk": "Ukrainian",
+    "ukr": "Ukrainian",
+    "en": "English",
+    "eng": "English",
 }
 
 
@@ -65,8 +65,9 @@ def _fallback_title_from_texts(*values: str) -> str:
 
 def _prompt_instructions(request, prompt_key: str) -> str:
     lang_code = (getattr(request, "LANGUAGE_CODE", "") or get_language() or "en").lower()
-    lang_prompt_key = LANG_RESPONSE_PROMPTS.get(lang_code, "lang_response_eng")
-    lang_prompt = get_prompt(lang_prompt_key).strip()
+    lang_key = lang_code.split("-")[0].split("_")[0]
+    lang_name = LANG_RESPONSE_NAMES.get(lang_key, "English")
+    lang_prompt = get_prompt("lang_response").replace("{LANG}", lang_name).strip()
     prompt_text = get_prompt(prompt_key).strip()
     return "\n\n".join(part for part in (lang_prompt, prompt_text) if part).strip()
 
@@ -229,13 +230,6 @@ def create_edit_sell_view(request, item_id: str = ""):
         ai_command_display_map["product"] = posted_product_command
         ai_command_display_map["company"] = posted_company_command
         ai_command_display_map["geo"] = posted_geo_command
-        ai_advice_map["product"] = (request.POST.get("product_ai_advice") or "").strip()
-        ai_advice_map["company"] = (request.POST.get("company_ai_advice") or "").strip()
-        ai_advice_map["geo"] = (request.POST.get("geo_ai_advice") or "").strip()
-        ai_question_map["product"] = (request.POST.get("product_ai_question") or "").strip()
-        ai_question_map["company"] = (request.POST.get("company_ai_question") or "").strip()
-        ai_question_map["geo"] = (request.POST.get("geo_ai_question") or "").strip()
-
         if action == "save_title" and title_text:
             if task:
                 task.title = title_text
@@ -272,8 +266,8 @@ def create_edit_sell_view(request, item_id: str = ""):
                 )
                 if new_value:
                     product_text = new_value
-                ai_advice_map["product"] = new_advice or ai_advice_map["product"]
-                ai_question_map["product"] = new_question or ai_question_map["product"]
+                ai_advice_map["product"] = new_advice
+                ai_question_map["product"] = new_question
             except Exception:
                 pass
 
@@ -322,8 +316,8 @@ def create_edit_sell_view(request, item_id: str = ""):
                 )
                 if new_value:
                     company_text = new_value
-                ai_advice_map["company"] = new_advice or ai_advice_map["company"]
-                ai_question_map["company"] = new_question or ai_question_map["company"]
+                ai_advice_map["company"] = new_advice
+                ai_question_map["company"] = new_question
             except Exception:
                 pass
 
@@ -372,8 +366,8 @@ def create_edit_sell_view(request, item_id: str = ""):
                 )
                 if new_value:
                     geo_text = new_value
-                ai_advice_map["geo"] = new_advice or ai_advice_map["geo"]
-                ai_question_map["geo"] = new_question or ai_question_map["geo"]
+                ai_advice_map["geo"] = new_advice
+                ai_question_map["geo"] = new_question
             except Exception:
                 pass
 

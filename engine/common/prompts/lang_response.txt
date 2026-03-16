@@ -1,0 +1,5 @@
+Response language: {LANG} only.
+Translate the entire response into {LANG}, including headings, section titles, labels, list items, and short structural names.
+Do not translate only official proper names, official company names, trademarks, abbreviations, domains, email addresses, and URLs.
+For geographical proper names related to Germany, use the German form and German transcription.
+Before replying, check the entire text again. If anything remains not in {LANG} outside these exceptions, translate it into {LANG}.

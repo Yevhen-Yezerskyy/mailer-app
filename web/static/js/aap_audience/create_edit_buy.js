@@ -1,9 +1,9 @@
-// FILE: web/static/js/aap_audience/create_edit_sell.js
-// DATE: 2026-03-14
-// PURPOSE: Unsaved changes warnings for create/edit sell page using YYModal.
+// FILE: web/static/js/aap_audience/create_edit_buy.js
+// DATE: 2026-03-15
+// PURPOSE: Unsaved changes warnings for create/edit buy page using YYModal.
 
 (function () {
-  const root = document.getElementById("yy-create-edit-sell-config");
+  const root = document.getElementById("yy-create-edit-buy-config");
   if (!root) return;
 
   const labels = {

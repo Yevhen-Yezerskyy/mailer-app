@@ -62,7 +62,7 @@ def get_prompt(key: str, lang: str = "en") -> str:
             return ""
 
         resp = GPTClient().ask(
-            model="mini",
+            model="gpt-5.4",
             service_tier="flex",
             user_id="SYSTEM",
             instructions=instructions,
@@ -87,7 +87,7 @@ def translate_text(text: str, lang: str = "en") -> str:
             return ""
 
         resp = GPTClient().ask(
-            model="mini",
+            model="gpt-5.4",
             service_tier="flex",
             user_id="SYSTEM",
             instructions=instructions,

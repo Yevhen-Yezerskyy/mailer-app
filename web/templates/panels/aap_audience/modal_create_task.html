@@ -1,0 +1,50 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/modal_create_task.html -->
+<!-- DATE: 2026-03-16 -->
+<!-- PURPOSE: Modal details for audience create-list row. -->
+
+<div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:900px;">
+  <button type="button" class="YY-BUTTON_MAIN !w-fit" data-yy-modal-close style="position:absolute;top:10px;right:10px;">✕</button>
+
+  <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
+    {% if task %}
+      <div class="YY-CARD_WHITE mb-6">
+        {% if task.type == "buy" %}
+          <div class="YY-STATUS_YELLOW !w-fit">{% trans "Поиск поставщиков / подрядчиков" %}</div>
+        {% else %}
+          <div class="YY-STATUS_GREEN !w-fit">{% trans "Поиск клиентов / покупателей" %}</div>
+        {% endif %}
+        <div class="YY-TEXT-BOLD !mb-0">{{ task.title|default:""|linebreaksbr }}</div>
+      </div>
+
+      <div class="YY-CARD_WHITE mb-6">
+        <div class="YY-TEXT-BOLD !mb-3">
+          {% if task.type == "buy" %}
+            {% trans "Продукт / услуга / работы" %}
+          {% else %}
+            {% trans "Продукт / услуга" %}
+          {% endif %}
+        </div>
+        <div class="YY-TEXT !mb-0">{{ task.source_product|default:""|linebreaksbr }}</div>
+      </div>
+
+      <div class="YY-CARD_WHITE mb-6">
+        <div class="YY-TEXT-BOLD !mb-3">
+          {% if task.type == "buy" %}
+            {% trans "Компания-заказчик" %}
+          {% else %}
+            {% trans "Компания" %}
+          {% endif %}
+        </div>
+        <div class="YY-TEXT !mb-0">{{ task.source_company|default:""|linebreaksbr }}</div>
+      </div>
+
+      <div class="YY-CARD_WHITE">
+        <div class="YY-TEXT-BOLD !mb-3">{% trans "География" %}</div>
+        <div class="YY-TEXT !mb-0">{{ task.source_geo|default:""|linebreaksbr }}</div>
+      </div>
+    {% else %}
+      <div class="YY-STATUS_GRAY w-full">{% trans "Здесь пока нет данных" %}</div>
+    {% endif %}
+  </div>
+</div>
