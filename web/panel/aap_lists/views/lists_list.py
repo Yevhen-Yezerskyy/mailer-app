@@ -48,7 +48,7 @@ def _get_list_or_redirect(request, ws_id, user):
         return res
 
     obj = (
-        MailingList.objects.filter(id=int(res), workspace_id=ws_id, user=user, archived=False)
+        MailingList.objects.filter(id=int(res), workspace_id=ws_id, archived=False)
         .prefetch_related("audience_tasks")
         .first()
     )

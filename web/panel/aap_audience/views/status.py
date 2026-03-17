@@ -22,7 +22,6 @@ def _get_tasks(request):
     return (
         AudienceTask.objects.filter(
             workspace_id=ws_id,
-            user=user,
             archived=False,
         ).order_by("-created_at")
     )
@@ -167,11 +166,11 @@ def _toggle_processing(request) -> None:
     except Exception:
         return
 
-    task = AudienceTask.objects.filter(id=task_id, workspace_id=ws_id, user=user).first()
+    task = AudienceTask.objects.filter(id=task_id, workspace_id=ws_id).first()
     if not task:
         return
 
-    AudienceTask.objects.filter(id=task.id, workspace_id=ws_id, user=user).update(run_processing=not bool(task.run_processing))
+    AudienceTask.objects.filter(id=task.id, workspace_id=ws_id).update(run_processing=not bool(task.run_processing))
 
 
 def status_view(request):

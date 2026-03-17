@@ -138,7 +138,6 @@ def _resolve_task(request, item_id: str):
         AudienceTask.objects.filter(
             id=pk,
             workspace_id=request.workspace_id,
-            user=request.user,
             archived=False,
             type="sell",
         ).first()

@@ -27,7 +27,7 @@ def _get_tasks(request):
     if not ws_id or not getattr(user, "is_authenticated", False):
         return AudienceTask.objects.none()
     return (
-        AudienceTask.objects.filter(workspace_id=ws_id, user=user, archived=False).order_by("-created_at")
+        AudienceTask.objects.filter(workspace_id=ws_id, archived=False).order_by("-created_at")
     )
 
 
@@ -55,7 +55,7 @@ def _get_edit_task_or_redirect(request):
         return None, res
 
     pk = int(res)
-    task = AudienceTask.objects.filter(id=pk, workspace_id=ws_id, user=user).first()
+    task = AudienceTask.objects.filter(id=pk, workspace_id=ws_id).first()
     if task is None:
         return None, redirect(request.path)
 
@@ -259,7 +259,7 @@ def clar_view(request):
                 form = FormClass(request.POST)
                 if form.is_valid():
                     cd = form.cleaned_data
-                    AudienceTask.objects.filter(id=edit_task.id, workspace_id=ws_id, user=user).update(
+                    AudienceTask.objects.filter(id=edit_task.id, workspace_id=ws_id).update(
                         title=(cd["title"] or "").strip(),
                         task=(cd["task"] or "").strip(),
                         task_client=(cd["task_client"] or "").strip(),

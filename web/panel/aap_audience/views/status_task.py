@@ -275,7 +275,7 @@ def status_task_view(request):
     if not ws_id or not getattr(user, "is_authenticated", False):
         return HttpResponseRedirect("../")
 
-    task = AudienceTask.objects.filter(id=pk, workspace_id=ws_id, user=user).first()
+    task = AudienceTask.objects.filter(id=pk, workspace_id=ws_id).first()
     if task is None:
         return HttpResponseRedirect("../")
 
@@ -288,7 +288,7 @@ def status_task_view(request):
         action = (request.POST.get("action") or "").strip()
 
         if action == "toggle_processing":
-            AudienceTask.objects.filter(id=task.id, workspace_id=ws_id, user=user).update(
+            AudienceTask.objects.filter(id=task.id, workspace_id=ws_id).update(
                 run_processing=not bool(task.run_processing)
             )
             return redirect(f"{request.path}?id={task.ui_id}")
@@ -315,7 +315,7 @@ def status_task_view(request):
                 changed_now = _criteria_changed(int(task.id), current_hash)
 
             if (not active_now) and (not changed_now) and add > 0:
-                AudienceTask.objects.filter(id=task.id, workspace_id=ws_id, user=user).update(
+                AudienceTask.objects.filter(id=task.id, workspace_id=ws_id).update(
                     subscribers_limit=int(task.subscribers_limit or 0) + int(add)
                 )
                 _rating_insert(int(task.id), "contacts", current_hash)

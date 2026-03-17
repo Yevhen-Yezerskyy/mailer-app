@@ -22,7 +22,6 @@ def modal_create_task_view(request):
         AudienceTask.objects.filter(
             id=pk,
             workspace_id=request.workspace_id,
-            user=request.user,
             archived=False,
         ).first()
     )

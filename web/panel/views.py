@@ -511,7 +511,6 @@ def dashboard(request):
     recent_tasks = list(
         AudienceTask.objects.filter(
             workspace_id=ws_id,
-            user=user,
             archived=False,
         )
         .only("id", "title", "run_processing")

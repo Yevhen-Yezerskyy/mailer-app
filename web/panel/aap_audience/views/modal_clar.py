@@ -58,7 +58,7 @@ def modal_clar_view(request):
         return res
 
     pk = int(res)
-    task = AudienceTask.objects.filter(id=pk, workspace_id=ws_id, user=user).first()
+    task = AudienceTask.objects.filter(id=pk, workspace_id=ws_id).first()
     if task is None:
         return redirect("/")
 

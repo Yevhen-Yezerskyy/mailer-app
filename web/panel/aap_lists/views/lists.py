@@ -34,19 +34,19 @@ def _pct(part: int, total: int) -> int:
     return int(round((int(part) * 100.0) / float(int(total))))
 
 
-def _lists_qs(ws_id, user):
+def _lists_qs(ws_id):
     return (
         MailingList.objects
-        .filter(workspace_id=ws_id, user=user, archived=False)
+        .filter(workspace_id=ws_id, archived=False)
         .order_by("-created_at")
         .prefetch_related("audience_tasks")
     )
 
 
-def _tasks_qs(ws_id, user):
+def _tasks_qs(ws_id):
     return (
         AudienceTask.objects
-        .filter(workspace_id=ws_id, user=user, archived=False)
+        .filter(workspace_id=ws_id, archived=False)
         .order_by("-created_at")
     )
 
@@ -63,12 +63,12 @@ def _bind_one_task(items):
     return items
 
 
-def _audience_choices(ws_id, user):
+def _audience_choices(ws_id):
     # ⛔ никаких encode_id — только реальные PK
-    return [(str(t.id), t.title or str(t.id)) for t in _tasks_qs(ws_id, user)]
+    return [(str(t.id), t.title or str(t.id)) for t in _tasks_qs(ws_id)]
 
 
-def _get_edit_obj(request, ws_id, user):
+def _get_edit_obj(request, ws_id):
     if request.GET.get("state") != "edit":
         return None
     if not request.GET.get("id"):
@@ -80,7 +80,7 @@ def _get_edit_obj(request, ws_id, user):
 
     return (
         MailingList.objects
-        .filter(id=int(res), workspace_id=ws_id, user=user, archived=False)
+        .filter(id=int(res), workspace_id=ws_id, archived=False)
         .prefetch_related("audience_tasks")
         .first()
     )
@@ -174,12 +174,12 @@ def lists_view(request):
     if not ws_id:
         return redirect("/")
 
-    edit_obj = _get_edit_obj(request, ws_id, user)
+    edit_obj = _get_edit_obj(request, ws_id)
     if isinstance(edit_obj, HttpResponseRedirect):
         return edit_obj
 
     state = "edit" if edit_obj else ""
-    choices = _audience_choices(ws_id, user)
+    choices = _audience_choices(ws_id)
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
@@ -208,9 +208,9 @@ def lists_view(request):
 
         form = MailingListForm(request.POST, audience_choices=choices)
         if not form.is_valid():
-            lists = _bind_one_task(_with_ui_ids(_lists_qs(ws_id, user)))
+            lists = _bind_one_task(_with_ui_ids(_lists_qs(ws_id)))
 
-            task_ids = [int(t.id) for t in _tasks_qs(ws_id, user)]
+            task_ids = [int(t.id) for t in _tasks_qs(ws_id)]
             task_stats = _fetch_rate_stats_by_task(task_ids)
             overall = _sum_overall(task_stats)
 
@@ -243,7 +243,6 @@ def lists_view(request):
         task_obj = AudienceTask.objects.filter(
             id=task_pk,
             workspace_id=ws_id,
-            user=user,
             archived=False,
         ).first()
         if task_obj is None:
@@ -272,7 +271,6 @@ def lists_view(request):
             obj = MailingList.objects.filter(
                 id=int(res),
                 workspace_id=ws_id,
-                user=user,
                 archived=False,
             ).first()
             if obj is None:
@@ -295,9 +293,9 @@ def lists_view(request):
             init["audience_task_id"] = str(one_task.id)
 
     form = MailingListForm(initial=init, audience_choices=choices)
-    lists = _bind_one_task(_with_ui_ids(_lists_qs(ws_id, user)))
+    lists = _bind_one_task(_with_ui_ids(_lists_qs(ws_id)))
 
-    task_ids = [int(t.id) for t in _tasks_qs(ws_id, user)]
+    task_ids = [int(t.id) for t in _tasks_qs(ws_id)]
     task_stats = _fetch_rate_stats_by_task(task_ids)
     overall = _sum_overall(task_stats)
 

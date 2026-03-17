@@ -105,7 +105,7 @@ def _get_tasks(request):
         return AudienceTask.objects.none()
     return (
         AudienceTask.objects
-        .filter(workspace_id=ws_id, user=user, archived=False)
+        .filter(workspace_id=ws_id, archived=False)
         .order_by("-created_at")
     )
 
@@ -122,7 +122,7 @@ def _get_task_obj_or_none(request, *, pk: int):
     if not ws_id or not getattr(user, "is_authenticated", False):
         return None
     try:
-        return AudienceTask.objects.get(id=int(pk), workspace_id=ws_id, user=user)
+        return AudienceTask.objects.get(id=int(pk), workspace_id=ws_id)
     except Exception:
         return None
 
@@ -440,7 +440,6 @@ def how_view(request):
             AudienceTask.objects.filter(
                 id=pk,
                 workspace_id=ws_id,
-                user=user,
             ).update(
                 archived=True,
                 run_processing=False,

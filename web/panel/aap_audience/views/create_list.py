@@ -14,7 +14,7 @@ def _get_tasks(request):
     if not ws_id or not getattr(user, "is_authenticated", False):
         return []
     tasks = list(
-        AudienceTask.objects.filter(workspace_id=ws_id, user=user, archived=False).order_by("-updated_at")
+        AudienceTask.objects.filter(workspace_id=ws_id, archived=False).order_by("-updated_at")
     )
     for t in tasks:
         t.ui_id = encode_id(int(t.id))
@@ -34,7 +34,7 @@ def create_list_view(request):
             except Exception:
                 pk = 0
             if pk > 0 and ws_id and getattr(user, "is_authenticated", False):
-                AudienceTask.objects.filter(id=pk, workspace_id=ws_id, user=user).update(archived=True)
+                AudienceTask.objects.filter(id=pk, workspace_id=ws_id).update(archived=True)
             return redirect("audience:create_list")
 
     tasks = _get_tasks(request)
