@@ -21,6 +21,7 @@ _SYSTEM_FROM_MARKERS = (
     "postmaster",
 )
 _DSN_CONTENT_TYPES = ("message/delivery-status", "message/rfc822")
+_EMAIL_WRONG_STATUS_RETURNED_MAIL = "RETURNED MAIL"
 
 
 def _extract_email(value: str) -> Optional[str]:
@@ -163,6 +164,19 @@ def _upsert_blocked_recipient(
     )
 
 
+def _mark_aggr_email_wrong(*, aggr_contact_id: int, status: str) -> None:
+    db.execute(
+        """
+        UPDATE public.raw_contacts_aggr
+        SET email_wrong = true,
+            email_wrong_status = %s,
+            updated_at = now()
+        WHERE id = %s
+        """,
+        [str(status or "").strip() or _EMAIL_WRONG_STATUS_RETURNED_MAIL, int(aggr_contact_id)],
+    )
+
+
 def process_imap_message(mailbox_id: int, folder: str, uid: str, raw_msg: bytes) -> Dict[str, Any]:
     raw_text = raw_msg.decode("utf-8", errors="replace")
     msg = BytesParser(policy=policy.default).parsebytes(raw_msg)
@@ -177,6 +191,10 @@ def process_imap_message(mailbox_id: int, folder: str, uid: str, raw_msg: bytes)
         aggr_contact_id = _unique_aggr_contact_id_by_email(failed_email)
 
     if should_block and aggr_contact_id is not None:
+        _mark_aggr_email_wrong(
+            aggr_contact_id=int(aggr_contact_id),
+            status=_EMAIL_WRONG_STATUS_RETURNED_MAIL,
+        )
         _upsert_blocked_recipient(
             aggr_contact_id=aggr_contact_id,
             mailbox_sent_id=None,

@@ -18,11 +18,17 @@ from multiprocessing import Pipe, Process
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
+from engine.common.cache.client import CLIENT
 from engine.common.db import execute, fetch_all, fetch_one
 from engine.common.email_template import _is_de_public_holiday
 from engine.common.mail.send import send_one
 
 _TZ_BERLIN = ZoneInfo("Europe/Berlin")
+_SMTP_451_QUARANTINE_TTL_SEC = 20 * 60
+_SMTP_451_STATE_TTL_SEC = 7 * 24 * 60 * 60
+_SMTP_451_MAX_FAILS_PER_EMAIL = 3
+_SMTP_451_CHAIN_MAX_ATTEMPTS = 3
+_SMTP_451_EMAIL_WRONG_STATUS = "451 TMP"
 
 
 def _parse_hhmm_to_minutes(s: str) -> Optional[int]:
@@ -111,6 +117,22 @@ class SenderRuntime:
     last_hb: Optional[Heartbeat] = None
 
 
+@dataclass(frozen=True)
+class SendCandidate:
+    campaign_id: int
+    list_contact_id: int
+    rate_contact_id: int
+    aggr_contact_id: Optional[int]
+    email: str
+
+
+@dataclass(frozen=True)
+class SendOutcome:
+    kind: str
+    status: str = ""
+    code: Optional[int] = None
+
+
 def _now_ts() -> float:
     return time.time()
 
@@ -127,7 +149,8 @@ def _fmt_wait_sec(ts: float, now: float) -> str:
 
 def _pending_by_campaign(campaign_ids: List[int]) -> Dict[int, int]:
     """
-    pending = active list rows (lists_contacts) NOT present in mailbox_sent by (campaign_id, rate_contact_id).
+    pending = active sendable list rows (email_wrong=false) NOT present in mailbox_sent
+    by (campaign_id, rate_contact_id).
     """
     ids = [int(x) for x in campaign_ids if int(x) > 0]
     if not ids:
@@ -137,10 +160,17 @@ def _pending_by_campaign(campaign_ids: List[int]) -> Dict[int, int]:
         """
         SELECT
           c.id AS campaign_id,
-          COUNT(*) FILTER (WHERE ms.id IS NULL) AS pending
+          COUNT(*) FILTER (
+            WHERE ms.id IS NULL
+              AND COALESCE(ag.email_wrong, false) = false
+          ) AS pending
         FROM public.campaigns_campaigns c
         JOIN public.lists_contacts lc
           ON lc.list_id = c.mailing_list_id AND lc.active = true
+        JOIN public.rate_contacts rc
+          ON rc.id = lc.rate_contact_id
+        JOIN public.raw_contacts_aggr ag
+          ON ag.id = rc.contact_id
         LEFT JOIN public.mailbox_sent ms
           ON ms.campaign_id = c.id
          AND ms.rate_contact_id = lc.rate_contact_id
@@ -155,6 +185,225 @@ def _pending_by_campaign(campaign_ids: List[int]) -> Dict[int, int]:
     for cid in ids:
         out.setdefault(int(cid), 0)
     return out
+
+
+def _smtp_451_subject_key(aggr_contact_id: Optional[int], email: str) -> Optional[str]:
+    if aggr_contact_id is not None and int(aggr_contact_id) > 0:
+        return f"aggr:{int(aggr_contact_id)}"
+    email_s = str(email or "").strip().lower()
+    if email_s:
+        return f"email:{email_s}"
+    return None
+
+
+def _smtp_451_quarantine_key(aggr_contact_id: Optional[int], email: str) -> Optional[str]:
+    subject = _smtp_451_subject_key(aggr_contact_id, email)
+    if not subject:
+        return None
+    return f"sender:smtp451:quarantine:{subject}"
+
+
+def _smtp_451_count_key(aggr_contact_id: Optional[int], email: str) -> Optional[str]:
+    subject = _smtp_451_subject_key(aggr_contact_id, email)
+    if not subject:
+        return None
+    return f"sender:smtp451:count:{subject}"
+
+
+def _smtp_451_is_quarantined(aggr_contact_id: Optional[int], email: str) -> bool:
+    key = _smtp_451_quarantine_key(aggr_contact_id, email)
+    if not key:
+        return False
+    return CLIENT.get(key, ttl_sec=1) is not None
+
+
+def _smtp_451_quarantine(aggr_contact_id: Optional[int], email: str) -> None:
+    key = _smtp_451_quarantine_key(aggr_contact_id, email)
+    if not key:
+        return
+    CLIENT.set(key, b"1", ttl_sec=_SMTP_451_QUARANTINE_TTL_SEC)
+
+
+def _smtp_451_get_count(aggr_contact_id: Optional[int], email: str) -> int:
+    key = _smtp_451_count_key(aggr_contact_id, email)
+    if not key:
+        return 0
+    raw = CLIENT.get(key, ttl_sec=1)
+    if raw is None:
+        return 0
+    try:
+        return max(0, int(bytes(raw).decode("utf-8", errors="replace").strip() or "0"))
+    except Exception:
+        return 0
+
+
+def _smtp_451_inc_count(aggr_contact_id: Optional[int], email: str) -> int:
+    key = _smtp_451_count_key(aggr_contact_id, email)
+    if not key:
+        return 0
+    value = _smtp_451_get_count(aggr_contact_id, email) + 1
+    CLIENT.set(key, str(value).encode("utf-8"), ttl_sec=_SMTP_451_STATE_TTL_SEC)
+    return value
+
+
+def _smtp_451_clear_state(aggr_contact_id: Optional[int], email: str) -> None:
+    keys = [
+        k
+        for k in (
+            _smtp_451_quarantine_key(aggr_contact_id, email),
+            _smtp_451_count_key(aggr_contact_id, email),
+        )
+        if k
+    ]
+    if not keys:
+        return
+    CLIENT.delete_many(keys)
+
+
+def _mark_aggr_email_wrong(aggr_contact_id: Optional[int], status: str) -> None:
+    if aggr_contact_id is None:
+        return
+    execute(
+        """
+        UPDATE public.raw_contacts_aggr
+        SET email_wrong = true,
+            email_wrong_status = %s,
+            updated_at = now()
+        WHERE id = %s
+        """,
+        [str(status or "").strip() or _SMTP_451_EMAIL_WRONG_STATUS, int(aggr_contact_id)],
+    )
+
+
+def _pick_weighted_campaign(candidates: List[Tuple[int, int]]) -> Optional[int]:
+    total = sum(max(0, int(weight)) for _, weight in candidates)
+    if total <= 0:
+        return None
+    pick = random.randint(1, total)
+    acc = 0
+    for cid, weight in candidates:
+        acc += max(0, int(weight))
+        if pick <= acc:
+            return int(cid)
+    return int(candidates[-1][0]) if candidates else None
+
+
+def _candidate_batch_for_campaign(campaign_id: int, *, limit: int = 200) -> List[SendCandidate]:
+    rows = fetch_all(
+        """
+        SELECT
+          lc.id AS list_contact_id,
+          lc.rate_contact_id,
+          rc.contact_id AS aggr_contact_id,
+          COALESCE(lower(trim(ag.email)), '') AS email
+        FROM public.campaigns_campaigns c
+        JOIN public.lists_contacts lc
+          ON lc.list_id = c.mailing_list_id AND lc.active = true
+        JOIN public.rate_contacts rc
+          ON rc.id = lc.rate_contact_id
+        JOIN public.raw_contacts_aggr ag
+          ON ag.id = rc.contact_id
+        LEFT JOIN public.mailbox_sent ms
+          ON ms.campaign_id = c.id
+         AND ms.rate_contact_id = lc.rate_contact_id
+        WHERE c.id = %s
+          AND ms.id IS NULL
+          AND COALESCE(ag.email_wrong, false) = false
+        ORDER BY
+          rc.rate_cl ASC NULLS LAST,
+          rc.rate_cb ASC NULLS LAST,
+          lc.id ASC
+        LIMIT %s
+        """,
+        [int(campaign_id), int(limit)],
+    )
+    out: List[SendCandidate] = []
+    for list_contact_id, rate_contact_id, aggr_contact_id, email in rows:
+        out.append(
+            SendCandidate(
+                campaign_id=int(campaign_id),
+                list_contact_id=int(list_contact_id),
+                rate_contact_id=int(rate_contact_id),
+                aggr_contact_id=int(aggr_contact_id) if aggr_contact_id is not None else None,
+                email=str(email or "").strip().lower(),
+            )
+        )
+    return out
+
+
+def _pick_send_candidate(candidates: List[Tuple[int, int]]) -> Optional[SendCandidate]:
+    pool = [(int(cid), int(weight)) for cid, weight in candidates if int(weight) > 0]
+    while pool:
+        chosen_campaign_id = _pick_weighted_campaign(pool)
+        if chosen_campaign_id is None:
+            return None
+        batch = _candidate_batch_for_campaign(int(chosen_campaign_id))
+        for candidate in batch:
+            if not _smtp_451_is_quarantined(candidate.aggr_contact_id, candidate.email):
+                return candidate
+        pool = [(cid, weight) for cid, weight in pool if int(cid) != int(chosen_campaign_id)]
+    return None
+
+
+def _last_smtp_send_event_id(mailbox_id: int) -> int:
+    row = fetch_one(
+        """
+        SELECT COALESCE(MAX(id), 0)
+        FROM public.mailbox_events
+        WHERE mailbox_id = %s
+          AND action = 'SMTP_SEND_CHECK'
+        """,
+        [int(mailbox_id)],
+    )
+    return int(row[0]) if row and row[0] is not None else 0
+
+
+def _read_send_outcome(mailbox_id: int, candidate: SendCandidate, prev_event_id: int) -> SendOutcome:
+    row = fetch_one(
+        """
+        SELECT status
+        FROM public.mailbox_sent
+        WHERE campaign_id = %s
+          AND rate_contact_id = %s
+        LIMIT 1
+        """,
+        [int(candidate.campaign_id), int(candidate.rate_contact_id)],
+    )
+    if row and row[0]:
+        status = str(row[0])
+        return SendOutcome(kind=("SENT" if status == "SEND" else "TERMINAL"), status=status)
+
+    row = fetch_one(
+        """
+        SELECT status, data
+        FROM public.mailbox_events
+        WHERE mailbox_id = %s
+          AND action = 'SMTP_SEND_CHECK'
+          AND id > %s
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        [int(mailbox_id), int(prev_event_id)],
+    )
+    if not row:
+        return SendOutcome(kind="NOOP")
+
+    status = str(row[0] or "")
+    data = row[1] if isinstance(row[1], dict) else {}
+    code_raw = data.get("code")
+    code: Optional[int]
+    try:
+        code = int(code_raw) if code_raw is not None else None
+    except Exception:
+        code = None
+
+    if status == "FAIL_TMP" and code == 451:
+        return SendOutcome(kind="SMTP_451_TMP", status=status, code=code)
+    if status == "FAIL_TMP":
+        return SendOutcome(kind="SMTP_TMP", status=status, code=code)
+    if status == "FAIL":
+        return SendOutcome(kind="SMTP_FAIL", status=status, code=code)
+    return SendOutcome(kind="NOOP", status=status, code=code)
 
 
 def _disable_campaigns(campaign_ids: List[int]) -> None:
@@ -376,73 +625,91 @@ def _sender_loop(
             time.sleep(sl)
             continue
 
-        total = sum(w for _, w in candidates)
-        pick = random.randint(1, total)
-        camp_id = candidates[0][0]
-        acc = 0
-        for cid, w in candidates:
-            acc += w
-            if pick <= acc:
-                camp_id = cid
+        attempts_in_chain = 0
+
+        while attempts_in_chain < _SMTP_451_CHAIN_MAX_ATTEMPTS:
+            candidate = _pick_send_candidate(candidates)
+            if candidate is None:
+                sl = min(30.0, float(send_interval))
+                hb(
+                    next_wake_at=_now_ts() + sl,
+                    state="NO_CANDIDATE",
+                    reason=f"limit_hour_sent={last_limit} interval={send_interval:.1f}s → sleep={sl:.0f}s",
+                )
+                time.sleep(sl)
                 break
 
-        row = fetch_one(
-            """
-            SELECT lc.id AS list_contact_id
-            FROM public.campaigns_campaigns c
-            JOIN public.lists_contacts lc
-              ON lc.list_id = c.mailing_list_id AND lc.active = true
-            LEFT JOIN public.mailbox_sent ms
-              ON ms.campaign_id = c.id
-             AND ms.rate_contact_id = lc.rate_contact_id
-            LEFT JOIN public.rate_contacts rc
-              ON rc.id = lc.rate_contact_id
-            WHERE c.id = %s
-              AND ms.id IS NULL
-            ORDER BY
-              rc.rate_cl ASC NULLS LAST,
-              rc.rate_cb ASC NULLS LAST,
-              lc.id ASC
-            LIMIT 1
-            """,
-            [int(camp_id)],
-        )
-        if not row:
-            sl = min(30.0, float(send_interval))
+            attempts_in_chain += 1
+            prev_event_id = _last_smtp_send_event_id(int(mailbox_id))
+
+            hb(
+                next_wake_at=_now_ts() + (float(send_interval) + 60.0),
+                state="SENDING",
+                campaign_id=candidate.campaign_id,
+                reason=(
+                    f"limit_hour_sent={last_limit} (~{last_limit}/h) interval={send_interval:.1f}s "
+                    f"→ send_one(campaign_id={candidate.campaign_id}, list_contact_id={candidate.list_contact_id}) "
+                    f"email={candidate.email or '?'} try={attempts_in_chain}/{_SMTP_451_CHAIN_MAX_ATTEMPTS}"
+                ),
+            )
+            try:
+                send_one(int(candidate.campaign_id), int(candidate.list_contact_id))
+            except Exception as e:
+                dead(f"SEND_ONE_EXCEPTION:{type(e).__name__}:{e}")
+                return
+
+            outcome = _read_send_outcome(int(mailbox_id), candidate, prev_event_id)
+
+            if outcome.kind == "SMTP_451_TMP":
+                fail_count = _smtp_451_inc_count(candidate.aggr_contact_id, candidate.email)
+                _smtp_451_quarantine(candidate.aggr_contact_id, candidate.email)
+
+                if fail_count >= _SMTP_451_MAX_FAILS_PER_EMAIL:
+                    _mark_aggr_email_wrong(candidate.aggr_contact_id, _SMTP_451_EMAIL_WRONG_STATUS)
+                    _smtp_451_clear_state(candidate.aggr_contact_id, candidate.email)
+                    pending[candidate.campaign_id] = max(0, int(pending.get(candidate.campaign_id, 0)) - 1)
+
+                if attempts_in_chain < _SMTP_451_CHAIN_MAX_ATTEMPTS:
+                    hb(
+                        next_wake_at=_now_ts() + 0.1,
+                        state="SMTP_451_TMP",
+                        campaign_id=candidate.campaign_id,
+                        reason=(
+                            f"email={candidate.email or '?'} 451_tmp fail_count={fail_count} "
+                            f"quarantine={_SMTP_451_QUARANTINE_TTL_SEC}s → try_next"
+                        ),
+                    )
+                    continue
+
+                sl = 30.0 * 60.0
+                hb(
+                    next_wake_at=_now_ts() + sl,
+                    state="SMTP_451_COOLDOWN",
+                    campaign_id=candidate.campaign_id,
+                    reason=(
+                        f"451_tmp_chain={attempts_in_chain} email={candidate.email or '?'} "
+                        f"→ sleep={sl:.0f}s"
+                    ),
+                )
+                time.sleep(sl)
+                break
+
+            if outcome.kind in ("SENT", "TERMINAL"):
+                _smtp_451_clear_state(candidate.aggr_contact_id, candidate.email)
+
+            sl = max(0.0, float(send_interval))
             hb(
                 next_wake_at=_now_ts() + sl,
-                state="NO_CANDIDATE",
-                campaign_id=camp_id,
-                reason=f"limit_hour_sent={last_limit} interval={send_interval:.1f}s → sleep={sl:.0f}s",
+                state="SLEEP",
+                campaign_id=candidate.campaign_id,
+                reason=(
+                    f"outcome={outcome.kind or 'UNKNOWN'} status={outcome.status or '-'} "
+                    f"list_contact_id={candidate.list_contact_id} → sleep={sl:.1f}s "
+                    f"(limit_hour_sent={last_limit})"
+                ),
             )
             time.sleep(sl)
-            continue
-
-        list_contact_id = int(row[0])
-
-        hb(
-            next_wake_at=_now_ts() + (float(send_interval) + 60.0),
-            state="SENDING",
-            campaign_id=camp_id,
-            reason=(
-                f"limit_hour_sent={last_limit} (~{last_limit}/h) interval={send_interval:.1f}s "
-                f"→ send_one(campaign_id={camp_id}, list_contact_id={list_contact_id})"
-            ),
-        )
-        try:
-            send_one(int(camp_id), int(list_contact_id))
-        except Exception as e:
-            dead(f"SEND_ONE_EXCEPTION:{type(e).__name__}:{e}")
-            return
-
-        sl = max(0.0, float(send_interval))
-        hb(
-            next_wake_at=_now_ts() + sl,
-            state="SLEEP",
-            campaign_id=camp_id,
-            reason=f"sent_ok list_contact_id={list_contact_id} → sleep={sl:.1f}s (limit_hour_sent={last_limit})",
-        )
-        time.sleep(sl)
+            break
 
 
 class Sender:
