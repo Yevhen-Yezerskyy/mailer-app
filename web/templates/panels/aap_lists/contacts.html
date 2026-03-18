@@ -111,13 +111,13 @@
 
       {% if rows %}
         <!-- PAGINATION TOP -->
-        <div class="YY-CARD_WHITE flex items-center mb-4">
+        <div class="YY-CARD_WHITE !h-auto flex items-center mb-4">
           {% if page > 1 %}
-            <a class="YY-BUTTON_MAIN mr-3"
+            <a class="YY-BUTTON_MAIN !w-fit mr-3"
               href="?p=1{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
               << <<
             </a>
-            <a class="YY-BUTTON_MAIN mr-6"
+            <a class="YY-BUTTON_MAIN !w-fit mr-6"
               href="?p={{ page|add:'-1' }}{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
               <<
             </a>
@@ -128,11 +128,11 @@
           </div>
 
           {% if page < pages %}
-            <a class="YY-BUTTON_MAIN ml-6"
+            <a class="YY-BUTTON_MAIN !w-fit ml-6"
               href="?p={{ page|add:'1' }}{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
               >>
             </a>
-            <a class="YY-BUTTON_MAIN ml-3"
+            <a class="YY-BUTTON_MAIN !w-fit ml-3"
               href="?p={{ pages }}{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
               >> >>
             </a>
@@ -184,7 +184,7 @@
                         onsubmit="return confirm('{% trans "Забыть контакт? Он будет удалён из контактов workspace." %}');">
                         {% csrf_token %}
                         <input type="hidden" name="contact_id" value="{{ it.aggr_id }}">
-                        <button type="submit" name="action" value="forget" class="YY-BUTTON_TAB_RED w-full">
+                        <button type="submit" name="action" value="forget" class="YY-BUTTON_TAB_RED !w-fit inline-block text-center">
                           {% trans "Забыть" %}
                         </button>
                       </form>
@@ -194,7 +194,7 @@
                       <form method="post" class="mb-10">
                         {% csrf_token %}
                         <input type="hidden" name="contact_id" value="{{ it.aggr_id }}">
-                        <button type="submit" name="action" value="unsubscribe" class="YY-BUTTON_TAB_MAIN w-full">
+                        <button type="submit" name="action" value="unsubscribe" class="YY-BUTTON_TAB_MAIN !w-fit inline-block text-center">
                           {% trans "Отписать" %}
                         </button>
                       </form>
@@ -202,14 +202,14 @@
                       <form method="post" class="mb-10">
                         {% csrf_token %}
                         <input type="hidden" name="contact_id" value="{{ it.aggr_id }}">
-                        <button type="submit" name="action" value="subscribe" class="YY-BUTTON_TAB_MAIN w-full">
+                        <button type="submit" name="action" value="subscribe" class="YY-BUTTON_TAB_MAIN !w-fit inline-block text-center">
                           {% trans "Подписать" %}
                         </button>
                       </form>
                     {% endif %}
 
                     <a href="#"
-                      class="YY-BUTTON_TAB_MAIN w-full inline-block text-center"
+                      class="YY-BUTTON_TAB_MAIN !w-fit inline-block text-center"
                       data-yy-modal="url=/panel/lists/contacts/modal/?id={{ it.ui_id }}">
                       {% trans "Больше" %}
                     </a>
@@ -221,13 +221,13 @@
         </div>
 
         <!-- PAGINATION BOTTOM -->
-        <div class="YY-CARD_WHITE flex items-center mb-4">
+        <div class="YY-CARD_WHITE !h-auto flex items-center mb-4">
           {% if page > 1 %}
-            <a class="YY-BUTTON_MAIN mr-3"
+            <a class="YY-BUTTON_MAIN !w-fit mr-3"
               href="?p=1{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
               << <<
             </a>
-            <a class="YY-BUTTON_MAIN mr-6"
+            <a class="YY-BUTTON_MAIN !w-fit mr-6"
               href="?p={{ page|add:'-1' }}{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
               <<
             </a>
@@ -238,11 +238,11 @@
           </div>
 
           {% if page < pages %}
-            <a class="YY-BUTTON_MAIN ml-6"
+            <a class="YY-BUTTON_MAIN !w-fit ml-6"
               href="?p={{ page|add:'1' }}{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
               >>
             </a>
-            <a class="YY-BUTTON_MAIN ml-3"
+            <a class="YY-BUTTON_MAIN !w-fit ml-3"
               href="?p={{ pages }}{% if list_filter_ui %}&list={{ list_filter_ui }}{% endif %}{% if no_list %}&nol=1{% endif %}{% if unsub %}&unsub=1{% endif %}{% if search_active %}&q_email={{ q_email }}&q_company={{ q_company }}&q_branch={{ q_branch }}&q_addr={{ q_addr }}&q_plz={{ q_plz }}{% endif %}">
               >> >>
             </a>

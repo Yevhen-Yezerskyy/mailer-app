@@ -190,16 +190,16 @@
         <div data-panel="rated" class="{% if tab != 'rated' %}hidden{% endif %}">
         {% if rated_rows %}
           <!-- PAGINATION TOP -->
-          <div class="YY-CARD_WHITE flex items-center mb-4">
+          <div class="YY-CARD_WHITE !h-auto flex items-center mb-4">
             {% if rated_page > 1 %}
-              <a class="YY-BUTTON_MAIN mr-3"
+              <a class="YY-BUTTON_MAIN !w-fit mr-3"
                 href="?id={{ request.GET.id }}&tab=rated&p_rated=1&p_all={{ all_page }}">
                 << <<
               </a>
             {% endif %}
 
             {% if rated_page > 1 %}
-              <a class="YY-BUTTON_MAIN mr-6"
+              <a class="YY-BUTTON_MAIN !w-fit mr-6"
                 href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_page|add:'-1' }}&p_all={{ all_page }}">
                 <<
               </a>
@@ -210,14 +210,14 @@
             </div>
 
             {% if rated_page < rated_pages %}
-              <a class="YY-BUTTON_MAIN ml-6"
+              <a class="YY-BUTTON_MAIN !w-fit ml-6"
                 href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_page|add:'1' }}&p_all={{ all_page }}">
                 >>
               </a>
             {% endif %}
 
             {% if rated_page < rated_pages %}
-              <a class="YY-BUTTON_MAIN ml-3"
+              <a class="YY-BUTTON_MAIN !w-fit ml-3"
                 href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_pages }}&p_all={{ all_page }}">
                 >> >>
               </a>
@@ -249,7 +249,7 @@
                     <td class="YY-TB_TD text-center {{ it.ratings.rate_cl_bg }}">{{ it.ratings.rate_cl }}</td>
                     <td class="YY-TB_TD">
                       <a href="#"
-                        class="YY-BUTTON_TAB_MAIN"
+                        class="YY-BUTTON_TAB_MAIN !w-fit inline-block text-center"
                         data-yy-modal="url=/panel/audience/status/task/modal/?id={{ it.ui_id }}">
                         {% trans "Больше" %}
                       </a>
@@ -261,16 +261,16 @@
           </div>
 
           <!-- PAGINATION BOTTOM -->
-          <div class="YY-CARD_WHITE flex items-center mt-6">
+          <div class="YY-CARD_WHITE !h-auto flex items-center mt-6">
             {% if rated_page > 1 %}
-              <a class="YY-BUTTON_MAIN mr-3"
+              <a class="YY-BUTTON_MAIN !w-fit mr-3"
                 href="?id={{ request.GET.id }}&tab=rated&p_rated=1&p_all={{ all_page }}">
                 << <<
               </a>
             {% endif %}
 
             {% if rated_page > 1 %}
-              <a class="YY-BUTTON_MAIN mr-6"
+              <a class="YY-BUTTON_MAIN !w-fit mr-6"
                 href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_page|add:'-1' }}&p_all={{ all_page }}">
                 <<
               </a>
@@ -281,14 +281,14 @@
             </div>
 
             {% if rated_page < rated_pages %}
-              <a class="YY-BUTTON_MAIN ml-6"
+              <a class="YY-BUTTON_MAIN !w-fit ml-6"
                 href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_page|add:'1' }}&p_all={{ all_page }}">
                 >>
               </a>
             {% endif %}
 
             {% if rated_page < rated_pages %}
-              <a class="YY-BUTTON_MAIN ml-3"
+              <a class="YY-BUTTON_MAIN !w-fit ml-3"
                 href="?id={{ request.GET.id }}&tab=rated&p_rated={{ rated_pages }}&p_all={{ all_page }}">
                 >> >>
               </a>
@@ -308,16 +308,16 @@
         <div data-panel="all" class="{% if tab != 'all' %}hidden{% endif %}">
           {% if all_rows %}
           <!-- PAGINATION TOP -->
-          <div class="YY-CARD_WHITE flex items-center mb-4">
+          <div class="YY-CARD_WHITE !h-auto flex items-center mb-4">
             {% if all_page > 1 %}
-              <a class="YY-BUTTON_MAIN mr-3"
+              <a class="YY-BUTTON_MAIN !w-fit mr-3"
                 href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all=1">
                 << <<
               </a>
             {% endif %}
 
             {% if all_page > 1 %}
-              <a class="YY-BUTTON_MAIN mr-6"
+              <a class="YY-BUTTON_MAIN !w-fit mr-6"
                 href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_page|add:'-1' }}">
                 <<
               </a>
@@ -328,14 +328,14 @@
             </div>
 
             {% if all_page < all_pages %}
-              <a class="YY-BUTTON_MAIN ml-6"
+              <a class="YY-BUTTON_MAIN !w-fit ml-6"
                 href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_page|add:'1' }}">
                 >>
               </a>
             {% endif %}
 
             {% if all_page < all_pages %}
-              <a class="YY-BUTTON_MAIN ml-3"
+              <a class="YY-BUTTON_MAIN !w-fit ml-3"
                 href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_pages }}">
                 >> >>
               </a>
@@ -365,7 +365,7 @@
                     <td class="YY-TB_TD text-center">{{ it.ratings.rate_cb_100 }}</td>
                     <td class="YY-TB_TD">
                       <a href="#"
-                        class="YY-BUTTON_TAB_MAIN"
+                        class="YY-BUTTON_TAB_MAIN !w-fit inline-block text-center"
                         data-yy-modal="url=/panel/audience/status/task/modal/?id={{ it.ui_id }}">
                         {% trans "Больше" %}
                       </a>
@@ -377,16 +377,16 @@
           </div>
 
           <!-- PAGINATION BOTTOM -->
-          <div class="YY-CARD_WHITE flex items-center mt-6">
+          <div class="YY-CARD_WHITE !h-auto flex items-center mt-6">
             {% if all_page > 1 %}
-              <a class="YY-BUTTON_MAIN mr-3"
+              <a class="YY-BUTTON_MAIN !w-fit mr-3"
                 href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all=1">
                 << <<
               </a>
             {% endif %}
 
             {% if all_page > 1 %}
-              <a class="YY-BUTTON_MAIN mr-6"
+              <a class="YY-BUTTON_MAIN !w-fit mr-6"
                 href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_page|add:'-1' }}">
                 <<
               </a>
@@ -397,14 +397,14 @@
             </div>
 
             {% if all_page < all_pages %}
-              <a class="YY-BUTTON_MAIN ml-6"
+              <a class="YY-BUTTON_MAIN !w-fit ml-6"
                 href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_page|add:'1' }}">
                 >>
               </a>
             {% endif %}
 
             {% if all_page < all_pages %}
-              <a class="YY-BUTTON_MAIN ml-3"
+              <a class="YY-BUTTON_MAIN !w-fit ml-3"
                 href="?id={{ request.GET.id }}&tab=all&p_rated={{ rated_page }}&p_all={{ all_pages }}">
                 >> >>
               </a>
