@@ -51,8 +51,8 @@ PANEL_MENU = [
                 "active_prefixes": ["/panel/audience/status/"],
             },
             {
-                "title": _("Постановка задачи"),
-                "page_title": _("Аудитории : Постановка задачи"),
+                "title": _("Списки рассылок"),
+                "page_title": _("Списки рассылок"),
                 "url_name": "audience:create_list",
                 "active_prefixes": ["/panel/audience/create/"],
             },
@@ -118,6 +118,12 @@ PANEL_MENU = [
                 "page_title": _("Настройки : Учет переходов"),
                 "url_name": "settings:url_stats",
                 "active_prefixes": ["/panel/settings/url-stats/"],
+            },
+            {
+                "title": _("Домены"),
+                "page_title": _("Настройки : Домены"),
+                "url_name": "settings:domains",
+                "active_prefixes": ["/panel/settings/domains/"],
             },
         ],
     },

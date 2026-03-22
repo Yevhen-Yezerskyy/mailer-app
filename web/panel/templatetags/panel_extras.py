@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from django import template
 
+from mailer_web.tw_classmap_middleware import get_tw_classmap
+
 register = template.Library()
 
 
@@ -24,3 +26,7 @@ def group_int(value, lang_code: str = "") -> str:
         s = s[:-3]
     return sign + sep.join(reversed(parts or ["0"]))
 
+
+@register.simple_tag(name="yy_tw_classmap")
+def yy_tw_classmap():
+    return dict(get_tw_classmap())

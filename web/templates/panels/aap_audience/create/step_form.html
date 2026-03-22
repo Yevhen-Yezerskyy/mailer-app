@@ -1,0 +1,159 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/create/step_form.html -->
+<!-- DATE: 2026-03-21 -->
+<!-- PURPOSE: Shared current-step editor with AI assistance for the create/edit audience flow. -->
+
+{% if current_step %}
+<form method="post" data-dirty-form="{{ current_step.key }}" data-submit-role="{{ current_step.key }}">
+  {% csrf_token %}
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD">
+        <div class="YY-CARD_WHITE">
+          <label class="YY-LABEL">
+            {{ current_step.editor_label }}
+          </label>
+          <textarea
+            name="{{ current_step.field_name }}"
+            class="YY-TEXTAREA"
+            rows="24"
+            data-track-dirty="1"
+            data-saved-value="{{ current_step.saved_value }}"
+            placeholder="{{ current_step.placeholder }}">{{ current_step.value }}</textarea>
+          <div class="grid grid-cols-2 gap-4">
+            <button type="submit" name="action" value="{{ current_step.process_action }}" class="YY-BUTTON_GRAY_FULL" data-process-main="1" data-button-label="{% trans 'Обработать' %}" disabled>
+              {% trans "Обработать" %}
+            </button>
+            <button
+              type="submit"
+              name="action"
+              value="{{ current_step.save_action }}"
+              class="YY-BUTTON_GRAY_FULL"
+              data-save-main="1"
+              data-button-label="{% trans 'Сохранить' %}"
+              disabled>
+              {% trans "Сохранить" %}
+            </button>
+          </div>
+        </div>
+      </td>
+      <td class="YY-MAIN_TOP_RIGHT_TD">
+        <div class="YY-CARD_WHITE flex flex-col">
+          <label class="YY-LABEL">{% trans "Команда / вопрос для ИИ ассистента." %}</label>
+          <textarea
+            name="{{ current_step.command_field }}"
+            class="YY-TEXTAREA"
+            rows="3"
+            data-track-dirty="1"
+            data-saved-value=""
+            placeholder="{% trans 'Дайте команду и / или задайте вопрос асситенту ИИ. Команда будет применена к описанию, на вопрос предлагается независимый ответ' %}">{{ current_step.ai_command_value }}</textarea>
+          <div>
+            <button type="submit" name="action" value="{{ current_step.process_action }}" class="YY-BUTTON_GRAY" data-process-instruction="1" data-button-label="{% trans 'Выполнить / задать вопрос' %}" disabled>{% trans "Выполнить / задать вопрос" %}</button>
+          </div>
+          <div class="mt-8">
+            {% if current_step.ai_advice == "__saved__" %}
+              <div>
+                <div class="YY-TEXT font-semibold">{% trans "Изменения сохранены" %}</div>
+                {% for paragraph in current_step.ai_help_paragraphs %}
+                  <div class="YY-TEXT text-slate-400{% if forloop.last %} !mb-0{% endif %}">{{ paragraph }}</div>
+                {% endfor %}
+              </div>
+            {% elif current_step.ai_command_display or current_step.ai_question %}
+              <div>
+                {% if current_step.ai_command_display %}
+                  <div class="YY-TEXT font-semibold !mb-0">{% trans "Команда / вопрос:" %}</div>
+                  <div class="YY-TEXT !mb-4">{{ current_step.ai_command_display|linebreaksbr }}</div>
+                {% endif %}
+                {% if current_step.ai_command_display or current_step.ai_advice %}
+                  <div class="YY-TEXT font-semibold !mb-0">{% trans "Ответ ассистента ИИ:" %}</div>
+                  {% if current_step.ai_advice %}
+                    <div class="YY-TEXT !mb-4">{{ current_step.ai_advice|linebreaksbr }}</div>
+                  {% else %}
+                    <div class="YY-TEXT !mb-4">{% trans "Выполнено" %}</div>
+                  {% endif %}
+                {% endif %}
+                {% if current_step.ai_question %}
+                  <div class="YY-TEXT font-semibold !mb-0">{% trans "Вопрос от ассистента ИИ:" %}</div>
+                  <div class="YY-TEXT !mb-0">{{ current_step.ai_question|linebreaksbr }}</div>
+                {% endif %}
+              </div>
+            {% else %}
+              {% for paragraph in current_step.ai_help_paragraphs %}
+                <div class="YY-TEXT text-slate-400">{{ paragraph }}</div>
+              {% endfor %}
+            {% endif %}
+          </div>
+          <div class="grid grid-cols-2 gap-4 mt-auto">
+            <button type="submit" name="action" value="{{ current_step.reset_action }}" class="YY-BUTTON_MAIN_FULL">
+              {% trans "Очистить / начать с начала" %}
+            </button>
+            <button
+              type="button"
+              class="YY-BUTTON_GRAY_FULL"
+              data-next-stage="1"
+              data-button-label="{{ current_step.next_footer_label }}"
+              data-dirty-nav="{{ current_step.next_url }}">
+              <span class="flex items-center justify-center gap-1 w-full">
+                <span>{{ current_step.next_footer_label }}</span>
+                <svg class="size-4 shrink-0" aria-hidden="true">
+                  <use href="#icon-arrow-circle"></use>
+                </svg>
+              </span>
+            </button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+</form>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <div class="YY-CARD_WHITE">
+        <div class="flex items-start gap-4">
+          <div class="w-[30%]">
+            <div class="{{ flow_mode_class }} !mb-0">
+              {{ flow_mode_label }}
+            </div>
+          </div>
+          <div class="w-[55%]">
+            <div class="{{ flow_mode_class }} !mb-0">
+              <span data-audience-title="1">{{ display_title }}</span>
+            </div>
+          </div>
+          <div class="w-[15%]">
+            {% if task %}
+              <button
+                type="button"
+                class="YY-BUTTON_MAIN_FULL"
+                data-yy-modal="url={% url 'audience:create_title_modal' %}?id={{ task_id_token }}">
+                {% trans "Изменить" %}
+              </button>
+            {% endif %}
+          </div>
+        </div>
+        {% for item in summary_items %}
+          <div class="flex items-start gap-4 mt-12">
+            <div class="w-[30%]">
+              <div class="{{ flow_mode_class }} !mb-0">
+                {{ item.label }}
+              </div>
+            </div>
+            <div class="w-[55%]" data-summary-section="{{ item.key }}" data-summary-value="{{ item.value|default:'' }}">
+              <div class="YY-TEXT !mb-0">
+                {{ item.value|default:""|linebreaksbr }}
+              </div>
+            </div>
+            <div class="w-[15%]">
+              <button type="button" class="{% if current_step and item.key == current_step.key %}YY-BUTTON_GRAY_FULL{% else %}YY-BUTTON_MAIN_FULL{% endif %}">
+                {% trans "Изменить" %}
+              </button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </td>
+  </tr>
+</table>
+{% endif %}

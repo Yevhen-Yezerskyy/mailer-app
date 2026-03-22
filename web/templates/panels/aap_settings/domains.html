@@ -1,0 +1,75 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_settings/domains.html -->
+<!-- DATE: 2026-03-19 -->
+<!-- PURPOSE: Client settings page for domain list and client-subsites directory management. -->
+
+{% block content %}
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-full">
+      <div class="YY-CARD_WHITE">
+        {% if messages %}
+          {% for m in messages %}
+            <div class="{% if 'success' in m.tags %}YY-STATUS_GREEN{% else %}YY-CARD_IN_FORM_ERROR{% endif %} mb-3">{{ m }}</div>
+          {% endfor %}
+        {% endif %}
+
+        {% if form.non_field_errors %}
+          <div class="YY-CARD_IN_FORM_ERROR mb-3">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <form method="post" class="grid grid-cols-[minmax(280px,1fr)_220px] gap-3 items-end">
+          {% csrf_token %}
+
+          <div>
+            <label class="YY-LABEL" for="{{ form.domain.id_for_label }}">{{ form.domain.label }}</label>
+            {{ form.domain }}
+            {% if form.domain.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.domain.errors }}</div>{% endif %}
+          </div>
+
+          <div>
+            <button type="submit" class="YY-BUTTON_GREEN w-full">{% trans "Добавить домен" %}</button>
+          </div>
+        </form>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      {% if items %}
+        <div class="YY-MAIN_BOTTOM_DIV">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH w-[40%]">{% trans "Домен" %}</th>
+                <th class="YY-TH_TH w-[40%]">{% trans "Каталог" %}</th>
+                <th class="YY-TH_TH w-[20%]">&nbsp;</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for it in items %}
+                <tr class="YY-TB_TR align-top">
+                  <td class="YY-TB_TD"><div class="YY-STATUS_BLUE">{{ it.domain }}</div></td>
+                  <td class="YY-TB_TD"><code>{{ it.relpath }}/</code></td>
+                  <td class="YY-TB_TD">
+                    <form method="post" action="{% url 'settings:domain_delete' it.id %}" onsubmit="return confirm('Удалить домен и его каталог?');">
+                      {% csrf_token %}
+                      <button type="submit" class="YY-BUTTON_RED w-full">{% trans "Удалить" %}</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="YY-CARD_WHITE">{% trans "Домены пока не добавлены." %}</div>
+      {% endif %}
+    </td>
+  </tr>
+</table>
+{% endblock %}

@@ -13,8 +13,8 @@
         <button
           type="button"
           onclick="location.href='{% url 'audience:create_edit_sell' %}'"
-          class="YY-BUTTON_GREEN w-full">
-          {% trans "Создать аудиторию" %}<br>{% trans "поиск клиентов / покупателей" %}
+          class="YY-BUTTON_GREEN_FULL">
+          {% trans "Создать список рассылки" %}<br>{% trans "поиск клиентов / покупателей" %}
         </button>
       </div>
     </td>
@@ -24,8 +24,8 @@
         <button
           type="button"
           onclick="location.href='{% url 'audience:create_edit_buy' %}'"
-          class="YY-BUTTON_YELLOW w-full">
-          {% trans "Создать аудиторию" %}<br>{% trans "поиск поставщиков / подрядчиков" %}
+          class="YY-BUTTON_YELLOW_FULL">
+          {% trans "Создать список рассылки" %}<br>{% trans "поиск поставщиков / подрядчиков" %}
         </button>
       </div>
     </td>
@@ -61,18 +61,18 @@
                     {% else %}
                       <div class="YY-STATUS_GREEN !w-fit">{{ t.title|default:""|linebreaksbr }}</div>
                     {% endif %}
-                    <a href="#" class="YY-BUTTON_TAB_MAIN !w-fit inline-block text-center" data-yy-modal="url=/panel/audience/create/modal/?id={{ t.ui_id }}">
+                    <a href="#" class="YY-BUTTON_MAIN" data-yy-modal="url=/panel/audience/create/modal/?id={{ t.ui_id }}">
                       {% trans "Подробнее" %}
                     </a>
                   </td>
                   <td class="YY-TB_TD">
                     <div class="flex flex-col gap-2">
                       {% if t.type == "buy" %}
-                        <a href="{% url 'audience:create_edit_buy_id' t.ui_id %}" class="YY-BUTTON_TAB_MAIN">
+                        <a href="{% url 'audience:create_edit_buy_id' t.ui_id %}" class="YY-BUTTON_MAIN_FULL">
                           {% trans "Изменить" %}
                         </a>
                       {% else %}
-                        <a href="{% url 'audience:create_edit_sell_id' t.ui_id %}" class="YY-BUTTON_TAB_MAIN">
+                        <a href="{% url 'audience:create_edit_sell_id' t.ui_id %}" class="YY-BUTTON_MAIN_FULL">
                           {% trans "Изменить" %}
                         </a>
                       {% endif %}
@@ -80,7 +80,7 @@
                         {% csrf_token %}
                         <input type="hidden" name="action" value="delete">
                         <input type="hidden" name="id" value="{{ t.ui_id }}">
-                        <button type="submit" class="YY-BUTTON_TAB_RED">
+                        <button type="submit" class="YY-BUTTON_RED_FULL">
                           {% trans "Удалить" %}
                         </button>
                       </form>

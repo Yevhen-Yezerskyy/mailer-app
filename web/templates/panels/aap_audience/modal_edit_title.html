@@ -1,0 +1,47 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/modal_edit_title.html -->
+<!-- DATE: 2026-03-22 -->
+<!-- PURPOSE: Modal form for editing and suggesting the audience title inside create/edit flow. -->
+
+<div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:720px;">
+  <button type="button" class="YY-BUTTON_MAIN !w-fit" data-yy-modal-close style="position:absolute;top:10px;right:10px;">✕</button>
+
+  <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
+    {% if task %}
+      <form method="post" action="{% url 'audience:create_title_modal' %}" data-edit-title-form="1">
+        {% csrf_token %}
+        <input type="hidden" name="id" value="{{ task_id_token }}">
+
+        <label class="YY-LABEL" for="yy-edit-title-input">
+          {% trans "Название списка рассылки" %}
+        </label>
+        <input
+          id="yy-edit-title-input"
+          type="text"
+          name="title"
+          class="YY-INPUT w-full"
+          value="{{ title_value }}"
+          autocomplete="off">
+
+        <div class="mt-4 hidden" data-edit-title-error-wrap="1">
+          <div class="YY-STATUS_RED w-full" data-edit-title-error="1"></div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mt-4">
+          <button
+            type="button"
+            class="{% if suggest_enabled %}YY-BUTTON_MAIN_FULL{% else %}YY-BUTTON_GRAY_FULL{% endif %}"
+            data-edit-title-suggest="1"
+            {% if not suggest_enabled %}disabled{% endif %}>
+            {% trans "Предложить название" %}
+          </button>
+          <button type="submit" class="YY-BUTTON_MAIN_FULL">
+            {% trans "Сохранить" %}
+          </button>
+        </div>
+      </form>
+    {% else %}
+      <div class="YY-STATUS_GRAY w-full">{% trans "Здесь пока нет данных" %}</div>
+    {% endif %}
+  </div>
+</div>

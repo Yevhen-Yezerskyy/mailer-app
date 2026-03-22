@@ -6,7 +6,7 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from .views import imap_server, mail_servers, mail_servers_api, sending, smtp_server, url_stats
+from .views import domains, imap_server, mail_servers, mail_servers_api, sending, smtp_server, url_stats
 
 app_name = "settings"
 
@@ -20,4 +20,6 @@ urlpatterns = [
     path("mail-servers/<str:id>/imap/", imap_server.imap_server_view, name="mail_servers_imap"),
     path("mail-servers/<str:id>/imap/secret/", imap_server.imap_secret_view, name="mail_servers_imap_secret"),
     path("url-stats/", url_stats.url_stats_view, name="url_stats"),
+    path("domains/", domains.domains_view, name="domains"),
+    path("domains/<int:pk>/delete/", domains.domain_delete_view, name="domain_delete"),
 ]

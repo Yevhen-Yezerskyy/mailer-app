@@ -48,6 +48,7 @@ services:
       - serenity-redis-run:/app/run/redis
       - serenity-redis-run:/app-dev/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
+      - certbot-etc:/etc/letsencrypt:ro
       - /home/eee/.ssh:/root/.ssh:ro
       - ./:/app-dev
     command: ["/app/config/sh/with-secrets.sh", "sleep", "infinity"]
@@ -148,6 +149,7 @@ services:
       - ./logs:/host-logs
       - serenity-logs:/serenity-logs
       - mailer-app-prod:/app
+      - ./client-subsites:/app/client-subsites
       - mailer-static:/app/web/staticfiles
       - mailer-media:/app/web/media
       - serenity-redis-run:/app/run/redis
@@ -492,6 +494,7 @@ services:
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./config/nginx/includes:/etc/nginx/includes:ro
       - mailer-app-prod:/app
+      - ./client-subsites:/app/client-subsites:ro
       - mailer-static:/var/www/mail-static:ro
       - mailer-media:/var/www/mail-media
       - certbot-www:/var/www/certbot

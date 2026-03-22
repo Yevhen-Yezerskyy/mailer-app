@@ -1,0 +1,115 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+{% load static %}
+<!-- FILE: web/templates/panels/aap_audience/create/flow.html -->
+<!-- DATE: 2026-03-21 -->
+<!-- PURPOSE: Shared create/edit flow screen for buy/sell audience creation. -->
+
+{% block content %}
+
+{% include "panels/modals/system/unsaved_changes.html" %}
+
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_TOP_TD">
+        <div class="flex flex-col gap-3">
+          <div class="YY-CARD_WHITE">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0 flex items-center gap-3">
+                <div class="YY-TEXT-BOLD !mb-0">
+                  {% if type == "buy" %}
+                    <span class="YY-STATUS_YELLOW !mb-0 inline-flex">{% trans "Покупка" %}: <span data-audience-title="1">{{ display_title }}</span></span>
+                  {% else %}
+                    <span class="YY-STATUS_GREEN !mb-0 inline-flex">{% trans "Продажа" %}: <span data-audience-title="1">{{ display_title }}</span></span>
+                  {% endif %}
+                </div>
+                {% if task %}
+                  <button
+                    type="button"
+                    class="YY-BUTTON_MAIN !w-fit !mb-0"
+                    data-yy-modal="url={% url 'audience:create_title_modal' %}?id={{ task_id_token }}">
+                    {% trans "Изменить" %}
+                  </button>
+                {% endif %}
+              </div>
+              <div>
+                <button
+                  type="button"
+                  class="YY-BUTTON_MAIN"
+                  data-dirty-nav="{{ flow_close_url }}">
+                  {% trans "Закрыть / перейти к спискам рассылки" %}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="YY-CARD_WHITE">
+            <div class="flex items-center gap-4">
+              {% for step in flow_step_states %}
+                <div class="min-w-0 flex-1">
+                  {% if step.is_current %}
+                    {% if type == "buy" %}
+                      <button type="button" class="YY-BUTTON_YELLOW_FULL" disabled>
+                        <span class="flex items-center justify-center gap-1 w-full">
+                          <span>{{ step.label }}</span>
+                          <svg class="size-4 shrink-0" aria-hidden="true">
+                            <use href="#icon-arrow-circle"></use>
+                          </svg>
+                        </span>
+                      </button>
+                    {% else %}
+                      <button type="button" class="YY-BUTTON_GREEN_FULL" disabled>
+                        <span class="flex items-center justify-center gap-1 w-full">
+                          <span>{{ step.label }}</span>
+                          <svg class="size-4 shrink-0" aria-hidden="true">
+                            <use href="#icon-arrow-circle"></use>
+                          </svg>
+                        </span>
+                      </button>
+                    {% endif %}
+                  {% elif step.is_clickable %}
+                    <button type="button" class="YY-BUTTON_MAIN_FULL" data-dirty-nav="{{ step.url }}" data-dirty-nav-skip-required="1">
+                      <span class="flex items-center justify-center gap-1 w-full">
+                        <span>{{ step.label }}</span>
+                        <svg class="size-4 shrink-0" aria-hidden="true">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </span>
+                    </button>
+                  {% else %}
+                    <button type="button" class="YY-BUTTON_GRAY_FULL" disabled>
+                      <span class="flex items-center justify-center gap-1 w-full">
+                        <span>{{ step.label }}</span>
+                        <svg class="size-4 shrink-0" aria-hidden="true">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </span>
+                    </button>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+{% include "panels/aap_audience/create/step_form.html" %}
+
+{% if placeholder_step %}
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_TD">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-STATUS_BLUE">{{ placeholder_step.title }}</div>
+        <div class="YY-TEXT !mb-0">{{ placeholder_step.text }}</div>
+      </div>
+    </td>
+  </tr>
+</table>
+{% endif %}
+
+{{ flow_js_config|json_script:"yy-create-edit-flow-config" }}
+<script src="{% static 'js/aap_audience/create_edit_flow.js' %}"></script>
+
+{% endblock %}

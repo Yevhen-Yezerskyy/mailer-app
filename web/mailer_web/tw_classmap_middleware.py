@@ -14,6 +14,7 @@ from typing import Dict, Optional
 
 _FLAG_ATTR = "_tw_classmap_enabled"
 _DEFAULT_MAP_FILENAME = "tw_classmap.txt"
+_MAP_PATH = Path(__file__).resolve().parent / _DEFAULT_MAP_FILENAME
 
 _MARKER = "<!-- TW-CLASSMAP: enabled -->\n"
 _DOCTYPE_RE = re.compile(r"(?is)^(?P<prefix>\s*<!doctype\s+html\s*>\s*)")
@@ -25,6 +26,9 @@ _CLASS_ATTR_RE = re.compile(r"""\bclass\s*=\s*(?P<q>["'])(?P<v>.*?)(?P=q)""", re
 class _MapCache:
     mtime_ns: int = -1
     mapping: Optional[Dict[str, str]] = None
+
+
+_MAP_CACHE = _MapCache()
 
 
 def _load_map_file(map_path: Path) -> Dict[str, str]:
@@ -76,11 +80,27 @@ def _inject_marker(html: str) -> str:
     return html[: m.end("prefix")] + _MARKER + html[m.end("prefix") :]
 
 
+def get_tw_classmap() -> Dict[str, str]:
+    global _MAP_CACHE
+
+    try:
+        st = os.stat(_MAP_PATH)
+        mtime_ns = int(getattr(st, "st_mtime_ns", int(st.st_mtime * 1_000_000_000)))
+    except FileNotFoundError:
+        _MAP_CACHE = _MapCache(mtime_ns=-1, mapping={})
+        return {}
+
+    if _MAP_CACHE.mapping is not None and _MAP_CACHE.mtime_ns == mtime_ns:
+        return _MAP_CACHE.mapping
+
+    mapping = _load_map_file(_MAP_PATH)
+    _MAP_CACHE = _MapCache(mtime_ns=mtime_ns, mapping=mapping)
+    return mapping
+
+
 class TailwindClassMapMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response
-        self._cache = _MapCache()
-        self._map_path = Path(__file__).resolve().parent / _DEFAULT_MAP_FILENAME
 
     def __call__(self, request):
         response = self.get_response(request)
@@ -97,7 +117,7 @@ class TailwindClassMapMiddleware:
         except Exception:
             return response
 
-        mapping = self._get_mapping()
+        mapping = get_tw_classmap()
 
         # 1) marker
         new_body = _inject_marker(body)
@@ -119,18 +139,3 @@ class TailwindClassMapMiddleware:
         if response.has_header("Content-Length"):
             response["Content-Length"] = str(len(response.content))
         return response
-
-    def _get_mapping(self) -> Dict[str, str]:
-        try:
-            st = os.stat(self._map_path)
-            mtime_ns = int(getattr(st, "st_mtime_ns", int(st.st_mtime * 1_000_000_000)))
-        except FileNotFoundError:
-            self._cache = _MapCache(mtime_ns=-1, mapping={})
-            return {}
-
-        if self._cache.mapping is not None and self._cache.mtime_ns == mtime_ns:
-            return self._cache.mapping
-
-        mapping = _load_map_file(self._map_path)
-        self._cache = _MapCache(mtime_ns=mtime_ns, mapping=mapping)
-        return mapping

@@ -295,6 +295,7 @@ def _build_payload(
     instructions: str,
     input_text: str,
     service_tier: ServiceTier,
+    web_search: Optional[bool] = None,
 ) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
         "model": model_name,
@@ -307,12 +308,49 @@ def _build_payload(
         payload["instructions"] = instructions
         payload["prompt_cache_key"] = _short_hash(instructions, 16)
 
-    web_tool = MODEL_WEB_TOOL.get(model_name)
-    if web_tool:
-        payload["tools"] = [{"type": web_tool}]
-        payload["tool_choice"] = "auto"
+    _apply_web_search(payload, model_name=model_name, web_search=web_search, default_enabled=True)
 
     return payload
+
+
+def _apply_web_search(
+    payload: Dict[str, Any],
+    *,
+    model_name: str,
+    web_search: Optional[bool],
+    default_enabled: bool,
+) -> None:
+    web_tool = MODEL_WEB_TOOL.get(model_name)
+    if not web_tool:
+        return
+
+    if web_search is None:
+        enabled = default_enabled
+    else:
+        enabled = bool(web_search)
+
+    tools_value = payload.get("tools")
+    tools_list = tools_value if isinstance(tools_value, list) else []
+
+    def _is_web_tool(tool: Any) -> bool:
+        return isinstance(tool, dict) and str(tool.get("type") or "").strip() == web_tool
+
+    if enabled:
+        if not any(_is_web_tool(tool) for tool in tools_list):
+            payload["tools"] = [*tools_list, {"type": web_tool}]
+        elif isinstance(tools_value, list):
+            payload["tools"] = tools_list
+        payload.setdefault("tool_choice", "auto")
+        return
+
+    if isinstance(tools_value, list):
+        filtered_tools = [tool for tool in tools_list if not _is_web_tool(tool)]
+        if filtered_tools:
+            payload["tools"] = filtered_tools
+        else:
+            payload.pop("tools", None)
+            if payload.get("tool_choice") == "auto":
+                payload.pop("tool_choice", None)
 
 
 # ---------- MAIN CLIENT ----------
@@ -334,6 +372,7 @@ class GPTClient:
         use_cache: bool = True,
         user_id: Any = "SET USER URGENTLY",
         service_tier: Optional[ServiceTier] = None,
+        web_search: Optional[bool] = None,
         # --- Legacy --- #
         tier: TierName = "nano",
         system: str = "",
@@ -351,10 +390,22 @@ class GPTClient:
         if override is not None:
             if not isinstance(override, dict):
                 raise GptValidationError("override must be a dict.")
+            override_payload = dict(override)
+            if web_search is not None:
+                override_model_name = MODEL_ALIASES.get(
+                    _optional_str(override_payload.get("model")),
+                    _optional_str(override_payload.get("model")),
+                )
+                _apply_web_search(
+                    override_payload,
+                    model_name=override_model_name,
+                    web_search=web_search,
+                    default_enabled=False,
+                )
             try:
                 t0 = time.monotonic()
                 client = _get_openai_client()
-                resp = client.responses.create(**override)
+                resp = client.responses.create(**override_payload)
                 elapsed_ms = int((time.monotonic() - t0) * 1000)
 
                 raw = resp.model_dump()
@@ -362,15 +413,15 @@ class GPTClient:
                 usage = self._extract_usage(raw)
 
                 log_tier = (
-                    str(override.get("service_tier")).strip()
-                    if str(override.get("service_tier", "")).strip()
+                    str(override_payload.get("service_tier")).strip()
+                    if str(override_payload.get("service_tier", "")).strip()
                     else effective_tier
                 )
                 now = datetime.now()
                 tier_for_log = log_tier if log_tier in ALLOWED_SERVICE_TIERS else effective_tier
-                model_for_log = str(override.get("model", "-"))
-                instructions_for_log = str(override.get("instructions", ""))
-                input_for_log = str(override.get("input", ""))
+                model_for_log = str(override_payload.get("model", "-"))
+                instructions_for_log = str(override_payload.get("instructions", ""))
+                input_for_log = str(override_payload.get("input", ""))
                 status_for_log = f"ok ({elapsed_ms} ms)"
 
                 _log_host_stream(
@@ -397,15 +448,15 @@ class GPTClient:
                 return GptResponse(content=content, raw=raw, usage=usage)
             except Exception as exc:
                 log_tier = (
-                    str(override.get("service_tier")).strip()
-                    if str(override.get("service_tier", "")).strip()
+                    str(override_payload.get("service_tier")).strip()
+                    if str(override_payload.get("service_tier", "")).strip()
                     else effective_tier
                 )
                 now = datetime.now()
                 tier_for_log = log_tier if log_tier in ALLOWED_SERVICE_TIERS else effective_tier
-                model_for_log = str(override.get("model", "-"))
-                instructions_for_log = str(override.get("instructions", ""))
-                input_for_log = str(override.get("input", ""))
+                model_for_log = str(override_payload.get("model", "-"))
+                instructions_for_log = str(override_payload.get("instructions", ""))
+                input_for_log = str(override_payload.get("input", ""))
                 error_message = str(exc)
                 output_for_log = _soft_error_message(exc) if _is_openai_related_exception(exc) else ""
 
@@ -462,20 +513,26 @@ class GPTClient:
             # Пустой запрос — платформу не зовём, и лог не пишем.
             return GptResponse(content="", raw={}, usage=GptUsage())
 
-        query: Tuple[str, str, str] = (model_name, instr, inp)
+        query: Tuple[str, str, str, str] = (
+            model_name,
+            instr,
+            inp,
+            "default" if web_search is None else ("on" if web_search else "off"),
+        )
 
         last_raw: Optional[Dict[str, Any]] = None
         last_usage: Optional[GptUsage] = None
 
-        def _fn(q: Tuple[str, str, str]) -> str:
+        def _fn(q: Tuple[str, str, str, str]) -> str:
             nonlocal last_raw, last_usage
 
-            m, ins, inpt = q
+            m, ins, inpt, _ = q
             payload = _build_payload(
                 model_name=m,
                 instructions=ins,
                 input_text=inpt,
                 service_tier=effective_tier,
+                web_search=web_search,
             )
 
             # Guard: только для НЕ-override вызовов, прямо перед платформой
@@ -571,7 +628,7 @@ class GPTClient:
                     query,
                     _fn,
                     ttl=DEFAULT_TTL_SEC,
-                    version="gpt.content.v1",
+                    version="gpt.content.v2",
                     update=False,
                 )
                 if last_raw is None:
@@ -616,6 +673,7 @@ class GPTClient:
         service_tier: Optional[ServiceTier] = None,
         conversation: Optional[str] = None,
         previous_response_id: Optional[str] = None,
+        web_search: Optional[bool] = None,
     ) -> GptResponse:
         """
         Dialog branch (platform-managed context):
@@ -646,16 +704,19 @@ class GPTClient:
         if prev:
             payload["previous_response_id"] = prev
 
-        web_tool = MODEL_WEB_TOOL.get(payload["model"])
-        if web_tool:
-            payload["tools"] = [{"type": web_tool}]
-            payload["tool_choice"] = "auto"
+        _apply_web_search(
+            payload,
+            model_name=str(payload["model"]),
+            web_search=web_search,
+            default_enabled=True,
+        )
 
         resp = self.ask(
             override=payload,
             use_cache=False,
             user_id=user_id,
             service_tier=service_tier or "flex",
+            web_search=web_search,
         )
         if (
             isinstance(resp.raw, dict)
@@ -668,5 +729,6 @@ class GPTClient:
                 use_cache=False,
                 user_id=user_id,
                 service_tier=service_tier or "flex",
+                web_search=web_search,
             )
         return resp

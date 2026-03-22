@@ -68,6 +68,7 @@ def get_prompt(key: str, lang: str = "en") -> str:
             instructions=instructions,
             input=text,
             use_cache=True,
+            web_search=False,
         )
         return (resp.content or "").strip()
     except Exception:
