@@ -229,9 +229,9 @@ FLOW_TYPE_CONFIG = {
                 prompt_key="create_sell_company",
                 user_id="panel.audience.create_edit_sell.company",
                 nav_label=_("Компания"),
-                summary_label=_("Компания"),
+                summary_label=_("Компания - продавец"),
                 dirty_label=_("Компания"),
-                editor_label=_("Продавец. Название, адрес, страна, размер, опыт, специальзация."),
+                editor_label=_("Компания - продавец. Название, адрес, страна, размер, опыт, специализация."),
                 placeholder=_(
                     "Для корректного выбора бизнес-категорий и рейтингования потенциальных клиентов необходимо "
                     "сформировать описание компании-продавца. Укажите название компании, страну и адрес. "
@@ -288,10 +288,10 @@ FLOW_TYPE_CONFIG = {
                 prompt_key="create_buy_product",
                 user_id="panel.audience.create_edit_buy.product",
                 nav_label=_("Продукт"),
-                summary_label=_("Продукт / услуга / работы"),
-                dirty_label=_("Продукт / услуга / работы"),
+                summary_label=_("Продукт / услуга"),
+                dirty_label=_("Продукт / услуга"),
                 editor_label=_(
-                    "Продукт / услуга / работы. Что нужно купить или заказать? Где применяется? Кто поставщик / подрядчик?"
+                    "Продукт / услуга. Что нужно купить / заказать? Кто поставляет / выполняет работы?"
                 ),
                 placeholder=_(
                     "Для корректного выбора бизнес-категорий и рейтингования потенциальных поставщиков и "
@@ -399,6 +399,55 @@ def _prompt_instructions(request, prompt_key: str) -> str:
     lang_prompt = get_prompt("lang_response").replace("{LANG}", lang_name).strip()
     prompt_text = get_prompt(prompt_key).strip()
     return "\n\n".join(part for part in (lang_prompt, prompt_text) if part).strip()
+
+
+def _title_prompt_key(task) -> str:
+    return "create_buy_title" if str(task.type or "").strip() == "buy" else "create_sell_title"
+
+
+def _title_user_id(task) -> str:
+    suffix = "buy" if str(task.type or "").strip() == "buy" else "sell"
+    return f"panel.audience.create_edit_{suffix}.title"
+
+
+def _title_input(task) -> str:
+    return (
+        f"PRODUCT:\n{(task.source_product or '').strip()}\n\n"
+        f"COMPANY:\n{(task.source_company or '').strip()}\n\n"
+        f"GEO:\n{(task.source_geo or '').strip()}"
+    )
+
+
+def _has_technical_title(task) -> bool:
+    if not task:
+        return False
+    return f"#{int(task.id)}" in str(task.title or "")
+
+
+def _suggest_title_for_task(request, task) -> str:
+    resp = GPTClient().ask(
+        model="gpt-5.4",
+        instructions=_prompt_instructions(request, _title_prompt_key(task)),
+        input=_title_input(task),
+        user_id=_title_user_id(task),
+        service_tier="flex",
+        web_search=False,
+    )
+    return str(resp.content or "").strip()
+
+
+def _maybe_update_title_on_geo_enter(request, *, requested_step: str, task):
+    if request.method == "POST" or requested_step != "geo" or not task or not _has_technical_title(task):
+        return task
+    try:
+        title = _suggest_title_for_task(request, task)
+    except Exception:
+        return task
+    if not title:
+        return task
+    AudienceTask.objects.filter(id=task.id).update(title=title)
+    task.title = title
+    return task
 
 
 def _parse_ai_json(text: str, main_key: str) -> tuple[str, str, str]:
@@ -525,6 +574,19 @@ def _task_saved_values(task) -> dict[str, Any]:
     }
 
 
+def _has_insertable_company_tasks(request, current_task) -> bool:
+    queryset = AudienceTask.objects.filter(
+        workspace_id=request.workspace_id,
+        archived=False,
+    ).order_by("-updated_at")
+    if current_task:
+        queryset = queryset.exclude(id=current_task.id)
+    for source_company in queryset.values_list("source_company", flat=True):
+        if str(source_company or "").strip():
+            return True
+    return False
+
+
 def _handle_step_action(
     *,
     request,
@@ -604,6 +666,7 @@ def _build_current_step_context(
     ai_command_display_map: Mapping[str, str],
     ai_advice_map: Mapping[str, str],
     ai_question_map: Mapping[str, str],
+    has_insertable_company_tasks: bool,
 ) -> dict[str, Any]:
     current_step = step_definitions[current_step_key]
     next_step_key = get_next_step_key(flow_step_states, current_step_key)
@@ -631,6 +694,15 @@ def _build_current_step_context(
         "next_url": _build_edit_url(flow_type, item_id, next_step_key),
         "next_save_label": next_step.get("summary_label") or next_step.get("nav_label") or "",
         "next_footer_label": next_step.get("nav_label") or next_step.get("summary_label") or "",
+        "show_insert_company_option": bool(current_step_key == "company" and has_insertable_company_tasks),
+        "show_insert_company_button": bool(
+            current_step_key == "company"
+            and has_insertable_company_tasks
+            and not str(working_values.get(field_name, "") or "").strip()
+        ),
+        "insert_company_modal_url": (
+            reverse("audience:create_company_insert_modal") + (f"?id={item_id}" if item_id else "")
+        ),
     }
 
 
@@ -654,6 +726,7 @@ def create_edit_flow_view(request, *, flow_type: str, step_key: str, item_id: st
     requested_step = (step_key or "product").strip().lower()
 
     task = _resolve_task(request, flow_type, item_id)
+    task = _maybe_update_title_on_geo_enter(request, requested_step=requested_step, task=task)
     saved_values = _task_saved_values(task)
     flow_status = build_flow_step_states(
         step_order=FLOW_STEP_ORDER,
@@ -718,6 +791,7 @@ def create_edit_flow_view(request, *, flow_type: str, step_key: str, item_id: st
         current_step_key = str(flow_status["current_step_key"] or "product")
 
     if current_step_key in TEXT_STEP_KEYS:
+        has_insertable_company_tasks = _has_insertable_company_tasks(request, task) if current_step_key == "company" else False
         current_step = _build_current_step_context(
             flow_type=flow_type,
             item_id=item_id,
@@ -729,6 +803,7 @@ def create_edit_flow_view(request, *, flow_type: str, step_key: str, item_id: st
             ai_command_display_map=ai_command_display_map,
             ai_advice_map=ai_advice_map,
             ai_question_map=ai_question_map,
+            has_insertable_company_tasks=has_insertable_company_tasks,
         )
     else:
         current_step = None

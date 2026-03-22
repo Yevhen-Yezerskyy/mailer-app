@@ -14,10 +14,6 @@
   }
 
   const labels = config.labels || {};
-  const missingTitle = config.missingTitle || "Required sections are missing";
-  const missingText = config.missingText || "Please fill and save:";
-  const closeLabel = config.closeLabel || "Close";
-  const requiredStepKeys = Array.isArray(config.requiredStepKeys) ? config.requiredStepKeys : [];
   const forms = Array.from(document.querySelectorAll("[data-dirty-form]"));
   const bypassSubmit = new WeakMap();
 
@@ -79,6 +75,30 @@
     ensureButtonLabel(button);
     button.disabled = !enabled;
     button.setAttribute("class", mappedButtonClass(enabled ? "YY-BUTTON_MAIN_FULL" : "YY-BUTTON_GRAY_FULL"));
+  }
+
+  function syncOptionalMainButtons(form, currentMainValue) {
+    const grid = form ? form.querySelector("[data-main-actions='1']") : null;
+    const insertButton = form ? form.querySelector("[data-insert-company='1']") : null;
+    const geoDefaultButton = form ? form.querySelector("[data-geo-default='1']") : null;
+    const insertAvailable = grid && grid.getAttribute("data-insert-company-available") === "1";
+    const empty = String(currentMainValue || "") === "";
+    const insertVisible = !!insertAvailable && empty;
+    const geoDefaultVisible = !!geoDefaultButton && empty;
+    const hasOptionalVisible = insertVisible || geoDefaultVisible;
+
+    if (grid) {
+      grid.classList.toggle("grid-cols-3", hasOptionalVisible);
+      grid.classList.toggle("grid-cols-2", !hasOptionalVisible);
+    }
+
+    if (insertButton) {
+      insertButton.classList.toggle("hidden", !insertVisible);
+    }
+
+    if (geoDefaultButton) {
+      geoDefaultButton.classList.toggle("hidden", !geoDefaultVisible);
+    }
   }
 
   function titleModalErrorNode(form) {
@@ -145,11 +165,14 @@
     const processMainBtn = form.querySelector("[data-process-main='1']");
     const processInstructionBtn = form.querySelector("[data-process-instruction='1']");
     const saveMainBtn = form.querySelector("[data-save-main='1']");
+    const resetMainBtn = form.querySelector("button[name='action'][value='reset_product_context'], button[name='action'][value='reset_company_context'], button[name='action'][value='reset_geo_context']");
     const nextStageBtn = form.querySelector("[data-next-stage='1']");
     const currentMainValue = norm(mainField ? mainField.value : "");
     const savedMainValue = summaryValue(form);
     const mainChanged = !!mainField && currentMainValue !== "" && currentMainValue !== savedMainValue;
     const mainEdited = form.getAttribute("data-main-field-edited") === "1";
+
+    syncOptionalMainButtons(form, currentMainValue);
 
     if (processMainBtn) {
       setStandardButtonState(processMainBtn, mainEdited && mainChanged);
@@ -162,6 +185,10 @@
     if (saveMainBtn) {
       saveMainBtn.type = "submit";
       setStandardButtonState(saveMainBtn, mainChanged);
+    }
+
+    if (resetMainBtn) {
+      setStandardFullButtonState(resetMainBtn, currentMainValue !== "");
     }
 
     if (nextStageBtn) {
@@ -198,17 +225,6 @@
     }
 
     return dirtyFormNames(null);
-  }
-
-  function requiredMissingNames() {
-    return requiredStepKeys
-      .filter(function (key) {
-        const field = document.querySelector("[data-summary-section='" + key + "']");
-        return !field || norm(field.dataset.summaryValue || "") === "";
-      })
-      .map(function (key) {
-        return labels[key] || key;
-      });
   }
 
   function esc(text) {
@@ -364,18 +380,6 @@
 
   document.querySelectorAll("[data-dirty-nav]").forEach(function (button) {
     button.addEventListener("click", function () {
-      const skipRequired = button.getAttribute("data-dirty-nav-skip-required") === "1";
-      const missing = skipRequired ? [] : requiredMissingNames();
-      if (missing.length) {
-        openDirtyModal(missing, function () {
-          window.location.href = button.getAttribute("data-dirty-nav");
-        }, {
-          title: missingTitle,
-          text: missingText,
-          closeLabel: closeLabel,
-        });
-        return;
-      }
       const names = dirtyFormNames(null);
       if (!names.length) {
         window.location.href = button.getAttribute("data-dirty-nav");
@@ -431,5 +435,58 @@
     }).catch(function () {
       setTitleModalError(form, "Request failed");
     });
+  });
+
+  document.addEventListener("click", function (event) {
+    const insertBtn = event.target.closest("[data-insert-company-select='1']");
+    if (!insertBtn) return;
+
+    event.preventDefault();
+
+    const card = insertBtn.closest(".YY-CARD_WHITE");
+    const sourceNode = card ? card.querySelector("[data-insert-company-value='1']") : null;
+    const mainField = document.querySelector("[data-dirty-form='company'] textarea[name='source_company']");
+    const form = mainField ? mainField.closest("[data-dirty-form]") : null;
+    const value = sourceNode && "value" in sourceNode ? String(sourceNode.value || "") : "";
+
+    if (!mainField || !form || !value.trim()) {
+      return;
+    }
+
+    mainField.value = value;
+    form.setAttribute("data-main-field-edited", "1");
+    mainField.dispatchEvent(new Event("input", { bubbles: true }));
+    mainField.dispatchEvent(new Event("change", { bubbles: true }));
+
+    if (window.YYModal && typeof window.YYModal.close === "function") {
+      window.YYModal.close();
+    }
+  });
+
+  document.addEventListener("click", function (event) {
+    const geoBtn = event.target.closest("[data-geo-default='1']");
+    if (!geoBtn) return;
+
+    event.preventDefault();
+
+    const form = geoBtn.closest("[data-dirty-form='geo']");
+    const mainField = form ? form.querySelector("textarea[name='source_geo']") : null;
+    const processBtn = form ? form.querySelector("[data-process-main='1']") : null;
+    const fillValue = String(geoBtn.getAttribute("data-geo-default-value") || "").trim();
+
+    if (!form || !mainField || !processBtn || !fillValue) {
+      return;
+    }
+
+    mainField.value = fillValue;
+    form.setAttribute("data-main-field-edited", "1");
+    mainField.dispatchEvent(new Event("input", { bubbles: true }));
+    mainField.dispatchEvent(new Event("change", { bubbles: true }));
+
+    if (typeof form.requestSubmit === "function") {
+      form.requestSubmit(processBtn);
+      return;
+    }
+    processBtn.click();
   });
 })();

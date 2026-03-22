@@ -20,10 +20,31 @@
             data-track-dirty="1"
             data-saved-value="{{ current_step.saved_value }}"
             placeholder="{{ current_step.placeholder }}">{{ current_step.value }}</textarea>
-          <div class="grid grid-cols-2 gap-4">
+          <div
+            class="grid gap-4 {% if current_step.show_insert_company_button or current_step.key == 'geo' and not current_step.value %}grid-cols-3{% else %}grid-cols-2{% endif %}"
+            data-main-actions="1"
+            {% if current_step.show_insert_company_option %}data-insert-company-available="1"{% endif %}>
             <button type="submit" name="action" value="{{ current_step.process_action }}" class="YY-BUTTON_GRAY_FULL" data-process-main="1" data-button-label="{% trans 'Обработать' %}" disabled>
               {% trans "Обработать" %}
             </button>
+            {% if current_step.show_insert_company_option %}
+              <button
+                type="button"
+                class="YY-BUTTON_MAIN_FULL{% if not current_step.show_insert_company_button %} hidden{% endif %}"
+                data-insert-company="1"
+                data-yy-modal="url={{ current_step.insert_company_modal_url }}">
+                {% trans "Подставить" %}
+              </button>
+            {% endif %}
+            {% if current_step.key == "geo" %}
+              <button
+                type="button"
+                class="YY-BUTTON_MAIN_FULL{% if current_step.value %} hidden{% endif %}"
+                data-geo-default="1"
+                data-geo-default-value="{% trans 'Вся Германия' %}">
+                {% trans "Вся Германия" %}
+              </button>
+            {% endif %}
             <button
               type="submit"
               name="action"
@@ -134,7 +155,7 @@
           </div>
         </div>
         {% for item in summary_items %}
-          <div class="flex items-start gap-4 mt-12">
+          <div class="flex items-start gap-4 mt-12{% if not item.value %} hidden{% endif %}">
             <div class="w-[30%]">
               <div class="{{ flow_mode_class }} !mb-0">
                 {{ item.label }}

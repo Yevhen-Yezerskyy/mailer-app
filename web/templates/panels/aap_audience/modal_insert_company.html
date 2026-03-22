@@ -1,0 +1,44 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/modal_insert_company.html -->
+<!-- DATE: 2026-03-22 -->
+<!-- PURPOSE: Modal with existing saved company descriptions available for insertion into the company step. -->
+
+<div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:960px;">
+  <button type="button" class="YY-BUTTON_MAIN !w-fit" data-yy-modal-close style="position:absolute;top:10px;right:10px;">✕</button>
+
+  <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
+    {% if items %}
+      <div class="flex flex-col gap-4">
+        {% for item in items %}
+          <div class="YY-CARD_WHITE border border-[#71d0f4]">
+            <div class="flex items-start gap-4">
+              <div class="w-[25%]">
+                {% if item.type == "buy" %}
+                  <div class="YY-STATUS_YELLOW !mb-0">{% trans "Поиск поставщиков / подрядчиков" %}</div>
+                {% else %}
+                  <div class="YY-STATUS_GREEN !mb-0">{% trans "Поиск клиентов / покупателей" %}</div>
+                {% endif %}
+              </div>
+              <div class="w-[60%]">
+                {% if item.type == "buy" %}
+                  <div class="YY-STATUS_YELLOW !w-fit">{{ item.title }}</div>
+                {% else %}
+                  <div class="YY-STATUS_GREEN !w-fit">{{ item.title }}</div>
+                {% endif %}
+                <div class="YY-TEXT !mb-0">{{ item.source_company|linebreaksbr }}</div>
+                <textarea class="hidden" data-insert-company-value="1">{{ item.source_company }}</textarea>
+              </div>
+              <div class="w-[15%]">
+                <button type="button" class="YY-BUTTON_MAIN_FULL" data-insert-company-select="1">
+                  {% trans "Подставить" %}
+                </button>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="YY-STATUS_GRAY w-full">{% trans "Здесь пока нет данных" %}</div>
+    {% endif %}
+  </div>
+</div>

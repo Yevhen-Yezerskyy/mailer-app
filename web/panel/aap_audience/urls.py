@@ -12,6 +12,7 @@ from .views.status_task import status_task_view
 from .views.modal_status_task import modal_status_task_view  # NEW
 from .views.modal_create_task import modal_create_task_view
 from .views.modal_edit_title import modal_edit_title_view
+from .views.modal_insert_company import modal_insert_company_view
 from .views.create_list import create_list_view
 from .views.create_edit_buy import (
     create_edit_buy_view,
@@ -46,6 +47,7 @@ urlpatterns = [
     path("status/task/modal/", modal_status_task_view, name="status_task_modal"),  # NEW
     path("create/modal/", modal_create_task_view, name="create_modal"),
     path("create/title/modal/", modal_edit_title_view, name="create_title_modal"),
+    path("create/company/insert/modal/", modal_insert_company_view, name="create_company_insert_modal"),
     path("create/", create_list_view, name="create_list"),
     path("create/edit-buy/", create_edit_buy_view, name="create_edit_buy"),
     path("create/edit-buy/product/", create_edit_buy_product_view, name="create_edit_buy_product"),
