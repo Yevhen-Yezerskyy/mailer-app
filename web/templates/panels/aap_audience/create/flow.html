@@ -94,19 +94,8 @@
     </tr>
   </table>
 
-{% include "panels/aap_audience/create/step_form.html" %}
-
-{% if placeholder_step %}
-<table class="YY-MAIN_TABLE">
-  <tr>
-    <td class="YY-MAIN_TOP_TD">
-      <div class="YY-CARD_WHITE">
-        <div class="YY-STATUS_BLUE">{{ placeholder_step.title }}</div>
-        <div class="YY-TEXT !mb-0">{{ placeholder_step.text }}</div>
-      </div>
-    </td>
-  </tr>
-</table>
+{% if step_template %}
+  {% include step_template %}
 {% endif %}
 
 {{ flow_js_config|json_script:"yy-create-edit-flow-config" }}

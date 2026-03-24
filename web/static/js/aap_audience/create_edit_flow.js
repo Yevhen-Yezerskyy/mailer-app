@@ -19,7 +19,18 @@
 
   function isWaitAction(submitter) {
     const action = submitter && submitter.name === "action" ? String(submitter.value || "") : "";
-    return action === "process_product" || action === "process_company" || action === "process_geo";
+    return (
+      action === "process_product" ||
+      action === "process_company" ||
+      action === "process_geo" ||
+      action === "branches_pick" ||
+      action === "branches_expand_adjacent" ||
+      action === "branches_expand_middlemen" ||
+      action === "branches_expand_custom" ||
+      action === "branches_save" ||
+      action === "branches_recalc_ratings" ||
+      action === "branches_refill"
+    );
   }
 
   function norm(value) {
@@ -127,6 +138,26 @@
     document.querySelectorAll("[data-audience-title='1']").forEach(function (node) {
       node.textContent = value;
     });
+  }
+
+  function branchRateModalErrorNode(form) {
+    return form ? form.querySelector("[data-edit-branch-rate-error='1']") : null;
+  }
+
+  function branchRateModalErrorWrap(form) {
+    return form ? form.querySelector("[data-edit-branch-rate-error-wrap='1']") : null;
+  }
+
+  function setBranchRateModalError(form, message) {
+    const errorNode = branchRateModalErrorNode(form);
+    const wrapNode = branchRateModalErrorWrap(form);
+    const text = String(message || "").trim();
+    if (errorNode) {
+      errorNode.textContent = text;
+    }
+    if (wrapNode) {
+      wrapNode.classList.toggle("hidden", !text);
+    }
   }
 
   function postEditTitle(form, action) {
@@ -437,6 +468,47 @@
     });
   });
 
+  document.addEventListener("submit", function (event) {
+    const form = event.target.closest("[data-edit-branch-rate-form='1']");
+    if (!form) return;
+
+    event.preventDefault();
+    setBranchRateModalError(form, "");
+
+    const data = new FormData(form);
+    if (window.YYWaitModal && typeof window.YYWaitModal.open === "function") {
+      window.YYWaitModal.open();
+    }
+
+    window.fetch(form.action, {
+      method: "POST",
+      body: data,
+      credentials: "same-origin",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    }).then(function (response) {
+      return response.json().catch(function () {
+        return { ok: false, error: "Request failed" };
+      }).then(function (payload) {
+        return { response: response, payload: payload };
+      });
+    }).then(function (result) {
+      const payload = result.payload || {};
+      if (!result.response.ok || !payload.ok) {
+        setBranchRateModalError(form, payload.error || "Request failed");
+        return;
+      }
+      window.location.reload();
+    }).catch(function () {
+      setBranchRateModalError(form, "Request failed");
+    }).finally(function () {
+      if (window.YYWaitModal && typeof window.YYWaitModal.close === "function") {
+        window.YYWaitModal.close();
+      }
+    });
+  });
+
   document.addEventListener("click", function (event) {
     const insertBtn = event.target.closest("[data-insert-company-select='1']");
     if (!insertBtn) return;
@@ -489,4 +561,73 @@
     }
     processBtn.click();
   });
+
+  function syncBranchDeleteState() {
+    const deleteInput = document.querySelector("[data-branches-delete-ids='1']");
+    const deleteSubmit = document.querySelector("[data-branches-delete-submit='1']");
+    const deleteActions = document.querySelector("[data-branches-delete-actions='1']");
+    if (!deleteInput || !deleteSubmit || !deleteActions) return;
+    const selected = [];
+    const seen = new Set();
+    Array.from(document.querySelectorAll("[data-branch-row='1'][data-delete-selected='1']")).forEach(function (row) {
+      String(row.getAttribute("data-branch-ids") || "")
+        .split(",")
+        .map(function (value) { return String(value || "").trim(); })
+        .filter(Boolean)
+        .forEach(function (value) {
+          if (seen.has(value)) return;
+          seen.add(value);
+          selected.push(value);
+        });
+    });
+    deleteInput.value = selected.join(",");
+    deleteActions.classList.toggle("hidden", selected.length === 0);
+  }
+
+  document.addEventListener("click", function (event) {
+    const button = event.target.closest("[data-branch-delete-toggle='1']");
+    if (!button) return;
+    const row = button.closest("[data-branch-row='1']");
+    if (!row) return;
+    const selected = row.getAttribute("data-delete-selected") === "1";
+    row.setAttribute("data-delete-selected", selected ? "0" : "1");
+    if (!selected) {
+      row.classList.remove("bg-[#f0fff0]");
+      row.classList.remove("bg-[#FFF7E0]");
+      row.classList.add("bg-[#fff3f3]");
+    } else {
+      row.classList.remove("bg-[#f0fff0]");
+      row.classList.remove("bg-[#FFF7E0]");
+      row.classList.remove("bg-[#fff3f3]");
+      if (row.getAttribute("data-branch-yellow") === "1") {
+        row.classList.add("bg-[#FFF7E0]");
+      } else {
+        row.classList.add("bg-[#f0fff0]");
+      }
+    }
+    syncBranchDeleteState();
+  });
+
+  document.addEventListener("click", function (event) {
+    const deleteCancel = event.target.closest("[data-branches-delete-cancel='1']");
+    if (!deleteCancel) return;
+      const deleteInput = document.querySelector("[data-branches-delete-ids='1']");
+      Array.from(document.querySelectorAll("[data-branch-row='1'][data-delete-selected='1']")).forEach(function (row) {
+        row.setAttribute("data-delete-selected", "0");
+        row.classList.remove("bg-[#fff3f3]");
+        row.classList.remove("bg-[#f0fff0]");
+        row.classList.remove("bg-[#FFF7E0]");
+        if (row.getAttribute("data-branch-yellow") === "1") {
+          row.classList.add("bg-[#FFF7E0]");
+        } else {
+          row.classList.add("bg-[#f0fff0]");
+        }
+      });
+      if (deleteInput) {
+        deleteInput.value = "";
+      }
+      syncBranchDeleteState();
+  });
+
+  syncBranchDeleteState();
 })();

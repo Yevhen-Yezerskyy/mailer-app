@@ -6,15 +6,12 @@ from __future__ import annotations
 
 from django.http import JsonResponse
 from django.shortcuts import render
-from django.utils.translation import get_language, gettext as _
+from django.utils.translation import gettext as _
 
 from engine.common.gpt import GPTClient
 from engine.common.prompts.process import get_prompt
 from mailer_web.access import decode_id
 from panel.aap_audience.models import AudienceTask
-
-from .create_edit_flow import LANG_RESPONSE_NAMES
-
 
 def _resolve_task(request, token: str):
     if not token:
@@ -37,9 +34,7 @@ def _can_suggest(task) -> bool:
 
 
 def _prompt_instructions(request, prompt_key: str) -> str:
-    lang_code = (getattr(request, "LANGUAGE_CODE", "") or get_language() or "en").lower()
-    lang_key = lang_code.split("-")[0].split("_")[0]
-    lang_name = LANG_RESPONSE_NAMES.get(lang_key, "English")
+    lang_name = request.ui_lang_name_en
     lang_prompt = get_prompt("lang_response").replace("{LANG}", lang_name).strip()
     prompt_text = get_prompt(prompt_key).strip()
     return "\n\n".join(part for part in (lang_prompt, prompt_text) if part).strip()

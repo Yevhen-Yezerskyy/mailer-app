@@ -9,10 +9,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from django.conf import settings
 from django.db import connection
 from django.utils.html import escape
 
-from engine.common.cache.client import memo, memo_many_iter
+from engine.common.cache.client import CLIENT, memo, memo_many_iter
+from engine.common.gpt import GPTClient
+from engine.common.utils import parse_json_response
+from engine.common.prompts.process import get_prompt
 import json
 import re
 
@@ -20,6 +24,9 @@ import re
 TTL_WEEK = 7 * 24 * 60 * 60
 TTL_HOUR = 60 * 60
 MEMO_VERSION = "format_data:v9"
+BRANCHES_SYS_I18N_CACHE_PREFIX = "branches_sys_i18n:v1"
+BRANCHES_SYS_CHUNK = 200
+BRANCHES_SYS_TRANSLATE_CHUNK = 50
 
 
 # ============================================================
@@ -303,6 +310,176 @@ def get_branch_str(branch_id: int, ui_lang: str) -> str:
     if _is_de_lang(ui_lang):
         return de
     return f"{de} - {tr}" if tr else de
+
+
+def get_branches_sys_translations(branch_ids: List[int], ui_lang: str) -> Dict[int, str]:
+    lang = (ui_lang or "de").strip().lower()
+    lang = lang.split("-", 1)[0].split("_", 1)[0].strip() or "de"
+
+    ids: List[int] = []
+    seen: set[int] = set()
+    for raw in branch_ids or []:
+        try:
+            branch_id = int(raw)
+        except Exception:
+            continue
+        if branch_id in seen:
+            continue
+        seen.add(branch_id)
+        ids.append(branch_id)
+
+    if not ids:
+        return {}
+
+    originals: Dict[int, str] = {}
+
+    def _load_originals(target_ids: List[int]) -> None:
+        for start in range(0, len(target_ids), BRANCHES_SYS_CHUNK):
+            chunk = target_ids[start : start + BRANCHES_SYS_CHUNK]
+            if not chunk:
+                continue
+            placeholders = ", ".join(["%s"] * len(chunk))
+            with connection.cursor() as cur:
+                cur.execute(
+                    "SELECT id, branch_name FROM public.branches_sys "
+                    f"WHERE id IN ({placeholders})",
+                    chunk,
+                )
+                for branch_id, branch_name in cur.fetchall() or []:
+                    name = " ".join(str(branch_name or "").split()).strip()
+                    if name:
+                        originals[int(branch_id)] = name
+
+    if _is_de_lang(lang):
+        _load_originals(ids)
+        return {branch_id: originals[branch_id] for branch_id in ids if branch_id in originals}
+
+    keys = [f"{BRANCHES_SYS_I18N_CACHE_PREFIX}:{lang}:{branch_id}" for branch_id in ids]
+    cached = CLIENT.get_many(keys, ttl_sec=TTL_WEEK)
+
+    out: Dict[int, str] = {}
+    missing_ids: List[int] = []
+    for branch_id, payload in zip(ids, cached):
+        text = bytes(payload).decode("utf-8", errors="ignore").strip() if payload else ""
+        if text:
+            out[branch_id] = text
+            continue
+        missing_ids.append(branch_id)
+
+    if missing_ids:
+        for start in range(0, len(missing_ids), BRANCHES_SYS_CHUNK):
+            chunk = missing_ids[start : start + BRANCHES_SYS_CHUNK]
+            if not chunk:
+                continue
+            placeholders = ", ".join(["%s"] * len(chunk))
+            with connection.cursor() as cur:
+                cur.execute(
+                    "SELECT id, branch_name FROM public.branches_sys_langs "
+                    f"WHERE lang = %s AND id IN ({placeholders})",
+                    [lang, *chunk],
+                )
+                rows = cur.fetchall() or []
+
+            cache_rows = []
+            for branch_id, branch_name in rows:
+                text = " ".join(str(branch_name or "").split()).strip()
+                if not text:
+                    continue
+                branch_id = int(branch_id)
+                out[branch_id] = text
+                cache_rows.append(
+                    (
+                        f"{BRANCHES_SYS_I18N_CACHE_PREFIX}:{lang}:{branch_id}",
+                        text.encode("utf-8"),
+                    )
+                )
+
+            if cache_rows:
+                CLIENT.set_many(cache_rows, ttl_sec=TTL_WEEK)
+
+        missing_ids = [branch_id for branch_id in missing_ids if branch_id not in out]
+
+    if missing_ids:
+        _load_originals(missing_ids)
+        prompt = get_prompt("create_branches_translate", lang="ru")
+        target_lang_name = str(
+            getattr(settings, "UI_LANGUAGE_META", {}).get(lang, {}).get("name_en")
+            or lang
+        )
+        upsert_rows = []
+        cache_rows = []
+
+        for start in range(0, len(missing_ids), BRANCHES_SYS_TRANSLATE_CHUNK):
+            chunk_ids = missing_ids[start : start + BRANCHES_SYS_TRANSLATE_CHUNK]
+            items = []
+            for branch_id in chunk_ids:
+                branch_name = originals.get(branch_id, "")
+                if branch_name:
+                    items.append({"id": branch_id, "branch_name_de": branch_name})
+            if not items:
+                continue
+
+            resp = GPTClient().ask(
+                model="gpt-5.4-mini",
+                instructions=prompt,
+                input=json.dumps(
+                    {
+                        "target_lang": lang,
+                        "target_lang_name": target_lang_name,
+                        "items": items,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                user_id=f"mailer_web.branches_sys_translate.{lang}",
+                service_tier="flex",
+                use_cache=True,
+                web_search=False,
+            )
+            data = parse_json_response(resp.content or "")
+            values = data.get("translations") if isinstance(data, dict) else None
+            if not isinstance(values, list):
+                continue
+
+            for item in values:
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    branch_id = int(item.get("id"))
+                except Exception:
+                    continue
+                text = " ".join(str(item.get("branch_name") or "").split()).strip()
+                if not text:
+                    continue
+                out[branch_id] = text
+                upsert_rows.append((branch_id, lang, text))
+                cache_rows.append(
+                    (
+                        f"{BRANCHES_SYS_I18N_CACHE_PREFIX}:{lang}:{branch_id}",
+                        text.encode("utf-8"),
+                    )
+                )
+
+        if upsert_rows:
+            with connection.cursor() as cur:
+                cur.executemany(
+                    "INSERT INTO public.branches_sys_langs (id, lang, branch_name) "
+                    "VALUES (%s, %s, %s) "
+                    "ON CONFLICT (id, lang) DO UPDATE SET branch_name = EXCLUDED.branch_name",
+                    upsert_rows,
+                )
+        if cache_rows:
+            CLIENT.set_many(cache_rows, ttl_sec=TTL_WEEK)
+
+    still_missing = [branch_id for branch_id in ids if branch_id not in out]
+    if still_missing:
+        _load_originals(still_missing)
+        for branch_id in still_missing:
+            text = originals.get(branch_id, "")
+            if text:
+                out[branch_id] = text
+
+    return {branch_id: out[branch_id] for branch_id in ids if branch_id in out}
 
 
 def format_branches_html(branch_ids: List[int], ui_lang: str) -> str:

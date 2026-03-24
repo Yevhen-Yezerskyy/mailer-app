@@ -5,6 +5,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
+import re
+from typing import Any
 
 
 def h64_text(text: str) -> int:
@@ -23,3 +26,25 @@ def h64_text(text: str) -> int:
 
     # signed int64 (Postgres BIGINT)
     return u - (1 << 64) if u >= (1 << 63) else u
+
+
+def parse_json_response(text: str) -> Any | None:
+    raw = str(text or "").strip()
+    if not raw:
+        return None
+
+    if raw.startswith("```"):
+        raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
+        raw = re.sub(r"\s*```$", "", raw)
+
+    try:
+        return json.loads(raw)
+    except Exception:
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            return None
+        try:
+            return json.loads(raw[start : end + 1])
+        except Exception:
+            return None

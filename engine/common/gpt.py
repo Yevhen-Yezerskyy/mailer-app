@@ -106,9 +106,13 @@ def _is_openai_related_exception(exc: Exception) -> bool:
     return "help.openai.com" in s or "request ID req_" in s or "server_error" in s
 
 
-def _is_retryable_server_error_text(text: str) -> bool:
+def _is_retryable_soft_error_text(text: str) -> bool:
     s = _optional_str(text).lower()
-    return "openai internal server error" in s
+    return (
+        "openai internal server error" in s
+        or "openai rate limit reached" in s
+        or "too many requests" in s
+    )
 
 
 def _require_api_key() -> str:
@@ -622,37 +626,43 @@ class GPTClient:
                     raise GptSoftError(_soft_error_message(exc), error_message=str(exc))
                 raise
 
-        try:
-            if use_cache:
-                content = cache_memo(
-                    query,
-                    _fn,
-                    ttl=DEFAULT_TTL_SEC,
-                    version="gpt.content.v2",
-                    update=False,
-                )
-                if last_raw is None:
-                    _log_host_stream(
-                        now=datetime.now(),
-                        status="cache",
-                        model_name=model_name,
-                        service_tier=effective_tier,
-                        user_id=user_id_str,
-                        instructions=instr,
-                        input_text=inp,
-                        output_text=str(content or ""),
-                        usage=None,
-                        cache_hit=True,
-                        real_request=False,
+        for attempt in range(2):
+            try:
+                if use_cache:
+                    content = cache_memo(
+                        query,
+                        _fn,
+                        ttl=DEFAULT_TTL_SEC,
+                        version="gpt.content.v2",
+                        update=False,
                     )
-                    return GptResponse(content=str(content or ""), raw={"cached": True}, usage=GptUsage())
+                    if last_raw is None:
+                        _log_host_stream(
+                            now=datetime.now(),
+                            status="cache",
+                            model_name=model_name,
+                            service_tier=effective_tier,
+                            user_id=user_id_str,
+                            instructions=instr,
+                            input_text=inp,
+                            output_text=str(content or ""),
+                            usage=None,
+                            cache_hit=True,
+                            real_request=False,
+                        )
+                        return GptResponse(content=str(content or ""), raw={"cached": True}, usage=GptUsage())
+                    return GptResponse(content=str(content or ""), raw=last_raw or {}, usage=last_usage or GptUsage())
+
+                content = _fn(query)
                 return GptResponse(content=str(content or ""), raw=last_raw or {}, usage=last_usage or GptUsage())
 
-            content = _fn(query)
-            return GptResponse(content=str(content or ""), raw=last_raw or {}, usage=last_usage or GptUsage())
-
-        except GptSoftError as exc:
-            return GptResponse(content=exc.user_message, raw={"soft_error": True}, usage=GptUsage())
+            except GptSoftError as exc:
+                if attempt == 0 and _is_retryable_soft_error_text(exc.user_message):
+                    time.sleep(3.0)
+                    last_raw = None
+                    last_usage = None
+                    continue
+                return GptResponse(content=exc.user_message, raw={"soft_error": True}, usage=GptUsage())
 
     @staticmethod
     def _extract_usage(raw: Dict[str, Any]) -> GptUsage:
@@ -718,17 +728,4 @@ class GPTClient:
             service_tier=service_tier or "flex",
             web_search=web_search,
         )
-        if (
-            isinstance(resp.raw, dict)
-            and resp.raw.get("soft_error") is True
-            and _is_retryable_server_error_text(resp.content)
-        ):
-            time.sleep(0.7)
-            resp = self.ask(
-                override=payload,
-                use_cache=False,
-                user_id=user_id,
-                service_tier=service_tier or "flex",
-                web_search=web_search,
-            )
         return resp

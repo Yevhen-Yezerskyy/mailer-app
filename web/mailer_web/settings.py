@@ -138,6 +138,27 @@ LANGUAGES = [
     ("en", "English"),
 ]
 
+PUBLIC_LANGS = ("ru", "de", "uk", "en")
+PUBLIC_LANG_SWITCH_ORDER = ("de", "uk", "ru", "en")
+UI_LANGUAGE_META = {
+    "ru": {
+        "name_en": "Russian",
+        "switch_label": "RUS",
+    },
+    "de": {
+        "name_en": "German",
+        "switch_label": "DEU",
+    },
+    "uk": {
+        "name_en": "Ukrainian",
+        "switch_label": "UKR",
+    },
+    "en": {
+        "name_en": "English",
+        "switch_label": "ENG",
+    },
+}
+
 TIME_ZONE = "Europe/Berlin"
 
 USE_I18N = True

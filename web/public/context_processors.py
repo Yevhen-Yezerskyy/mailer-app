@@ -6,27 +6,24 @@ from __future__ import annotations
 
 from django.conf import settings
 
-_DISPLAY_ORDER = ("de", "uk", "ru", "en")
-_DISPLAY_LABELS = {
-    "de": "DEU",
-    "uk": "UKR",
-    "ru": "RUS",
-    "en": "ENG",
-}
-
 
 def language_switcher(request):
-    current = (getattr(request, "LANGUAGE_CODE", "") or "").split("-", 1)[0].lower()
+    current = (
+        getattr(request, "ui_lang_code", "")
+        or (getattr(request, "LANGUAGE_CODE", "") or "").split("-", 1)[0].lower()
+    )
     available = {str(code).lower() for code, _name in getattr(settings, "LANGUAGES", [])}
+    display_order = tuple(getattr(settings, "PUBLIC_LANG_SWITCH_ORDER", ()))
+    labels = dict(getattr(settings, "UI_LANGUAGE_META", {}))
 
     items = []
-    for code in _DISPLAY_ORDER:
+    for code in display_order:
         if code not in available:
             continue
         items.append(
             {
                 "code": code,
-                "label": _DISPLAY_LABELS.get(code, code.upper()),
+                "label": str(labels.get(code, {}).get("switch_label") or code.upper()),
                 "active": code == current,
             }
         )

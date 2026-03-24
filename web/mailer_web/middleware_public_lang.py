@@ -102,6 +102,18 @@ def _activate(request: HttpRequest, lang: str) -> None:
     translation.activate(lang)
     request.LANGUAGE_CODE = lang
 
+    meta = dict(getattr(settings, "UI_LANGUAGE_META", {}).get(lang, {}))
+    request.ui_lang_code = lang
+    request.ui_lang_name_en = str(meta.get("name_en") or lang)
+    request.ui_lang_switch_label = str(meta.get("switch_label") or lang.upper())
+    request.ui_lang_is_de = lang == "de"
+    request.ui_lang = {
+        "code": request.ui_lang_code,
+        "name_en": request.ui_lang_name_en,
+        "switch_label": request.ui_lang_switch_label,
+        "is_de": request.ui_lang_is_de,
+    }
+
 
 def _set_lang_cookie(resp: HttpResponse, name: str, value: str, max_age: int) -> None:
     resp.set_cookie(name, value, max_age=max_age, samesite="Lax")
