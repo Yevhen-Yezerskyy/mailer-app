@@ -17,9 +17,6 @@ class AudienceTask(models.Model):
     source_product = models.TextField(blank=True, default="")
     source_company = models.TextField(blank=True, default="")
     source_geo = models.TextField(blank=True, default="")
-    target_branches = models.TextField(blank=True, default="")
-    target_geo = models.TextField(blank=True, default="")
-    target_contact = models.TextField(blank=True, default="")
 
     type = models.CharField(
         max_length=4,
@@ -27,6 +24,8 @@ class AudienceTask(models.Model):
         default="sell",
     )
 
+    collected = models.BooleanField(default=False)
+    ready = models.BooleanField(default=False)
     archived = models.BooleanField(default=False)  # NEW
 
     run_processing = models.BooleanField(default=False)

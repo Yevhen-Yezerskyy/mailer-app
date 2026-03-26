@@ -29,7 +29,8 @@
       action === "branches_expand_custom" ||
       action === "branches_save" ||
       action === "branches_recalc_ratings" ||
-      action === "branches_refill"
+      action === "branches_refill" ||
+      action === "cities_pick_refine"
     );
   }
 
@@ -584,6 +585,28 @@
     deleteActions.classList.toggle("hidden", selected.length === 0);
   }
 
+  function syncCityDeleteState() {
+    const deleteInput = document.querySelector("[data-cities-delete-ids='1']");
+    const deleteSubmit = document.querySelector("[data-cities-delete-submit='1']");
+    const deleteActions = document.querySelector("[data-cities-delete-actions='1']");
+    if (!deleteInput || !deleteSubmit || !deleteActions) return;
+    const selected = [];
+    const seen = new Set();
+    Array.from(document.querySelectorAll("[data-city-row='1'][data-delete-selected='1']")).forEach(function (row) {
+      String(row.getAttribute("data-city-ids") || "")
+        .split(",")
+        .map(function (value) { return String(value || "").trim(); })
+        .filter(Boolean)
+        .forEach(function (value) {
+          if (seen.has(value)) return;
+          seen.add(value);
+          selected.push(value);
+        });
+    });
+    deleteInput.value = selected.join(",");
+    deleteActions.classList.toggle("hidden", selected.length === 0);
+  }
+
   document.addEventListener("click", function (event) {
     const button = event.target.closest("[data-branch-delete-toggle='1']");
     if (!button) return;
@@ -630,4 +653,51 @@
   });
 
   syncBranchDeleteState();
+
+  document.addEventListener("click", function (event) {
+    const button = event.target.closest("[data-city-delete-toggle='1']");
+    if (!button) return;
+    const row = button.closest("[data-city-row='1']");
+    if (!row) return;
+    const selected = row.getAttribute("data-delete-selected") === "1";
+    row.setAttribute("data-delete-selected", selected ? "0" : "1");
+    if (!selected) {
+      row.classList.remove("bg-[#f0fff0]");
+      row.classList.remove("bg-[#FFF7E0]");
+      row.classList.add("bg-[#fff3f3]");
+    } else {
+      row.classList.remove("bg-[#f0fff0]");
+      row.classList.remove("bg-[#FFF7E0]");
+      row.classList.remove("bg-[#fff3f3]");
+      if (row.getAttribute("data-city-yellow") === "1") {
+        row.classList.add("bg-[#FFF7E0]");
+      } else {
+        row.classList.add("bg-[#f0fff0]");
+      }
+    }
+    syncCityDeleteState();
+  });
+
+  document.addEventListener("click", function (event) {
+    const deleteCancel = event.target.closest("[data-cities-delete-cancel='1']");
+    if (!deleteCancel) return;
+      const deleteInput = document.querySelector("[data-cities-delete-ids='1']");
+      Array.from(document.querySelectorAll("[data-city-row='1'][data-delete-selected='1']")).forEach(function (row) {
+        row.setAttribute("data-delete-selected", "0");
+        row.classList.remove("bg-[#fff3f3]");
+        row.classList.remove("bg-[#f0fff0]");
+        row.classList.remove("bg-[#FFF7E0]");
+        if (row.getAttribute("data-city-yellow") === "1") {
+          row.classList.add("bg-[#FFF7E0]");
+        } else {
+          row.classList.add("bg-[#f0fff0]");
+        }
+      });
+      if (deleteInput) {
+        deleteInput.value = "";
+      }
+      syncCityDeleteState();
+  });
+
+  syncCityDeleteState();
 })();

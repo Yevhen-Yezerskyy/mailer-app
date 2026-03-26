@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 from typing import Any, Mapping
 
@@ -17,7 +18,7 @@ from engine.common.cache.client import CLIENT
 from engine.common.gpt import GPTClient
 from engine.common.utils import h64_text, parse_json_response
 from engine.common.prompts.process import get_prompt, translate_text
-from mailer_web.format_data import get_branches_sys_translations
+from mailer_web.format_data import get_branches_sys_translations, normalize_city
 
 from .create_edit_flow_shared import (
     build_flow_render_context,
@@ -31,6 +32,7 @@ BRANCH_QUERY_LIMIT = BRANCH_CLEAN_CHUNK_SIZE * 10
 FORM_TTL_SEC = 24 * 60 * 60
 BRANCH_EXPAND_ADJACENT_RU = "Расширь текущий список за счет других использований продукта, которые не были перечислены в описании продукта. Расширь список категорий за счет смежных категорий, похожих категорий, дополнительных синонимов, аналогов. Используй контекст бизнес-справочников."
 BRANCH_EXPAND_MIDDLEMEN_RU = "Расширь текущий список за счет релевантных посредников и перекупщиков, оптовых торговцев и покупателей. Если по компании-продавцу понятно, что это экспорт в Германию, расширь список за счет релевантных посредников импорт-экспорт."
+CITY_RADIUS_RE = re.compile(r"__RADIUS_FROM_CITY__\('((?:[^']|'')+)',\s*([0-9]+)\)")
 
 
 def _render_branch_items(records: list[dict[str, Any]], ui_lang: str) -> list[str]:
@@ -94,6 +96,45 @@ def _collapse_branch_records_for_rating(records: list[dict[str, Any]]) -> list[d
     return out
 
 
+def _expand_city_radius_sql(condition: str) -> str:
+    value = str(condition or "").strip()
+    if not value or "__RADIUS_FROM_CITY__(" not in value:
+        return value
+
+    replacements: dict[tuple[str, str], str] = {}
+    with connection.cursor() as cur:
+        for city_raw, radius_raw in CITY_RADIUS_RE.findall(value):
+            key = (city_raw, radius_raw)
+            if key in replacements:
+                continue
+            city = city_raw.replace("''", "'").strip()
+            cur.execute(
+                "SELECT lat, lon "
+                "FROM public.cities_sys "
+                "WHERE name ILIKE %s OR name ILIKE %s "
+                "ORDER BY pop_total DESC NULLS LAST "
+                "LIMIT 1",
+                [city, f"{city},%"],
+            )
+            row = cur.fetchone()
+            if not row or row[0] is None or row[1] is None:
+                continue
+            lat = float(row[0])
+            lon = float(row[1])
+            radius = int(radius_raw)
+            replacements[key] = (
+                "6371 * ACOS(LEAST(1.0, GREATEST(-1.0, "
+                f"COS(RADIANS({lat})) * COS(RADIANS(lat)) * COS(RADIANS(lon) - RADIANS({lon})) + "
+                f"SIN(RADIANS({lat})) * SIN(RADIANS(lat))"
+                f"))) <= {radius}"
+            )
+
+    def _replace(match: re.Match[str]) -> str:
+        return replacements.get((match.group(1), match.group(2)), match.group(0))
+
+    return CITY_RADIUS_RE.sub(_replace, value)
+
+
 def handle_branches_cities_step_view(
     request,
     *,
@@ -110,6 +151,9 @@ def handle_branches_cities_step_view(
     branch_rating_rows: list[dict[str, Any]] = []
     branch_expand_rows: list[dict[str, Any]] = []
     branch_hash_changed = False
+    city_rating_rows: list[dict[str, Any]] = []
+    city_expand_rows: list[dict[str, Any]] = []
+    city_probe: dict[str, Any] = {}
 
     branch_form = str(request.GET.get("branch_form") or "").strip()
     city_form = str(request.GET.get("city_form") or "").strip()
@@ -162,11 +206,33 @@ def handle_branches_cities_step_view(
                 redirect_needed = True
 
         if not CLIENT.get(city_key, ttl_sec=FORM_TTL_SEC):
-            CLIENT.set(city_key, b"1", ttl_sec=FORM_TTL_SEC)
+            CLIENT.set(
+                city_key,
+                json.dumps(
+                    {
+                        "probe": {},
+                        "conversation_id": "",
+                        "response_id": "",
+                    },
+                    ensure_ascii=False,
+                ).encode("utf-8"),
+                ttl_sec=FORM_TTL_SEC,
+            )
             if request.GET.get("city_form"):
                 city_form = f"cf_{secrets.token_urlsafe(12)}"
                 city_key = f"aap:create_flow:city_form:{city_form}"
-                CLIENT.set(city_key, b"1", ttl_sec=FORM_TTL_SEC)
+                CLIENT.set(
+                    city_key,
+                    json.dumps(
+                        {
+                            "probe": {},
+                            "conversation_id": "",
+                            "response_id": "",
+                        },
+                        ensure_ascii=False,
+                    ).encode("utf-8"),
+                    ttl_sec=FORM_TTL_SEC,
+                )
                 redirect_needed = True
 
         if redirect_needed:
@@ -176,6 +242,7 @@ def handle_branches_cities_step_view(
             return HttpResponseRedirect(f"{request.path}?{params.urlencode()}")
 
     branch_key = f"aap:create_flow:branch_form:{branch_form}" if branch_form else ""
+    city_key = f"aap:create_flow:city_form:{city_form}" if city_form else ""
 
     branch_instruction = ""
     branch_records: list[dict[str, Any]] = []
@@ -194,6 +261,39 @@ def handle_branches_cities_step_view(
     branch_state.setdefault("expanded_clean_ids", [])
     branch_state.setdefault("conversation_id", "")
     branch_state.setdefault("response_id", "")
+
+    city_state_payload = CLIENT.get(city_key, ttl_sec=FORM_TTL_SEC) if city_key else None
+    try:
+        city_state = json.loads((city_state_payload or b"").decode("utf-8")) if city_state_payload else {}
+    except Exception:
+        city_state = {}
+    if not isinstance(city_state, dict):
+        city_state = {}
+    city_state.setdefault("probe", {})
+    city_state.setdefault("conversation_id", "")
+    city_state.setdefault("response_id", "")
+    city_probe = city_state.get("probe") if isinstance(city_state.get("probe"), dict) else {}
+    if not isinstance(city_probe.get("yes_no_options"), list):
+        city_probe["yes_no_options"] = []
+    if not isinstance(city_probe.get("radio_questions"), list):
+        flat_radio_options = city_probe.get("radio_options")
+        radio_questions: list[dict[str, Any]] = []
+        current_options: list[dict[str, Any]] = []
+        if isinstance(flat_radio_options, list):
+            for item in flat_radio_options:
+                if not isinstance(item, dict):
+                    continue
+                current_options.append({
+                    "label": str(item.get("label") or "").strip(),
+                    "checked": bool(item.get("checked")),
+                    "sql_condition": str(item.get("sql_condition") or "").strip(),
+                })
+                if str(item.get("sql_condition") or "").strip() == "":
+                    radio_questions.append({"options": current_options})
+                    current_options = []
+            if current_options:
+                radio_questions.append({"options": current_options})
+        city_probe["radio_questions"] = radio_questions
 
     if task:
         current_task_hash = h64_text((task.source_product or "") + (task.source_company or ""))
@@ -280,11 +380,256 @@ def handle_branches_cities_step_view(
                 if branch_id in expanded_map
             ])
 
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT tcr.city_id, tcr.rate, cs.name, cs.state_name "
+                "FROM task_city_ratings tcr "
+                "JOIN cities_sys cs ON cs.id = tcr.city_id "
+                "WHERE tcr.task_id = %s "
+                "ORDER BY tcr.rate ASC NULLS LAST, cs.state_name ASC, cs.name ASC, tcr.city_id ASC",
+                [int(task.id)],
+            )
+            city_rows = cur.fetchall() or []
+
+        city_rating_rows = [
+            {
+                "id": int(row[0]),
+                "ids_csv": str(int(row[0])),
+                "rate_display": str(row[1]) if row[1] is not None else "-",
+                "city_name": normalize_city(str(row[2] or "").strip()),
+                "state_name": str(row[3] or "").strip(),
+            }
+            for row in city_rows
+            if row and row[2] and row[3] and row[1] is not None
+        ]
+        city_expand_rows = [
+            {
+                "id": int(row[0]),
+                "ids_csv": str(int(row[0])),
+                "rate_display": "-",
+                "city_name": normalize_city(str(row[2] or "").strip()),
+                "state_name": str(row[3] or "").strip(),
+            }
+            for row in city_rows
+            if row and row[2] and row[3] and row[1] is None
+        ]
+
     if request.method == "POST" and task:
         current_records: list[dict[str, Any]] = []
         product_de = (translate_text(task.source_product or "", "de") or "").strip() or (task.source_product or "").strip()
         company_de = (translate_text(task.source_company or "", "de") or "").strip() or (task.source_company or "").strip()
+        geo_text = (task.source_geo or "").strip() or (task.task_geo or "").strip()
         action = str(request.POST.get("action") or "").strip()
+        if action == "cities_apply_selected" and city_key:
+            yes_no_options = city_probe.get("yes_no_options") if isinstance(city_probe, dict) else None
+            radio_questions = city_probe.get("radio_questions") if isinstance(city_probe, dict) else None
+            sql_parts: list[str] = []
+            if isinstance(yes_no_options, list):
+                for index, item in enumerate(yes_no_options):
+                    if not isinstance(item, dict):
+                        continue
+                    if str(request.POST.get(f"city_probe_yes_{index}") or "").strip() != "1":
+                        continue
+                    sql_condition = str(item.get("sql_condition") or "").strip()
+                    sql_condition = _expand_city_radius_sql(sql_condition)
+                    if sql_condition:
+                        sql_parts.append(f"({sql_condition})")
+            if isinstance(radio_questions, list):
+                for question_index, question in enumerate(radio_questions):
+                    if not isinstance(question, dict):
+                        continue
+                    options = question.get("options")
+                    if not isinstance(options, list):
+                        continue
+                    selected_radio = str(request.POST.get(f"city_probe_radio_{question_index}") or "").strip()
+                    try:
+                        radio_index = int(selected_radio)
+                    except Exception:
+                        radio_index = None
+                    if radio_index is not None and 0 <= radio_index < len(options):
+                        item = options[radio_index]
+                        if isinstance(item, dict):
+                            sql_condition = str(item.get("sql_condition") or "").strip()
+                            sql_condition = _expand_city_radius_sql(sql_condition)
+                            if sql_condition:
+                                sql_parts.append(f"({sql_condition})")
+
+            selected_city_ids: list[int] = []
+            try:
+                with transaction.atomic(), connection.cursor() as cur:
+                    cur.execute("SET LOCAL TRANSACTION READ ONLY")
+                    if sql_parts:
+                        cur.execute(
+                            "SELECT id "
+                            "FROM public.cities_sys "
+                            f"WHERE {' AND '.join(sql_parts)} "
+                            "ORDER BY state_name ASC, name ASC, id ASC"
+                        )
+                    else:
+                        cur.execute(
+                            "SELECT id "
+                            "FROM public.cities_sys "
+                            "ORDER BY state_name ASC, name ASC, id ASC"
+                        )
+                    selected_city_ids = [int(row[0]) for row in (cur.fetchall() or []) if row]
+            except Exception:
+                selected_city_ids = []
+
+            if selected_city_ids:
+                hash_task = h64_text((task.source_product or "") + (task.source_company or ""))
+                with connection.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO task_city_ratings (task_id, city_id, rate, hash_task) "
+                        "VALUES " + ", ".join(["(%s,%s,%s,%s)"] * len(selected_city_ids)) + " "
+                        "ON CONFLICT (task_id, city_id) DO NOTHING",
+                        [value for city_id in selected_city_ids for value in (int(task.id), city_id, None, hash_task)],
+                    )
+            city_state["probe"] = {}
+            CLIENT.set(city_key, json.dumps(city_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
+            return HttpResponseRedirect(request.get_full_path())
+
+        if action == "cities_apply_all" and city_key:
+            with connection.cursor() as cur:
+                cur.execute("SELECT id FROM public.cities_sys ORDER BY state_name ASC, name ASC, id ASC")
+                all_city_ids = [int(row[0]) for row in (cur.fetchall() or []) if row]
+            if all_city_ids:
+                hash_task = h64_text((task.source_product or "") + (task.source_company or ""))
+                with connection.cursor() as cur:
+                    cur.execute(
+                        "INSERT INTO task_city_ratings (task_id, city_id, rate, hash_task) "
+                        "VALUES " + ", ".join(["(%s,%s,%s,%s)"] * len(all_city_ids)) + " "
+                        "ON CONFLICT (task_id, city_id) DO NOTHING",
+                        [value for city_id in all_city_ids for value in (int(task.id), city_id, None, hash_task)],
+                    )
+            city_state["probe"] = {}
+            CLIENT.set(city_key, json.dumps(city_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
+            return HttpResponseRedirect(request.get_full_path())
+
+        if action == "cities_delete_selected" and city_key:
+            delete_ids: list[int] = []
+            for value in str(request.POST.get("cities_delete_ids") or "").split(","):
+                value = value.strip()
+                if not value:
+                    continue
+                try:
+                    delete_ids.append(int(value))
+                except Exception:
+                    continue
+            delete_ids = list(dict.fromkeys(delete_ids))
+            if delete_ids:
+                with connection.cursor() as cur:
+                    cur.execute(
+                        "DELETE FROM task_city_ratings "
+                        "WHERE task_id = %s AND city_id = ANY(%s)",
+                        [int(task.id), delete_ids],
+                    )
+            return HttpResponseRedirect(request.get_full_path())
+
+        if action == "cities_pick_refine" and city_key:
+            if geo_text:
+                city_probe_instructions = "\n\n".join(
+                    part for part in (
+                        get_prompt("lang_response").replace(
+                            "{LANG}",
+                            f"{request.ui_lang_name_en} for all label values only",
+                        ).strip(),
+                        get_prompt("create_cities_geo_probe").strip(),
+                    )
+                    if part
+                ).strip()
+                resp = GPTClient().ask_dialog(
+                    model="gpt-5.4",
+                    instructions=city_probe_instructions,
+                    input=json.dumps(
+                        {
+                            "geo": geo_text,
+                            "product": task.source_product or "",
+                            "company": task.source_company or "",
+                            "available_geo_fields": [
+                                "state_name",
+                                "name",
+                                "pop_total",
+                                "lat",
+                                "lon",
+                            ],
+                        },
+                        ensure_ascii=False,
+                        indent=2,
+                    ),
+                    conversation=(str(city_state.get("conversation_id") or "").strip() or None),
+                    previous_response_id=(str(city_state.get("response_id") or "").strip() or None),
+                    user_id=str(request.user.id),
+                    service_tier="flex",
+                    web_search=False,
+                )
+                raw = resp.raw if isinstance(resp.raw, dict) else {}
+                city_state["response_id"] = str(raw.get("id") or "").strip()
+                conversation = raw.get("conversation")
+                city_state["conversation_id"] = (
+                    str(conversation.get("id") or "").strip()
+                    if isinstance(conversation, dict)
+                    else str(conversation or "").strip()
+                )
+                data = parse_json_response(resp.content or "")
+                if isinstance(data, dict):
+                    yes_no_options_raw = data.get("yes_no_options")
+                    radio_questions_raw = data.get("radio_questions")
+                    yes_no_options = []
+                    radio_questions = []
+                    if isinstance(yes_no_options_raw, list):
+                        for item in yes_no_options_raw:
+                            if not isinstance(item, dict):
+                                continue
+                            label = str(item.get("label") or "").strip()
+                            sql_condition = str(item.get("sql_condition") or "").strip()
+                            yes_no_options.append({
+                                "label": label,
+                                "checked": bool(item.get("checked")),
+                                "sql_condition": sql_condition,
+                            })
+                    if isinstance(radio_questions_raw, list):
+                        for question in radio_questions_raw:
+                            if not isinstance(question, dict):
+                                continue
+                            options_raw = question.get("options")
+                            if not isinstance(options_raw, list):
+                                continue
+                            options = []
+                            for item in options_raw:
+                                if not isinstance(item, dict):
+                                    continue
+                                options.append({
+                                    "label": str(item.get("label") or "").strip(),
+                                    "checked": bool(item.get("checked")),
+                                    "sql_condition": str(item.get("sql_condition") or "").strip(),
+                                })
+                            radio_questions.append({"options": options})
+                    city_state["probe"] = {
+                        "yes_no_options": yes_no_options,
+                        "radio_questions": radio_questions,
+                    }
+                    if not yes_no_options and not radio_questions:
+                        with connection.cursor() as cur:
+                            cur.execute("SELECT id FROM public.cities_sys ORDER BY state_name ASC, name ASC, id ASC")
+                            all_city_ids = [int(row[0]) for row in (cur.fetchall() or []) if row]
+                        if all_city_ids:
+                            hash_task = h64_text((task.source_product or "") + (task.source_company or ""))
+                            with connection.cursor() as cur:
+                                cur.execute(
+                                    "INSERT INTO task_city_ratings (task_id, city_id, rate, hash_task) "
+                                    "VALUES " + ", ".join(["(%s,%s,%s,%s)"] * len(all_city_ids)) + " "
+                                    "ON CONFLICT (task_id, city_id) DO NOTHING",
+                                    [value for city_id in all_city_ids for value in (int(task.id), city_id, None, hash_task)],
+                                )
+                        city_state["probe"] = {}
+                else:
+                    city_state["probe"] = {
+                        "yes_no_options": [],
+                        "radio_questions": [],
+                    }
+                CLIENT.set(city_key, json.dumps(city_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
+            return HttpResponseRedirect(request.get_full_path())
+
         if action == "branches_recalc_ratings" and branch_key:
             with connection.cursor() as cur:
                 cur.execute(
@@ -859,6 +1204,9 @@ def handle_branches_cities_step_view(
                     "branch_rating_rows": branch_rating_rows,
                     "branch_expand_rows": branch_expand_rows,
                     "city_items": [],
+                    "city_rating_rows": city_rating_rows,
+                    "city_expand_rows": city_expand_rows,
+                    "city_probe": city_probe,
                     "branch_instruction": branch_instruction,
                     "city_instruction": "",
                     "branch_conversation_id": "",
