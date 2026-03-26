@@ -3,7 +3,7 @@
 <!-- DATE: 2026-03-23 -->
 <!-- PURPOSE: Independent forms for branches and cities inside the flow step. -->
 
-<table class="YY-MAIN_TABLE !mb-10">
+<table class="YY-MAIN_TABLE !mt-3 !mb-10">
   <tr>
     <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
       <div class="YY-CARD_WHITE !h-auto">
@@ -43,12 +43,12 @@
                 </button>
               </div>
             {% endif %}
-            <div class="mb-6 min-h-[220px]">
+            <div class="mb-6 {% if branches_cities_step.branch_rating_rows or branches_cities_step.branch_expand_rows %}h-[725px] overflow-y-auto pr-1{% else %}min-h-[220px]{% endif %}" data-branches-scroll-box="1" data-has-green-branches="{% if branches_cities_step.branch_rating_rows %}1{% else %}0{% endif %}" data-has-yellow-branches="{% if branches_cities_step.branch_expand_rows %}1{% else %}0{% endif %}">
               {% if branches_cities_step.branch_rating_rows or branches_cities_step.branch_expand_rows %}
                 {% if branches_cities_step.branch_rating_rows %}
-                  <div class="flex flex-col gap-1">
+                  <div class="flex flex-col gap-[2px]">
                     {% for item in branches_cities_step.branch_rating_rows %}
-                      <div class="grid items-start bg-[#f0fff0]" data-branch-row="1" data-branch-ids="{{ item.ids_csv }}" data-branch-yellow="0" style="grid-template-columns:3ch minmax(0,1fr) {% if item.translated_name %}minmax(0,1fr){% else %}0px{% endif %} 3ch;">
+                      <div class="grid items-start bg-[#f0fff0]" data-branch-row="1" data-branch-last-green="{% if forloop.last %}1{% else %}0{% endif %}" data-branch-ids="{{ item.ids_csv }}" data-branch-yellow="0" style="grid-template-columns:3ch minmax(0,1fr) {% if item.translated_name %}minmax(0,1fr){% else %}0px{% endif %} 3ch;">
                         <div class="YY-TEXT !mb-0 !py-1 !px-1 whitespace-nowrap text-center">
                           <a
                             href="#"
@@ -61,9 +61,8 @@
                         <div class="YY-TEXT !mb-0 !py-1 !px-2 break-words overflow-hidden {% if not item.translated_name %}!p-0{% endif %}">{% if item.translated_name %}{{ item.translated_name }}{% endif %}</div>
                         <div class="YY-STATUS_RED !py-1 !pr-2 !pl-0 !min-h-0 !w-auto bg-transparent border-transparent text-right self-start leading-none">
                           <button type="button" class="!p-0 !m-0 bg-transparent border-0" data-branch-delete-toggle="1" data-branch-ids="{{ item.ids_csv }}" aria-label="{% trans 'Удалить' %}">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="inline-block h-[1.38em] w-[1.38em] align-top" aria-hidden="true">
-                              <path fill="currentColor" d="M9 3h6l1 1h4v2H4V4h4l1-1Zm-2 5h10v11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V8Zm2 2v8h6v-8H9Z"/>
-                              <path fill="currentColor" d="M10 11h1.5v6H10v-6Zm2.5 0H14v6h-1.5v-6Z"/>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="inline-block h-[1.38em] w-[1.38em] align-top" aria-hidden="true">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                             </svg>
                           </button>
                         </div>
@@ -72,17 +71,16 @@
                   </div>
                 {% endif %}
                 {% if branches_cities_step.branch_expand_rows %}
-                  <div class="flex flex-col gap-1 mt-6">
+                  <div class="flex flex-col gap-[2px] mt-6">
                     {% for item in branches_cities_step.branch_expand_rows %}
-                      <div class="grid items-start bg-[#FFF7E0]" data-branch-row="1" data-branch-ids="{{ item.ids_csv }}" data-branch-yellow="1" style="grid-template-columns:3ch minmax(0,1fr) {% if item.translated_name %}minmax(0,1fr){% else %}0px{% endif %} 3ch;">
+                      <div class="grid items-start bg-[#FFF7E0]" data-branch-row="1" data-branch-first-yellow="{% if forloop.first %}1{% else %}0{% endif %}" data-branch-ids="{{ item.ids_csv }}" data-branch-yellow="1" style="grid-template-columns:3ch minmax(0,1fr) {% if item.translated_name %}minmax(0,1fr){% else %}0px{% endif %} 3ch;">
                         <div class="YY-TEXT !mb-0 !py-1 !px-1 whitespace-nowrap text-center">{{ item.rate_display }}</div>
                         <div class="YY-TEXT !mb-0 !py-1 !px-1 break-words">{{ item.branch_name }}</div>
                         <div class="YY-TEXT !mb-0 !py-1 !px-1 break-words overflow-hidden {% if not item.translated_name %}!p-0{% endif %}">{% if item.translated_name %}{{ item.translated_name }}{% endif %}</div>
                         <div class="YY-STATUS_RED !py-1 !pr-1 !pl-0 !min-h-0 !w-auto bg-transparent border-transparent text-right self-start leading-none">
                           <button type="button" class="!p-0 !m-0 bg-transparent border-0" data-branch-delete-toggle="1" data-branch-ids="{{ item.ids_csv }}" aria-label="{% trans 'Удалить' %}">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="inline-block h-[1.38em] w-[1.38em] align-top" aria-hidden="true">
-                              <path fill="currentColor" d="M9 3h6l1 1h4v2H4V4h4l1-1Zm-2 5h10v11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V8Zm2 2v8h6v-8H9Z"/>
-                              <path fill="currentColor" d="M10 11h1.5v6H10v-6Zm2.5 0H14v6h-1.5v-6Z"/>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="inline-block h-[1.38em] w-[1.38em] align-top" aria-hidden="true">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                             </svg>
                           </button>
                         </div>
@@ -157,118 +155,7 @@
           <input type="hidden" name="cities_conversation_id" value="{{ branches_cities_step.city_conversation_id }}">
           <input type="hidden" name="cities_response_id" value="{{ branches_cities_step.city_response_id }}">
           <input type="hidden" name="cities_records_json" value="{{ branches_cities_step.city_records_json }}">
-          {% if type == "buy" %}
-            <div class="YY-STATUS_YELLOW !mb-3">{% trans "Города и населенные пункты" %}</div>
-          {% else %}
-            <div class="YY-STATUS_GREEN !mb-3">{% trans "Города и населенные пункты" %}</div>
-          {% endif %}
-          {% if not branches_cities_step.city_rating_rows and not branches_cities_step.city_expand_rows and not branches_cities_step.city_probe.yes_no_options and not branches_cities_step.city_probe.radio_questions and not branches_cities_step.city_items %}
-            <div class="YY-TEXT !mb-8">
-              {% trans "Необходимо подобрать города и населённые пункты Германии для поиска контактов в бизнес-справочниках. Обрабатываются города с населением более 12 000 человек." %}<br><br>
-              {% trans "Подбор выполняется с помощью ассистента ИИ. Если заданы ограничения по географии (территория, радиус, расстояние, конкретные города или федеральные земли), они учитываются при подборе." %}<br><br>
-              {% trans "Если ограничений нет, используется полный список из 1 326 городов и населённых пунктов." %}<br><br>
-              {% trans "Далее выполняется рейтингование городов и населённых пунктов." %}<br><br>
-              {% trans "Для изменения результата измените географические критерии. Это можно сделать в разделе \"География\"." %}
-            </div>
-            <button type="submit" name="action" value="cities_pick_refine" class="YY-BUTTON_MAIN_FULL mt-auto">
-              {% trans "Подобрать города и населенные пункты" %}
-            </button>
-          {% else %}
-          <div class="{% if branches_cities_step.city_rating_rows or branches_cities_step.city_expand_rows %}!mb-5 h-[800px] overflow-y-auto pr-1{% endif %}">
-            {% if branches_cities_step.city_rating_rows or branches_cities_step.city_expand_rows %}
-              {% if branches_cities_step.city_rating_rows %}
-                <div class="flex flex-col gap-1">
-                  {% for item in branches_cities_step.city_rating_rows %}
-                    <div class="grid items-start bg-[#f0fff0]" data-city-row="1" data-city-ids="{{ item.ids_csv }}" data-city-yellow="0" style="grid-template-columns:3ch minmax(0,1fr) minmax(0,1fr) 3ch;">
-                      <div class="YY-TEXT !mb-0 !py-1 !px-1 whitespace-nowrap text-center">{{ item.rate_display }}</div>
-                      <div class="YY-TEXT !mb-0 !py-1 !px-2 break-words">{{ item.city_name }}</div>
-                      <div class="YY-TEXT !mb-0 !py-1 !px-2 break-words">{{ item.state_name }}</div>
-                      <div class="YY-STATUS_RED !py-1 !pr-2 !pl-0 !min-h-0 !w-auto bg-transparent border-transparent text-right self-start leading-none">
-                        <button type="button" class="!p-0 !m-0 bg-transparent border-0" data-city-delete-toggle="1" data-city-ids="{{ item.ids_csv }}" aria-label="{% trans 'Удалить' %}">
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="inline-block h-[1.38em] w-[1.38em] align-top" aria-hidden="true">
-                            <path fill="currentColor" d="M9 3h6l1 1h4v2H4V4h4l1-1Zm-2 5h10v11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V8Zm2 2v8h6v-8H9Z"/>
-                            <path fill="currentColor" d="M10 11h1.5v6H10v-6Zm2.5 0H14v6h-1.5v-6Z"/>
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  {% endfor %}
-                </div>
-              {% endif %}
-              {% if branches_cities_step.city_expand_rows %}
-                <div class="flex flex-col gap-1 mt-6">
-                  {% for item in branches_cities_step.city_expand_rows %}
-                    <div class="grid items-start bg-[#FFF7E0]" data-city-row="1" data-city-ids="{{ item.ids_csv }}" data-city-yellow="1" style="grid-template-columns:3ch minmax(0,1fr) minmax(0,1fr) 3ch;">
-                      <div class="YY-TEXT !mb-0 !py-1 !px-1 whitespace-nowrap text-center">{{ item.rate_display }}</div>
-                      <div class="YY-TEXT !mb-0 !py-1 !px-2 break-words">{{ item.city_name }}</div>
-                      <div class="YY-TEXT !mb-0 !py-1 !px-2 break-words">{{ item.state_name }}</div>
-                      <div class="YY-STATUS_RED !py-1 !pr-2 !pl-0 !min-h-0 !w-auto bg-transparent border-transparent text-right self-start leading-none">
-                        <button type="button" class="!p-0 !m-0 bg-transparent border-0" data-city-delete-toggle="1" data-city-ids="{{ item.ids_csv }}" aria-label="{% trans 'Удалить' %}">
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="inline-block h-[1.38em] w-[1.38em] align-top" aria-hidden="true">
-                            <path fill="currentColor" d="M9 3h6l1 1h4v2H4V4h4l1-1Zm-2 5h10v11a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V8Zm2 2v8h6v-8H9Z"/>
-                            <path fill="currentColor" d="M10 11h1.5v6H10v-6Zm2.5 0H14v6h-1.5v-6Z"/>
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  {% endfor %}
-                </div>
-              {% endif %}
-            {% elif branches_cities_step.city_probe.yes_no_options or branches_cities_step.city_probe.radio_questions %}
-              <div class="flex flex-col gap-4">
-                {% if branches_cities_step.city_probe.yes_no_options %}
-                  <div class="flex flex-col gap-4">
-                    {% for item in branches_cities_step.city_probe.yes_no_options %}
-                      <div class="YY-CARD_BLUE !h-auto">
-                        <label class="flex items-start gap-2">
-                          <input type="checkbox" name="city_probe_yes_{{ forloop.counter0 }}" value="1" {% if item.checked %}checked{% endif %}>
-                          <span class="YY-TEXT !mb-0">{{ item.label }}</span>
-                        </label>
-                      </div>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-
-                {% if branches_cities_step.city_probe.radio_questions %}
-                  <div class="flex flex-col gap-4">
-                    {% for question in branches_cities_step.city_probe.radio_questions %}
-                      <div class="YY-CARD_BLUE !h-auto">
-                        <div class="flex flex-col gap-2">
-                          {% for item in question.options %}
-                            <label class="flex items-start gap-2">
-                              <input type="radio" name="city_probe_radio_{{ forloop.parentloop.counter0 }}" value="{{ forloop.counter0 }}" {% if item.checked %}checked{% endif %}>
-                              <span class="YY-TEXT !mb-0">{{ item.label }}</span>
-                            </label>
-                          {% endfor %}
-                        </div>
-                      </div>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-
-                <div class="grid grid-cols-2 gap-4 !mb-0">
-                  <button type="submit" name="action" value="cities_apply_all" class="YY-BUTTON_MAIN_FULL">
-                    {% trans "Вся Германия без ограничений" %}
-                  </button>
-                  <button type="submit" name="action" value="cities_apply_selected" class="YY-BUTTON_MAIN_FULL">
-                    {% trans "Применить ограничение" %}
-                  </button>
-                </div>
-              </div>
-            {% endif %}
-          </div>
-          {% endif %}
-          {% if branches_cities_step.city_rating_rows or branches_cities_step.city_expand_rows %}
-            <div class="grid grid-cols-2 gap-4 !mb-6 hidden" data-cities-delete-actions="1">
-              <button type="button" class="YY-BUTTON_MAIN_FULL" data-cities-delete-cancel="1">
-                {% trans "Отменить" %}
-              </button>
-              <button type="submit" name="action" value="cities_delete_selected" class="YY-BUTTON_RED_FULL" data-cities-delete-submit="1">
-                {% trans "Удалить" %}
-              </button>
-            </div>
-            <input type="hidden" name="cities_delete_ids" value="" data-cities-delete-ids="1">
-          {% endif %}
+          {% include "panels/aap_audience/create/_cities_panel.html" %}
         </form>
       </div>
     </td>

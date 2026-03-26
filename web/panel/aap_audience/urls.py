@@ -12,6 +12,7 @@ from .views.status_task import status_task_view
 from .views.modal_status_task import modal_status_task_view  # NEW
 from .views.modal_create_task import modal_create_task_view
 from .views.modal_edit_branch_rate import modal_edit_branch_rate_view
+from .views.modal_edit_city_rate import modal_edit_city_rate_view
 from .views.modal_edit_title import modal_edit_title_view
 from .views.modal_insert_company import modal_insert_company_view
 from .views.create_list import create_list_view
@@ -48,6 +49,7 @@ urlpatterns = [
     path("status/task/modal/", modal_status_task_view, name="status_task_modal"),  # NEW
     path("create/modal/", modal_create_task_view, name="create_modal"),
     path("create/branch-rate/modal/", modal_edit_branch_rate_view, name="create_branch_rate_modal"),
+    path("create/city-rate/modal/", modal_edit_city_rate_view, name="create_city_rate_modal"),
     path("create/title/modal/", modal_edit_title_view, name="create_title_modal"),
     path("create/company/insert/modal/", modal_insert_company_view, name="create_company_insert_modal"),
     path("create/", create_list_view, name="create_list"),

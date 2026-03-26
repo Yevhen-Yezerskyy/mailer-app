@@ -135,6 +135,190 @@ def _expand_city_radius_sql(condition: str) -> str:
     return CITY_RADIUS_RE.sub(_replace, value)
 
 
+def _request_branch_rating_map(
+    request,
+    *,
+    flow_type: str,
+    product_de: str,
+    company_de: str,
+    branch_state: dict[str, Any],
+    already_rated_items: list[dict[str, Any]],
+    items_to_rate: list[dict[str, Any]],
+) -> tuple[dict[str, int], dict[str, Any]]:
+    rating_map: dict[str, int] = {}
+    if not items_to_rate:
+        return rating_map, branch_state
+
+    resp = GPTClient().ask_dialog(
+        model="gpt-5.4",
+        instructions=get_prompt("create_branches_buy_rate" if flow_type == "buy" else "create_branches_sell_rate"),
+        input=json.dumps(
+            {
+                "what_is_needed" if flow_type == "buy" else "what_is_sold": product_de,
+                "buyer_company" if flow_type == "buy" else "seller_company": company_de,
+                "already_rated_items": already_rated_items,
+                "items_to_rate": items_to_rate,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        conversation=(str(branch_state.get("conversation_id") or "").strip() or None),
+        previous_response_id=(str(branch_state.get("response_id") or "").strip() or None),
+        user_id=str(request.user.id),
+        service_tier="flex",
+        web_search=False,
+    )
+    raw = resp.raw if isinstance(resp.raw, dict) else {}
+    branch_state["response_id"] = str(raw.get("id") or "").strip()
+    conversation = raw.get("conversation")
+    branch_state["conversation_id"] = (
+        str(conversation.get("id") or "").strip()
+        if isinstance(conversation, dict)
+        else str(conversation or "").strip()
+    )
+    data = parse_json_response(resp.content or "")
+    rated_items = data.get("rated_items") if isinstance(data, dict) else None
+    if isinstance(rated_items, list):
+        for item in rated_items:
+            if not isinstance(item, dict):
+                continue
+            branch_name = str(item.get("branch_name") or "").strip()
+            try:
+                rate = int(item.get("rate"))
+            except Exception:
+                continue
+            if not branch_name or rate < 1 or rate > 20:
+                continue
+            rating_map[branch_name.casefold()] = rate
+    return rating_map, branch_state
+
+
+def _ensure_saved_branch_ratings(
+    request,
+    *,
+    task,
+    flow_type: str,
+    product_de: str,
+    company_de: str,
+    branch_state: dict[str, Any],
+) -> dict[str, Any]:
+    for _attempt in range(2):
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT tbr.branch_id, bs.branch_name, tbr.rate "
+                "FROM task_branch_ratings tbr "
+                "JOIN branches_sys bs ON bs.id = tbr.branch_id "
+                "WHERE tbr.task_id = %s "
+                "ORDER BY tbr.rate ASC NULLS LAST, tbr.branch_id ASC",
+                [int(task.id)],
+            )
+            rows = cur.fetchall() or []
+
+        unrated_rows = [row for row in rows if row and row[1] and row[2] is None]
+        if not unrated_rows:
+            break
+
+        already_rated_items = _collapse_branch_records_for_rating(
+            [
+                {"branch_name": str(row[1] or "").strip(), "rate": row[2]}
+                for row in rows
+                if row and row[1] and row[2] is not None
+            ]
+        )
+        items_to_rate = _collapse_branch_records_for_rating(
+            [{"branch_name": str(row[1] or "").strip()} for row in unrated_rows if row and row[1]]
+        )
+        rating_map, branch_state = _request_branch_rating_map(
+            request,
+            flow_type=flow_type,
+            product_de=product_de,
+            company_de=company_de,
+            branch_state=branch_state,
+            already_rated_items=already_rated_items,
+            items_to_rate=items_to_rate,
+        )
+        if not rating_map:
+            break
+
+        hash_task = h64_text((task.source_product or "") + (task.source_company or ""))
+        updated_any = False
+        with connection.cursor() as cur:
+            for row in unrated_rows:
+                branch_id = int(row[0])
+                branch_name = str(row[1] or "").strip()
+                rate = rating_map.get(branch_name.casefold())
+                if rate is None:
+                    continue
+                updated_any = True
+                cur.execute(
+                    "UPDATE task_branch_ratings "
+                    "SET rate = %s, hash_task = %s "
+                    "WHERE task_id = %s AND branch_id = %s",
+                    [rate, hash_task, int(task.id), branch_id],
+                )
+        if not updated_any:
+            break
+
+    return branch_state
+
+
+def _current_city_hash(task, geo_text: str) -> int:
+    return int(h64_text((task.source_product or "") + (task.source_company or "") + str(geo_text or "")))
+
+
+def _build_city_rows_context(task, geo_text: str) -> dict[str, Any]:
+    with connection.cursor() as cur:
+        cur.execute(
+            "SELECT tcr.city_id, tcr.rate, tcr.hash_task, cs.name, cs.state_name "
+            "FROM task_city_ratings tcr "
+            "JOIN cities_sys cs ON cs.id = tcr.city_id "
+            "WHERE tcr.task_id = %s "
+            "ORDER BY tcr.rate ASC NULLS LAST, cs.state_name ASC, cs.name ASC, tcr.city_id ASC",
+            [int(task.id)],
+        )
+        city_rows = cur.fetchall() or []
+
+    city_task_hash = _current_city_hash(task, geo_text)
+    city_hash_changed = bool(city_rows) and any(row[2] != city_task_hash for row in city_rows)
+
+    city_rating_rows = [
+        {
+            "id": int(row[0]),
+            "ids_csv": str(int(row[0])),
+            "rate_display": str(row[1]) if row[1] is not None else "-",
+            "city_name": normalize_city(str(row[3] or "").strip()),
+            "state_name": str(row[4] or "").strip(),
+        }
+        for row in city_rows
+        if row and row[3] and row[4] and row[1] is not None
+    ]
+    city_expand_rows = [
+        {
+            "id": int(row[0]),
+            "ids_csv": str(int(row[0])),
+            "rate_display": "-",
+            "city_name": normalize_city(str(row[3] or "").strip()),
+            "state_name": str(row[4] or "").strip(),
+        }
+        for row in city_rows
+        if row and row[3] and row[4] and row[1] is None
+    ]
+    total_count = len(city_rating_rows) + len(city_expand_rows)
+    unrated_count = len(city_expand_rows)
+    rated_count = len(city_rating_rows)
+
+    return {
+        "city_hash_changed": city_hash_changed,
+        "city_rating_rows": city_rating_rows,
+        "city_expand_rows": city_expand_rows,
+        "city_rating_running": total_count > 0 and unrated_count > 0,
+        "city_rating_total_count": total_count,
+        "city_rating_unrated_count": unrated_count,
+        "city_rating_rated_count": rated_count,
+        "city_rating_percent": int((rated_count * 100) / total_count) if total_count else 0,
+    }
+
+
 def handle_branches_cities_step_view(
     request,
     *,
@@ -148,12 +332,27 @@ def handle_branches_cities_step_view(
     flow_conf = get_flow_config(flow_type)
     step_definitions = build_step_definitions(flow_type)
     ui_lang = request.ui_lang_code
+    is_city_partial = request.method == "GET" and str(request.GET.get("cities_partial") or "").strip() == "1"
     branch_rating_rows: list[dict[str, Any]] = []
     branch_expand_rows: list[dict[str, Any]] = []
     branch_hash_changed = False
+    city_hash_changed = False
     city_rating_rows: list[dict[str, Any]] = []
     city_expand_rows: list[dict[str, Any]] = []
+    city_rating_running = False
+    city_rating_total_count = 0
+    city_rating_unrated_count = 0
+    city_rating_rated_count = 0
+    city_rating_percent = 0
     city_probe: dict[str, Any] = {}
+    product_de = ""
+    company_de = ""
+    if task and (request.method == "POST" or not is_city_partial):
+        product_de = (translate_text(task.source_product or "", "de") or "").strip()
+        product_de = product_de or (task.source_product or "").strip()
+        company_de = (translate_text(task.source_company or "", "de") or "").strip()
+        company_de = company_de or (task.source_company or "").strip()
+    geo_text = ((task.source_geo or "").strip() or (task.task_geo or "").strip()) if task else ""
 
     branch_form = str(request.GET.get("branch_form") or "").strip()
     city_form = str(request.GET.get("city_form") or "").strip()
@@ -161,17 +360,18 @@ def handle_branches_cities_step_view(
     if request.method == "GET":
         redirect_needed = False
 
-        if not branch_form:
+        if not branch_form and not is_city_partial:
             branch_form = f"bf_{secrets.token_urlsafe(12)}"
             redirect_needed = True
         if not city_form:
             city_form = f"cf_{secrets.token_urlsafe(12)}"
-            redirect_needed = True
+            if not is_city_partial:
+                redirect_needed = True
 
         branch_key = f"aap:create_flow:branch_form:{branch_form}"
         city_key = f"aap:create_flow:city_form:{city_form}"
 
-        if not CLIENT.get(branch_key, ttl_sec=FORM_TTL_SEC):
+        if branch_form and not CLIENT.get(branch_key, ttl_sec=FORM_TTL_SEC):
             CLIENT.set(
                 branch_key,
                 json.dumps(
@@ -235,7 +435,7 @@ def handle_branches_cities_step_view(
                 )
                 redirect_needed = True
 
-        if redirect_needed:
+        if redirect_needed and not is_city_partial:
             params = request.GET.copy()
             params["branch_form"] = branch_form
             params["city_form"] = city_form
@@ -295,7 +495,15 @@ def handle_branches_cities_step_view(
                 radio_questions.append({"options": current_options})
         city_probe["radio_questions"] = radio_questions
 
-    if task:
+    if task and not is_city_partial:
+        branch_state = _ensure_saved_branch_ratings(
+            request,
+            task=task,
+            flow_type=flow_type,
+            product_de=product_de,
+            company_de=company_de,
+            branch_state=branch_state,
+        )
         current_task_hash = h64_text((task.source_product or "") + (task.source_company or ""))
         with connection.cursor() as cur:
             cur.execute(
@@ -380,45 +588,19 @@ def handle_branches_cities_step_view(
                 if branch_id in expanded_map
             ])
 
-        with connection.cursor() as cur:
-            cur.execute(
-                "SELECT tcr.city_id, tcr.rate, cs.name, cs.state_name "
-                "FROM task_city_ratings tcr "
-                "JOIN cities_sys cs ON cs.id = tcr.city_id "
-                "WHERE tcr.task_id = %s "
-                "ORDER BY tcr.rate ASC NULLS LAST, cs.state_name ASC, cs.name ASC, tcr.city_id ASC",
-                [int(task.id)],
-            )
-            city_rows = cur.fetchall() or []
-
-        city_rating_rows = [
-            {
-                "id": int(row[0]),
-                "ids_csv": str(int(row[0])),
-                "rate_display": str(row[1]) if row[1] is not None else "-",
-                "city_name": normalize_city(str(row[2] or "").strip()),
-                "state_name": str(row[3] or "").strip(),
-            }
-            for row in city_rows
-            if row and row[2] and row[3] and row[1] is not None
-        ]
-        city_expand_rows = [
-            {
-                "id": int(row[0]),
-                "ids_csv": str(int(row[0])),
-                "rate_display": "-",
-                "city_name": normalize_city(str(row[2] or "").strip()),
-                "state_name": str(row[3] or "").strip(),
-            }
-            for row in city_rows
-            if row and row[2] and row[3] and row[1] is None
-        ]
+    if task:
+        city_ctx = _build_city_rows_context(task, geo_text)
+        city_hash_changed = bool(city_ctx["city_hash_changed"])
+        city_rating_rows = list(city_ctx["city_rating_rows"])
+        city_expand_rows = list(city_ctx["city_expand_rows"])
+        city_rating_running = bool(city_ctx["city_rating_running"])
+        city_rating_total_count = int(city_ctx["city_rating_total_count"])
+        city_rating_unrated_count = int(city_ctx["city_rating_unrated_count"])
+        city_rating_rated_count = int(city_ctx["city_rating_rated_count"])
+        city_rating_percent = int(city_ctx["city_rating_percent"])
 
     if request.method == "POST" and task:
         current_records: list[dict[str, Any]] = []
-        product_de = (translate_text(task.source_product or "", "de") or "").strip() or (task.source_product or "").strip()
-        company_de = (translate_text(task.source_company or "", "de") or "").strip() or (task.source_company or "").strip()
-        geo_text = (task.source_geo or "").strip() or (task.task_geo or "").strip()
         action = str(request.POST.get("action") or "").strip()
         if action == "cities_apply_selected" and city_key:
             yes_no_options = city_probe.get("yes_no_options") if isinstance(city_probe, dict) else None
@@ -476,7 +658,7 @@ def handle_branches_cities_step_view(
                 selected_city_ids = []
 
             if selected_city_ids:
-                hash_task = h64_text((task.source_product or "") + (task.source_company or ""))
+                hash_task = _current_city_hash(task, geo_text)
                 with connection.cursor() as cur:
                     cur.execute(
                         "INSERT INTO task_city_ratings (task_id, city_id, rate, hash_task) "
@@ -493,7 +675,7 @@ def handle_branches_cities_step_view(
                 cur.execute("SELECT id FROM public.cities_sys ORDER BY state_name ASC, name ASC, id ASC")
                 all_city_ids = [int(row[0]) for row in (cur.fetchall() or []) if row]
             if all_city_ids:
-                hash_task = h64_text((task.source_product or "") + (task.source_company or ""))
+                hash_task = _current_city_hash(task, geo_text)
                 with connection.cursor() as cur:
                     cur.execute(
                         "INSERT INTO task_city_ratings (task_id, city_id, rate, hash_task) "
@@ -523,6 +705,39 @@ def handle_branches_cities_step_view(
                         "WHERE task_id = %s AND city_id = ANY(%s)",
                         [int(task.id), delete_ids],
                     )
+            return HttpResponseRedirect(request.get_full_path())
+
+        if action == "cities_recalc_ratings" and city_key:
+            with connection.cursor() as cur:
+                cur.execute(
+                    "UPDATE task_city_ratings "
+                    "SET rate = NULL, hash_task = NULL "
+                    "WHERE task_id = %s",
+                    [int(task.id)],
+                )
+            return HttpResponseRedirect(request.get_full_path())
+
+        if action == "cities_refill" and city_key:
+            with connection.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM task_city_ratings "
+                    "WHERE task_id = %s",
+                    [int(task.id)],
+                )
+            city_state["probe"] = {}
+            city_state["conversation_id"] = ""
+            city_state["response_id"] = ""
+            CLIENT.set(city_key, json.dumps(city_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
+            action = "cities_pick_refine"
+
+        if action == "cities_ignore_hash" and city_key:
+            with connection.cursor() as cur:
+                cur.execute(
+                    "UPDATE task_city_ratings "
+                    "SET hash_task = %s "
+                    "WHERE task_id = %s",
+                    [_current_city_hash(task, geo_text), int(task.id)],
+                )
             return HttpResponseRedirect(request.get_full_path())
 
         if action == "cities_pick_refine" and city_key:
@@ -613,7 +828,7 @@ def handle_branches_cities_step_view(
                             cur.execute("SELECT id FROM public.cities_sys ORDER BY state_name ASC, name ASC, id ASC")
                             all_city_ids = [int(row[0]) for row in (cur.fetchall() or []) if row]
                         if all_city_ids:
-                            hash_task = h64_text((task.source_product or "") + (task.source_company or ""))
+                            hash_task = _current_city_hash(task, geo_text)
                             with connection.cursor() as cur:
                                 cur.execute(
                                     "INSERT INTO task_city_ratings (task_id, city_id, rate, hash_task) "
@@ -1186,6 +1401,52 @@ def handle_branches_cities_step_view(
                 CLIENT.set(branch_key, json.dumps(branch_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
         return HttpResponseRedirect(request.get_full_path())
 
+    params = request.GET.copy()
+    if branch_form:
+        params["branch_form"] = branch_form
+    if city_form:
+        params["city_form"] = city_form
+    params["cities_partial"] = "1"
+    city_partial_url = f"{request.path}?{params.urlencode()}"
+
+    branches_cities_context = {
+        "branch_items": branch_items,
+        "branch_rating_rows": branch_rating_rows,
+        "branch_expand_rows": branch_expand_rows,
+        "city_items": [],
+        "city_rating_rows": city_rating_rows,
+        "city_expand_rows": city_expand_rows,
+        "city_probe": city_probe,
+        "city_hash_changed": city_hash_changed,
+        "city_rating_running": city_rating_running,
+        "city_rating_total_count": city_rating_total_count,
+        "city_rating_unrated_count": city_rating_unrated_count,
+        "city_rating_rated_count": city_rating_rated_count,
+        "city_rating_percent": city_rating_percent,
+        "city_partial_url": city_partial_url,
+        "branch_instruction": branch_instruction,
+        "city_instruction": "",
+        "branch_conversation_id": "",
+        "branch_response_id": "",
+        "branch_records_json": "[]",
+        "branch_rate_modal_base_url": reverse("audience:create_branch_rate_modal") + f"?id={item_id}",
+        "branch_hash_changed": branch_hash_changed,
+        "city_rate_modal_base_url": reverse("audience:create_city_rate_modal") + f"?id={item_id}",
+        "city_conversation_id": "",
+        "city_response_id": "",
+        "city_records_json": "",
+    }
+
+    if is_city_partial:
+        return render(
+            request,
+            "panels/aap_audience/create/_cities_panel.html",
+            {
+                "type": flow_type,
+                "branches_cities_step": branches_cities_context,
+            },
+        )
+
     return render(
         request,
         flow_conf["template_name"],
@@ -1199,25 +1460,7 @@ def handle_branches_cities_step_view(
             current_step_key=current_step_key,
             step_template="panels/aap_audience/create/step_branches_cities.html",
             extra_context={
-                "branches_cities_step": {
-                    "branch_items": branch_items,
-                    "branch_rating_rows": branch_rating_rows,
-                    "branch_expand_rows": branch_expand_rows,
-                    "city_items": [],
-                    "city_rating_rows": city_rating_rows,
-                    "city_expand_rows": city_expand_rows,
-                    "city_probe": city_probe,
-                    "branch_instruction": branch_instruction,
-                    "city_instruction": "",
-                    "branch_conversation_id": "",
-                    "branch_response_id": "",
-                "branch_records_json": "[]",
-                    "branch_rate_modal_base_url": reverse("audience:create_branch_rate_modal") + f"?id={item_id}",
-                    "branch_hash_changed": branch_hash_changed,
-                    "city_conversation_id": "",
-                    "city_response_id": "",
-                    "city_records_json": "",
-                },
+                "branches_cities_step": branches_cities_context,
             },
         ),
     )

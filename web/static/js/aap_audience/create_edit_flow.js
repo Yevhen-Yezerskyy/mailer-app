@@ -16,6 +16,8 @@
   const labels = config.labels || {};
   const forms = Array.from(document.querySelectorAll("[data-dirty-form]"));
   const bypassSubmit = new WeakMap();
+  let cityRatingPollTimer = 0;
+  let cityRatingPollInFlight = false;
 
   function isWaitAction(submitter) {
     const action = submitter && submitter.name === "action" ? String(submitter.value || "") : "";
@@ -30,7 +32,8 @@
       action === "branches_save" ||
       action === "branches_recalc_ratings" ||
       action === "branches_refill" ||
-      action === "cities_pick_refine"
+      action === "cities_pick_refine" ||
+      action === "cities_refill"
     );
   }
 
@@ -607,6 +610,74 @@
     deleteActions.classList.toggle("hidden", selected.length === 0);
   }
 
+  function cityRatingPanel() {
+    return document.querySelector("[data-city-rating-panel='1']");
+  }
+
+  function stopCityRatingPolling() {
+    if (!cityRatingPollTimer) return;
+    window.clearInterval(cityRatingPollTimer);
+    cityRatingPollTimer = 0;
+  }
+
+  function startCityRatingPolling() {
+    stopCityRatingPolling();
+    const panel = cityRatingPanel();
+    if (!panel) return;
+    if (panel.getAttribute("data-city-rating-running") !== "1") return;
+    cityRatingPollTimer = window.setInterval(refreshCityRatingPanel, 2000);
+  }
+
+  function refreshCityRatingPanel() {
+    const panel = cityRatingPanel();
+    if (!panel || cityRatingPollInFlight) return;
+    const url = String(panel.getAttribute("data-city-rating-partial-url") || "").trim();
+    if (!url) return;
+
+    cityRatingPollInFlight = true;
+    window.fetch(url, {
+      credentials: "same-origin",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    }).then(function (response) {
+      return response.text();
+    }).then(function (html) {
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = html;
+      const nextPanel = wrapper.querySelector("[data-city-rating-panel='1']");
+      const currentPanel = cityRatingPanel();
+      if (!nextPanel || !currentPanel) return;
+      currentPanel.replaceWith(nextPanel);
+      syncCityDeleteState();
+      startCityRatingPolling();
+    }).catch(function () {
+    }).finally(function () {
+      cityRatingPollInFlight = false;
+    });
+  }
+
+  function scrollBranchesToLastGreen() {
+    const box = document.querySelector("[data-branches-scroll-box='1']");
+    if (!box) return;
+    if (box.getAttribute("data-has-green-branches") !== "1") return;
+    if (box.getAttribute("data-has-yellow-branches") !== "1") return;
+
+    const lastGreen = box.querySelector("[data-branch-last-green='1']");
+    if (!lastGreen) return;
+    const firstYellow = box.querySelector("[data-branch-first-yellow='1']");
+    if (!firstYellow) {
+      box.scrollTop = Math.max(0, lastGreen.offsetTop);
+      return;
+    }
+
+    const greenRect = lastGreen.getBoundingClientRect();
+    const yellowRect = firstYellow.getBoundingClientRect();
+    const gap = Math.max(0, yellowRect.top - greenRect.bottom);
+    const targetTop = firstYellow.offsetTop - lastGreen.offsetHeight - gap - 70;
+    box.scrollTop = Math.max(0, targetTop);
+  }
+
   document.addEventListener("click", function (event) {
     const button = event.target.closest("[data-branch-delete-toggle='1']");
     if (!button) return;
@@ -652,6 +723,7 @@
       syncBranchDeleteState();
   });
 
+  scrollBranchesToLastGreen();
   syncBranchDeleteState();
 
   document.addEventListener("click", function (event) {
@@ -700,4 +772,5 @@
   });
 
   syncCityDeleteState();
+  startCityRatingPolling();
 })();

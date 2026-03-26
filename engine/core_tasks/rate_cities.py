@@ -20,7 +20,7 @@ from engine.common.utils import h64_text, parse_json_response
 
 
 BATCH_SIZE = 50
-MODEL = "gpt-5.4"
+MODEL = "gpt-5.4-mini"
 SERVICE_TIER = "flex"
 TASK_LOCK_TTL_SEC = 300
 TASK_PICK_LIMIT = 200

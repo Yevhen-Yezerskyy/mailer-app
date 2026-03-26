@@ -38,6 +38,7 @@ MODEL_ALIASES: dict[str, str] = {
 MODEL_WEB_TOOL: dict[str, str] = {
     "gpt-5.1": "web_search_preview",
     "gpt-5.4": "web_search_preview",
+    "gpt-5.4-mini": "web_search_preview",
     "gpt-5-mini": "web_search_preview",
     "gpt-5-nano": "web_search_preview",
 }
