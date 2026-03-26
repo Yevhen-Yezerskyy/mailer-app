@@ -112,16 +112,18 @@ BASE_STEP_DEFINITIONS = {
         "depends_on": ("product", "company", "geo"),
     },
     "contacts": {
-        "completion_type": "never",
+        "completion_type": "truthy",
+        "completion_field": "ready",
         "visible": True,
         "implemented": True,
-        "depends_on": ("product", "company", "geo"),
+        "depends_on": (),
     },
     "mailing_list": {
-        "completion_type": "never",
+        "completion_type": "truthy",
+        "completion_field": "ready",
         "visible": True,
         "implemented": True,
-        "depends_on": ("product", "company", "geo"),
+        "depends_on": (),
     },
 }
 
@@ -500,6 +502,7 @@ def task_saved_values(task) -> dict[str, Any]:
         "source_geo": (task.source_geo or "") if task else "",
         "task_branches": (task.task_branches or "") if task else "",
         "task_geo": (task.task_geo or "") if task else "",
+        "ready": bool(task.ready) if task else False,
         "run_processing": bool(task.run_processing) if task else False,
     }
 
