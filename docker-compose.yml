@@ -375,7 +375,36 @@ services:
         "/app/config/sh/with-secrets.sh",
         "python",
         "-m",
-        "engine.core_tasks.tasks_processor"
+        "engine.core_tasks.cities_rate_processor"
+      ]
+
+  mailer-engine-expand-cb-ready-prod:
+    image: mailer-python:latest
+    container_name: mailer-engine-expand-cb-ready-prod
+    working_dir: /app
+    restart: unless-stopped
+    depends_on:
+      mailer-set-env:
+        condition: service_started
+      mailer-db:
+        condition: service_started
+      mailer-redis:
+        condition: service_started
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
+      - mailer-app-prod:/app
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
+    cpus: "0.30"
+    command:
+      [
+        "/app/config/sh/with-secrets.sh",
+        "python",
+        "-m",
+        "engine.core_tasks.expand_cb_ready_task_processor"
       ]
 
   mailer-engine-cr-prod:

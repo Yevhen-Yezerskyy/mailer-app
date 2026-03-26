@@ -17,6 +17,8 @@ class AudienceTask(models.Model):
     source_product = models.TextField(blank=True, default="")
     source_company = models.TextField(blank=True, default="")
     source_geo = models.TextField(blank=True, default="")
+    rating_city_hash = models.BigIntegerField(blank=True, null=True)
+    rating_branch_hash = models.BigIntegerField(blank=True, null=True)
 
     type = models.CharField(
         max_length=4,
