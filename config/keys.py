@@ -29,6 +29,9 @@ KEYS: Dict[str, KeyItem] = {
     "DB_PASSWORD": {"encrypted": 'v1:gcm:9Qsvm6dVqQqvV5WYtrQeEXnIxcELrj--CpS6eZGJ7MapbQ', "decrypted": ""},
     "DB_PORT": {"encrypted": 'v1:gcm:Y7t5kDfjgckEo-ElOtjq0fYLGyxZZCQd732j7gd6ySc', "decrypted": ""},
     "DB_USER": {"encrypted": 'v1:gcm:sg49x4qSDLvWqg0jWpnu9ZZB1dHmsaUGaSRmFUTUW4cDW-PcmbV5uw1u', "decrypted": ""},
+
+    # Core crawler tunnels
+    "CORE_CRAWLER_TUNNELS_11880_JSON": {"encrypted": 'v1:gcm:1xoVwd7zy2jarKl3qc-s0z4XYQGtHTa6YGY4joXyuG-KvN5eK41mGLqFtbVsaF_6Qs1cJY6hUsAAvOI-0ONSqtJyUYpLc_uYrPI566nMLjVyT6POKmfdITcn5NGq4b30qrsT8WWnJl-ywiNCsAWyeXypYvv3VWRcndE04OPktD4iJX7z3g1KpiHb9wG9FkDO8znU-s4tJFzoBafuvvhx3CeDoruJWZ_A4pj0EbiC1q05eSeqkEwx3Dh7TMAqKQx8TE0s9cReMKF0ePi3nFdYGa_qWhFsntolif_fDUtx_HOjw63CvQb94bEgYDujAlzi0gbhL6184ZGpg8EQhPU18qwektek8c2ErEL9auYLf1iiHpvJrqxFnTkk5fDN_fOTkQlkwRAQCLxh77aumqa4T89Kl6AZ7feG2_WD6AeU013mZ3lRrvwFYeIA18uHoEgCVzye-lLtSo8gq7Ji-ALg_RgcZKk781RmFHyOh4zM_SAJvHl-MbJRwV_FXAYkaJOH2MonrBBEFjKtEPhaFVc', "decrypted": ""},
     
     
 }

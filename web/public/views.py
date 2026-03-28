@@ -2,6 +2,7 @@
 # DATE: 2026-03-07
 # PURPOSE: public index + custom 404 page.
 
+from django.http import HttpResponse
 from django.shortcuts import render
 
 
