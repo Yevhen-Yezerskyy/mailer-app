@@ -207,7 +207,7 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
     "11880": SiteSessionConfig(
         site="11880",
         home_url="https://www.11880.com/",
-        egress_slots=("fenster_ukraine", "nowedel", "zenosolar", "direct"),
+        egress_slots=("fenster_ukraine", "nowedel", "zenosolar", "aws_54_93_240_19", "aws_18_196_116_251", "direct"),
         slot_quarantine_sec=4 * 60 * 60,
         sessions_per_egress=1,
         concurrent_pages_per_session=2,

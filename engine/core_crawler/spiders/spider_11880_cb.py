@@ -68,7 +68,7 @@ class OneOneEightZeroCBSpider:
             self._detail_referers[url] = page_url
 
     def _run_fetch(self) -> None:
-        self._start_url = f"https://www.11880.com/suche/{self.branch_slug}/{self.plz}?query={self.branch_slug}"
+        self._start_url = f"https://www.11880.com/suche/{self.branch_slug}/{self.plz}"
         current_search_url = self._start_url
         current_referer = ""
         selected_urls: List[str] = []
