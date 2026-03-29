@@ -1,24 +1,40 @@
 # FILE: engine/core_crawler/spiders/spider_gs_store.py
-# DATE: 2026-03-27
-# PURPOSE: GS spider payload logging into crawler/spider_gs.
+# DATE: 2026-03-29
+# PURPOSE: Save core_crawler GS cards into public.raw_contacts_cb.
 
 from __future__ import annotations
 
 import json
 from typing import Any, Dict
 
-from engine.common.logs import log
-
-
-LOG_FILE = "spider_gs"
-LOG_FOLDER = "crawler"
+from engine.common.db import get_connection
 
 
 def save_gs_probe_run(payload: Dict[str, Any]) -> int:
-    log(
-        LOG_FILE,
-        folder=LOG_FOLDER,
-        message=json.dumps(payload, ensure_ascii=False, default=str, indent=2),
-    )
+    cb_id = int(payload.get("cb_id") or 0)
     items = payload.get("items") or []
-    return len(items) if isinstance(items, list) else 0
+    if cb_id <= 0:
+        raise RuntimeError("save_gs_probe_run requires cb_id")
+    if not isinstance(items, list):
+        raise RuntimeError("save_gs_probe_run requires items list")
+
+    written = 0
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM public.raw_contacts_cb WHERE cb_id=%s", (cb_id,))
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            card = dict(item.get("card") or {})
+            if not card:
+                continue
+            url = str(item.get("url") or "").strip() or None
+            cur.execute(
+                """
+                INSERT INTO public.raw_contacts_cb (cb_id, card, url)
+                VALUES (%s, %s::jsonb, %s)
+                """,
+                (cb_id, json.dumps(card, ensure_ascii=False, default=str), url),
+            )
+            written += 1
+        conn.commit()
+    return int(written)

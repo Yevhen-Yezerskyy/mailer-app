@@ -42,6 +42,13 @@ SESSION_LEASE_TTL_SEC = 5 * 60.0
 HTTP_CHROMIUM_LOG_FILE = "http_chromium.log"
 HTTP_LIGHT_LOG_FILE = "http_light.log"
 ROUTER_STATE_LOG_FILE = "router_state.log"
+QUARANTINE_STEP_LADDER_SEC = (
+    1 * 60 * 60,
+    4 * 60 * 60,
+    12 * 60 * 60,
+    24 * 60 * 60,
+    48 * 60 * 60,
+)
 
 
 @dataclass
@@ -322,7 +329,14 @@ class BrowserSessionRouter:
         site_name = str(site or "").strip()
         if not site_name:
             raise ValueError("quarantine key requires site")
-        return f"core_crawler:slot_quarantine:{site_name}"
+        return "core_crawler:slot_quarantine:global"
+
+    @staticmethod
+    def _quarantine_backoff_key(site: str) -> str:
+        site_name = str(site or "").strip()
+        if not site_name:
+            raise ValueError("quarantine backoff key requires site")
+        return "core_crawler:slot_quarantine_backoff:global"
 
     @staticmethod
     def _session_key(site: str, slot_name: str, slot_idx: int) -> str:
@@ -397,11 +411,6 @@ class BrowserSessionRouter:
         for name in cfg.egress_slots:
             if name in quarantined:
                 slot_errors.append(f"{name}: quarantined")
-                if name != "direct":
-                    try:
-                        stop_tunnel_by_name(name)
-                    except Exception as exc:
-                        slot_errors.append(f"{name}: stop failed: {type(exc).__name__}: {exc}")
                 continue
             if name == excluded_name:
                 continue
@@ -493,14 +502,57 @@ class BrowserSessionRouter:
         quarantined = self._load_quarantine(cfg)
         return slot_name in quarantined
 
+    def _load_quarantine_backoff(self, cfg: SiteSessionConfig) -> dict[str, dict[str, float | int]]:
+        raw = self._cache_get_obj(self._quarantine_backoff_key(cfg.site)) or {}
+        if not isinstance(raw, dict):
+            return {}
+        now = time.time()
+        grace_sec = max(60.0, float(cfg.slot_quarantine_sec))
+        out: dict[str, dict[str, float | int]] = {}
+        for name, row in raw.items():
+            if not isinstance(row, dict):
+                continue
+            try:
+                until = float(row.get("until") or 0.0)
+                level = int(row.get("level") or 0)
+            except Exception:
+                continue
+            if until <= 0.0:
+                continue
+            if now > (until + grace_sec):
+                continue
+            out[str(name)] = {"until": until, "level": max(0, int(level))}
+        if out != raw:
+            self._cache_set_obj(self._quarantine_backoff_key(cfg.site), out)
+        return out
+
+    def _next_quarantine_level(self, cfg: SiteSessionConfig, slot_name: str) -> tuple[int, int]:
+        history = self._load_quarantine_backoff(cfg)
+        current = dict(history.get(str(slot_name)) or {})
+        now = time.time()
+        prev_until = float(current.get("until") or 0.0)
+        prev_level = max(0, int(current.get("level") or 0))
+        grace_sec = max(60.0, float(cfg.slot_quarantine_sec))
+        if prev_until > 0.0 and now <= (prev_until + grace_sec):
+            next_level = min(prev_level + 1, len(QUARANTINE_STEP_LADDER_SEC) - 1)
+        else:
+            next_level = 0
+        duration_sec = int(QUARANTINE_STEP_LADDER_SEC[next_level])
+        return next_level, duration_sec
+
     def _mute_slot(self, cfg: SiteSessionConfig, slot_name: str, reason: str) -> None:
         if not slot_name:
             return
         state = self._load_quarantine(cfg)
-        until = time.time() + float(cfg.slot_quarantine_sec)
+        backoff = self._load_quarantine_backoff(cfg)
+        level, duration_sec = self._next_quarantine_level(cfg, slot_name)
+        until = time.time() + float(duration_sec)
         state[slot_name] = until
         self._cache_set_obj(self._quarantine_key(cfg.site), state)
-        self._drop_egress_session_state(cfg, slot_name)
+        backoff[str(slot_name)] = {"level": int(level), "until": float(until)}
+        self._cache_set_obj(self._quarantine_backoff_key(cfg.site), backoff)
+        for site_cfg in SITE_CONFIGS.values():
+            self._drop_egress_session_state(site_cfg, slot_name)
         if slot_name != "direct":
             try:
                 stop_tunnel_by_name(slot_name)
@@ -509,7 +561,10 @@ class BrowserSessionRouter:
         log(
             ROUTER_STATE_LOG_FILE,
             folder=LOG_FOLDER,
-            message=f"slot_quarantine site={cfg.site} tunnel={slot_name} reason={reason} until_ts={int(until)}",
+            message=(
+                f"slot_quarantine site={cfg.site} tunnel={slot_name} scope=global reason={reason} "
+                f"level={int(level) + 1} duration_sec={int(duration_sec)} until_ts={int(until)}"
+            ),
         )
 
     @staticmethod

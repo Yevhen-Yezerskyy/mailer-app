@@ -8,7 +8,7 @@ import json
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
-from engine.common.db import fetch_one
+from engine.common.db import fetch_one, get_connection
 from engine.common.logs import log
 from engine.core_crawler.browser.fetcher import fetch_html, to_text_response
 from engine.core_crawler.spiders.spider_11880_card import parse_11880_card
@@ -161,7 +161,6 @@ class OneOneEightZeroCBSpider:
 
     def _db_flush_items_and_mark(self) -> bool:
         payload = {
-            "event": "11880_payload",
             "task_id": self.task_id,
             "cb_id": self.cb_id,
             "plz": self.plz,
@@ -177,6 +176,36 @@ class OneOneEightZeroCBSpider:
         }
         self._db_rows = save_11880_probe_run(payload)
         return True
+
+    @staticmethod
+    def _reason_marks_collected(reason: str) -> bool:
+        reason_s = str(reason or "").strip()
+        if not reason_s:
+            return False
+        if reason_s in {"OK", "NO DETAIL ITEMS"}:
+            return True
+        if reason_s.startswith("SEARCH HTTP"):
+            return True
+        if reason_s.startswith("DETAIL HTTP"):
+            return True
+        return False
+
+    def _mark_pair_result(self, reason: str) -> None:
+        error_value = None if str(reason or "").strip() == "OK" else str(reason or "").strip() or None
+        collected_num = int(self._db_rows if self._db_rows >= 0 else len(self.items))
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                UPDATE public.cb_crawl_pairs
+                SET collected = true,
+                    collected_num = %s,
+                    error = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+                """,
+                (collected_num, error_value, self.cb_id),
+            )
+            conn.commit()
 
     def _index_log_line(self, reason: str) -> str:
         if str(reason or "") == "ALREADY COLLECTED":
@@ -211,27 +240,25 @@ class OneOneEightZeroCBSpider:
     def closed(self, reason):
         r = (self._final_reason or reason or "").strip() or "UNKNOWN"
         self._log_status(r)
-        print(
-            f"CORE_11880_CB task_id={self.task_id} cb_id={self.cb_id} reason='{r}' "
-            f"plz='{self.plz}' branch='{self.branch_slug}' list_seen={self._list_seen} "
-            f"paging_seen={self._paging_seen} detail_seen={self._detail_seen} "
-            f"detail_parsed={self._detail_parsed} index_cards={len(self.index_cards)} "
-            f"selected={len(self.selected_urls)} items={len(self.items)} failed={len(self.failed_urls)}"
-        )
 
         if r == "ALREADY COLLECTED":
             self._db_action = "skip_already"
+            print(f"CORE_11880_CB cb_id={self.cb_id} result=skip reason={r}")
             return
 
-        if (
-            r.startswith("SEARCH HTTP")
-            or r.startswith("DETAIL HTTP")
-            or r.startswith("FAILED TO PARSE")
-            or r.startswith("FETCH EXCEPTION")
-        ):
-            self._db_action = "mark_fail"
+        if not self._reason_marks_collected(r):
+            self._db_action = "leave_pending"
+            print(
+                f"CORE_11880_CB cb_id={self.cb_id} result=pending reason={r} "
+                f"indexed={len(self.index_cards)} selected={len(self.selected_urls)} parsed={self._detail_parsed}"
+            )
             return
 
-        ok = self._db_flush_items_and_mark()
-        if ok:
-            self._db_action = "commit"
+        self._db_flush_items_and_mark()
+        self._mark_pair_result(r)
+        self._db_action = "commit"
+        print(
+            f"CORE_11880_CB cb_id={self.cb_id} result=commit reason={r} "
+            f"stored={self._db_rows} indexed={len(self.index_cards)} selected={len(self.selected_urls)} "
+            f"parsed={self._detail_parsed}"
+        )

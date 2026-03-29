@@ -32,7 +32,7 @@ WATCH_INTERVAL_SEC = 5.0
 LOG_FOLDER = "crawler"
 TUNNELS_LOG_FILE = "tunnels.log"
 STATE_TTL_SEC = 24 * 60 * 60
-QUARANTINE_SITES = ("11880", "gs")
+GLOBAL_QUARANTINE_KEY = "core_crawler:slot_quarantine:global"
 _WATCHDOG_THREAD: threading.Thread | None = None
 _WATCHDOG_STOP = threading.Event()
 _WATCHDOG_LAST_STATE: dict[str, tuple[bool, bool, bool, str]] = {}
@@ -143,8 +143,8 @@ def _watch_state_signature(status: dict[str, Any], quarantine_sites: list[str]) 
     return (alive, port_open, control_ok, sites)
 
 
-def _load_quarantine_state(site: str) -> dict[str, float]:
-    key = f"core_crawler:slot_quarantine:{str(site or '').strip()}"
+def _load_quarantine_state() -> dict[str, float]:
+    key = GLOBAL_QUARANTINE_KEY
     payload = CLIENT.get(key, ttl_sec=STATE_TTL_SEC)
     if not payload:
         return {}
@@ -170,14 +170,12 @@ def _load_quarantine_state(site: str) -> dict[str, float]:
 
 def _active_quarantine_sites(name: str) -> list[str]:
     tunnel_name = str(name or "").strip()
-    active_sites: list[str] = []
     if not tunnel_name:
-        return active_sites
-    for site in QUARANTINE_SITES:
-        state = _load_quarantine_state(site)
-        if tunnel_name in state:
-            active_sites.append(str(site))
-    return active_sites
+        return []
+    state = _load_quarantine_state()
+    if tunnel_name not in state:
+        return []
+    return ["global"]
 
 
 def _port_open(port: int) -> bool:
