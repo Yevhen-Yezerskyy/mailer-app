@@ -407,34 +407,34 @@ services:
         "engine.core_tasks.expand_cb_ready_task_processor"
       ]
 
-  mailer-engine-crawler-prod:
-    image: mailer-python:latest
-    container_name: mailer-engine-crawler-prod
-    init: true
-    working_dir: /app
-    restart: unless-stopped
-    depends_on:
-      mailer-set-env:
-        condition: service_started
-      mailer-db:
-        condition: service_started
-      mailer-redis:
-        condition: service_started
-    environment:
-      PYTHONPATH: /app
-    volumes:
-      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
-      - mailer-app-prod:/app
-      - serenity-redis-run:/app/run/redis
-      - serenity-secrets:/run/serenity-secrets:ro
-    cpus: "0.30"
-    command:
-      [
-        "/app/config/sh/with-secrets.sh",
-        "python",
-        "-m",
-        "engine.core_crawler.crawler_processor"
-      ]
+  # mailer-engine-crawler-prod:
+  #   image: mailer-python:latest
+  #   container_name: mailer-engine-crawler-prod
+  #   init: true
+  #   working_dir: /app
+  #   restart: unless-stopped
+  #   depends_on:
+  #     mailer-set-env:
+  #       condition: service_started
+  #     mailer-db:
+  #       condition: service_started
+  #     mailer-redis:
+  #       condition: service_started
+  #   environment:
+  #     PYTHONPATH: /app
+  #   volumes:
+  #     - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
+  #     - mailer-app-prod:/app
+  #     - serenity-redis-run:/app/run/redis
+  #     - serenity-secrets:/run/serenity-secrets:ro
+  #   cpus: "0.30"
+  #   command:
+  #     [
+  #       "/app/config/sh/with-secrets.sh",
+  #       "python",
+  #       "-m",
+  #       "engine.core_crawler.crawler_processor"
+  #     ]
 
   # mailer-engine-stat-prod:
   #   image: mailer-python:latest

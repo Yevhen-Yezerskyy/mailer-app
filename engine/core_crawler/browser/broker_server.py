@@ -7,7 +7,9 @@ from __future__ import annotations
 import json
 import multiprocessing
 import os
+import pickle
 import queue
+import random
 import socketserver
 import struct
 import subprocess
@@ -18,11 +20,16 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from engine.common.cache.client import CLIENT
 from engine.core_crawler.browser.session_config import BROKER_QUEUE_MAX, BROKER_WORKERS, SITE_CONFIGS
 from engine.core_crawler.browser.session_router import BrowserSessionRouter
-from engine.core_crawler.tunnels_11880 import ensure_tunnel_watchdog, stop_tunnel_watchdog
+from engine.core_crawler.tunnels_11880 import ensure_tunnel_watchdog, load_tunnel_statuses, stop_tunnel_watchdog
 
 BROKER_SOCKET_PATH = "/tmp/core_crawler_browser.sock"
+STATE_TTL_SEC = 7 * 24 * 60 * 60
+SCHEDULE_ROTATE_MIN_SEC = 600.0
+SCHEDULE_ROTATE_MAX_SEC = 1200.0
+ROUTE_SITES = ("11880", "gs")
 
 
 def _cleanup_browser_processes() -> None:
@@ -98,7 +105,148 @@ def _normalize_fetch_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "extra_headers": dict(payload.get("extra_headers") or {}) or None,
         "preferred_slot_name": str(payload.get("preferred_slot_name") or ""),
         "preferred_slot_idx": _int_value(payload.get("preferred_slot_idx"), -1),
+        "allowed_slot_names": [str(name) for name in list(payload.get("allowed_slot_names") or []) if str(name or "").strip()],
     }
+
+
+def _cache_get_obj(key: str) -> Any:
+    payload = CLIENT.get(key, ttl_sec=STATE_TTL_SEC)
+    if not payload:
+        return None
+    try:
+        return pickle.loads(payload)
+    except Exception as exc:
+        raise RuntimeError(f"BAD CACHE PAYLOAD {key}: {type(exc).__name__}: {exc}") from exc
+
+
+def _cache_set_obj(key: str, value: Any) -> None:
+    try:
+        payload = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
+    except Exception as exc:
+        raise RuntimeError(f"CACHE ENCODE FAILED {key}: {type(exc).__name__}: {exc}") from exc
+    CLIENT.set(key, payload, ttl_sec=STATE_TTL_SEC)
+
+
+def _schedule_key(site: str) -> str:
+    site_name = str(site or "").strip()
+    if not site_name:
+        raise ValueError("schedule key requires site")
+    return f"core_crawler:slot_schedule:{site_name}"
+
+
+def _rr_key(site: str) -> str:
+    site_name = str(site or "").strip()
+    if not site_name:
+        raise ValueError("rr key requires site")
+    return f"core_crawler:slot_rr:{site_name}"
+
+
+def _quarantine_key(site: str) -> str:
+    site_name = str(site or "").strip()
+    if not site_name:
+        raise ValueError("quarantine key requires site")
+    return f"core_crawler:slot_quarantine:{site_name}"
+
+
+def _configured_slot_names() -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for site in ROUTE_SITES:
+        cfg = SITE_CONFIGS.get(site)
+        if cfg is None:
+            continue
+        for raw_name in cfg.egress_slots:
+            name = str(raw_name or "").strip()
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            ordered.append(name)
+    return ordered
+
+
+def _site_owned_slot_names() -> dict[str, list[str]]:
+    owned = {site: [] for site in ROUTE_SITES}
+    slots = _configured_slot_names()
+    if not slots:
+        return owned
+    site_count = len(ROUTE_SITES)
+    for idx, slot_name in enumerate(slots):
+        site = ROUTE_SITES[idx % site_count]
+        owned[site].append(slot_name)
+    return owned
+
+
+def _load_site_quarantine(site: str) -> dict[str, float]:
+    raw = _cache_get_obj(_quarantine_key(site)) or {}
+    if not isinstance(raw, dict):
+        return {}
+    now = time.time()
+    out: dict[str, float] = {}
+    for slot_name, until in raw.items():
+        try:
+            until_ts = float(until or 0.0)
+        except Exception as exc:
+            raise RuntimeError(
+                f"BAD QUARANTINE STATE {site} {slot_name}: {type(exc).__name__}: {exc}"
+            ) from exc
+        if until_ts > now:
+            out[str(slot_name)] = until_ts
+    if out != raw:
+        _cache_set_obj(_quarantine_key(site), out)
+    return out
+
+
+def _slot_is_live(slot_name: str, statuses: dict[str, dict[str, Any]]) -> bool:
+    name = str(slot_name or "").strip()
+    if not name:
+        return False
+    if name == "direct":
+        return True
+    return bool((statuses.get(name) or {}).get("alive"))
+
+
+def _scheduled_rest_slot(site: str, active_names: list[str], has_quarantine: bool) -> str:
+    if has_quarantine or len(active_names) <= 1:
+        return ""
+    now = time.time()
+    state = _cache_get_obj(_schedule_key(site)) or {}
+    excluded_name = str(state.get("name") or "")
+    until = float(state.get("until") or 0.0)
+    is_current = excluded_name in active_names and until > now and until <= (now + SCHEDULE_ROTATE_MAX_SEC + 5.0)
+    if is_current:
+        return excluded_name
+    rr_state = _cache_get_obj(_rr_key(site)) or {"pos": 0}
+    rr_pos = int(rr_state.get("pos") or 0)
+    excluded_name = active_names[rr_pos % len(active_names)]
+    _cache_set_obj(_rr_key(site), {"pos": rr_pos + 1})
+    until = now + random.uniform(SCHEDULE_ROTATE_MIN_SEC, SCHEDULE_ROTATE_MAX_SEC)
+    _cache_set_obj(_schedule_key(site), {"name": excluded_name, "until": until})
+    return excluded_name
+
+
+def site_active_slot_names(site: str) -> list[str]:
+    site_name = str(site or "").strip()
+    cfg = SITE_CONFIGS.get(site_name)
+    owned = _site_owned_slot_names().get(site_name) or []
+    if cfg is not None:
+        configured = {str(name or "").strip() for name in cfg.egress_slots if str(name or "").strip()}
+        owned = [name for name in owned if name in configured]
+    if not owned:
+        return []
+    statuses = load_tunnel_statuses(owned)
+    quarantine = _load_site_quarantine(site_name)
+    live_owned = [name for name in owned if _slot_is_live(name, statuses)]
+    available = [name for name in live_owned if name not in quarantine]
+    if not available:
+        return []
+    rest_name = _scheduled_rest_slot(site_name, available, bool(quarantine))
+    if not rest_name:
+        return available
+    return [name for name in available if name != rest_name]
+
+
+def current_site_route_plan() -> dict[str, list[str]]:
+    return {site: site_active_slot_names(site) for site in ROUTE_SITES}
 
 
 class _BrokerDispatcher:
@@ -152,18 +300,18 @@ class _BrokerDispatcher:
             self._inflight.clear()
             self._accepted_count = 0
 
-    def _pick_slot_for_site(self, site: str) -> tuple[str, int]:
+    def _pick_slot_for_site(self, site: str, allowed_slot_names: list[str]) -> tuple[str, int]:
         cfg = SITE_CONFIGS.get(site)
-        if cfg is None:
+        if cfg is None or not allowed_slot_names:
             return "", 0
-        total_slots = max(1, len(cfg.egress_slots) * int(cfg.sessions_per_egress))
+        total_slots = max(1, len(allowed_slot_names) * int(cfg.sessions_per_egress))
         with self._rr_mu:
             pos = int(self._site_rr.get(site, 0))
             self._site_rr[site] = pos + 1
         logical_idx = pos % total_slots
         egress_idx = logical_idx // int(cfg.sessions_per_egress)
         slot_idx = logical_idx % int(cfg.sessions_per_egress)
-        return str(cfg.egress_slots[egress_idx]), int(slot_idx)
+        return str(allowed_slot_names[egress_idx]), int(slot_idx)
 
     def submit(self, payload: dict[str, Any]) -> dict[str, Any]:
         request_id = uuid4().hex
@@ -172,10 +320,17 @@ class _BrokerDispatcher:
         except ValueError as exc:
             return {"ok": False, "error": "BAD_REQUEST", "detail": str(exc)}
         site = str(payload.get("site") or "")
+        allowed_slot_names = site_active_slot_names(site)
+        if site in SITE_CONFIGS and not allowed_slot_names:
+            return {"ok": False, "error": "NO_ACTIVE_SITE_SLOTS", "detail": f"{site} has no active live slots"}
+        payload["allowed_slot_names"] = list(allowed_slot_names)
         preferred_slot_name = str(payload.get("preferred_slot_name") or "")
         preferred_slot_idx = _int_value(payload.get("preferred_slot_idx"), -1)
+        if site in SITE_CONFIGS and preferred_slot_name not in allowed_slot_names:
+            preferred_slot_name = ""
+            preferred_slot_idx = -1
         if site in SITE_CONFIGS and not preferred_slot_name:
-            preferred_slot_name, preferred_slot_idx = self._pick_slot_for_site(site)
+            preferred_slot_name, preferred_slot_idx = self._pick_slot_for_site(site, allowed_slot_names)
             payload["preferred_slot_name"] = preferred_slot_name
             payload["preferred_slot_idx"] = preferred_slot_idx
         cfg = SITE_CONFIGS.get(site)
@@ -261,6 +416,7 @@ def _broker_worker_main(
                     extra_headers=dict(payload.get("extra_headers") or {}) or None,
                     preferred_slot_name=str(payload.get("preferred_slot_name") or ""),
                     preferred_slot_idx=_int_value(payload.get("preferred_slot_idx"), -1),
+                    allowed_slot_names=[str(name) for name in list(payload.get("allowed_slot_names") or []) if str(name or "").strip()],
                 )
                 results.put(
                     {

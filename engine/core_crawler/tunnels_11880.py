@@ -10,7 +10,6 @@ import fcntl
 import json
 import os
 import pickle
-import random
 import re
 import signal
 import shlex
@@ -33,14 +32,12 @@ WATCH_INTERVAL_SEC = 5.0
 LOG_FOLDER = "crawler"
 TUNNELS_LOG_FILE = "tunnels.log"
 STATE_TTL_SEC = 24 * 60 * 60
-GLOBAL_QUARANTINE_KEY = "core_crawler:slot_quarantine:global"
-GLOBAL_SCHEDULE_KEY = "core_crawler:slot_schedule:global"
-GLOBAL_RR_KEY = "core_crawler:slot_rr:global"
-SCHEDULE_ROTATE_MIN_SEC = 600.0
-SCHEDULE_ROTATE_MAX_SEC = 1200.0
+TUNNEL_STATUS_KEY = "core_crawler:tunnel_status:global"
 _WATCHDOG_THREAD: threading.Thread | None = None
 _WATCHDOG_STOP = threading.Event()
-_WATCHDOG_LAST_STATE: dict[str, tuple[bool, bool, bool, bool, str]] = {}
+_WATCHDOG_LAST_STATE: dict[str, tuple[bool, bool, bool]] = {}
+_WATCHDOG_RESTART_MU = threading.Lock()
+_WATCHDOG_RESTARTING: set[str] = set()
 
 
 def _load_config() -> dict[str, Any]:
@@ -158,99 +155,38 @@ def _short_detail(value: Any, max_len: int = 240) -> str:
     return text[: max_len - 3] + "..."
 
 
-def _watch_state_signature(
-    status: dict[str, Any],
-    quarantine_sites: list[str],
-    desired_up: bool,
-) -> tuple[bool, bool, bool, bool, str]:
+def _watch_state_signature(status: dict[str, Any]) -> tuple[bool, bool, bool]:
     alive = bool(status.get("alive"))
     port_open = bool(status.get("port_open"))
     control_ok = bool(status.get("control_ok"))
-    sites = ",".join(sorted(str(site) for site in quarantine_sites))
-    return (alive, port_open, control_ok, bool(desired_up), sites)
+    return (alive, port_open, control_ok)
 
 
-def _load_quarantine_state() -> dict[str, float]:
-    key = GLOBAL_QUARANTINE_KEY
-    payload = CLIENT.get(key, ttl_sec=STATE_TTL_SEC)
-    if not payload:
-        return {}
-    try:
-        raw = pickle.loads(payload)
-    except Exception as exc:
-        raise RuntimeError(f"BAD QUARANTINE CACHE {key}: {type(exc).__name__}: {exc}") from exc
+def load_tunnel_statuses(configured_names: list[str] | tuple[str, ...] | None = None) -> dict[str, dict[str, Any]]:
+    raw = _cache_get_obj(TUNNEL_STATUS_KEY) or {}
     if not isinstance(raw, dict):
         return {}
-    now = time.time()
-    out: dict[str, float] = {}
-    for name, until in raw.items():
-        try:
-            until_f = float(until or 0.0)
-        except Exception as exc:
-            raise RuntimeError(
-                f"BAD QUARANTINE VALUE {key} {name}: {type(exc).__name__}: {exc}"
-            ) from exc
-        if until_f > now:
-            out[str(name)] = until_f
-    return out
-
-
-def _configured_tunnel_names(cfg: dict[str, Any]) -> list[str]:
-    names: list[str] = []
-    seen: set[str] = set()
-    for tunnel in list(cfg.get("tunnels") or []):
-        name = str(tunnel.get("name") or "").strip()
-        if not name or name in seen:
-            continue
-        seen.add(name)
-        names.append(name)
-    return names
-
-
-def _global_active_tunnel_names(cfg: dict[str, Any]) -> list[str]:
-    all_names = _configured_tunnel_names(cfg)
-    quarantine = _load_quarantine_state()
-    available = [name for name in all_names if name not in quarantine]
-    if not available:
-        return []
-    if quarantine or len(available) <= 1:
-        return available
-    now = time.time()
-    state = _cache_get_obj(GLOBAL_SCHEDULE_KEY) or {}
-    excluded_name = str(state.get("name") or "")
-    until = float(state.get("until") or 0.0)
-    is_recent = excluded_name in available and until > now and until <= (now + SCHEDULE_ROTATE_MAX_SEC + 5.0)
-    if not is_recent:
-        rr_state = _cache_get_obj(GLOBAL_RR_KEY) or {"pos": 0}
-        rr_pos = int(rr_state.get("pos") or 0)
-        excluded_name = available[rr_pos % len(available)]
-        _cache_set_obj(GLOBAL_RR_KEY, {"pos": rr_pos + 1})
-        until = now + random.uniform(SCHEDULE_ROTATE_MIN_SEC, SCHEDULE_ROTATE_MAX_SEC)
-        _cache_set_obj(GLOBAL_SCHEDULE_KEY, {"name": excluded_name, "until": until})
-    return [name for name in available if name != excluded_name]
-
-
-def _active_quarantine_sites(name: str) -> list[str]:
-    tunnel_name = str(name or "").strip()
-    if not tunnel_name:
-        return []
-    state = _load_quarantine_state()
-    if tunnel_name not in state:
-        return []
-    return ["global"]
-
-
-def active_tunnel_names(configured_names: list[str] | tuple[str, ...] | None = None) -> list[str]:
-    cfg = _load_config()
-    active_names = _global_active_tunnel_names(cfg)
     if configured_names is None:
-        return active_names
+        return {str(name): dict(row or {}) for name, row in raw.items()}
     allowed: set[str] = set()
     for raw_name in configured_names:
         name = str(raw_name or "").strip()
         if name:
             allowed.add(name)
-    return [name for name in active_names if name in allowed]
+    return {
+        str(name): dict(row or {})
+        for name, row in raw.items()
+        if str(name or "") in allowed
+    }
+
+
+def live_tunnel_names(configured_names: list[str] | tuple[str, ...] | None = None) -> list[str]:
+    statuses = load_tunnel_statuses(configured_names)
+    live: list[str] = []
+    for name, row in statuses.items():
+        if bool((row or {}).get("alive")):
+            live.append(str(name))
+    return live
 
 
 def _port_open(port: int) -> bool:
@@ -603,44 +539,56 @@ def status_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]
     }
 
 
+def _watchdog_restart_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> None:
+    name = str(tunnel.get("name") or "")
+    try:
+        result = start_tunnel(cfg, tunnel)
+        detail = _short_detail(result.get("transcript") or result.get("stderr") or "")
+        _log_tunnel(
+            f"watch_restart_result name={name} status={result.get('status')} "
+            f"detail={json.dumps(detail, ensure_ascii=False)}"
+        )
+    except Exception as exc:
+        _log_tunnel(f"watch_restart_result name={name} status=error detail={json.dumps(_short_detail(exc), ensure_ascii=False)}")
+    finally:
+        with _WATCHDOG_RESTART_MU:
+            _WATCHDOG_RESTARTING.discard(name)
+
+
 def _watchdog_loop() -> None:
     while not _WATCHDOG_STOP.is_set():
         try:
             cfg = _load_config()
             tunnels = list(cfg.get("tunnels") or [])
-            desired_names = set(_global_active_tunnel_names(cfg))
+            status_map: dict[str, dict[str, Any]] = {}
             for tunnel in tunnels:
                 name = str(tunnel.get("name") or "")
                 if not name:
                     continue
                 status = status_tunnel(cfg, tunnel)
-                quarantine_sites = _active_quarantine_sites(name)
-                desired_up = name in desired_names
-                signature = _watch_state_signature(status, quarantine_sites, desired_up)
+                status["checked_at"] = float(time.time())
+                status_map[name] = dict(status)
+                signature = _watch_state_signature(status)
                 if _WATCHDOG_LAST_STATE.get(name) != signature:
                     _WATCHDOG_LAST_STATE[name] = signature
                     _log_tunnel(
                         f"watch_status name={name} alive={status['alive']} port_open={status['port_open']} "
-                        f"control_ok={status['control_ok']} local_port={status['local_port']} "
-                        f"desired={'up' if desired_up else 'down'} "
-                        f"quarantine={','.join(quarantine_sites) if quarantine_sites else '-'}"
+                        f"control_ok={status['control_ok']} local_port={status['local_port']}"
                     )
-                if not desired_up:
-                    if (
-                        bool(status.get("alive"))
-                        or bool(status.get("port_open"))
-                        or bool(status.get("control_ok"))
-                        or _ctl_path(name).exists()
-                        or _meta_path(name).exists()
-                    ):
-                        stop_tunnel(cfg, tunnel)
-                    continue
                 if status["alive"]:
                     continue
+                with _WATCHDOG_RESTART_MU:
+                    if name in _WATCHDOG_RESTARTING:
+                        continue
+                    _WATCHDOG_RESTARTING.add(name)
                 _log_tunnel(f"watch_restart name={name} local_port={status['local_port']}")
-                result = start_tunnel(cfg, tunnel)
-                detail = _short_detail(result.get("transcript") or result.get("stderr") or "")
-                _log_tunnel(f"watch_restart_result name={name} status={result.get('status')} detail={json.dumps(detail, ensure_ascii=False)}")
+                threading.Thread(
+                    target=_watchdog_restart_tunnel,
+                    args=(cfg, dict(tunnel)),
+                    name=f"core_crawler_tunnel_restart_{name}",
+                    daemon=True,
+                ).start()
+            _cache_set_obj(TUNNEL_STATUS_KEY, status_map)
         except Exception as exc:
             _log_tunnel(f"watch_error error={type(exc).__name__}: {exc}")
         _WATCHDOG_STOP.wait(WATCH_INTERVAL_SEC)

@@ -12,10 +12,8 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from engine.core_crawler.browser.broker_server import run_browser_broker
-from engine.core_crawler.browser.session_config import SITE_CONFIGS
+from engine.core_crawler.browser.broker_server import current_site_route_plan, run_browser_broker
 from engine.core_crawler.fetch_cb import pending_items_exist
-from engine.core_crawler.tunnels_11880 import active_tunnel_names, status_tunnel_by_name
 
 TICK_SEC = 1.0
 
@@ -26,35 +24,12 @@ class WorkerProcess:
     started_at: float
 
 
-def _configured_tunnel_names() -> list[str]:
-    tunnel_names: list[str] = []
-    seen: set[str] = set()
-    for site_name in ("11880", "gs"):
-        cfg = SITE_CONFIGS.get(site_name)
-        if cfg is None:
-            continue
-        for name in cfg.egress_slots:
-            tunnel_name = str(name or "").strip()
-            if not tunnel_name or tunnel_name == "direct" or tunnel_name in seen:
-                continue
-            seen.add(tunnel_name)
-            tunnel_names.append(tunnel_name)
-    return tunnel_names
-
-
 def _target_parallelism() -> int:
-    tunnel_names = _configured_tunnel_names()
-    if not tunnel_names:
-        return 0
-    live_active_tunnels = 0
-    for tunnel_name in active_tunnel_names(tunnel_names):
-        try:
-            status = status_tunnel_by_name(tunnel_name)
-        except Exception:
-            continue
-        if bool(status.get("alive")):
-            live_active_tunnels += 1
-    return max(0, int(live_active_tunnels * 2))
+    route_plan = current_site_route_plan()
+    active_routes = 0
+    for site_name in ("11880", "gs"):
+        active_routes += len(route_plan.get(site_name) or [])
+    return max(0, int(active_routes * 2))
 
 
 def _collect_finished_workers(active: list[WorkerProcess]) -> list[WorkerProcess]:

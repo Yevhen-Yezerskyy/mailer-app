@@ -29,13 +29,11 @@ from engine.core_crawler.browser.session_config import (
     BrowserProfile,
     SiteSessionConfig,
 )
-from engine.core_crawler.tunnels_11880 import active_tunnel_names, list_tunnels, status_tunnel_by_name, stop_tunnel_by_name
+from engine.core_crawler.tunnels_11880 import list_tunnels, load_tunnel_statuses
 
 STATE_TTL_SEC = 7 * 24 * 60 * 60
 WAIT_TIMEOUT_SEC = 60.0
 RUNTIME_IDLE_REAP_SEC = 90.0
-SCHEDULE_ROTATE_MIN_SEC = 600.0
-SCHEDULE_ROTATE_MAX_SEC = 1200.0
 SESSION_GATE_TTL_SEC = 5.0
 SESSION_GATE_WAIT_SEC = 5.0
 SESSION_LEASE_TTL_SEC = 5 * 60.0
@@ -311,32 +309,18 @@ class BrowserSessionRouter:
         return f"{site_name}:{tunnel_name}"
 
     @staticmethod
-    def _schedule_key(site: str) -> str:
-        site_name = str(site or "").strip()
-        if not site_name:
-            raise ValueError("schedule key requires site")
-        return f"core_crawler:slot_schedule:{site_name}"
-
-    @staticmethod
-    def _rr_key(site: str) -> str:
-        site_name = str(site or "").strip()
-        if not site_name:
-            raise ValueError("rr key requires site")
-        return f"core_crawler:slot_rr:{site_name}"
-
-    @staticmethod
     def _quarantine_key(site: str) -> str:
         site_name = str(site or "").strip()
         if not site_name:
             raise ValueError("quarantine key requires site")
-        return "core_crawler:slot_quarantine:global"
+        return f"core_crawler:slot_quarantine:{site_name}"
 
     @staticmethod
     def _quarantine_backoff_key(site: str) -> str:
         site_name = str(site or "").strip()
         if not site_name:
             raise ValueError("quarantine backoff key requires site")
-        return "core_crawler:slot_quarantine_backoff:global"
+        return f"core_crawler:slot_quarantine_backoff:{site_name}"
 
     @staticmethod
     def _session_key(site: str, slot_name: str, slot_idx: int) -> str:
@@ -393,7 +377,7 @@ class BrowserSessionRouter:
         except Exception:
             pass
 
-    def _load_slots(self, cfg: SiteSessionConfig) -> list[dict[str, Any]]:
+    def _load_slots(self, cfg: SiteSessionConfig, allowed_slot_names: list[str] | None = None) -> list[dict[str, Any]]:
         by_name = {
             str(row.get("name") or ""): row
             for row in list_tunnels()
@@ -402,8 +386,13 @@ class BrowserSessionRouter:
         resolved: list[dict[str, Any]] = []
         slot_errors: list[str] = []
         quarantined = self._load_quarantine(cfg)
-        active_tunnels = set(active_tunnel_names(cfg.egress_slots))
-        for name in cfg.egress_slots:
+        tunnel_statuses = load_tunnel_statuses(cfg.egress_slots)
+        if allowed_slot_names is None:
+            slot_names = list(cfg.egress_slots)
+        else:
+            allowed = {str(name or "").strip() for name in allowed_slot_names if str(name or "").strip()}
+            slot_names = [name for name in cfg.egress_slots if name in allowed]
+        for name in slot_names:
             if name in quarantined:
                 slot_errors.append(f"{name}: quarantined")
                 continue
@@ -421,10 +410,7 @@ class BrowserSessionRouter:
             if not row:
                 slot_errors.append(f"{name}: not configured")
                 continue
-            if name not in active_tunnels:
-                slot_errors.append(f"{name}: inactive")
-                continue
-            status = status_tunnel_by_name(name)
+            status = dict(tunnel_statuses.get(name) or {})
             if not bool(status.get("alive")):
                 slot_errors.append(
                     f"{name}: down port_open={bool(status.get('port_open'))} "
@@ -447,28 +433,6 @@ class BrowserSessionRouter:
             detail = "; ".join(slot_errors) if slot_errors else "no live tunnels"
             raise RuntimeError(f"NO LIVE TUNNELS FOR {cfg.site}: {detail}")
         return resolved
-
-    def _scheduled_excluded_slot(self, cfg: SiteSessionConfig, active_names: list[str]) -> str:
-        if self._load_quarantine(cfg):
-            return ""
-        eligible = [name for name in cfg.egress_slots if name in active_names]
-        if len(eligible) <= 1:
-            return ""
-        now = time.time()
-        state = self._cache_get_obj(self._schedule_key(cfg.site)) or {}
-        name = str(state.get("name") or "")
-        until = float(state.get("until") or 0.0)
-        is_recent = until > now and until <= (now + SCHEDULE_ROTATE_MAX_SEC + 5.0)
-        if name and name in eligible and is_recent:
-            return name
-        rr_state = self._cache_get_obj(self._rr_key(cfg.site)) or {"pos": 0}
-        rr_pos = int(rr_state.get("pos") or 0)
-        name = eligible[rr_pos % len(eligible)]
-        self._cache_set_obj(self._rr_key(cfg.site), {"pos": rr_pos + 1})
-        rotate_for = random.uniform(SCHEDULE_ROTATE_MIN_SEC, SCHEDULE_ROTATE_MAX_SEC)
-        state = {"name": name, "until": now + rotate_for}
-        self._cache_set_obj(self._schedule_key(cfg.site), state)
-        return name
 
     def _load_quarantine(self, cfg: SiteSessionConfig) -> dict[str, float]:
         raw = self._cache_get_obj(self._quarantine_key(cfg.site)) or {}
@@ -542,18 +506,12 @@ class BrowserSessionRouter:
         self._cache_set_obj(self._quarantine_key(cfg.site), state)
         backoff[str(slot_name)] = {"level": int(level), "until": float(until)}
         self._cache_set_obj(self._quarantine_backoff_key(cfg.site), backoff)
-        for site_cfg in SITE_CONFIGS.values():
-            self._drop_egress_session_state(site_cfg, slot_name)
-        if slot_name != "direct":
-            try:
-                stop_tunnel_by_name(slot_name)
-            except Exception:
-                pass
+        self._drop_egress_session_state(cfg, slot_name)
         log(
             ROUTER_STATE_LOG_FILE,
             folder=LOG_FOLDER,
             message=(
-                f"slot_quarantine site={cfg.site} tunnel={slot_name} scope=global reason={reason} "
+                f"slot_quarantine site={cfg.site} tunnel={slot_name} reason={reason} "
                 f"level={int(level) + 1} duration_sec={int(duration_sec)} until_ts={int(until)}"
             ),
         )
@@ -962,8 +920,9 @@ class BrowserSessionRouter:
         excluded: set[tuple[str, int]],
         preferred_slot_name: str = "",
         preferred_slot_idx: int = -1,
+        allowed_slot_names: list[str] | None = None,
     ) -> list[tuple[dict[str, Any], int]]:
-        active = [row for row in self._load_slots(cfg) if not self._slot_is_quarantined(cfg, row["name"])]
+        active = [row for row in self._load_slots(cfg, allowed_slot_names) if not self._slot_is_quarantined(cfg, row["name"])]
         if not active:
             raise RuntimeError(f"NO ACTIVE SLOTS FOR {cfg.site}")
 
@@ -1981,6 +1940,7 @@ class BrowserSessionRouter:
         extra_headers: dict[str, str] | None = None,
         preferred_slot_name: str = "",
         preferred_slot_idx: int = -1,
+        allowed_slot_names: list[str] | None = None,
     ) -> FetchResult:
         cfg = SITE_CONFIGS[site]
         effective_mode = str(mode or "")
@@ -1994,7 +1954,13 @@ class BrowserSessionRouter:
 
         while time.time() < deadline:
             try:
-                candidates = self._session_candidates(cfg, tried, preferred_slot_name, int(preferred_slot_idx))
+                candidates = self._session_candidates(
+                    cfg,
+                    tried,
+                    preferred_slot_name,
+                    int(preferred_slot_idx),
+                    allowed_slot_names,
+                )
             except RuntimeError as exc:
                 last_error = exc
                 time.sleep(0.2)

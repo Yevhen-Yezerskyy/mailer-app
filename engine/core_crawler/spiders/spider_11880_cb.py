@@ -68,7 +68,8 @@ class OneOneEightZeroCBSpider:
             self._detail_referers[url] = page_url
 
     def _run_fetch(self) -> None:
-        self._start_url = f"https://www.11880.com/suche/{self.branch_slug}/{self.plz}"
+        # self._start_url = f"https://www.11880.com/suche/{self.branch_slug}/{self.plz}"
+        self._start_url = f"https://serenity-mail.de/suche/{self.branch_slug}/{self.plz}"
         current_search_url = self._start_url
         current_referer = ""
         selected_urls: List[str] = []
@@ -246,7 +247,14 @@ class OneOneEightZeroCBSpider:
             print(f"CORE_11880_CB cb_id={self.cb_id} result=skip reason={r}")
             return
 
-        if not self._reason_marks_collected(r):
+        # if not self._reason_marks_collected(r):
+        #     self._db_action = "leave_pending"
+        #     print(
+        #         f"CORE_11880_CB cb_id={self.cb_id} result=pending reason={r} "
+        #         f"indexed={len(self.index_cards)} selected={len(self.selected_urls)} parsed={self._detail_parsed}"
+        #     )
+        #     return
+        if not self._start_url:
             self._db_action = "leave_pending"
             print(
                 f"CORE_11880_CB cb_id={self.cb_id} result=pending reason={r} "
