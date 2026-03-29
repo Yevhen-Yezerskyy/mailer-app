@@ -29,7 +29,7 @@ from engine.core_crawler.browser.session_config import (
     BrowserProfile,
     SiteSessionConfig,
 )
-from engine.core_crawler.tunnels_11880 import ensure_tunnel_up, list_tunnels, status_tunnel_by_name, stop_tunnel_by_name
+from engine.core_crawler.tunnels_11880 import active_tunnel_names, list_tunnels, status_tunnel_by_name, stop_tunnel_by_name
 
 STATE_TTL_SEC = 7 * 24 * 60 * 60
 WAIT_TIMEOUT_SEC = 60.0
@@ -402,17 +402,10 @@ class BrowserSessionRouter:
         resolved: list[dict[str, Any]] = []
         slot_errors: list[str] = []
         quarantined = self._load_quarantine(cfg)
-        active_names = [
-            name
-            for name in cfg.egress_slots
-            if name == "direct" or (name in by_name and name not in quarantined)
-        ]
-        excluded_name = self._scheduled_excluded_slot(cfg, active_names)
+        active_tunnels = set(active_tunnel_names(cfg.egress_slots))
         for name in cfg.egress_slots:
             if name in quarantined:
                 slot_errors.append(f"{name}: quarantined")
-                continue
-            if name == excluded_name:
                 continue
             if name == "direct":
                 resolved.append(
@@ -428,15 +421,13 @@ class BrowserSessionRouter:
             if not row:
                 slot_errors.append(f"{name}: not configured")
                 continue
-            try:
-                ensure_tunnel_up(name)
-            except Exception as exc:
-                slot_errors.append(f"{name}: ensure failed: {type(exc).__name__}: {exc}")
+            if name not in active_tunnels:
+                slot_errors.append(f"{name}: inactive")
                 continue
             status = status_tunnel_by_name(name)
             if not bool(status.get("alive")):
                 slot_errors.append(
-                    f"{name}: down after ensure port_open={bool(status.get('port_open'))} "
+                    f"{name}: down port_open={bool(status.get('port_open'))} "
                     f"control_ok={bool(status.get('control_ok'))}"
                 )
                 continue

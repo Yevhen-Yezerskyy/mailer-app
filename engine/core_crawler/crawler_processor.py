@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import multiprocessing
-import pickle
 import signal
 import subprocess
 import sys
@@ -13,13 +12,12 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from engine.common.cache.client import CLIENT
 from engine.core_crawler.browser.broker_server import run_browser_broker
 from engine.core_crawler.browser.session_config import SITE_CONFIGS
 from engine.core_crawler.fetch_cb import pending_items_exist
+from engine.core_crawler.tunnels_11880 import active_tunnel_names, status_tunnel_by_name
 
 TICK_SEC = 1.0
-QUARANTINE_KEY = "core_crawler:slot_quarantine:global"
 
 
 @dataclass
@@ -28,50 +26,35 @@ class WorkerProcess:
     started_at: float
 
 
-def _configured_route_names() -> list[str]:
-    route_names: list[str] = []
+def _configured_tunnel_names() -> list[str]:
+    tunnel_names: list[str] = []
     seen: set[str] = set()
     for site_name in ("11880", "gs"):
         cfg = SITE_CONFIGS.get(site_name)
         if cfg is None:
             continue
         for name in cfg.egress_slots:
-            route_name = str(name or "").strip()
-            if not route_name or route_name in seen:
+            tunnel_name = str(name or "").strip()
+            if not tunnel_name or tunnel_name == "direct" or tunnel_name in seen:
                 continue
-            seen.add(route_name)
-            route_names.append(route_name)
-    return route_names
-
-
-def _load_global_quarantine() -> dict[str, float]:
-    payload = CLIENT.get(QUARANTINE_KEY, ttl_sec=24 * 60 * 60)
-    if not payload:
-        return {}
-    raw = pickle.loads(payload)
-    if not isinstance(raw, dict):
-        return {}
-    now = time.time()
-    active: dict[str, float] = {}
-    for name, until in raw.items():
-        until_ts = float(until or 0.0)
-        if until_ts > now:
-            active[str(name)] = until_ts
-    return active
+            seen.add(tunnel_name)
+            tunnel_names.append(tunnel_name)
+    return tunnel_names
 
 
 def _target_parallelism() -> int:
-    route_names = _configured_route_names()
-    if not route_names:
+    tunnel_names = _configured_tunnel_names()
+    if not tunnel_names:
         return 0
-    quarantine = _load_global_quarantine()
-    if quarantine:
-        available_routes = [name for name in route_names if name not in quarantine]
-    else:
-        available_routes = list(route_names)
-        if len(available_routes) > 1:
-            available_routes = available_routes[:-1]
-    return max(0, int(len(available_routes) * 2))
+    live_active_tunnels = 0
+    for tunnel_name in active_tunnel_names(tunnel_names):
+        try:
+            status = status_tunnel_by_name(tunnel_name)
+        except Exception:
+            continue
+        if bool(status.get("alive")):
+            live_active_tunnels += 1
+    return max(0, int(live_active_tunnels * 2))
 
 
 def _collect_finished_workers(active: list[WorkerProcess]) -> list[WorkerProcess]:
