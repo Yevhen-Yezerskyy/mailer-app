@@ -158,3 +158,7 @@ def main() -> None:
         if broker.is_alive():
             broker.kill()
             broker.join(timeout=5.0)
+
+
+if __name__ == "__main__":
+    main()
