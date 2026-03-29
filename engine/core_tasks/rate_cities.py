@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from engine.common.cache.client import CLIENT
 from engine.common.db import get_connection
 from engine.common.gpt import GPTClient
-from engine.common.logs import sys_log
+from engine.common.logs import log
 from engine.common.prompts.process import get_prompt, translate_text
 from engine.common.utils import h64_text, parse_json_response
 
@@ -267,7 +267,7 @@ def _save_rated_items(task_id: int, items: List[Dict[str, int]], hash_task: int)
 
 
 def _log_event(payload: Dict[str, Any]) -> None:
-    sys_log(LOG_FILE, folder=LOG_FOLDER, message=json.dumps(payload, ensure_ascii=False, default=str))
+    log(LOG_FILE, folder=LOG_FOLDER, message=json.dumps(payload, ensure_ascii=False, default=str))
 
 
 def run_once() -> Dict[str, Any]:

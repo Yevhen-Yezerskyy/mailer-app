@@ -18,6 +18,7 @@ RUN apt-get update \
       procps \
       iproute2 \
       openssh-client \
+      sshpass \
       tzdata \
       postgresql-client \
       libnss3 \

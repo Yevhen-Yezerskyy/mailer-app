@@ -67,6 +67,11 @@ def _submit_fetch(
     cb_id: int,
     referer: str = "",
     mode: str = "",
+    method: str = "GET",
+    form: dict[str, Any] | None = None,
+    extra_headers: dict[str, str] | None = None,
+    preferred_slot_name: str = "",
+    preferred_slot_idx: int = -1,
 ) -> str:
     response = _rpc(
         {
@@ -78,6 +83,11 @@ def _submit_fetch(
             "cb_id": int(cb_id),
             "referer": str(referer or ""),
             "mode": str(mode or ""),
+            "method": str(method or "GET"),
+            "form": dict(form or {}) or None,
+            "extra_headers": dict(extra_headers or {}) or None,
+            "preferred_slot_name": str(preferred_slot_name or ""),
+            "preferred_slot_idx": int(preferred_slot_idx),
         },
         timeout_sec=5.0,
     )
@@ -91,16 +101,6 @@ def _submit_fetch(
     return request_id
 
 
-def _poll_fetch_result(request_id: str) -> dict[str, Any]:
-    return _rpc(
-        {
-            "action": "result",
-            "request_id": str(request_id or ""),
-        },
-        timeout_sec=5.0,
-    )
-
-
 def fetch_html_via_broker(
     site: str,
     url: str,
@@ -109,6 +109,11 @@ def fetch_html_via_broker(
     cb_id: int,
     referer: str = "",
     mode: str = "",
+    method: str = "GET",
+    form: dict[str, Any] | None = None,
+    extra_headers: dict[str, str] | None = None,
+    preferred_slot_name: str = "",
+    preferred_slot_idx: int = -1,
 ) -> FetchResult:
     request_id = _submit_fetch(
         site=str(site),
@@ -118,11 +123,22 @@ def fetch_html_via_broker(
         cb_id=int(cb_id),
         referer=str(referer or ""),
         mode=str(mode or ""),
+        method=str(method or "GET"),
+        form=dict(form or {}) or None,
+        extra_headers=dict(extra_headers or {}) or None,
+        preferred_slot_name=str(preferred_slot_name or ""),
+        preferred_slot_idx=int(preferred_slot_idx),
     )
     deadline = time.time() + float(BROKER_TIMEOUT_SEC)
     response: dict[str, Any] | None = None
     while time.time() < deadline:
-        response = _poll_fetch_result(request_id)
+        response = _rpc(
+            {
+                "action": "result",
+                "request_id": str(request_id or ""),
+            },
+            timeout_sec=5.0,
+        )
         if response.get("ok") is True and response.get("pending") is True:
             time.sleep(BROKER_POLL_INTERVAL_SEC)
             continue
@@ -145,5 +161,6 @@ def fetch_html_via_broker(
         ms=int(result.get("ms") or 0),
         site=str(result.get("site") or ""),
         session_id=str(result.get("session_id") or ""),
+        session_slot=int(result.get("session_slot") or 0),
         tunnel=dict(result.get("tunnel") or {}),
     )

@@ -5,22 +5,37 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+import fcntl
 import json
 import os
-import pty
-import fcntl
+import pickle
+import re
+import signal
 import shlex
 import socket
 import subprocess
+import threading
 import time
 from pathlib import Path
 from typing import Any
+
+from engine.common.cache.client import CLIENT
+from engine.common.logs import log
 
 
 CONFIG_ENV = "CORE_CRAWLER_TUNNELS_11880_JSON"
 RUN_DIR = Path(__file__).resolve().parents[2] / "tmp" / "11880_tunnels"
 START_TIMEOUT_SEC = 30.0
 STOP_TIMEOUT_SEC = 10.0
+WATCH_INTERVAL_SEC = 5.0
+LOG_FOLDER = "crawler"
+TUNNELS_LOG_FILE = "tunnels.log"
+STATE_TTL_SEC = 24 * 60 * 60
+QUARANTINE_SITES = ("11880", "gs")
+_WATCHDOG_THREAD: threading.Thread | None = None
+_WATCHDOG_STOP = threading.Event()
+_WATCHDOG_LAST_STATE: dict[str, tuple[bool, bool, bool, str]] = {}
 
 
 def _load_config() -> dict[str, Any]:
@@ -77,8 +92,92 @@ def _ctl_path(name: str) -> Path:
     return RUN_DIR / f"{name}.ctl"
 
 
+def _lock_path(name: str) -> Path:
+    _ensure_run_dir()
+    path = RUN_DIR / f"{name}.lock"
+    return path
+
+
+@contextmanager
+def _tunnel_lock(name: str):
+    lock_path = _lock_path(name)
+    handle = lock_path.open("a+", encoding="utf-8")
+    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    try:
+        yield
+    finally:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        handle.close()
+
+
 def _write_meta(name: str, payload: dict[str, Any]) -> None:
     _meta_path(name).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _tail_log(path: Path, max_chars: int = 2000) -> str:
+    if not path.exists():
+        return ""
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")[-max_chars:]
+    except Exception:
+        return ""
+
+
+def _log_tunnel(message: str) -> None:
+    log(TUNNELS_LOG_FILE, folder=LOG_FOLDER, message=message)
+
+
+def _short_detail(value: Any, max_len: int = 240) -> str:
+    text = str(value or "").strip()
+    text = re.sub(r"\s+", " ", text)
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 3] + "..."
+
+
+def _watch_state_signature(status: dict[str, Any], quarantine_sites: list[str]) -> tuple[bool, bool, bool, str]:
+    alive = bool(status.get("alive"))
+    port_open = bool(status.get("port_open"))
+    control_ok = bool(status.get("control_ok"))
+    sites = ",".join(sorted(str(site) for site in quarantine_sites))
+    return (alive, port_open, control_ok, sites)
+
+
+def _load_quarantine_state(site: str) -> dict[str, float]:
+    key = f"core_crawler:slot_quarantine:{str(site or '').strip()}"
+    payload = CLIENT.get(key, ttl_sec=STATE_TTL_SEC)
+    if not payload:
+        return {}
+    try:
+        raw = pickle.loads(payload)
+    except Exception as exc:
+        raise RuntimeError(f"BAD QUARANTINE CACHE {key}: {type(exc).__name__}: {exc}") from exc
+    if not isinstance(raw, dict):
+        return {}
+    now = time.time()
+    out: dict[str, float] = {}
+    for name, until in raw.items():
+        try:
+            until_f = float(until or 0.0)
+        except Exception as exc:
+            raise RuntimeError(
+                f"BAD QUARANTINE VALUE {key} {name}: {type(exc).__name__}: {exc}"
+            ) from exc
+        if until_f > now:
+            out[str(name)] = until_f
+    return out
+
+
+def _active_quarantine_sites(name: str) -> list[str]:
+    tunnel_name = str(name or "").strip()
+    active_sites: list[str] = []
+    if not tunnel_name:
+        return active_sites
+    for site in QUARANTINE_SITES:
+        state = _load_quarantine_state(site)
+        if tunnel_name in state:
+            active_sites.append(str(site))
+    return active_sites
 
 
 def _port_open(port: int) -> bool:
@@ -102,8 +201,87 @@ def _cleanup_state(name: str) -> None:
             pass
 
 
-def _ssh_args(user: str, password: str, tunnel: dict[str, Any]) -> list[str]:
-    del password
+def _listener_pids(local_port: int) -> list[int]:
+    proc = subprocess.run(
+        ["ss", "-ltnp"],
+        capture_output=True,
+        text=True,
+        timeout=5,
+        check=False,
+    )
+    out: list[int] = []
+    pattern = re.compile(r"pid=(\d+)")
+    for line in (proc.stdout or "").splitlines():
+        if f":{int(local_port)}" not in line:
+            continue
+        for match in pattern.findall(line):
+            try:
+                out.append(int(match))
+            except Exception:
+                continue
+    return sorted(set(out))
+
+
+def _terminate_pids(pids: list[int]) -> None:
+    live = [int(pid) for pid in pids if int(pid) > 1]
+    if not live:
+        return
+    for pid in live:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            continue
+        except Exception:
+            continue
+    deadline = time.time() + 3.0
+    while time.time() < deadline:
+        still_live: list[int] = []
+        for pid in live:
+            try:
+                os.kill(pid, 0)
+                still_live.append(pid)
+            except ProcessLookupError:
+                continue
+            except Exception:
+                continue
+        if not still_live:
+            return
+        time.sleep(0.1)
+    for pid in still_live:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except Exception:
+            continue
+
+
+def _wait_port_closed(local_port: int, timeout_sec: float) -> bool:
+    deadline = time.time() + max(0.5, float(timeout_sec))
+    while time.time() < deadline:
+        if not _port_open(local_port):
+            return True
+        time.sleep(0.1)
+    return not _port_open(local_port)
+
+
+def _cleanup_stale_state(cfg: dict[str, Any], tunnel: dict[str, Any], force: bool = False) -> None:
+    name = str(tunnel["name"])
+    local_port = int(tunnel["local_port"])
+    status = status_tunnel(cfg, tunnel)
+    if bool(status.get("alive")) and not force:
+        return
+    if bool(status.get("port_open")) and not bool(status.get("control_ok")):
+        pids = _listener_pids(local_port)
+        if pids:
+            _log_tunnel(
+                f"stale_kill name={name} local_port={local_port} "
+                f"reason=port_open_control_missing pids={','.join(str(pid) for pid in pids)}"
+            )
+            _terminate_pids(pids)
+            _wait_port_closed(local_port, 5.0)
+    _cleanup_state(name)
+
+
+def _ssh_args(user: str, tunnel: dict[str, Any]) -> list[str]:
     host = str(tunnel["host"])
     ssh_port = int(tunnel.get("ssh_port") or 22)
     local_port = int(tunnel["local_port"])
@@ -111,7 +289,6 @@ def _ssh_args(user: str, password: str, tunnel: dict[str, Any]) -> list[str]:
     ctl_path = str(_ctl_path(str(tunnel["name"])))
     return [
         "ssh",
-        "-f",
         "-M",
         "-S",
         ctl_path,
@@ -144,129 +321,174 @@ def _ssh_args(user: str, password: str, tunnel: dict[str, Any]) -> list[str]:
     ]
 
 
-def _spawn_ssh(user: str, password: str, tunnel: dict[str, Any]) -> tuple[int, int]:
-    _ensure_run_dir()
-    pid, master_fd = pty.fork()
-    if pid == 0:
-        os.execvp("ssh", _ssh_args(user, password, tunnel))
-    flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
-    fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-    return pid, master_fd
+def _spawn_ssh(user: str, password: str, tunnel: dict[str, Any]) -> subprocess.Popen[bytes]:
+    log_path = _log_path(str(tunnel["name"]))
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text("", encoding="utf-8")
+    env = dict(os.environ)
+    env["SSHPASS"] = str(password)
+    return subprocess.Popen(
+        ["sshpass", "-e", *_ssh_args(user, tunnel)],
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        env=env,
+        start_new_session=True,
+        close_fds=True,
+    )
 
 
-def _read_ready(pid: int, master_fd: int, password: str, local_port: int) -> tuple[bool, str]:
+def _wait_tunnel_ready(cfg: dict[str, Any], tunnel: dict[str, Any], proc: subprocess.Popen[bytes]) -> tuple[bool, str]:
     deadline = time.time() + START_TIMEOUT_SEC
-    sent_password = False
-    chunks: list[str] = []
+    log_path = _log_path(str(tunnel["name"]))
 
     while time.time() < deadline:
-        if _port_open(local_port):
-            return True, "".join(chunks)[-2000:]
+        status = status_tunnel(cfg, tunnel)
+        if status["port_open"] and status["control_ok"]:
+            return True, _tail_log(log_path)
+        rc = proc.poll()
+        transcript = _tail_log(log_path)
+        lower = transcript.lower()
+        if rc is not None and rc != 0:
+            return False, transcript or f"ssh exited rc={rc}"
+        if "permission denied" in lower:
+            return False, transcript
+        if "could not resolve hostname" in lower:
+            return False, transcript
+        if "connection refused" in lower:
+            return False, transcript
+        time.sleep(0.2)
+    return False, _tail_log(log_path) or "timeout waiting for port_open+control_ok"
 
-        try:
-            data = os.read(master_fd, 4096)
-        except BlockingIOError:
-            data = b""
-        except OSError:
-            data = b""
 
-        if data:
-            text = data.decode("utf-8", errors="replace")
-            chunks.append(text)
-            lower = text.lower()
-            if "password:" in lower and not sent_password:
-                os.write(master_fd, (password + "\n").encode("utf-8"))
-                sent_password = True
-            if "permission denied" in lower:
-                break
-            if "connection refused" in lower or "could not resolve hostname" in lower:
-                break
-            if "backgrounding" in lower:
-                time.sleep(0.5)
-                if _port_open(local_port):
-                    return True, "".join(chunks)[-2000:]
-        else:
-            time.sleep(0.2)
-
-    return _port_open(local_port), "".join(chunks)[-2000:]
+def _reap_bootstrap_ssh(proc: subprocess.Popen[bytes]) -> None:
+    try:
+        proc.wait(timeout=2.0)
+    except subprocess.TimeoutExpired:
+        return
+    except Exception:
+        return
 
 
 def start_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]:
     name = str(tunnel["name"])
-    local_port = int(tunnel["local_port"])
-    user = _tunnel_user(cfg, tunnel)
-    password = _tunnel_password(cfg, tunnel)
-    if _port_open(local_port):
+    with _tunnel_lock(name):
+        local_port = int(tunnel["local_port"])
+        user = _tunnel_user(cfg, tunnel)
+        password = _tunnel_password(cfg, tunnel)
+        status = status_tunnel(cfg, tunnel)
+        if bool(status.get("alive")):
+            return {
+                "name": name,
+                "status": "already_up",
+                "local_port": local_port,
+                "host": tunnel["host"],
+            }
+
+        _cleanup_stale_state(cfg, tunnel, force=True)
+        if _port_open(local_port):
+            detail = f"port_busy_after_cleanup local_port={local_port}"
+            _log_tunnel(f"start_fail name={name} host={tunnel['host']} local_port={local_port} detail={json.dumps(_short_detail(detail), ensure_ascii=False)}")
+            return {
+                "name": name,
+                "status": "failed",
+                "local_port": local_port,
+                "host": tunnel["host"],
+                "transcript": detail,
+            }
+        _log_tunnel(
+            f"start_begin name={name} host={tunnel['host']} ssh_port={int(tunnel.get('ssh_port') or 22)} "
+            f"local_port={local_port} user={user}"
+        )
+        proc = _spawn_ssh(user, password, tunnel)
+        ok, transcript = _wait_tunnel_ready(cfg, tunnel, proc)
+        _reap_bootstrap_ssh(proc)
+
+        if not ok:
+            try:
+                proc.terminate()
+            except Exception:
+                pass
+            _cleanup_stale_state(cfg, tunnel, force=True)
+            _log_tunnel(
+                f"start_fail name={name} host={tunnel['host']} local_port={local_port} "
+                f"detail={json.dumps(_short_detail(transcript), ensure_ascii=False)}"
+            )
+            return {
+                "name": name,
+                "status": "failed",
+                "pid": int(proc.pid or 0),
+                "local_port": local_port,
+                "host": tunnel["host"],
+                "transcript": transcript,
+            }
+
+        meta = {
+            "name": name,
+            "host": tunnel["host"],
+            "ssh_port": int(tunnel.get("ssh_port") or 22),
+            "local_port": local_port,
+            "bootstrap_pid": int(proc.pid or 0),
+            "started_at": int(time.time()),
+            "cmd": shlex.join(["sshpass", "-e", *_ssh_args(user, tunnel)]),
+        }
+        _write_meta(name, meta)
+        _log_tunnel(f"start_ok name={name} host={tunnel['host']} local_port={local_port}")
         return {
             "name": name,
-            "status": "already_up",
+            "status": "started",
             "local_port": local_port,
             "host": tunnel["host"],
         }
-
-    _cleanup_state(name)
-    pid, master_fd = _spawn_ssh(user, password, tunnel)
-    ok, transcript = _read_ready(pid, master_fd, password, local_port)
-    try:
-        os.close(master_fd)
-    except Exception:
-        pass
-
-    if not ok:
-        return {
-            "name": name,
-            "status": "failed",
-            "pid": pid,
-            "local_port": local_port,
-            "host": tunnel["host"],
-            "transcript": transcript,
-        }
-
-    meta = {
-        "name": name,
-        "host": tunnel["host"],
-        "ssh_port": int(tunnel.get("ssh_port") or 22),
-        "local_port": local_port,
-        "bootstrap_pid": pid,
-        "started_at": int(time.time()),
-        "cmd": shlex.join(_ssh_args(user, password, tunnel)),
-    }
-    _write_meta(name, meta)
-    return {
-        "name": name,
-        "status": "started",
-        "local_port": local_port,
-        "host": tunnel["host"],
-    }
 
 
 def stop_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]:
     name = str(tunnel["name"])
-    ctl_path = _ctl_path(name)
-    if not ctl_path.exists():
+    with _tunnel_lock(name):
+        local_port = int(tunnel["local_port"])
+        ctl_path = _ctl_path(name)
+        if not ctl_path.exists():
+            pids = _listener_pids(local_port)
+            if pids:
+                _terminate_pids(pids)
+                _wait_port_closed(local_port, 5.0)
+                _cleanup_state(name)
+                _log_tunnel(
+                    f"stop_done name={name} host={tunnel['host']} local_port={local_port} "
+                    f"status=stopped_stale"
+                )
+                return {"name": name, "status": "stopped_stale"}
+            _cleanup_state(name)
+            _log_tunnel(f"stop_skip name={name} status=not_running")
+            return {"name": name, "status": "not_running"}
+        user = _tunnel_user(cfg, tunnel)
+        host = str(tunnel["host"])
+        ssh_port = int(tunnel.get("ssh_port") or 22)
+        cmd = [
+            "ssh",
+            "-S",
+            str(ctl_path),
+            "-O",
+            "exit",
+            "-p",
+            str(ssh_port),
+            f"{user}@{host}",
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=STOP_TIMEOUT_SEC)
+        if proc.returncode != 0 and _port_open(local_port):
+            _terminate_pids(_listener_pids(local_port))
+            _wait_port_closed(local_port, 5.0)
         _cleanup_state(name)
-        return {"name": name, "status": "not_running"}
-    user = _tunnel_user(cfg, tunnel)
-    host = str(tunnel["host"])
-    ssh_port = int(tunnel.get("ssh_port") or 22)
-    cmd = [
-        "ssh",
-        "-S",
-        str(ctl_path),
-        "-O",
-        "exit",
-        "-p",
-        str(ssh_port),
-        f"{user}@{host}",
-    ]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=STOP_TIMEOUT_SEC)
-    _cleanup_state(name)
-    return {
-        "name": name,
-        "status": "stopped" if proc.returncode == 0 else "stop_failed",
-        "stdout": (proc.stdout or "").strip(),
-        "stderr": (proc.stderr or "").strip(),
-    }
+        _log_tunnel(
+            f"stop_done name={name} host={host} local_port={local_port} "
+            f"status={'stopped' if proc.returncode == 0 else 'stop_failed'}"
+        )
+        return {
+            "name": name,
+            "status": "stopped" if proc.returncode == 0 else "stop_failed",
+            "stdout": (proc.stdout or "").strip(),
+            "stderr": (proc.stderr or "").strip(),
+        }
 
 
 def _control_ok(cfg: dict[str, Any], tunnel: dict[str, Any]) -> bool:
@@ -299,13 +521,63 @@ def status_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]
         "name": name,
         "host": tunnel["host"],
         "local_port": int(tunnel["local_port"]),
-        "alive": bool(port_open or control_ok),
+        "alive": bool(port_open and control_ok),
         "port_open": port_open,
         "control_ok": control_ok,
         "ctl_path": str(_ctl_path(name)),
         "meta_path": str(_meta_path(name)),
         "log_path": str(_log_path(name)),
     }
+
+
+def _watchdog_loop() -> None:
+    while not _WATCHDOG_STOP.is_set():
+        try:
+            cfg = _load_config()
+            tunnels = list(cfg.get("tunnels") or [])
+            for tunnel in tunnels:
+                name = str(tunnel.get("name") or "")
+                if not name:
+                    continue
+                status = status_tunnel(cfg, tunnel)
+                quarantine_sites = _active_quarantine_sites(name)
+                signature = _watch_state_signature(status, quarantine_sites)
+                if _WATCHDOG_LAST_STATE.get(name) != signature:
+                    _WATCHDOG_LAST_STATE[name] = signature
+                    _log_tunnel(
+                        f"watch_status name={name} alive={status['alive']} port_open={status['port_open']} "
+                        f"control_ok={status['control_ok']} local_port={status['local_port']} "
+                        f"quarantine={','.join(quarantine_sites) if quarantine_sites else '-'}"
+                    )
+                if status["alive"]:
+                    continue
+                if quarantine_sites:
+                    continue
+                _log_tunnel(f"watch_restart name={name} local_port={status['local_port']}")
+                result = start_tunnel(cfg, tunnel)
+                detail = _short_detail(result.get("transcript") or result.get("stderr") or "")
+                _log_tunnel(f"watch_restart_result name={name} status={result.get('status')} detail={json.dumps(detail, ensure_ascii=False)}")
+        except Exception as exc:
+            _log_tunnel(f"watch_error error={type(exc).__name__}: {exc}")
+        _WATCHDOG_STOP.wait(WATCH_INTERVAL_SEC)
+
+
+def ensure_tunnel_watchdog() -> None:
+    global _WATCHDOG_THREAD
+    if _WATCHDOG_THREAD is not None and _WATCHDOG_THREAD.is_alive():
+        return
+    _WATCHDOG_STOP.clear()
+    _WATCHDOG_THREAD = threading.Thread(
+        target=_watchdog_loop,
+        name="core_crawler_tunnels_watchdog",
+        daemon=True,
+    )
+    _WATCHDOG_THREAD.start()
+    _log_tunnel("watch_start interval_sec=5")
+
+
+def stop_tunnel_watchdog() -> None:
+    _WATCHDOG_STOP.set()
 
 
 def ensure_tunnel_up(name: str) -> dict[str, Any]:

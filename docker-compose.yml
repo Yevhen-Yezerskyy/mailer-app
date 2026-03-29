@@ -9,6 +9,7 @@ services:
       dockerfile: config/docker/Dockerfile_mailer_python
     image: mailer-python:latest
     container_name: mailer-set-env
+    init: true
     working_dir: /app
     restart: unless-stopped
     stop_signal: SIGKILL
@@ -17,8 +18,7 @@ services:
       PYTHONPATH: /app
       SERENITY_KEYS_MASTER_KEY: ${SERENITY_KEYS_MASTER_KEY:?missing}
     volumes:
-      - ./logs:/host-logs
-      - serenity-logs:/serenity-logs
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - ./config/sh/init_set_env.sh:/usr/local/bin/init_set_env.sh:ro
       - ./config/sh/trim_host_logs.sh:/usr/local/bin/trim_host_logs.sh:ro
       - mailer-app-prod:/app
@@ -30,6 +30,7 @@ services:
   mailer-tools:
     image: mailer-python:latest
     container_name: mailer-tools
+    init: true
     working_dir: /app
     restart: unless-stopped
     stop_signal: SIGKILL
@@ -40,8 +41,7 @@ services:
       mailer-redis:
         condition: service_started
     volumes:
-      - ./logs:/host-logs
-      - serenity-logs:/serenity-logs
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - mailer-app-prod:/app
       - mailer-static:/app/web/staticfiles
       - mailer-media:/app/web/media
@@ -56,25 +56,25 @@ services:
   mailer-redis:
     image: redis:7-alpine
     container_name: mailer-redis
+    init: true
     restart: unless-stopped
     command: >
       /bin/sh -c "exec redis-server /etc/redis/redis.conf"
     volumes:
-      - ./logs:/host-logs
-      - serenity-logs:/serenity-logs
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - ./config/redis/redis-prod.conf:/etc/redis/redis.conf:ro
       - serenity-redis-run:/app/run/redis
 
   mailer-db:
     image: postgres:16
     container_name: mailer-db
+    init: true
     restart: unless-stopped
     depends_on:
       mailer-set-env:
         condition: service_started
     volumes:
-      - ./logs:/host-logs
-      - serenity-logs:/serenity-logs
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - mailer-db-data:/var/lib/postgresql/data
       - mailer-app-prod:/app:ro
       - serenity-secrets:/run/serenity-secrets:ro
@@ -82,18 +82,18 @@ services:
     command:
       - |
         set -e
-        mkdir -p /host-logs/postgres
-        touch /host-logs/postgres/postgresql.log
-        chown postgres:postgres /host-logs/postgres /host-logs/postgres/postgresql.log
-        chmod 777 /host-logs/postgres
-        chmod 640 /host-logs/postgres/postgresql.log
+        mkdir -p /home/eee/mailer-app/logs/postgres
+        touch /home/eee/mailer-app/logs/postgres/postgresql.log
+        chown postgres:postgres /home/eee/mailer-app/logs/postgres /home/eee/mailer-app/logs/postgres/postgresql.log
+        chmod 777 /home/eee/mailer-app/logs/postgres
+        chmod 640 /home/eee/mailer-app/logs/postgres/postgresql.log
         exec docker-entrypoint.sh postgres \
           -c shared_preload_libraries=pg_stat_statements \
           -c pg_stat_statements.track=all \
           -c pg_stat_statements.max=10000 \
           -c logging_collector=on \
           -c log_destination=stderr \
-          -c log_directory='/host-logs/postgres' \
+          -c log_directory='/home/eee/mailer-app/logs/postgres' \
           -c log_filename='postgresql.log' \
           -c log_truncate_on_rotation=off \
           -c log_rotation_age=0 \
@@ -107,6 +107,7 @@ services:
   mailer-web:
     image: mailer-python:latest
     container_name: mailer-web
+    init: true
     working_dir: /app/web
     restart: unless-stopped
     user: "1001:1001"
@@ -122,8 +123,7 @@ services:
       DJANGO_INSTANCE: "dev"
       PYTHONPATH: /app
     volumes:
-      - ./logs:/host-logs
-      - serenity-logs:/serenity-logs
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - ./:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
@@ -132,6 +132,7 @@ services:
   mailer-web-prod:
     image: mailer-python:latest
     container_name: mailer-web-prod
+    init: true
     working_dir: /app/web
     restart: unless-stopped
     depends_on:
@@ -146,8 +147,7 @@ services:
       DJANGO_INSTANCE: "prod"
       PYTHONPATH: /app
     volumes:
-      - ./logs:/host-logs
-      - serenity-logs:/serenity-logs
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - mailer-app-prod:/app
       - ./client-subsites:/app/client-subsites
       - mailer-static:/app/web/staticfiles
@@ -160,19 +160,20 @@ services:
       - -c
       - |
         set -e
-        mkdir -p /host-logs/django-prod
+        mkdir -p /home/eee/mailer-app/logs/django-prod
         exec gunicorn mailer_web.wsgi:application \
           --bind 0.0.0.0:8000 \
           --workers 2 \
           --timeout 420 \
-          --access-logfile /host-logs/django-prod/access.log \
-          --error-logfile /host-logs/django-prod/error.log \
+          --access-logfile /home/eee/mailer-app/logs/django-prod/access.log \
+          --error-logfile /home/eee/mailer-app/logs/django-prod/error.log \
           --capture-output \
           --log-level info
 
   mailer-web-admin:
     image: mailer-python:latest
     container_name: mailer-web-admin
+    init: true
     working_dir: /app/web-admin
     restart: unless-stopped
     user: "1001:1001"
@@ -188,8 +189,7 @@ services:
       DJANGO_INSTANCE: "admin-dev"
       PYTHONPATH: /app
     volumes:
-      - ./logs:/host-logs
-      - serenity-logs:/serenity-logs
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - ./:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
@@ -198,6 +198,7 @@ services:
   mailer-web-admin-prod:
     image: mailer-python:latest
     container_name: mailer-web-admin-prod
+    init: true
     working_dir: /app/web-admin
     restart: unless-stopped
     depends_on:
@@ -212,8 +213,7 @@ services:
       DJANGO_INSTANCE: "admin-prod"
       PYTHONPATH: /app
     volumes:
-      - ./logs:/host-logs
-      - serenity-logs:/serenity-logs
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - mailer-app-prod:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
@@ -223,13 +223,13 @@ services:
       - -c
       - |
         set -e
-        mkdir -p /host-logs/django-admin-prod
+        mkdir -p /home/eee/mailer-app/logs/django-admin-prod
         exec gunicorn web_admin.wsgi:application \
           --bind 0.0.0.0:8000 \
           --workers 2 \
           --timeout 420 \
-          --access-logfile /host-logs/django-admin-prod/access.log \
-          --error-logfile /host-logs/django-admin-prod/error.log \
+          --access-logfile /home/eee/mailer-app/logs/django-admin-prod/access.log \
+          --error-logfile /home/eee/mailer-app/logs/django-admin-prod/error.log \
           --capture-output \
           --log-level info
 
@@ -352,6 +352,7 @@ services:
   mailer-engine-tasks-prod:
     image: mailer-python:latest
     container_name: mailer-engine-tasks-prod
+    init: true
     working_dir: /app
     restart: unless-stopped
     depends_on:
@@ -364,8 +365,7 @@ services:
     environment:
       PYTHONPATH: /app
     volumes:
-      - ./logs:/host-logs
-      - serenity-logs:/serenity-logs
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - mailer-app-prod:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
@@ -381,6 +381,7 @@ services:
   mailer-engine-expand-cb-ready-prod:
     image: mailer-python:latest
     container_name: mailer-engine-expand-cb-ready-prod
+    init: true
     working_dir: /app
     restart: unless-stopped
     depends_on:
@@ -393,8 +394,7 @@ services:
     environment:
       PYTHONPATH: /app
     volumes:
-      - ./logs:/host-logs
-      - serenity-logs:/serenity-logs
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - mailer-app-prod:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
@@ -497,6 +497,7 @@ services:
   nginx:
     image: nginx:1.26
     container_name: serenity-nginx
+    init: true
     restart: unless-stopped
     ulimits:
       nofile:
@@ -517,6 +518,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - ./logs:/host-logs
       - serenity-logs:/serenity-logs
       - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
@@ -533,23 +535,22 @@ services:
       - -c
       - |
         set -e
-        mkdir -p /host-logs/nginx
-        mkdir -p /serenity-logs/nginx
+        mkdir -p /home/eee/mailer-app/logs/nginx
         mkdir -p /host-logs/smrel
         mkdir -p /serenity-logs/smrel
-        chmod 777 /host-logs/nginx /serenity-logs/nginx /host-logs/smrel /serenity-logs/smrel || true
+        chmod 777 /home/eee/mailer-app/logs/nginx /host-logs/smrel /serenity-logs/smrel || true
         exec nginx -g 'daemon off;'
 
   certbot-init:
     image: certbot/certbot:latest
     container_name: serenity-certbot-init
+    init: true
     restart: "no"
     environment:
       CERTBOT_MODE: "init"
       CERTBOT_EMAIL: "yevhen.yezerskyy@gmail.com"
     volumes:
-      - ./logs:/host-logs
-      - serenity-logs:/serenity-logs
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./config/sh/certbot_run.sh:/usr/local/bin/certbot_run.sh:ro
       - certbot-www:/var/www/certbot
@@ -562,6 +563,7 @@ services:
   certbot:
     image: certbot/certbot:latest
     container_name: serenity-certbot
+    init: true
     restart: unless-stopped
     pid: "service:nginx"
     stop_signal: SIGKILL
@@ -574,8 +576,7 @@ services:
       CERTBOT_EMAIL: "yevhen.yezerskyy@gmail.com"
       CERTBOT_RENEW_INTERVAL_SECONDS: "43200"
     volumes:
-      - ./logs:/host-logs
-      - serenity-logs:/serenity-logs
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./config/sh/certbot_run.sh:/usr/local/bin/certbot_run.sh:ro
       - certbot-www:/var/www/certbot

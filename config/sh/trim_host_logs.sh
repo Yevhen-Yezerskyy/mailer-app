@@ -1,11 +1,11 @@
 #!/bin/sh
 # FILE: config/sh/trim_host_logs.sh
 # DATE: 2026-02-22
-# PURPOSE: Trim oversized host logs in /host-logs (24 MB max -> keep 16 MB tail).
+# PURPOSE: Trim oversized logs in the shared absolute project log root (24 MB max -> keep 16 MB tail).
 
 set -eu
 
-HOST_ROOT="/host-logs"
+HOST_ROOT="/home/eee/mailer-app/logs"
 MAX_MB=24
 CUT_MB=8
 

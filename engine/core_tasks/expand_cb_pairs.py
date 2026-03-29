@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from engine.common.cache.client import CLIENT
 from engine.common.db import get_connection
-from engine.common.logs import sys_log
+from engine.common.logs import log
 from engine.common.utils import h64_text
 
 
@@ -329,7 +329,7 @@ def run_once() -> Dict[str, Any]:
     task, lock_token, sql_pick_ms = _pick_task()
     if not task:
         result = {"mode": "noop", "reason": "no_ready_task", "sql_pick_ms": int(sql_pick_ms)}
-        sys_log(LOG_FILE, folder=LOG_FOLDER, message=json.dumps({"event": "expand_cb_pairs", **result}, ensure_ascii=False, default=str))
+        log(LOG_FILE, folder=LOG_FOLDER, message=json.dumps({"event": "expand_cb_pairs", **result}, ensure_ascii=False, default=str))
         return result
 
     task_id = int(task["task_id"])
@@ -588,7 +588,7 @@ def run_once() -> Dict[str, Any]:
         }
         if reason:
             result["reason"] = str(reason)
-        sys_log(LOG_FILE, folder=LOG_FOLDER, message=json.dumps({"event": "expand_cb_pairs", **result}, ensure_ascii=False, default=str))
+        log(LOG_FILE, folder=LOG_FOLDER, message=json.dumps({"event": "expand_cb_pairs", **result}, ensure_ascii=False, default=str))
         return result
     finally:
         if lock_token:

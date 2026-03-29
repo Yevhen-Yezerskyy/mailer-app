@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict
 
-from engine.common.logs import sys_log
+from engine.common.logs import log
 
 
 LOG_FILE = "spider_11880"
@@ -15,7 +15,7 @@ LOG_FOLDER = "crawler"
 
 
 def save_11880_probe_run(payload: Dict[str, Any]) -> int:
-    sys_log(
+    log(
         LOG_FILE,
         folder=LOG_FOLDER,
         message=json.dumps(payload, ensure_ascii=False, default=str, indent=2),

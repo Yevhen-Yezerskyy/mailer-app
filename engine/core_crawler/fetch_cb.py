@@ -1,14 +1,15 @@
 # FILE: engine/core_crawler/fetch_cb.py
-# DATE: 2026-03-26
-# PURPOSE: Simplified CB crawler queue on top of task_cb_ratings/cb_crawl_pairs.
+# DATE: 2026-03-29
+# PURPOSE: Simplified CB crawler queue on top of task_cb_ratings/cb_crawl_pairs without Scrapy runtime per pair.
 
 from __future__ import annotations
 
+import argparse
+import base64
+import json
 import os
 from dataclasses import dataclass
 from typing import Optional
-
-from scrapy.crawler import CrawlerProcess
 
 from engine.common.cache.client import CLIENT
 from engine.common.db import fetch_one, get_connection
@@ -30,6 +31,32 @@ class QueueItem:
     catalog: str
     lock_key: str
     lock_token: str
+
+
+def _make_item(
+    task_id: int,
+    cb_id: int,
+    plz: str,
+    branch_id: int,
+    branch_name: str,
+    branch_slug: str,
+    catalog: str,
+    rate: Optional[int] = None,
+    lock_key: str = "",
+    lock_token: str = "",
+) -> QueueItem:
+    return QueueItem(
+        task_id=int(task_id),
+        cb_id=int(cb_id),
+        rate=int(rate) if rate is not None else None,
+        plz=str(plz or "").strip(),
+        branch_id=int(branch_id),
+        branch_name=str(branch_name or "").strip(),
+        branch_slug=str(branch_slug or "").strip(),
+        catalog=str(catalog or "").strip(),
+        lock_key=str(lock_key or ""),
+        lock_token=str(lock_token or ""),
+    )
 
 
 def _pick_active_task_id() -> Optional[int]:
@@ -57,6 +84,8 @@ def _try_lock_cb(cb_id: int) -> Optional[tuple[str, str]]:
 
 
 def _release_item_lock(item: QueueItem) -> None:
+    if not item.lock_key or not item.lock_token:
+        return
     try:
         CLIENT.lock_release(item.lock_key, token=item.lock_token)
     except Exception:
@@ -115,7 +144,7 @@ def _claim_next_item() -> Optional[QueueItem]:
                 CLIENT.lock_release(lock_data[0], token=lock_data[1])
                 continue
 
-            return QueueItem(
+            return _make_item(
                 task_id=int(queue_row[0]),
                 cb_id=cb_id,
                 rate=int(queue_row[2]) if queue_row[2] is not None else None,
@@ -144,49 +173,25 @@ def _pair_is_collected(cb_id: int) -> bool:
 
 
 def _run_gs_spider(item: QueueItem) -> None:
-    process = CrawlerProcess(
-        settings={
-            "LOG_LEVEL": "ERROR",
-            "TELNETCONSOLE_ENABLED": False,
-            "DOWNLOAD_DELAY": 2.0,
-            "RANDOMIZE_DOWNLOAD_DELAY": True,
-            "CONCURRENT_REQUESTS": 1,
-            "CONCURRENT_REQUESTS_PER_DOMAIN": 1,
-            "AUTOTHROTTLE_ENABLED": True,
-            "AUTOTHROTTLE_START_DELAY": 2.0,
-            "AUTOTHROTTLE_MAX_DELAY": 30.0,
-            "AUTOTHROTTLE_TARGET_CONCURRENCY": 0.5,
-            "COOKIES_ENABLED": True,
-        }
-    )
-    process.crawl(
-        GelbeSeitenCBSpider,
+    spider = GelbeSeitenCBSpider(
         task_id=int(item.task_id),
         cb_id=int(item.cb_id),
         plz=str(item.plz),
         branch_slug=str(item.branch_slug),
         branch_name=str(item.branch_name),
     )
-    process.start()
+    spider.run()
 
 
 def _run_11880_spider(item: QueueItem) -> None:
-    process = CrawlerProcess(
-        settings={
-            "LOG_LEVEL": "ERROR",
-            "TELNETCONSOLE_ENABLED": False,
-            "COOKIES_ENABLED": True,
-        }
-    )
-    process.crawl(
-        OneOneEightZeroCBSpider,
+    spider = OneOneEightZeroCBSpider(
         task_id=int(item.task_id),
         cb_id=int(item.cb_id),
         plz=str(item.plz),
         branch_slug=str(item.branch_slug),
         branch_name=str(item.branch_name),
     )
-    process.start()
+    spider.run()
 
 
 def _run_spider(item: QueueItem) -> bool:
@@ -200,6 +205,60 @@ def _run_spider(item: QueueItem) -> bool:
     return False
 
 
+def _run_item(item: QueueItem) -> None:
+    print(
+        f"[core_crawler] pop task_id={item.task_id} cb_id={item.cb_id} "
+        f"catalog='{item.catalog}' plz='{item.plz}' branch='{item.branch_slug}'"
+    )
+
+    if not item.branch_slug or not item.plz:
+        print(
+            f"[core_crawler] skip invalid meta task_id={item.task_id} cb_id={item.cb_id} "
+            f"plz='{item.plz}' branch_slug='{item.branch_slug}'"
+        )
+        return
+
+    started = _run_spider(item)
+    if not started:
+        print(
+            f"[core_crawler] skip unsupported catalog='{item.catalog}' "
+            f"task_id={item.task_id} cb_id={item.cb_id}"
+        )
+        return
+
+    if not _pair_is_collected(item.cb_id):
+        print(
+            f"[core_crawler] spider finished without collected flag; "
+            f"cb_id={item.cb_id} remains pending"
+        )
+
+
+def run_fixed_pair(
+    task_id: int,
+    cb_id: int,
+    plz: str,
+    branch_id: int,
+    branch_name: str,
+    branch_slug: str,
+    catalog: str,
+) -> None:
+    _run_item(
+        _make_item(
+            task_id=task_id,
+            cb_id=cb_id,
+            plz=plz,
+            branch_id=branch_id,
+            branch_name=branch_name,
+            branch_slug=branch_slug,
+            catalog=catalog,
+        )
+    )
+
+
+def _decode_run_one_b64(raw_b64: str) -> dict:
+    return json.loads(base64.b64decode(str(raw_b64).encode("ascii")).decode("utf-8"))
+
+
 def worker_run_once() -> None:
     item = _claim_next_item()
     if not item:
@@ -207,30 +266,31 @@ def worker_run_once() -> None:
         return
 
     try:
-        print(
-            f"[core_crawler] pop task_id={item.task_id} cb_id={item.cb_id} "
-            f"catalog='{item.catalog}' plz='{item.plz}' branch='{item.branch_slug}'"
-        )
-
-        if not item.branch_slug or not item.plz:
-            print(
-                f"[core_crawler] skip invalid meta task_id={item.task_id} cb_id={item.cb_id} "
-                f"plz='{item.plz}' branch_slug='{item.branch_slug}'"
-            )
-            return
-
-        started = _run_spider(item)
-        if not started:
-            print(
-                f"[core_crawler] skip unsupported catalog='{item.catalog}' "
-                f"task_id={item.task_id} cb_id={item.cb_id}"
-            )
-            return
-
-        if not _pair_is_collected(item.cb_id):
-            print(
-                f"[core_crawler] spider finished without collected flag; "
-                f"cb_id={item.cb_id} remains pending"
-            )
+        _run_item(item)
     finally:
         _release_item_lock(item)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run-one-b64", default="")
+    args = parser.parse_args()
+
+    if args.run_one_b64:
+        data = _decode_run_one_b64(args.run_one_b64)
+        run_fixed_pair(
+            task_id=int(data["task_id"]),
+            cb_id=int(data["cb_id"]),
+            plz=str(data["plz"] or "").strip(),
+            branch_id=int(data["branch_id"]),
+            branch_name=str(data["branch_name"] or "").strip(),
+            branch_slug=str(data["branch_slug"] or "").strip(),
+            catalog=str(data["catalog"] or "").strip(),
+        )
+        return
+
+    worker_run_once()
+
+
+if __name__ == "__main__":
+    main()

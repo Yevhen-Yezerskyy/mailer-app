@@ -9,7 +9,7 @@ import json
 from typing import Any, Dict
 
 from engine.common.db import get_connection
-from engine.common.logs import sys_log
+from engine.common.logs import log
 
 
 LOG_FILE = "ready_tasks.log"
@@ -80,5 +80,5 @@ def run_once() -> Dict[str, Any]:
         "ready_false_cnt": int(row[3] or 0),
         "sql_ms": int(sql_ms),
     }
-    sys_log(LOG_FILE, folder=LOG_FOLDER, message=json.dumps({"event": "ready_tasks", **result}, ensure_ascii=False))
+    log(LOG_FILE, folder=LOG_FOLDER, message=json.dumps({"event": "ready_tasks", **result}, ensure_ascii=False))
     return result

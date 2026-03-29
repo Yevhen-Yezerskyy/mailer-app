@@ -20,6 +20,7 @@ from uuid import uuid4
 
 from engine.core_crawler.browser.session_config import BROKER_QUEUE_MAX, BROKER_WORKERS, SITE_CONFIGS
 from engine.core_crawler.browser.session_router import BrowserSessionRouter
+from engine.core_crawler.tunnels_11880 import ensure_tunnel_watchdog, stop_tunnel_watchdog
 
 BROKER_SOCKET_PATH = "/tmp/core_crawler_browser.sock"
 
@@ -63,6 +64,41 @@ def _send_json(sock, payload: dict[str, Any]) -> None:
     raw = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
     sock.sendall(struct.pack("!I", len(raw)))
     sock.sendall(raw)
+
+
+def _int_value(value: Any, default: int = 0) -> int:
+    if value in (None, ""):
+        return int(default)
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"expected int-compatible value, got {value!r}") from exc
+
+
+def _normalize_fetch_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    site = str(payload.get("site") or "").strip()
+    url = str(payload.get("url") or "").strip()
+    kind = str(payload.get("kind") or "").strip()
+    if not site:
+        raise ValueError("site is required")
+    if not url:
+        raise ValueError("url is required")
+    if not kind:
+        raise ValueError("kind is required")
+    return {
+        "site": site,
+        "url": url,
+        "kind": kind,
+        "task_id": _int_value(payload.get("task_id"), 0),
+        "cb_id": _int_value(payload.get("cb_id"), 0),
+        "referer": str(payload.get("referer") or ""),
+        "mode": str(payload.get("mode") or ""),
+        "method": str(payload.get("method") or "GET"),
+        "form": dict(payload.get("form") or {}) or None,
+        "extra_headers": dict(payload.get("extra_headers") or {}) or None,
+        "preferred_slot_name": str(payload.get("preferred_slot_name") or ""),
+        "preferred_slot_idx": _int_value(payload.get("preferred_slot_idx"), -1),
+    }
 
 
 class _BrokerDispatcher:
@@ -129,60 +165,39 @@ class _BrokerDispatcher:
         slot_idx = logical_idx % int(cfg.sessions_per_egress)
         return str(cfg.egress_slots[egress_idx]), int(slot_idx)
 
-    def _worker_idx_for_slot(self, site: str, slot_name: str, slot_idx: int) -> int:
-        cfg = SITE_CONFIGS.get(site)
-        if cfg is None:
-            return 0
-        try:
-            egress_idx = list(cfg.egress_slots).index(str(slot_name))
-        except ValueError:
-            egress_idx = 0
-        return int(egress_idx % self._worker_count)
-
     def submit(self, payload: dict[str, Any]) -> dict[str, Any]:
         request_id = uuid4().hex
-        payload = dict(payload)
+        try:
+            payload = _normalize_fetch_payload(payload)
+        except ValueError as exc:
+            return {"ok": False, "error": "BAD_REQUEST", "detail": str(exc)}
         site = str(payload.get("site") or "")
         preferred_slot_name = str(payload.get("preferred_slot_name") or "")
-        preferred_slot_idx = int(payload.get("preferred_slot_idx") or 0)
+        preferred_slot_idx = _int_value(payload.get("preferred_slot_idx"), -1)
         if site in SITE_CONFIGS and not preferred_slot_name:
             preferred_slot_name, preferred_slot_idx = self._pick_slot_for_site(site)
             payload["preferred_slot_name"] = preferred_slot_name
             payload["preferred_slot_idx"] = preferred_slot_idx
-        worker_idx = self._worker_idx_for_slot(site, preferred_slot_name, preferred_slot_idx)
+        cfg = SITE_CONFIGS.get(site)
+        if cfg is None:
+            worker_idx = 0
+        else:
+            try:
+                egress_idx = list(cfg.egress_slots).index(str(preferred_slot_name))
+            except ValueError:
+                egress_idx = 0
+            worker_idx = int(egress_idx % self._worker_count)
         with self._state_mu:
             if self._accepted_count >= self._queue_maxsize:
-                print(
-                    f"[browser-broker] busy request_id={request_id} "
-                    f"site={payload.get('site')} kind={payload.get('kind')} "
-                    f"task_id={payload.get('task_id')} cb_id={payload.get('cb_id')} "
-                    f"accepted={self._accepted_count}/{self._queue_maxsize}",
-                    flush=True,
-                )
                 return {"ok": False, "error": "BROKER_BUSY", "detail": "TRY_AGAIN"}
             self._accepted_count += 1
             self._inflight.add(request_id)
-        print(
-            f"[browser-broker] enqueue request_id={request_id} "
-            f"site={payload.get('site')} kind={payload.get('kind')} "
-            f"task_id={payload.get('task_id')} cb_id={payload.get('cb_id')} "
-            f"worker={worker_idx} slot={preferred_slot_name}:{preferred_slot_idx} "
-            f"accepted={self._accepted_count}/{self._queue_maxsize}",
-            flush=True,
-        )
         try:
             self._jobs[worker_idx].put_nowait({"request_id": request_id, "payload": payload})
         except queue.Full:
             with self._state_mu:
                 self._inflight.discard(request_id)
                 self._accepted_count = max(0, int(self._accepted_count) - 1)
-            print(
-                f"[browser-broker] busy request_id={request_id} "
-                f"site={payload.get('site')} kind={payload.get('kind')} "
-                f"task_id={payload.get('task_id')} cb_id={payload.get('cb_id')} "
-                f"worker={worker_idx} queue_full=1",
-                flush=True,
-            )
             return {"ok": False, "error": "BROKER_BUSY", "detail": "TRY_AGAIN"}
         return {"ok": True, "accepted": True, "request_id": request_id}
 
@@ -231,18 +246,8 @@ def _broker_worker_main(
             if item is None:
                 break
             request_id = str(item.get("request_id") or "")
-            payload = dict(item.get("payload") or {})
+            payload = _normalize_fetch_payload(dict(item.get("payload") or {}))
             try:
-                action = str(payload.get("action") or "fetch")
-                if action == "ping":
-                    results.put({"request_id": request_id, "response": {"ok": True, "pong": True}})
-                    continue
-                print(
-                    f"[browser-broker] start request_id={request_id} "
-                    f"site={payload.get('site')} kind={payload.get('kind')} "
-                    f"cb_id={payload.get('cb_id')} url={payload.get('url')}",
-                    flush=True,
-                )
                 result = router.fetch(
                     site=str(payload["site"]),
                     url=str(payload["url"]),
@@ -251,14 +256,11 @@ def _broker_worker_main(
                     cb_id=int(payload["cb_id"]),
                     referer=str(payload.get("referer") or ""),
                     mode=str(payload.get("mode") or ""),
+                    method=str(payload.get("method") or "GET"),
+                    form=dict(payload.get("form") or {}) or None,
+                    extra_headers=dict(payload.get("extra_headers") or {}) or None,
                     preferred_slot_name=str(payload.get("preferred_slot_name") or ""),
-                    preferred_slot_idx=int(payload.get("preferred_slot_idx") or 0),
-                )
-                print(
-                    f"[browser-broker] done request_id={request_id} "
-                    f"site={payload.get('site')} cb_id={payload.get('cb_id')} "
-                    f"status={result.status} session={result.session_id}",
-                    flush=True,
+                    preferred_slot_idx=_int_value(payload.get("preferred_slot_idx"), -1),
                 )
                 results.put(
                     {
@@ -310,7 +312,7 @@ class _BrokerHandler(socketserver.BaseRequestHandler):
             except BrokenPipeError:
                 pass
             return
-        if action in ("fetch", "submit"):
+        if action == "submit":
             response = self.server.dispatcher.submit(payload)
         elif action == "result":
             response = self.server.dispatcher.poll_result(str(payload.get("request_id") or ""))
@@ -332,6 +334,7 @@ def run_browser_broker(socket_path: str = BROKER_SOCKET_PATH) -> None:
         pass
 
     dispatcher = _BrokerDispatcher()
+    ensure_tunnel_watchdog()
     dispatcher.start()
     server = _BrokerUnixServer(str(path), dispatcher)
     try:
@@ -342,6 +345,7 @@ def run_browser_broker(socket_path: str = BROKER_SOCKET_PATH) -> None:
     try:
         server.serve_forever(poll_interval=0.2)
     finally:
+        stop_tunnel_watchdog()
         try:
             server.shutdown()
         except Exception:

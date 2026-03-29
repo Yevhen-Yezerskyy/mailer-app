@@ -12,7 +12,6 @@ import socket
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -21,15 +20,28 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 from engine.common.cache.client import CLIENT
-from engine.common.logs import sys_log
+from engine.common.logs import log
 from engine.core_crawler.browser.http_fetch import build_http_session, cookie_snapshot, export_storage_state, fetch_html, storage_state_has_cookies
-from engine.core_crawler.browser.session_config import BROWSER_PROFILES, LOG_FOLDER, ROUTER_HTTP_LOG_FILE, SITE_CONFIGS, BrowserProfile, SiteSessionConfig
-from engine.core_crawler.tunnels_11880 import ensure_tunnel_up, list_tunnels, stop_tunnel_by_name
+from engine.core_crawler.browser.session_config import (
+    BROWSER_PROFILES,
+    LOG_FOLDER,
+    SITE_CONFIGS,
+    BrowserProfile,
+    SiteSessionConfig,
+)
+from engine.core_crawler.tunnels_11880 import ensure_tunnel_up, list_tunnels, status_tunnel_by_name, stop_tunnel_by_name
 
 STATE_TTL_SEC = 7 * 24 * 60 * 60
-LOCK_TTL_SEC = 15 * 60
 WAIT_TIMEOUT_SEC = 60.0
 RUNTIME_IDLE_REAP_SEC = 90.0
+SCHEDULE_ROTATE_MIN_SEC = 600.0
+SCHEDULE_ROTATE_MAX_SEC = 1200.0
+SESSION_GATE_TTL_SEC = 5.0
+SESSION_GATE_WAIT_SEC = 5.0
+SESSION_LEASE_TTL_SEC = 5 * 60.0
+HTTP_CHROMIUM_LOG_FILE = "http_chromium.log"
+HTTP_LIGHT_LOG_FILE = "http_light.log"
+ROUTER_STATE_LOG_FILE = "router_state.log"
 
 
 @dataclass
@@ -42,6 +54,7 @@ class FetchResult:
     ms: int
     site: str
     session_id: str
+    session_slot: int
     tunnel: dict[str, Any]
 
 
@@ -62,10 +75,8 @@ class BrowserSession:
     warmed: bool = False
     current_url: str = ""
     active_pages: int = 0
-    warming: bool = False
     recycle_after_ts: float = 0.0
     next_dispatch_ts: float = 0.0
-    dispatch_mu: Any = field(default_factory=threading.Lock)
     http_mu: Any = field(default_factory=threading.Lock)
 
 
@@ -80,11 +91,25 @@ class BrowserRuntime:
     recycle_after_ts: float = 0.0
 
 
+@dataclass
+class SessionLease:
+    session_key: str
+    slot_name: str
+    slot_idx: int
+    session_id: str
+    state: dict[str, Any]
+    needs_warm: bool
+    base_requests_total: int
+    page_lock_key: str
+    page_lock_token: str
+    warm_lock_key: str = ""
+    warm_lock_token: str = ""
+
+
 class BrowserSessionRouter:
     def __init__(self) -> None:
         self._pw_mu = threading.Lock()
         self._playwright = None
-        self._profile_pos: dict[str, int] = {}
         self._runtime_cv = threading.Condition()
         self._runtimes: dict[str, BrowserSession] = {}
         self._browsers: dict[str, BrowserRuntime] = {}
@@ -133,16 +158,116 @@ class BrowserSessionRouter:
                 self._playwright = sync_playwright().start()
             return self._playwright
 
-    def _sys_log(self, log_file: str, payload: dict[str, Any]) -> None:
-        sys_log(
+    def _log_fetch_start(
+        self,
+        *,
+        log_file: str,
+        site: str,
+        has_cookies: bool,
+        tunnel: dict[str, Any],
+        url: str,
+    ) -> None:
+        log(
             log_file,
             folder=LOG_FOLDER,
-            message=json.dumps(payload, ensure_ascii=False, default=str, indent=2),
+            message=self._request_log_line(
+                stage="start",
+                site=site,
+                has_cookies=has_cookies,
+                tunnel=tunnel,
+                url=url,
+            ),
+        )
+
+    def _log_fetch_done(
+        self,
+        *,
+        log_file: str,
+        site: str,
+        has_cookies: bool,
+        tunnel: dict[str, Any],
+        final_url: str,
+        status: int,
+        ms: int,
+    ) -> None:
+        log(
+            log_file,
+            folder=LOG_FOLDER,
+            message=self._request_log_line(
+                stage="end",
+                site=site,
+                has_cookies=has_cookies,
+                tunnel=tunnel,
+                url=final_url,
+                status=status,
+                ms=ms,
+            ),
+        )
+
+    def _log_fetch_error(
+        self,
+        *,
+        log_file: str,
+        site: str,
+        has_cookies: bool,
+        tunnel: dict[str, Any],
+        url: str,
+        status: int,
+        ms: int,
+        error: str,
+    ) -> None:
+        log(
+            log_file,
+            folder=LOG_FOLDER,
+            message=self._request_log_line(
+                stage="end",
+                site=site,
+                has_cookies=has_cookies,
+                tunnel=tunnel,
+                url=url,
+                status=status,
+                ms=ms,
+                error=error,
+            ),
         )
 
     @staticmethod
-    def _iso_ts(ts: float) -> str:
-        return datetime.fromtimestamp(float(ts), tz=timezone.utc).isoformat()
+    def _format_error_message(exc: Exception) -> str:
+        exc_type = type(exc).__name__
+        detail = str(exc or "").strip()
+        if not detail:
+            return exc_type
+        return f"{exc_type}: {detail}"
+
+    @staticmethod
+    def _request_log_line(
+        *,
+        stage: str,
+        site: str,
+        has_cookies: bool,
+        tunnel: dict[str, Any],
+        url: str,
+        status: int | None = None,
+        ms: int | None = None,
+        error: str = "",
+    ) -> str:
+        site_name = str(site or "").strip().lower()
+        if site_name == "gs":
+            site_name = "gelbeseiten"
+        parts = [
+            stage,
+            f"site={site_name}",
+            f"cookies={'yes' if bool(has_cookies) else 'no'}",
+            f"tunnel={str((tunnel or {}).get('name') or '')}",
+            f"url={url}",
+        ]
+        if status is not None:
+            parts.append(f"status={int(status)}")
+        if ms is not None:
+            parts.append(f"ms={int(ms)}")
+        if error:
+            parts.append(f"error={error}")
+        return " ".join(parts)
 
     @staticmethod
     def _cache_get_obj(key: str) -> Any:
@@ -151,40 +276,108 @@ class BrowserSessionRouter:
             return None
         try:
             return pickle.loads(payload)
-        except Exception:
-            return None
+        except Exception as exc:
+            raise RuntimeError(f"BAD CACHE PAYLOAD {key}: {type(exc).__name__}: {exc}") from exc
 
     @staticmethod
     def _cache_set_obj(key: str, value: Any, ttl_sec: int = STATE_TTL_SEC) -> None:
         try:
             payload = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
-        except Exception:
-            return
+        except Exception as exc:
+            raise RuntimeError(f"CACHE ENCODE FAILED {key}: {type(exc).__name__}: {exc}") from exc
         CLIENT.set(key, payload, ttl_sec=ttl_sec)
 
     @staticmethod
     def _runtime_key(site: str, slot_name: str, slot_idx: int) -> str:
-        return f"{site}:{slot_name}:{slot_idx}"
+        site_name = str(site or "").strip()
+        tunnel_name = str(slot_name or "").strip()
+        if not site_name or not tunnel_name:
+            raise ValueError("runtime key requires site and slot_name")
+        return f"{site_name}:{tunnel_name}:{int(slot_idx)}"
 
     @staticmethod
     def _browser_key(site: str, slot_name: str) -> str:
-        return f"{site}:{slot_name}"
+        site_name = str(site or "").strip()
+        tunnel_name = str(slot_name or "").strip()
+        if not site_name or not tunnel_name:
+            raise ValueError("browser key requires site and slot_name")
+        return f"{site_name}:{tunnel_name}"
 
     @staticmethod
     def _schedule_key(site: str) -> str:
-        return f"core_crawler:slot_schedule:{site}"
+        site_name = str(site or "").strip()
+        if not site_name:
+            raise ValueError("schedule key requires site")
+        return f"core_crawler:slot_schedule:{site_name}"
 
     @staticmethod
     def _rr_key(site: str) -> str:
-        return f"core_crawler:slot_rr:{site}"
+        site_name = str(site or "").strip()
+        if not site_name:
+            raise ValueError("rr key requires site")
+        return f"core_crawler:slot_rr:{site_name}"
 
     @staticmethod
     def _quarantine_key(site: str) -> str:
-        return f"core_crawler:slot_quarantine:{site}"
+        site_name = str(site or "").strip()
+        if not site_name:
+            raise ValueError("quarantine key requires site")
+        return f"core_crawler:slot_quarantine:{site_name}"
 
     @staticmethod
     def _session_key(site: str, slot_name: str, slot_idx: int) -> str:
-        return f"core_crawler:browser_session:{site}:{slot_name}:{slot_idx}"
+        site_name = str(site or "").strip()
+        tunnel_name = str(slot_name or "").strip()
+        if not site_name or not tunnel_name:
+            raise ValueError("session key requires site and slot_name")
+        return f"core_crawler:browser_session:{site_name}:{tunnel_name}:{int(slot_idx)}"
+
+    @staticmethod
+    def _session_gate_key(site: str, slot_name: str, slot_idx: int) -> str:
+        site_name = str(site or "").strip()
+        tunnel_name = str(slot_name or "").strip()
+        if not site_name or not tunnel_name:
+            raise ValueError("session gate key requires site and slot_name")
+        return f"core_crawler:browser_session_gate:{site_name}:{tunnel_name}:{int(slot_idx)}"
+
+    @staticmethod
+    def _session_warm_key(site: str, slot_name: str, slot_idx: int) -> str:
+        site_name = str(site or "").strip()
+        tunnel_name = str(slot_name or "").strip()
+        if not site_name or not tunnel_name:
+            raise ValueError("session warm key requires site and slot_name")
+        return f"core_crawler:browser_session_warm:{site_name}:{tunnel_name}:{int(slot_idx)}"
+
+    @staticmethod
+    def _session_page_key(site: str, slot_name: str, slot_idx: int, page_idx: int) -> str:
+        site_name = str(site or "").strip()
+        tunnel_name = str(slot_name or "").strip()
+        if not site_name or not tunnel_name:
+            raise ValueError("session page key requires site and slot_name")
+        return f"core_crawler:browser_session_page:{site_name}:{tunnel_name}:{int(slot_idx)}:{int(page_idx)}"
+
+    def _try_lock(self, key: str, ttl_sec: float, owner: str) -> str:
+        info = CLIENT.lock_try(key, ttl_sec=ttl_sec, owner=owner)
+        if not info or not bool(info.get("acquired")):
+            return ""
+        return str(info.get("token") or "")
+
+    def _lock_until(self, key: str, ttl_sec: float, owner: str, wait_sec: float) -> str:
+        deadline = time.time() + max(0.1, float(wait_sec))
+        while time.time() < deadline:
+            token = self._try_lock(key, ttl_sec, owner)
+            if token:
+                return token
+            time.sleep(0.05)
+        return ""
+
+    def _release_lock(self, key: str, token: str) -> None:
+        if not key or not token:
+            return
+        try:
+            CLIENT.lock_release(key, token=token)
+        except Exception:
+            pass
 
     def _load_slots(self, cfg: SiteSessionConfig) -> list[dict[str, Any]]:
         by_name = {
@@ -193,12 +386,26 @@ class BrowserSessionRouter:
             if str(row.get("name") or "")
         }
         resolved: list[dict[str, Any]] = []
-        muted_name = self._scheduled_muted_slot(cfg)
+        slot_errors: list[str] = []
         quarantined = self._load_quarantine(cfg)
+        active_names = [
+            name
+            for name in cfg.egress_slots
+            if name == "direct" or (name in by_name and name not in quarantined)
+        ]
+        excluded_name = self._scheduled_excluded_slot(cfg, active_names)
         for name in cfg.egress_slots:
+            if name in quarantined:
+                slot_errors.append(f"{name}: quarantined")
+                if name != "direct":
+                    try:
+                        stop_tunnel_by_name(name)
+                    except Exception as exc:
+                        slot_errors.append(f"{name}: stop failed: {type(exc).__name__}: {exc}")
+                continue
+            if name == excluded_name:
+                continue
             if name == "direct":
-                if name == muted_name or name in quarantined:
-                    continue
                 resolved.append(
                     {
                         "name": "direct",
@@ -210,19 +417,23 @@ class BrowserSessionRouter:
                 continue
             row = by_name.get(name)
             if not row:
-                continue
-            if name == muted_name or name in quarantined:
-                try:
-                    stop_tunnel_by_name(name)
-                except Exception:
-                    pass
+                slot_errors.append(f"{name}: not configured")
                 continue
             try:
                 ensure_tunnel_up(name)
-            except Exception:
-                pass
-            port = int(row.get("local_port") or 0)
-            if not self._port_open(port):
+            except Exception as exc:
+                slot_errors.append(f"{name}: ensure failed: {type(exc).__name__}: {exc}")
+                continue
+            status = status_tunnel_by_name(name)
+            if not bool(status.get("alive")):
+                slot_errors.append(
+                    f"{name}: down after ensure port_open={bool(status.get('port_open'))} "
+                    f"control_ok={bool(status.get('control_ok'))}"
+                )
+                continue
+            port = int(status.get("local_port") or row.get("local_port") or 0)
+            if not port:
+                slot_errors.append(f"{name}: missing local_port")
                 continue
             resolved.append(
                 {
@@ -233,27 +444,29 @@ class BrowserSessionRouter:
                 }
             )
         if not resolved:
-            raise RuntimeError(f"NO LIVE TUNNELS FOR {cfg.site}")
+            detail = "; ".join(slot_errors) if slot_errors else "no live tunnels"
+            raise RuntimeError(f"NO LIVE TUNNELS FOR {cfg.site}: {detail}")
         return resolved
 
-    def _next_rr_slot(self, cfg: SiteSessionConfig) -> str:
-        state = self._cache_get_obj(self._rr_key(cfg.site)) or {"pos": 0}
-        pos = int(state.get("pos") or 0)
-        name = cfg.egress_slots[pos % len(cfg.egress_slots)]
-        self._cache_set_obj(self._rr_key(cfg.site), {"pos": pos + 1})
-        return name
-
-    def _scheduled_muted_slot(self, cfg: SiteSessionConfig) -> str:
-        if cfg.active_slot_count >= len(cfg.egress_slots):
+    def _scheduled_excluded_slot(self, cfg: SiteSessionConfig, active_names: list[str]) -> str:
+        if self._load_quarantine(cfg):
+            return ""
+        eligible = [name for name in cfg.egress_slots if name in active_names]
+        if len(eligible) <= 1:
             return ""
         now = time.time()
         state = self._cache_get_obj(self._schedule_key(cfg.site)) or {}
         name = str(state.get("name") or "")
         until = float(state.get("until") or 0.0)
-        if name and until > now:
+        is_recent = until > now and until <= (now + SCHEDULE_ROTATE_MAX_SEC + 5.0)
+        if name and name in eligible and is_recent:
             return name
-        name = self._next_rr_slot(cfg)
-        state = {"name": name, "until": now + float(cfg.slot_quarantine_sec)}
+        rr_state = self._cache_get_obj(self._rr_key(cfg.site)) or {"pos": 0}
+        rr_pos = int(rr_state.get("pos") or 0)
+        name = eligible[rr_pos % len(eligible)]
+        self._cache_set_obj(self._rr_key(cfg.site), {"pos": rr_pos + 1})
+        rotate_for = random.uniform(SCHEDULE_ROTATE_MIN_SEC, SCHEDULE_ROTATE_MAX_SEC)
+        state = {"name": name, "until": now + rotate_for}
         self._cache_set_obj(self._schedule_key(cfg.site), state)
         return name
 
@@ -263,25 +476,22 @@ class BrowserSessionRouter:
             return {}
         now = time.time()
         out: dict[str, float] = {}
-        dirty = False
         for name, until in raw.items():
             try:
                 until_f = float(until or 0.0)
-            except Exception:
-                dirty = True
-                continue
+            except Exception as exc:
+                raise RuntimeError(
+                    f"BAD QUARANTINE STATE {cfg.site} {name}: {type(exc).__name__}: {exc}"
+                ) from exc
             if until_f > now:
                 out[str(name)] = until_f
-            else:
-                dirty = True
-        if dirty:
+        if out != raw:
             self._cache_set_obj(self._quarantine_key(cfg.site), out)
         return out
 
     def _slot_is_quarantined(self, cfg: SiteSessionConfig, slot_name: str) -> bool:
-        if slot_name == self._scheduled_muted_slot(cfg):
-            return True
-        return slot_name in self._load_quarantine(cfg)
+        quarantined = self._load_quarantine(cfg)
+        return slot_name in quarantined
 
     def _mute_slot(self, cfg: SiteSessionConfig, slot_name: str, reason: str) -> None:
         if not slot_name:
@@ -296,23 +506,60 @@ class BrowserSessionRouter:
                 stop_tunnel_by_name(slot_name)
             except Exception:
                 pass
-        self._sys_log(
-            ROUTER_HTTP_LOG_FILE,
-            {
-                "event": "slot_quarantine",
-                "site": cfg.site,
-                "slot": slot_name,
-                "reason": reason,
-                "until_ts": until,
-            },
+        log(
+            ROUTER_STATE_LOG_FILE,
+            folder=LOG_FOLDER,
+            message=f"slot_quarantine site={cfg.site} tunnel={slot_name} reason={reason} until_ts={int(until)}",
         )
-
-    def _active_egresses(self, cfg: SiteSessionConfig) -> list[dict[str, Any]]:
-        return [row for row in self._load_slots(cfg) if not self._slot_is_quarantined(cfg, row["name"])]
 
     @staticmethod
     def _profile_script(profile: BrowserProfile) -> str:
         langs = json.dumps(list(profile.languages), ensure_ascii=False)
+        ua_meta = json.dumps(profile.user_agent_metadata, ensure_ascii=False)
+        mime_types = json.dumps(
+            [
+                {
+                    "type": "application/pdf",
+                    "suffixes": "pdf",
+                    "description": "Portable Document Format",
+                },
+                {
+                    "type": "text/pdf",
+                    "suffixes": "pdf",
+                    "description": "Portable Document Format",
+                },
+            ],
+            ensure_ascii=False,
+        )
+        plugins = json.dumps(
+            [
+                {
+                    "name": "Chrome PDF Viewer",
+                    "filename": "internal-pdf-viewer",
+                    "description": "Portable Document Format",
+                },
+                {
+                    "name": "Chromium PDF Viewer",
+                    "filename": "internal-pdf-viewer",
+                    "description": "Portable Document Format",
+                },
+                {
+                    "name": "Microsoft Edge PDF Viewer",
+                    "filename": "internal-pdf-viewer",
+                    "description": "Portable Document Format",
+                },
+            ],
+            ensure_ascii=False,
+        )
+        connection = json.dumps(
+            {
+                "downlink": profile.connection_downlink,
+                "effectiveType": profile.connection_effective_type,
+                "rtt": profile.connection_rtt,
+                "saveData": False,
+            },
+            ensure_ascii=False,
+        )
         return f"""
 (() => {{
   const patch = (obj, key, value) => {{
@@ -320,6 +567,48 @@ class BrowserSessionRouter:
       Object.defineProperty(obj, key, {{ get: () => value, configurable: true }});
     }} catch (_) {{}}
   }};
+  const defineValue = (obj, key, value) => {{
+    try {{
+      Object.defineProperty(obj, key, {{ value, configurable: true }});
+    }} catch (_) {{}}
+  }};
+  const buildCollection = (rows, nameKey) => {{
+    const items = rows.map((row, index) => {{
+      const item = Object.assign({{}}, row);
+      defineValue(item, 'index', index);
+      return item;
+    }});
+    defineValue(items, 'item', (index) => items[index] || null);
+    defineValue(items, 'namedItem', (name) => items.find((row) => row[nameKey] === name) || null);
+    return items;
+  }};
+  const uaMeta = {ua_meta};
+  const highEntropyValues = {{
+    architecture: uaMeta.architecture,
+    bitness: uaMeta.bitness,
+    brands: uaMeta.brands,
+    fullVersionList: uaMeta.fullVersionList,
+    mobile: uaMeta.mobile,
+    model: uaMeta.model,
+    platform: uaMeta.platform,
+    platformVersion: uaMeta.platformVersion,
+    uaFullVersion: uaMeta.fullVersion,
+    wow64: uaMeta.wow64,
+  }};
+  const mimeTypes = buildCollection({mime_types}, 'type');
+  const plugins = buildCollection({plugins}, 'name');
+  for (const plugin of plugins) {{
+    defineValue(plugin, 'item', (index) => mimeTypes[index] || null);
+    defineValue(plugin, 'namedItem', (name) => mimeTypes.find((entry) => entry.type === name) || null);
+    patch(plugin, 'length', mimeTypes.length);
+  }}
+  for (const mimeType of mimeTypes) {{
+    defineValue(mimeType, 'enabledPlugin', plugins[0] || null);
+  }}
+  const connection = Object.assign({{}}, {connection});
+  defineValue(connection, 'addEventListener', () => undefined);
+  defineValue(connection, 'removeEventListener', () => undefined);
+  defineValue(connection, 'dispatchEvent', () => true);
   patch(navigator, 'webdriver', undefined);
   patch(navigator, 'platform', {json.dumps(profile.navigator_platform)});
   patch(navigator, 'vendor', {json.dumps(profile.navigator_vendor)});
@@ -327,23 +616,67 @@ class BrowserSessionRouter:
   patch(navigator, 'languages', {langs});
   patch(navigator, 'hardwareConcurrency', {int(profile.hardware_concurrency)});
   patch(navigator, 'deviceMemory', {int(profile.device_memory)});
+  patch(navigator, 'maxTouchPoints', {int(profile.max_touch_points)});
+  patch(navigator, 'vendorSub', '');
+  patch(navigator, 'productSub', '20030107');
+  patch(navigator, 'cookieEnabled', true);
+  patch(navigator, 'onLine', true);
   patch(navigator, 'pdfViewerEnabled', true);
-  patch(screen, 'colorDepth', 24);
-  patch(screen, 'pixelDepth', 24);
-  try {{
-    Object.defineProperty(navigator, 'plugins', {{
-      get: () => [
-        {{ name: 'Chrome PDF Plugin' }},
-        {{ name: 'Chrome PDF Viewer' }},
-        {{ name: 'Native Client' }},
-      ],
-      configurable: true,
-    }});
-  }} catch (_) {{}}
+  patch(navigator, 'plugins', plugins);
+  patch(navigator, 'mimeTypes', mimeTypes);
+  patch(navigator, 'connection', connection);
+  patch(navigator, 'userAgentData', {{
+    brands: uaMeta.brands,
+    mobile: false,
+    platform: uaMeta.platform,
+    getHighEntropyValues: async (hints) => {{
+      const out = {{}};
+      for (const hint of Array.isArray(hints) ? hints : []) {{
+        if (Object.prototype.hasOwnProperty.call(highEntropyValues, hint)) {{
+          out[hint] = highEntropyValues[hint];
+        }}
+      }}
+      return out;
+    }},
+    toJSON: () => ({{ brands: uaMeta.brands, mobile: false, platform: uaMeta.platform }}),
+  }});
+  patch(screen, 'availWidth', {int(profile.avail_width)});
+  patch(screen, 'availHeight', {int(profile.avail_height)});
+  patch(screen, 'colorDepth', {int(profile.color_depth)});
+  patch(screen, 'pixelDepth', {int(profile.pixel_depth)});
+  patch(window, 'devicePixelRatio', {float(profile.device_scale_factor)});
+  patch(window, 'outerWidth', {int(profile.outer_width)});
+  patch(window, 'outerHeight', {int(profile.outer_height)});
+  patch(window, 'screenX', 0);
+  patch(window, 'screenY', 0);
+  patch(window, 'screenLeft', 0);
+  patch(window, 'screenTop', 0);
   try {{
     window.chrome = window.chrome || {{}};
     window.chrome.runtime = window.chrome.runtime || {{}};
     window.chrome.app = window.chrome.app || {{ isInstalled: false }};
+    window.chrome.webstore = window.chrome.webstore || {{}};
+    window.chrome.csi = window.chrome.csi || (() => ({{
+      onloadT: Date.now(),
+      startE: Date.now(),
+      pageT: Math.max(1, Math.round(performance.now())),
+      tran: 15,
+    }}));
+    window.chrome.loadTimes = window.chrome.loadTimes || (() => ({{
+      requestTime: Date.now() / 1000,
+      startLoadTime: Date.now() / 1000,
+      commitLoadTime: Date.now() / 1000,
+      finishDocumentLoadTime: Date.now() / 1000,
+      finishLoadTime: Date.now() / 1000,
+      firstPaintTime: Date.now() / 1000,
+      firstPaintAfterLoadTime: 0,
+      navigationType: 'Other',
+      wasFetchedViaSpdy: true,
+      wasNpnNegotiated: true,
+      npnNegotiatedProtocol: 'h2',
+      wasAlternateProtocolAvailable: false,
+      connectionInfo: 'h2',
+    }}));
   }} catch (_) {{}}
   try {{
     const orig = navigator.permissions && navigator.permissions.query;
@@ -359,21 +692,18 @@ class BrowserSessionRouter:
 """
 
     def _pick_profile(self, site: str) -> BrowserProfile:
-        pos = self._profile_pos.get(site, 0)
-        profile = BROWSER_PROFILES[pos % len(BROWSER_PROFILES)]
-        self._profile_pos[site] = pos + 1
-        return profile
-
-    @staticmethod
-    def _profile_by_name(name: str) -> BrowserProfile | None:
-        for profile in BROWSER_PROFILES:
-            if profile.name == name:
-                return profile
-        return None
+        site_name = str(site or "").strip()
+        if not site_name:
+            raise RuntimeError("profile selection requires site")
+        if not BROWSER_PROFILES:
+            raise RuntimeError("NO BROWSER PROFILES CONFIGURED")
+        return random.choice(BROWSER_PROFILES)
 
     def _load_session_state(self, cfg: SiteSessionConfig, slot_name: str, slot_idx: int) -> dict[str, Any] | None:
         state = self._cache_get_obj(self._session_key(cfg.site, slot_name, slot_idx))
         if not isinstance(state, dict):
+            return None
+        if not state:
             return None
         created_at = float(state.get("created_at") or 0.0)
         requests_total = int(state.get("requests_total") or 0)
@@ -381,24 +711,133 @@ class BrowserSessionRouter:
             return None
         if created_at and (time.time() - created_at) >= cfg.max_session_age_sec:
             return None
-        if bool(state.get("warmed") is True) and not storage_state_has_cookies((state or {}).get("storage_state")):
-            return None
         return state
 
-    @staticmethod
-    def _dispatch_ready(next_dispatch_ts: float) -> bool:
-        return time.time() >= float(next_dispatch_ts or 0.0)
-
-    def _reserve_dispatch_window(self, session: BrowserSession, cfg: SiteSessionConfig) -> bool:
+    def _new_session_state(self, cfg: SiteSessionConfig, slot_idx: int) -> dict[str, Any]:
         now = time.time()
-        with session.dispatch_mu:
-            current_next = float(session.next_dispatch_ts or 0.0)
-            if not self._dispatch_ready(current_next):
-                return False
-            min_pause = max(0.1, float(cfg.pause_min_sec))
-            max_pause = max(min_pause, float(cfg.pause_max_sec))
-            session.next_dispatch_ts = max(now, current_next) + round(random.uniform(min_pause, max_pause), 2)
-            return True
+        profile = self._pick_profile(cfg.site)
+        return {
+            "session_id": uuid4().hex[:12],
+            "profile_name": profile.name,
+            "slot_idx": int(slot_idx),
+            "created_at": now,
+            "last_used_at": now,
+            "requests_total": 0,
+            "warmed": False,
+            "current_url": "",
+            "next_dispatch_ts": 0.0,
+            "storage_state": {},
+        }
+
+    def _reserve_dispatch_ts(self, cfg: SiteSessionConfig, current_next: float) -> float:
+        now = time.time()
+        min_pause = max(0.1, float(cfg.pause_min_sec))
+        max_pause = max(min_pause, float(cfg.pause_max_sec))
+        reserved = max(now, float(current_next or 0.0)) + round(random.uniform(min_pause, max_pause), 2)
+        return reserved
+
+    def _apply_state_to_runtime(self, session: BrowserSession, state: dict[str, Any]) -> None:
+        if not isinstance(state, dict):
+            return
+        storage_state = dict(state.get("storage_state") or {})
+        should_sync_http = storage_state != dict(session.storage_state or {})
+        session.created_at = float(state.get("created_at") or session.created_at or time.time())
+        session.last_used_at = float(state.get("last_used_at") or session.last_used_at or time.time())
+        session.requests_total = int(state.get("requests_total") or 0)
+        session.warmed = bool(state.get("warmed") is True)
+        session.current_url = str(state.get("current_url") or "")
+        session.next_dispatch_ts = float(state.get("next_dispatch_ts") or 0.0)
+        session.storage_state = storage_state
+        if should_sync_http:
+            self._sync_http_session(session)
+
+    def _merge_session_state(
+        self,
+        session: BrowserSession,
+        current_state: dict[str, Any] | None,
+        requests_delta: int,
+    ) -> dict[str, Any]:
+        merged = dict(current_state or {})
+        merged["session_id"] = str(session.session_id)
+        merged["profile_name"] = str(session.profile.name)
+        merged["slot_idx"] = int(session.slot_idx)
+        merged["created_at"] = float(merged.get("created_at") or session.created_at or time.time())
+        merged["last_used_at"] = max(
+            float(merged.get("last_used_at") or 0.0),
+            float(session.last_used_at or 0.0),
+            time.time(),
+        )
+        merged["requests_total"] = int(merged.get("requests_total") or 0) + max(0, int(requests_delta))
+        merged["warmed"] = bool(bool(merged.get("warmed") is True) or session.warmed)
+        merged["current_url"] = str(session.current_url or merged.get("current_url") or "")
+        merged["next_dispatch_ts"] = max(
+            float(merged.get("next_dispatch_ts") or 0.0),
+            float(session.next_dispatch_ts or 0.0),
+        )
+        exported_state = export_storage_state(session.http_session, session.storage_state)
+        merged["storage_state"] = exported_state if exported_state else dict(merged.get("storage_state") or {})
+        return merged
+
+    def _checkout_session_lease(
+        self,
+        cfg: SiteSessionConfig,
+        slot: dict[str, Any],
+        slot_idx: int,
+    ) -> SessionLease | None:
+        slot_name = str(slot["name"])
+        gate_key = self._session_gate_key(cfg.site, slot_name, slot_idx)
+        owner = f"{cfg.site}:{slot_name}:{int(slot_idx)}:{uuid4().hex}"
+        gate_token = self._try_lock(gate_key, SESSION_GATE_TTL_SEC, owner)
+        if not gate_token:
+            return None
+        try:
+            state = self._load_session_state(cfg, slot_name, slot_idx)
+            if state is None:
+                state = self._new_session_state(cfg, slot_idx)
+            current_next = float(state.get("next_dispatch_ts") or 0.0)
+            if time.time() < current_next:
+                return None
+            needs_warm = not bool(state.get("warmed") is True)
+            warm_lock_key = ""
+            warm_lock_token = ""
+            if needs_warm:
+                warm_lock_key = self._session_warm_key(cfg.site, slot_name, slot_idx)
+                warm_lock_token = self._try_lock(warm_lock_key, SESSION_LEASE_TTL_SEC, owner)
+                if not warm_lock_token:
+                    return None
+            page_lock_key = ""
+            page_lock_token = ""
+            for current_page_idx in range(int(cfg.concurrent_pages_per_session)):
+                candidate_key = self._session_page_key(cfg.site, slot_name, slot_idx, current_page_idx)
+                candidate_token = self._try_lock(candidate_key, SESSION_LEASE_TTL_SEC, owner)
+                if not candidate_token:
+                    continue
+                page_lock_key = candidate_key
+                page_lock_token = candidate_token
+                break
+            if not page_lock_token:
+                self._release_lock(warm_lock_key, warm_lock_token)
+                return None
+            state = dict(state)
+            state["slot_idx"] = int(slot_idx)
+            state["last_used_at"] = max(float(state.get("last_used_at") or 0.0), time.time())
+            state["next_dispatch_ts"] = self._reserve_dispatch_ts(cfg, current_next)
+            self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), state)
+            return SessionLease(
+                session_key=self._session_key(cfg.site, slot_name, slot_idx),
+                slot_name=slot_name,
+                slot_idx=int(slot_idx),
+                session_id=str(state.get("session_id") or ""),
+                state=state,
+                needs_warm=needs_warm,
+                base_requests_total=int(state.get("requests_total") or 0),
+                page_lock_key=page_lock_key,
+                page_lock_token=page_lock_token,
+                warm_lock_key=warm_lock_key,
+                warm_lock_token=warm_lock_token,
+            )
+        finally:
+            self._release_lock(gate_key, gate_token)
 
     def _drop_egress_session_state(self, cfg: SiteSessionConfig, slot_name: str) -> None:
         doomed: list[BrowserSession] = []
@@ -435,19 +874,13 @@ class BrowserSessionRouter:
         recycle_after_ts = float(runtime.recycle_after_ts or 0.0)
         return bool(recycle_after_ts and now >= recycle_after_ts)
 
-    @staticmethod
-    def _browser_runtime_expired(browser_runtime: BrowserRuntime) -> bool:
-        now = time.time()
-        recycle_after_ts = float(browser_runtime.recycle_after_ts or 0.0)
-        return bool(recycle_after_ts and now >= recycle_after_ts)
-
     def reap_idle_runtimes(self) -> None:
         doomed: list[tuple[SiteSessionConfig, BrowserSession, bool]] = []
         doomed_browsers: list[BrowserRuntime] = []
         now = time.time()
         with self._runtime_cv:
             for runtime_key, runtime in list(self._runtimes.items()):
-                if runtime.active_pages > 0 or runtime.warming:
+                if runtime.active_pages > 0:
                     continue
                 cfg = SITE_CONFIGS[runtime.site]
                 clear_state = self._slot_is_quarantined(cfg, runtime.tunnel["name"])
@@ -460,7 +893,9 @@ class BrowserSessionRouter:
             for browser_key, browser_runtime in list(self._browsers.items()):
                 if any(self._browser_key(row.site, row.tunnel["name"]) == browser_key for row in self._runtimes.values()):
                     continue
-                if (now - float(browser_runtime.last_used_at or 0.0)) < RUNTIME_IDLE_REAP_SEC and not self._browser_runtime_expired(browser_runtime):
+                recycle_after_ts = float(browser_runtime.recycle_after_ts or 0.0)
+                browser_expired = bool(recycle_after_ts and now >= recycle_after_ts)
+                if (now - float(browser_runtime.last_used_at or 0.0)) < RUNTIME_IDLE_REAP_SEC and not browser_expired:
                     continue
                 self._browsers.pop(browser_key, None)
                 doomed_browsers.append(browser_runtime)
@@ -481,8 +916,8 @@ class BrowserSessionRouter:
         excluded: set[tuple[str, int]],
         preferred_slot_name: str = "",
         preferred_slot_idx: int = -1,
-    ) -> list[tuple[dict[str, Any], int, dict[str, Any] | None]]:
-        active = self._active_egresses(cfg)
+    ) -> list[tuple[dict[str, Any], int]]:
+        active = [row for row in self._load_slots(cfg) if not self._slot_is_quarantined(cfg, row["name"])]
         if not active:
             raise RuntimeError(f"NO ACTIVE SLOTS FOR {cfg.site}")
 
@@ -495,25 +930,22 @@ class BrowserSessionRouter:
                         continue
                     preferred_rank = 0 if (str(slot["name"]) == str(preferred_slot_name) and int(slot_idx) == int(preferred_slot_idx)) else 1
                     runtime = self._runtimes.get(self._runtime_key(cfg.site, slot["name"], slot_idx))
-                    if runtime is not None:
-                        if self._runtime_expired(cfg, runtime):
-                            continue
-                        if runtime.warming:
-                            continue
-                        if runtime.active_pages >= cfg.concurrent_pages_per_session:
-                            continue
-                        if not self._dispatch_ready(float(runtime.next_dispatch_ts or 0.0)):
-                            continue
-                        weighted.append((preferred_rank, 0, int(runtime.active_pages), float(runtime.last_used_at), slot, slot_idx, None))
-                        continue
                     state = self._load_session_state(cfg, slot["name"], slot_idx)
-                    if state and not self._dispatch_ready(float(state.get("next_dispatch_ts") or 0.0)):
+                    if state and time.time() < float(state.get("next_dispatch_ts") or 0.0):
                         continue
-                    last_used_at = float((state or {}).get("last_used_at") or 0.0)
-                    weighted.append((preferred_rank, 1, 0, last_used_at, slot, slot_idx, state))
+                    if runtime is not None and self._runtime_expired(cfg, runtime):
+                        runtime = None
+                    has_local_runtime = 0 if runtime is not None else 1
+                    local_uses = int((runtime.active_pages if runtime is not None else 0) or 0)
+                    last_used_at = float(
+                        (state or {}).get("last_used_at")
+                        or (runtime.last_used_at if runtime is not None else 0.0)
+                        or 0.0
+                    )
+                    weighted.append((preferred_rank, has_local_runtime, local_uses, last_used_at, slot, slot_idx))
 
         weighted.sort(key=lambda item: (item[0], item[1], item[2], item[3]))
-        return [(slot, slot_idx, state) for _, _, _, _, slot, slot_idx, state in weighted]
+        return [(slot, slot_idx) for _, _, _, _, slot, slot_idx in weighted]
 
     def _create_session(
         self,
@@ -522,7 +954,14 @@ class BrowserSessionRouter:
         slot_idx: int,
         state: dict[str, Any] | None,
     ) -> BrowserSession:
-        profile = self._profile_by_name(str((state or {}).get("profile_name") or "")) or self._pick_profile(cfg.site)
+        profile_name = str((state or {}).get("profile_name") or "")
+        profile = None
+        for candidate in BROWSER_PROFILES:
+            if candidate.name == profile_name:
+                profile = candidate
+                break
+        if profile is None:
+            profile = self._pick_profile(cfg.site)
         storage_state = dict((state or {}).get("storage_state") or {})
         http_session = build_http_session(profile, tunnel, storage_state)
 
@@ -542,7 +981,6 @@ class BrowserSessionRouter:
             warmed=bool((state or {}).get("warmed") is True),
             current_url=str((state or {}).get("current_url") or ""),
             active_pages=0,
-            warming=not bool((state or {}).get("warmed") is True),
             recycle_after_ts=time.time() + random.uniform(float(cfg.runtime_recycle_min_sec), float(cfg.runtime_recycle_max_sec)),
             next_dispatch_ts=float((state or {}).get("next_dispatch_ts") or 0.0),
         )
@@ -551,7 +989,6 @@ class BrowserSessionRouter:
         pw = self._ensure_playwright()
         launch_kwargs: dict[str, Any] = {
             "headless": True,
-            "slow_mo": 150,
             "ignore_default_args": ["--enable-automation"],
             "args": [
                 "--disable-blink-features=AutomationControlled",
@@ -560,21 +997,13 @@ class BrowserSessionRouter:
                 "--lang=de-DE",
                 "--disable-gpu",
                 "--disable-software-rasterizer",
-                "--disable-background-networking",
-                "--disable-background-timer-throttling",
                 "--disable-backgrounding-occluded-windows",
                 "--disable-renderer-backgrounding",
-                "--disable-breakpad",
-                "--disable-component-update",
                 "--disable-default-apps",
-                "--disable-extensions",
-                "--disable-features=AudioServiceOutOfProcess,AutofillServerCommunication,CertificateTransparencyComponentUpdater,MediaRouter,OptimizationHints,Translate",
-                "--disable-sync",
-                "--metrics-recording-only",
-                "--mute-audio",
+                "--disable-features=AudioServiceOutOfProcess,BackForwardCache,MediaRouter,Translate",
                 "--no-default-browser-check",
                 "--no-first-run",
-                "--renderer-process-limit=3",
+                "--renderer-process-limit=2",
             ],
         }
         if tunnel.get("proxy_server"):
@@ -614,44 +1043,67 @@ class BrowserSessionRouter:
         cfg: SiteSessionConfig,
         slot: dict[str, Any],
         slot_idx: int,
-        state: dict[str, Any] | None,
-    ) -> tuple[BrowserSession, bool] | None:
+    ) -> tuple[BrowserSession, SessionLease] | None:
+        lease = self._checkout_session_lease(cfg, slot, int(slot_idx))
+        if lease is None:
+            return None
         runtime_key = self._runtime_key(cfg.site, slot["name"], slot_idx)
+        doomed: BrowserSession | None = None
         with self._runtime_cv:
             runtime = self._runtimes.get(runtime_key)
             if runtime is not None:
-                if runtime.warming:
-                    return None
-                if runtime.active_pages >= cfg.concurrent_pages_per_session:
-                    return None
-                if not self._reserve_dispatch_window(runtime, cfg):
-                    return None
-                runtime.active_pages += 1
-                runtime.last_used_at = time.time()
-                return runtime, False
+                if str(runtime.session_id) != str(lease.session_id):
+                    if runtime.active_pages > 0:
+                        self._release_lock(lease.page_lock_key, lease.page_lock_token)
+                        self._release_lock(lease.warm_lock_key, lease.warm_lock_token)
+                        return None
+                    self._runtimes.pop(runtime_key, None)
+                    doomed = runtime
+                    runtime = None
+                if runtime is not None:
+                    self._apply_state_to_runtime(runtime, lease.state)
+                    runtime.next_dispatch_ts = float(lease.state.get("next_dispatch_ts") or 0.0)
+                    runtime.last_used_at = time.time()
+                    runtime.active_pages += 1
+                    self._runtime_cv.notify_all()
+                    return runtime, lease
+
+        if doomed is not None:
+            self._close_session(doomed)
 
         runtime = None
         try:
-            runtime = self._create_session(cfg, slot, slot_idx, state)
-            if not self._reserve_dispatch_window(runtime, cfg):
-                self._close_session(runtime)
-                return None
+            runtime = self._create_session(cfg, slot, slot_idx, lease.state)
+            runtime.next_dispatch_ts = float(lease.state.get("next_dispatch_ts") or 0.0)
             runtime.active_pages = 1
             with self._runtime_cv:
                 existing = self._runtimes.get(runtime_key)
                 if existing is not None:
-                    self._close_session(runtime)
-                    if existing.warming or existing.active_pages >= cfg.concurrent_pages_per_session:
-                        return None
-                    if not self._reserve_dispatch_window(existing, cfg):
-                        return None
-                    existing.active_pages += 1
-                    existing.last_used_at = time.time()
-                    return existing, False
+                    if str(existing.session_id) != str(lease.session_id):
+                        if existing.active_pages > 0:
+                            self._release_lock(lease.page_lock_key, lease.page_lock_token)
+                            self._release_lock(lease.warm_lock_key, lease.warm_lock_token)
+                            self._close_session(runtime)
+                            return None
+                        self._runtimes.pop(runtime_key, None)
+                        doomed = existing
+                        existing = None
+                    if existing is not None:
+                        self._apply_state_to_runtime(existing, lease.state)
+                        existing.next_dispatch_ts = float(lease.state.get("next_dispatch_ts") or 0.0)
+                        existing.last_used_at = time.time()
+                        existing.active_pages += 1
+                        self._runtime_cv.notify_all()
+                        self._close_session(runtime)
+                        return existing, lease
                 self._runtimes[runtime_key] = runtime
                 self._runtime_cv.notify_all()
-            return runtime, runtime.warming
+            if doomed is not None:
+                self._close_session(doomed)
+            return runtime, lease
         except Exception:
+            self._release_lock(lease.page_lock_key, lease.page_lock_token)
+            self._release_lock(lease.warm_lock_key, lease.warm_lock_token)
             if runtime is not None:
                 self._close_session(runtime)
             raise
@@ -675,33 +1127,21 @@ class BrowserSessionRouter:
             pass
 
     def _persist_session_state(self, cfg: SiteSessionConfig, session: BrowserSession) -> None:
-        exported_state = export_storage_state(session.http_session, session.storage_state)
-        state = {
-            "session_id": session.session_id,
-            "profile_name": session.profile.name,
-            "slot_idx": int(session.slot_idx),
-            "created_at": float(session.created_at),
-            "last_used_at": float(session.last_used_at),
-            "requests_total": int(session.requests_total),
-            "warmed": bool(session.warmed),
-            "current_url": str(session.current_url or ""),
-            "next_dispatch_ts": float(session.next_dispatch_ts or 0.0),
-            "storage_state": exported_state,
-        }
-        self._cache_set_obj(self._session_key(cfg.site, session.tunnel["name"], session.slot_idx), state)
-        self._sys_log(
-            ROUTER_HTTP_LOG_FILE,
-            {
-                "event": "cookie_persist_redis",
-                "site": cfg.site,
-                "session_id": session.session_id,
-                "session_slot": int(session.slot_idx),
-                "tunnel": session.tunnel,
-                "cookies": [str(row.get("name") or "") for row in ((exported_state or {}).get("cookies") or [])],
-                "cookie_count": len(((exported_state or {}).get("cookies") or [])),
-                "warmed": bool(session.warmed),
-            },
-        )
+        slot_name = str(session.tunnel["name"])
+        slot_idx = int(session.slot_idx)
+        gate_key = self._session_gate_key(cfg.site, slot_name, slot_idx)
+        owner = f"persist:{cfg.site}:{slot_name}:{slot_idx}:{uuid4().hex}"
+        gate_token = self._lock_until(gate_key, SESSION_GATE_TTL_SEC, owner, SESSION_GATE_WAIT_SEC)
+        if not gate_token:
+            raise RuntimeError(f"SESSION GATE BUSY {cfg.site} {slot_name}:{slot_idx}")
+        try:
+            current_state = self._load_session_state(cfg, slot_name, slot_idx) or {}
+            merged = self._merge_session_state(session, current_state, requests_delta=0)
+            session.requests_total = int(merged.get("requests_total") or session.requests_total)
+            session.next_dispatch_ts = float(merged.get("next_dispatch_ts") or session.next_dispatch_ts)
+            self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), merged)
+        finally:
+            self._release_lock(gate_key, gate_token)
 
     def _sync_http_session(self, session: BrowserSession) -> None:
         storage_state = dict(session.storage_state or {})
@@ -712,203 +1152,107 @@ class BrowserSessionRouter:
                 old_http.close()
             except Exception:
                 pass
-        self._sys_log(
-            ROUTER_HTTP_LOG_FILE,
-            {
-                "event": "cookie_sync_http",
-                "site": session.site,
-                "session_id": session.session_id,
-                "session_slot": int(session.slot_idx),
-                "tunnel": session.tunnel,
-                "storage_cookie_count": len((storage_state or {}).get("cookies") or []),
-                "http_cookie_count": len(cookie_snapshot(session.http_session)),
-                "cookies": [str(row.get("name") or "") for row in cookie_snapshot(session.http_session)],
-            },
-        )
+
+    def _capture_browser_state(self, session: BrowserSession, page: Any) -> None:
+        try:
+            session.storage_state = dict(page.context.storage_state() or {})
+        except Exception:
+            session.storage_state = dict(session.storage_state or {})
+        self._sync_http_session(session)
 
     def _session_has_live_cookies(self, session: BrowserSession) -> bool:
-        if not storage_state_has_cookies(session.storage_state):
-            return False
         try:
-            return bool(cookie_snapshot(session.http_session))
+            has_http_cookies = bool(cookie_snapshot(session.http_session))
         except Exception:
-            return False
+            has_http_cookies = False
+        return storage_state_has_cookies(session.storage_state) or has_http_cookies
 
-    def _persist_and_verify_ready(self, cfg: SiteSessionConfig, session: BrowserSession, *, stage: str) -> bool:
-        if not self._session_has_live_cookies(session):
-            self._sys_log(
-                ROUTER_HTTP_LOG_FILE,
-                {
-                    "event": "session_gate_failed",
-                    "site": cfg.site,
-                    "stage": stage,
-                    "session_id": session.session_id,
-                    "session_slot": int(session.slot_idx),
-                    "tunnel": session.tunnel,
-                    "reason": "NO_COOKIES_IN_MEMORY",
-                },
-            )
-            return False
-        self._persist_session_state(cfg, session)
-        reloaded = self._load_session_state(cfg, session.tunnel["name"], session.slot_idx) or {}
-        self._sys_log(
-            ROUTER_HTTP_LOG_FILE,
-            {
-                "event": "cookie_reload_redis",
-                "site": cfg.site,
-                "stage": stage,
-                "session_id": session.session_id,
-                "session_slot": int(session.slot_idx),
-                "tunnel": session.tunnel,
-                "cookie_count": len(((reloaded or {}).get("storage_state") or {}).get("cookies") or []),
-                "cookies": [
-                    str(row.get("name") or "")
-                    for row in ((((reloaded or {}).get("storage_state") or {}).get("cookies") or []))
-                ],
-            },
-        )
-        ok = storage_state_has_cookies((reloaded or {}).get("storage_state"))
-        if not ok:
-            self._sys_log(
-                ROUTER_HTTP_LOG_FILE,
-                {
-                    "event": "session_gate_failed",
-                    "site": cfg.site,
-                    "stage": stage,
-                    "session_id": session.session_id,
-                    "session_slot": int(session.slot_idx),
-                    "tunnel": session.tunnel,
-                    "reason": "NO_COOKIES_IN_REDIS",
-                },
-            )
-        return ok
-
-    def _release_runtime(self, cfg: SiteSessionConfig, session: BrowserSession, *, clear_state: bool = False) -> None:
+    def _release_runtime(
+        self,
+        cfg: SiteSessionConfig,
+        session: BrowserSession,
+        lease: SessionLease,
+        *,
+        clear_state: bool = False,
+    ) -> None:
         runtime_key = self._runtime_key(cfg.site, session.tunnel["name"], session.slot_idx)
         browser_key = self._browser_key(cfg.site, session.tunnel["name"])
         should_close = False
         close_browser: BrowserRuntime | None = None
-        with self._runtime_cv:
-            session.active_pages = max(0, int(session.active_pages) - 1)
-            session.last_used_at = time.time()
-            browser_runtime = self._browsers.get(browser_key)
-            if browser_runtime is not None:
-                browser_runtime.last_used_at = session.last_used_at
-            if session.active_pages <= 0 and (clear_state or self._slot_is_quarantined(cfg, session.tunnel["name"]) or self._runtime_expired(cfg, session)):
-                self._runtimes.pop(runtime_key, None)
-                should_close = True
-                if not any(self._browser_key(row.site, row.tunnel["name"]) == browser_key for row in self._runtimes.values()):
-                    browser_runtime = self._browsers.get(browser_key)
-                    if browser_runtime is not None and (clear_state or self._slot_is_quarantined(cfg, session.tunnel["name"]) or self._browser_runtime_expired(browser_runtime)):
-                        close_browser = self._browsers.pop(browser_key, None)
-            self._runtime_cv.notify_all()
+        merged_state: dict[str, Any] | None = None
+        slot_name = str(session.tunnel["name"])
+        slot_idx = int(session.slot_idx)
+        gate_key = self._session_gate_key(cfg.site, slot_name, slot_idx)
+        owner = f"release:{cfg.site}:{slot_name}:{slot_idx}:{uuid4().hex}"
+
+        gate_token = self._lock_until(gate_key, SESSION_GATE_TTL_SEC, owner, SESSION_GATE_WAIT_SEC)
+        if not gate_token:
+            raise RuntimeError(f"SESSION GATE BUSY {cfg.site} {slot_name}:{slot_idx}")
+
+        try:
+            current_state = self._load_session_state(cfg, slot_name, slot_idx) or {}
+            if str(current_state.get("session_id") or session.session_id) != str(session.session_id):
+                current_state = {}
+            requests_delta = max(0, int(session.requests_total) - int(lease.base_requests_total))
+            if not clear_state and not self._slot_is_quarantined(cfg, slot_name):
+                merged_state = self._merge_session_state(session, current_state, requests_delta)
+                session.requests_total = int(merged_state.get("requests_total") or session.requests_total)
+                session.next_dispatch_ts = float(merged_state.get("next_dispatch_ts") or session.next_dispatch_ts)
+            with self._runtime_cv:
+                session.active_pages = max(0, int(session.active_pages) - 1)
+                session.last_used_at = time.time()
+                browser_runtime = self._browsers.get(browser_key)
+                if browser_runtime is not None:
+                    browser_runtime.last_used_at = session.last_used_at
+                runtime_is_expired = False
+                if merged_state is not None:
+                    session.created_at = float(merged_state.get("created_at") or session.created_at)
+                    session.warmed = bool(merged_state.get("warmed") is True)
+                    runtime_is_expired = (
+                        int(merged_state.get("requests_total") or 0) >= cfg.max_requests_per_session
+                        or (session.last_used_at - float(merged_state.get("created_at") or session.created_at or 0.0)) >= float(cfg.max_session_age_sec)
+                    )
+                if session.active_pages <= 0 and (clear_state or self._slot_is_quarantined(cfg, slot_name) or runtime_is_expired or self._runtime_expired(cfg, session)):
+                    self._runtimes.pop(runtime_key, None)
+                    should_close = True
+                    if not any(self._browser_key(row.site, row.tunnel["name"]) == browser_key for row in self._runtimes.values()):
+                        browser_runtime = self._browsers.get(browser_key)
+                        if browser_runtime is not None:
+                            recycle_after_ts = float(browser_runtime.recycle_after_ts or 0.0)
+                            browser_expired = bool(recycle_after_ts and time.time() >= recycle_after_ts)
+                        else:
+                            browser_expired = False
+                        if browser_runtime is not None and (
+                            clear_state
+                            or self._slot_is_quarantined(cfg, slot_name)
+                            or browser_expired
+                        ):
+                            close_browser = self._browsers.pop(browser_key, None)
+                self._runtime_cv.notify_all()
+
+            if clear_state or self._slot_is_quarantined(cfg, slot_name):
+                self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), {})
+            elif merged_state is not None:
+                self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), merged_state)
+        finally:
+            self._release_lock(lease.page_lock_key, lease.page_lock_token)
+            self._release_lock(lease.warm_lock_key, lease.warm_lock_token)
+            self._release_lock(gate_key, gate_token)
 
         if not should_close:
-            try:
-                self._persist_session_state(cfg, session)
-            except Exception:
-                pass
             return
 
-        if clear_state or self._slot_is_quarantined(cfg, session.tunnel["name"]):
-            self._cache_set_obj(self._session_key(cfg.site, session.tunnel["name"], session.slot_idx), {})
-        else:
-            self._persist_session_state(cfg, session)
         self._close_session(session)
         if close_browser is not None:
             self._close_browser_runtime(close_browser)
 
-    def _safe_request_headers(self, req) -> dict[str, Any]:
-        try:
-            return dict(req.all_headers())
-        except Exception:
+    def _all_headers_or_empty(self, source: Any, source_name: str) -> dict[str, Any]:
+        if source is None:
             return {}
-
-    def _safe_response_headers(self, resp) -> dict[str, Any]:
         try:
-            return dict(resp.all_headers())
-        except Exception:
-            return {}
-
-    def _attach_http_logging(self, page: Any, session: BrowserSession, cfg: SiteSessionConfig) -> dict[str, dict[str, Any]]:
-        subrequests: dict[str, dict[str, Any]] = {}
-
-        def on_request(req) -> None:
-            req_id = uuid4().hex
-            try:
-                setattr(req, "_serenity_req_id", req_id)
-            except Exception:
-                pass
-            started = time.time()
-            subrequests[req_id] = {"started": started}
-            self._sys_log(
-                ROUTER_HTTP_LOG_FILE,
-                {
-                    "event": "subrequest",
-                    "site": cfg.site,
-                    "session_id": session.session_id,
-                    "session_slot": int(session.slot_idx),
-                    "tunnel": session.tunnel,
-                    "request_id": req_id,
-                    "url": str(req.url),
-                    "method": str(req.method),
-                    "resource_type": str(req.resource_type),
-                    "is_navigation_request": bool(req.is_navigation_request()),
-                    "request_headers": self._safe_request_headers(req),
-                },
-            )
-
-        def on_response(resp) -> None:
-            req = resp.request
-            req_id = getattr(req, "_serenity_req_id", "")
-            started = float((subrequests or {}).get(req_id, {}).get("started") or time.time())
-            self._sys_log(
-                ROUTER_HTTP_LOG_FILE,
-                {
-                    "event": "subresponse",
-                    "site": cfg.site,
-                    "session_id": session.session_id,
-                    "session_slot": int(session.slot_idx),
-                    "tunnel": session.tunnel,
-                    "request_id": req_id,
-                    "url": str(resp.url),
-                    "method": str(req.method),
-                    "resource_type": str(req.resource_type),
-                    "status": int(resp.status),
-                    "ms": int((time.time() - started) * 1000),
-                    "response_headers": self._safe_response_headers(resp),
-                },
-            )
-
-        def on_request_failed(req) -> None:
-            req_id = getattr(req, "_serenity_req_id", "")
-            started = float((subrequests or {}).get(req_id, {}).get("started") or time.time())
-            failure = ""
-            try:
-                failure = str(req.failure)
-            except Exception:
-                failure = ""
-            self._sys_log(
-                ROUTER_HTTP_LOG_FILE,
-                {
-                    "event": "subresponse_failed",
-                    "site": cfg.site,
-                    "session_id": session.session_id,
-                    "session_slot": int(session.slot_idx),
-                    "tunnel": session.tunnel,
-                    "request_id": req_id,
-                    "url": str(req.url),
-                    "method": str(req.method),
-                    "resource_type": str(req.resource_type),
-                    "ms": int((time.time() - started) * 1000),
-                    "error": failure,
-                },
-            )
-
-        page.on("request", on_request)
-        page.on("response", on_response)
-        page.on("requestfailed", on_request_failed)
-        return subrequests
+            return dict(source.all_headers())
+        except Exception as exc:
+            return {"_error": f"{source_name}_headers_unavailable: {type(exc).__name__}: {exc}"}
 
     def _new_page(self, session: BrowserSession, cfg: SiteSessionConfig) -> tuple[Any, Any]:
         browser_runtime = self._checkout_browser_runtime(cfg, session.tunnel)
@@ -919,7 +1263,10 @@ class BrowserSessionRouter:
             "viewport": {"width": session.profile.viewport_width, "height": session.profile.viewport_height},
             "screen": {"width": session.profile.screen_width, "height": session.profile.screen_height},
             "color_scheme": "light",
+            "device_scale_factor": session.profile.device_scale_factor,
+            "has_touch": bool(session.profile.max_touch_points > 0),
             "ignore_https_errors": True,
+            "reduced_motion": "reduce",
             "service_workers": "block",
         }
         if isinstance(session.storage_state, dict) and session.storage_state:
@@ -937,76 +1284,160 @@ class BrowserSessionRouter:
                 "userAgentMetadata": session.profile.user_agent_metadata,
             },
         )
-        self._attach_http_logging(page, session, cfg)
         return context, page
 
-    def _humanize(self, page: Any) -> None:
+    @staticmethod
+    def _close_page_context(page: Any, context: Any) -> None:
+        if page is not None:
+            try:
+                page.close()
+            except Exception:
+                pass
+        if context is not None:
+            try:
+                context.close()
+            except Exception:
+                pass
+
+    def _humanize(self, page: Any, profile: BrowserProfile) -> None:
+        first_x = max(32, int(profile.viewport_width * random.uniform(0.18, 0.36)))
+        first_y = max(32, int(profile.viewport_height * random.uniform(0.16, 0.34)))
+        second_x = max(48, int(profile.viewport_width * random.uniform(0.44, 0.72)))
+        second_y = max(48, int(profile.viewport_height * random.uniform(0.38, 0.68)))
         try:
-            page.wait_for_load_state("networkidle", timeout=15_000)
+            page.bring_to_front()
         except Exception:
             pass
         try:
-            page.mouse.move(260, 220, steps=12)
-            page.wait_for_timeout(300)
-            page.mouse.wheel(0, 420)
-            page.wait_for_timeout(450)
-            page.mouse.move(520, 360, steps=10)
-            page.wait_for_timeout(250)
-            page.mouse.wheel(0, -180)
-            page.wait_for_timeout(300)
+            page.wait_for_timeout(random.randint(90, 180))
+            page.mouse.move(first_x, first_y, steps=random.randint(7, 12))
+            page.wait_for_timeout(random.randint(70, 140))
+            page.mouse.move(second_x, second_y, steps=random.randint(6, 10))
+            if profile.viewport_height >= 760:
+                page.wait_for_timeout(random.randint(60, 120))
+                page.mouse.wheel(0, random.randint(90, 220))
+                page.wait_for_timeout(random.randint(80, 160))
+                page.mouse.wheel(0, -random.randint(40, 120))
+            page.wait_for_timeout(random.randint(120, 240))
         except Exception:
             pass
-
-    def _looks_blocked(self, status: int, title: str, html: str) -> bool:
-        if int(status or 0) in (403, 429):
-            return True
-        title = str(title or "")
-        html = str(html or "")
-        return "Nur einen Moment" in title or "challenge-platform" in html or "error code: 1015" in html
-
-    def _should_quarantine_for_block(self, status: int, title: str, html: str) -> bool:
-        return self._looks_blocked(int(status or 0), str(title or ""), str(html or ""))
 
     @staticmethod
-    def _same_origin(url_a: str, url_b: str) -> bool:
+    def _cookie_names(page: Any, url: str) -> set[str]:
         try:
-            aa = urlsplit(str(url_a or ""))
-            bb = urlsplit(str(url_b or ""))
-            return bool(aa.scheme and aa.netloc and aa.scheme == bb.scheme and aa.netloc == bb.netloc)
+            return {str(row.get("name") or "") for row in (page.context.cookies([url]) or []) if str(row.get("name") or "")}
         except Exception:
+            return set()
+
+    def _home_cookies_ready(self, page: Any, cfg: SiteSessionConfig, url: str) -> bool:
+        cookie_names = self._cookie_names(page, url)
+        if cfg.site == "11880":
+            return bool(cookie_names & {"PHPSESSID", "randomSeed", "__cf_bm", "referrer"})
+        if cfg.site == "gs":
+            return any(name.startswith("__cmp") for name in cookie_names) or "utag_main" in cookie_names
+        return bool(cookie_names)
+
+    def _wait_home_cookies(self, page: Any, cfg: SiteSessionConfig, url: str) -> None:
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            if self._home_cookies_ready(page, cfg, url):
+                try:
+                    page.wait_for_timeout(180)
+                except Exception:
+                    pass
+                return
+            try:
+                page.wait_for_timeout(120)
+            except Exception:
+                time.sleep(0.12)
+
+    def _minimal_page_ready(self, page: Any, cfg: SiteSessionConfig, kind: str, url: str) -> bool:
+        kind_s = str(kind or "")
+        if kind_s == "home":
+            return self._home_cookies_ready(page, cfg, url)
+        cookie_names = self._cookie_names(page, url)
+        if kind_s == "search":
+            try:
+                ready = page.evaluate(
+                    """
+                    ({ site }) => {
+                      if (site === 'gs') {
+                        return !!(
+                          document.querySelector('article.mod.mod-Treffer a[href*="/gsbiz/"]') ||
+                          document.querySelector('#mod-LoadMore')
+                        );
+                      }
+                      if (site === '11880') {
+                        const scripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
+                        if (scripts.some((el) => (el.textContent || '').includes('itemListElement'))) return true;
+                        return !!document.querySelector('a[href*="/branchenbuch/"]');
+                      }
+                      return true;
+                    }
+                    """,
+                    {"site": cfg.site},
+                )
+                if bool(ready):
+                    return True
+            except Exception:
+                pass
+            return bool(cookie_names)
+        return True
+
+    def _wait_minimal_ready(self, page: Any, cfg: SiteSessionConfig, kind: str, url: str) -> None:
+        timeout_ms = 1200 if str(kind or "") == "home" else 1500
+        deadline = time.time() + (timeout_ms / 1000.0)
+        while time.time() < deadline:
+            if self._minimal_page_ready(page, cfg, kind, url):
+                try:
+                    page.wait_for_timeout(180)
+                except Exception:
+                    pass
+                return
+            time.sleep(0.05)
+
+    def _looks_blocked(self, status: int, title: str, html: str) -> bool:
+        title = str(title or "")
+        html = str(html or "")
+        if int(status or 0) in {403, 429}:
+            return True
+        if not title and not html:
             return False
+        return "Nur einen Moment" in title or "challenge-platform" in html or "error code: 1015" in html
 
     def _should_try_click(self, session: BrowserSession, url: str, referer: str) -> bool:
         if not referer:
             return False
-        if not self._same_origin(url, referer):
+        url_parts = urlsplit(str(url or ""))
+        referer_parts = urlsplit(str(referer or ""))
+        same_origin = bool(
+            url_parts.scheme
+            and url_parts.netloc
+            and url_parts.scheme == referer_parts.scheme
+            and url_parts.netloc == referer_parts.netloc
+        )
+        if not same_origin:
             return False
         if random.random() > 0.35:
             return False
         return True
 
-    @staticmethod
-    def _candidate_hrefs(url: str) -> list[str]:
-        parsed = urlsplit(str(url or ""))
-        out: list[str] = []
-        full = str(url or "")
-        if full:
-            out.append(full)
-        path_q = parsed.path or "/"
-        if parsed.query:
-            path_q = f"{path_q}?{parsed.query}"
-        out.append(path_q)
-        if parsed.path:
-            out.append(parsed.path)
-        dedup: list[str] = []
-        for row in out:
-            if row and row not in dedup:
-                dedup.append(row)
-        return dedup
-
     def _click_to_target(self, page: Any, target_url: str, timeout_ms: int) -> bool:
+        parsed = urlsplit(str(target_url or ""))
+        candidate_hrefs: list[str] = []
+        full_url = str(target_url or "")
+        if full_url:
+            candidate_hrefs.append(full_url)
+        path_with_query = parsed.path or "/"
+        if parsed.query:
+            path_with_query = f"{path_with_query}?{parsed.query}"
+        candidate_hrefs.append(path_with_query)
+        if parsed.path:
+            candidate_hrefs.append(parsed.path)
         selectors = []
-        for href in self._candidate_hrefs(target_url):
+        for href in candidate_hrefs:
+            if not href or href in selectors:
+                continue
             href_escaped = href.replace('"', '\\"')
             selectors.append(f'a[href="{href_escaped}"]')
         for selector in selectors:
@@ -1068,7 +1499,7 @@ class BrowserSessionRouter:
                 """
             )
             try:
-                page.wait_for_timeout(350)
+                page.wait_for_timeout(100)
             except Exception:
                 pass
             return int(clicked or 0)
@@ -1091,43 +1522,8 @@ class BrowserSessionRouter:
             context, page = self._new_page(session, cfg)
             result = self._fetch_once(session, page, cfg, url, kind, task_id, cb_id, referer)
             if result.status == 200 and not self._looks_blocked(result.status, result.title, result.html):
-                click_count = self._simulate_index_clicks(page, cfg)
-                try:
-                    session.storage_state = dict(page.context.storage_state() or {})
-                except Exception:
-                    pass
-                self._sys_log(
-                    ROUTER_HTTP_LOG_FILE,
-                    {
-                        "event": "cookie_capture_browser",
-                        "site": cfg.site,
-                        "stage": "index_browser",
-                        "kind": kind,
-                        "task_id": task_id,
-                        "cb_id": cb_id,
-                        "session_id": session.session_id,
-                        "session_slot": int(session.slot_idx),
-                        "tunnel": session.tunnel,
-                        "cookie_count": len((session.storage_state or {}).get("cookies") or []),
-                        "cookies": [str(row.get("name") or "") for row in ((session.storage_state or {}).get("cookies") or [])],
-                    },
-                )
-                self._sync_http_session(session)
-                self._sys_log(
-                    ROUTER_HTTP_LOG_FILE,
-                    {
-                        "event": "index_click_simulation",
-                        "site": cfg.site,
-                        "kind": kind,
-                        "task_id": task_id,
-                        "cb_id": cb_id,
-                        "session_id": session.session_id,
-                        "session_slot": int(session.slot_idx),
-                        "tunnel": session.tunnel,
-                        "url": url,
-                        "clicked": int(click_count),
-                    },
-                )
+                self._simulate_index_clicks(page, cfg)
+                self._capture_browser_state(session, page)
             return result
         finally:
             if page is not None:
@@ -1152,94 +1548,49 @@ class BrowserSessionRouter:
         cb_id: int,
         referer: str = "",
     ) -> FetchResult:
+        session.current_url = url
         started = time.time()
-        started_iso = self._iso_ts(started)
-        print(
-            f"[browser-router] -> site={cfg.site} kind={kind} task_id={task_id} cb_id={cb_id} "
-            f"tunnel={session.tunnel.get('name')} slot={session.slot_idx} "
-            f"session={session.session_id} url={url}",
-            flush=True,
-        )
         cookies_before = []
         try:
             cookies_before = page.context.cookies([url])
         except Exception:
             cookies_before = []
+        self._log_fetch_start(
+            log_file=HTTP_CHROMIUM_LOG_FILE,
+            site=cfg.site,
+            has_cookies=bool(cookies_before),
+            tunnel=session.tunnel,
+            url=url,
+        )
         response = page.goto(
             url,
             referer=referer or None,
             wait_until="domcontentloaded",
             timeout=cfg.browser_timeout_ms,
         )
+        self._wait_minimal_ready(page, cfg, kind, url)
+        if str(kind or "") == "home":
+            self._humanize(page, session.profile)
+            self._wait_home_cookies(page, cfg, url)
         html = page.content()
         final_url = str(page.url)
         status = int(response.status) if response else 0
         title = page.title() or ""
-        body_text = " ".join((html or "")[:500].split())
         finished = time.time()
-        finished_iso = self._iso_ts(finished)
         elapsed_ms = int((finished - started) * 1000)
-        req = response.request if response else None
-        self._sys_log(
-            ROUTER_HTTP_LOG_FILE,
-            {
-                "event": "top_fetch",
-                "site": cfg.site,
-                "kind": kind,
-                "task_id": task_id,
-                "cb_id": cb_id,
-                "session_id": session.session_id,
-                "session_slot": int(session.slot_idx),
-                "tunnel": session.tunnel,
-                "request_started_at": started_iso,
-                "response_received_at": finished_iso,
-                "request": {
-                    "url": url,
-                    "referer": referer,
-                    "headers": self._safe_request_headers(req) if req else {},
-                    "cookies": cookies_before,
-                },
-                "response": {
-                    "final_url": final_url,
-                    "status": status,
-                    "ms": elapsed_ms,
-                    "headers": self._safe_response_headers(response) if response else {},
-                    "cookies": page.context.cookies([final_url or url]),
-                    "title": title,
-                    "body_head": body_text[:300],
-                },
-            },
-        )
-        print(
-            f"[browser-router] <- site={cfg.site} kind={kind} cb_id={cb_id} "
-            f"status={status} ms={elapsed_ms} "
-            f"tunnel={session.tunnel.get('name')} slot={session.slot_idx} "
-            f"session={session.session_id} final_url={final_url}",
-            flush=True,
+        self._log_fetch_done(
+            log_file=HTTP_CHROMIUM_LOG_FILE,
+            site=cfg.site,
+            has_cookies=bool(cookies_before),
+            tunnel=session.tunnel,
+            final_url=final_url or url,
+            status=status,
+            ms=elapsed_ms,
         )
         session.last_used_at = time.time()
         session.current_url = final_url or url
         session.requests_total += 1
-        try:
-            session.storage_state = dict(page.context.storage_state() or {})
-        except Exception:
-            pass
-        self._sys_log(
-            ROUTER_HTTP_LOG_FILE,
-            {
-                "event": "cookie_capture_browser",
-                "site": cfg.site,
-                "stage": kind,
-                "task_id": task_id,
-                "cb_id": cb_id,
-                "session_id": session.session_id,
-                "session_slot": int(session.slot_idx),
-                "tunnel": session.tunnel,
-                "cookie_count": len((session.storage_state or {}).get("cookies") or []),
-                "cookies": [str(row.get("name") or "") for row in ((session.storage_state or {}).get("cookies") or [])],
-            },
-        )
-        self._sync_http_session(session)
+        self._capture_browser_state(session, page)
         return FetchResult(
             status=status,
             url=url,
@@ -1249,6 +1600,7 @@ class BrowserSessionRouter:
             ms=elapsed_ms,
             site=cfg.site,
             session_id=session.session_id,
+            session_slot=int(session.slot_idx),
             tunnel=dict(session.tunnel),
         )
 
@@ -1261,25 +1613,34 @@ class BrowserSessionRouter:
         task_id: int,
         cb_id: int,
         referer: str = "",
+        method: str = "GET",
+        form: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> FetchResult:
-        if not self._session_has_live_cookies(session):
-            raise RuntimeError(f"HTTP SESSION NOT WARMED {cfg.site} {session.tunnel.get('name')}:{session.slot_idx}")
+        session.current_url = url
+        method_s = str(method or "GET").upper()
         started = time.time()
-        started_iso = self._iso_ts(started)
-        print(
-            f"[browser-router] -> site={cfg.site} kind={kind} task_id={task_id} cb_id={cb_id} "
-            f"tunnel={session.tunnel.get('name')} slot={session.slot_idx} "
-            f"session={session.session_id} url={url}",
-            flush=True,
-        )
+        had_cookies = False
         with session.http_mu:
             cookies_before = cookie_snapshot(session.http_session)
+            had_cookies = bool(cookies_before)
+        self._log_fetch_start(
+            log_file=HTTP_LIGHT_LOG_FILE,
+            site=cfg.site,
+            has_cookies=had_cookies,
+            tunnel=session.tunnel,
+            url=url,
+        )
+        with session.http_mu:
             payload = fetch_html(
                 session.http_session,
                 session.profile,
                 url,
                 referer=referer or "",
                 timeout_ms=cfg.browser_timeout_ms,
+                method=method_s,
+                form=dict(form or {}) or None,
+                extra_headers=dict(extra_headers or {}) or None,
             )
             session.storage_state = export_storage_state(session.http_session, session.storage_state)
         final_url = str(payload.get("final_url") or url)
@@ -1291,46 +1652,16 @@ class BrowserSessionRouter:
         p2 = low.find("</title>")
         if p1 >= 0 and p2 > p1:
             title = html[p1 + 7 : p2].strip()
-        body_text = " ".join(html[:500].split())
         finished = time.time()
-        finished_iso = self._iso_ts(finished)
         elapsed_ms = int((finished - started) * 1000)
-        self._sys_log(
-            ROUTER_HTTP_LOG_FILE,
-            {
-                "event": "top_fetch",
-                "site": cfg.site,
-                "kind": kind,
-                "task_id": task_id,
-                "cb_id": cb_id,
-                "session_id": session.session_id,
-                "session_slot": int(session.slot_idx),
-                "tunnel": session.tunnel,
-                "request_started_at": started_iso,
-                "response_received_at": finished_iso,
-                "request": {
-                    "url": url,
-                    "referer": referer,
-                    "headers": dict(payload.get("request_headers") or {}),
-                    "cookies": cookies_before,
-                },
-                "response": {
-                    "final_url": final_url,
-                    "status": status,
-                    "ms": elapsed_ms,
-                    "headers": dict(payload.get("response_headers") or {}),
-                    "cookies": cookie_snapshot(session.http_session),
-                    "title": title,
-                    "body_head": body_text[:300],
-                },
-            },
-        )
-        print(
-            f"[browser-router] <- site={cfg.site} kind={kind} cb_id={cb_id} "
-            f"status={status} ms={elapsed_ms} "
-            f"tunnel={session.tunnel.get('name')} slot={session.slot_idx} "
-            f"session={session.session_id} final_url={final_url}",
-            flush=True,
+        self._log_fetch_done(
+            log_file=HTTP_LIGHT_LOG_FILE,
+            site=cfg.site,
+            has_cookies=had_cookies,
+            tunnel=session.tunnel,
+            final_url=final_url or url,
+            status=status,
+            ms=elapsed_ms,
         )
         session.last_used_at = time.time()
         session.current_url = final_url or url
@@ -1344,6 +1675,7 @@ class BrowserSessionRouter:
             ms=elapsed_ms,
             site=cfg.site,
             session_id=session.session_id,
+            session_slot=int(session.slot_idx),
             tunnel=dict(session.tunnel),
         )
 
@@ -1359,14 +1691,28 @@ class BrowserSessionRouter:
     ) -> FetchResult | None:
         if not self._should_try_click(session, url, referer):
             return None
+        session.current_url = url
+        started = time.time()
         context = None
         page = None
+        cookies_before = False
+        try:
+            cookies_before = bool(session.context.cookies([referer or url])) if session.context is not None else False
+        except Exception:
+            cookies_before = False
+        self._log_fetch_start(
+            log_file=HTTP_CHROMIUM_LOG_FILE,
+            site=cfg.site,
+            has_cookies=cookies_before,
+            tunnel=session.tunnel,
+            url=url,
+        )
         try:
             context, page = self._new_page(session, cfg)
             warm_ref = self._fetch_once(session, page, cfg, referer, "referer", task_id, cb_id, "")
             if warm_ref.status != 200 or self._looks_blocked(warm_ref.status, warm_ref.title, warm_ref.html):
                 return None
-            self._humanize(page)
+            self._humanize(page, session.profile)
             clicked = self._click_to_target(page, url, cfg.browser_timeout_ms)
             if not clicked:
                 return None
@@ -1381,38 +1727,15 @@ class BrowserSessionRouter:
             session.last_used_at = time.time()
             session.current_url = final_url or url
             session.requests_total += 1
-            try:
-                session.storage_state = dict(page.context.storage_state() or {})
-            except Exception:
-                pass
-            self._sync_http_session(session)
-            self._sys_log(
-                ROUTER_HTTP_LOG_FILE,
-                {
-                    "event": "top_fetch_click",
-                    "site": cfg.site,
-                    "kind": kind,
-                    "task_id": task_id,
-                    "cb_id": cb_id,
-                    "session_id": session.session_id,
-                    "session_slot": int(session.slot_idx),
-                    "tunnel": session.tunnel,
-                    "request_started_at": self._iso_ts(started),
-                    "response_received_at": self._iso_ts(finished),
-                    "request": {
-                        "url": url,
-                        "referer": referer,
-                        "mode": "browser_click",
-                    },
-                    "response": {
-                        "final_url": final_url,
-                        "status": status,
-                        "ms": elapsed_ms,
-                        "title": title,
-                        "cookies": page.context.cookies([final_url or url]),
-                        "body_head": " ".join((html or "")[:300].split()),
-                    },
-                },
+            self._capture_browser_state(session, page)
+            self._log_fetch_done(
+                log_file=HTTP_CHROMIUM_LOG_FILE,
+                site=cfg.site,
+                has_cookies=cookies_before,
+                tunnel=session.tunnel,
+                final_url=final_url or url,
+                status=status,
+                ms=elapsed_ms,
             )
             return FetchResult(
                 status=status,
@@ -1423,9 +1746,10 @@ class BrowserSessionRouter:
                 ms=elapsed_ms,
                 site=cfg.site,
                 session_id=session.session_id,
+                session_slot=int(session.slot_idx),
                 tunnel=dict(session.tunnel),
             )
-        except Exception:
+        except PlaywrightTimeoutError:
             return None
         finally:
             if page is not None:
@@ -1439,6 +1763,164 @@ class BrowserSessionRouter:
                 except Exception:
                     pass
 
+    def _warm_session(self, session: BrowserSession, cfg: SiteSessionConfig, task_id: int, cb_id: int) -> FetchResult:
+        context = None
+        page = None
+        try:
+            context, page = self._new_page(session, cfg)
+            warm = self._fetch_once(session, page, cfg, cfg.home_url, "home", task_id, cb_id, "")
+            if warm.status != 200 or self._looks_blocked(warm.status, warm.title, warm.html):
+                return warm
+            session.warmed = True
+            self._persist_session_state(cfg, session)
+            return warm
+        finally:
+            self._close_page_context(page, context)
+
+    def _run_mode_fetch(
+        self,
+        session: BrowserSession,
+        cfg: SiteSessionConfig,
+        url: str,
+        kind: str,
+        task_id: int,
+        cb_id: int,
+        referer: str = "",
+        mode: str = "",
+        method: str = "GET",
+        form: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
+    ) -> tuple[FetchResult, str]:
+        if mode == "index_browser":
+            result = self._fetch_index_browser_once(
+                session,
+                cfg,
+                url,
+                kind,
+                task_id,
+                cb_id,
+                referer or session.current_url,
+            )
+            self._persist_session_state(cfg, session)
+            return result, HTTP_CHROMIUM_LOG_FILE
+
+        if mode == "http_only":
+            if not self._session_has_live_cookies(session):
+                result = self._fetch_index_browser_once(
+                    session,
+                    cfg,
+                    url,
+                    kind,
+                    task_id,
+                    cb_id,
+                    referer or session.current_url,
+                )
+                self._persist_session_state(cfg, session)
+                return result, HTTP_CHROMIUM_LOG_FILE
+            return (
+                self._fetch_http_once(
+                    session,
+                    cfg,
+                    url,
+                    kind,
+                    task_id,
+                    cb_id,
+                    referer or session.current_url,
+                    method=method,
+                    form=form,
+                    extra_headers=extra_headers,
+                ),
+                HTTP_LIGHT_LOG_FILE,
+            )
+
+        click_referer = referer or session.current_url
+        if self._should_try_click(session, url, click_referer):
+            result = self._fetch_browser_click_once(
+                session,
+                cfg,
+                url,
+                kind,
+                task_id,
+                cb_id,
+                click_referer,
+            )
+            if result is not None:
+                return result, HTTP_CHROMIUM_LOG_FILE
+
+        if not self._session_has_live_cookies(session):
+            result = self._fetch_index_browser_once(
+                session,
+                cfg,
+                url,
+                kind,
+                task_id,
+                cb_id,
+                referer or session.current_url,
+            )
+            self._persist_session_state(cfg, session)
+            return result, HTTP_CHROMIUM_LOG_FILE
+
+        return (
+            self._fetch_http_once(
+                session,
+                cfg,
+                url,
+                kind,
+                task_id,
+                cb_id,
+                referer or session.current_url,
+                method=method,
+                form=form,
+                extra_headers=extra_headers,
+            ),
+            HTTP_LIGHT_LOG_FILE,
+        )
+
+    def _execute_fetch_for_session(
+        self,
+        session: BrowserSession,
+        cfg: SiteSessionConfig,
+        slot: dict[str, Any],
+        needs_warm: bool,
+        url: str,
+        kind: str,
+        task_id: int,
+        cb_id: int,
+        referer: str = "",
+        mode: str = "",
+        method: str = "GET",
+        form: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
+    ) -> tuple[FetchResult, str]:
+        if needs_warm:
+            warm = self._warm_session(session, cfg, task_id, cb_id)
+            if warm.status != 200:
+                if self._looks_blocked(warm.status, warm.title, warm.html):
+                    self._mute_slot(cfg, slot["name"], f"home:{warm.status}")
+                raise RuntimeError(f"WARM BLOCKED {warm.status}")
+            if self._looks_blocked(warm.status, warm.title, warm.html):
+                self._mute_slot(cfg, slot["name"], f"home:{warm.status}")
+                raise RuntimeError(f"WARM BLOCKED {warm.status}")
+
+        result, current_log_file = self._run_mode_fetch(
+            session,
+            cfg,
+            url,
+            kind,
+            task_id,
+            cb_id,
+            referer=referer,
+            mode=mode,
+            method=method,
+            form=form,
+            extra_headers=extra_headers,
+        )
+        if result.status != 200 or self._looks_blocked(result.status, result.title, result.html):
+            if self._looks_blocked(result.status, result.title, result.html):
+                self._mute_slot(cfg, slot["name"], f"{kind}:{result.status}")
+            raise RuntimeError(f"BLOCKED {result.status}")
+        return result, current_log_file
+
     def fetch(
         self,
         site: str,
@@ -1448,12 +1930,19 @@ class BrowserSessionRouter:
         cb_id: int,
         referer: str = "",
         mode: str = "",
+        method: str = "GET",
+        form: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
         preferred_slot_name: str = "",
         preferred_slot_idx: int = -1,
     ) -> FetchResult:
         cfg = SITE_CONFIGS[site]
+        effective_mode = str(mode or "")
+        if cfg.site == "11880" and str(kind or "") == "search" and effective_mode == "index_browser":
+            effective_mode = "http_only"
         self.reap_idle_runtimes()
         last_error = None
+        current_log_file = HTTP_LIGHT_LOG_FILE
         tried: set[tuple[str, int]] = set()
         deadline = time.time() + WAIT_TIMEOUT_SEC
 
@@ -1470,9 +1959,9 @@ class BrowserSessionRouter:
                     self._runtime_cv.wait(timeout=0.2)
                 continue
 
-            slot, slot_idx, state = candidates[0]
+            slot, slot_idx = candidates[0]
             tried.add((slot["name"], int(slot_idx)))
-            checked = self._checkout_runtime(cfg, slot, int(slot_idx), state)
+            checked = self._checkout_runtime(cfg, slot, int(slot_idx))
             if checked is None:
                 if len(tried) >= len(candidates):
                     tried.clear()
@@ -1480,130 +1969,69 @@ class BrowserSessionRouter:
                         self._runtime_cv.wait(timeout=0.1)
                 continue
 
-            session, needs_warm = checked
-            page = None
-            context = None
+            session, lease = checked
+            needs_warm = bool(lease.needs_warm)
             clear_state = False
             try:
-                if needs_warm:
-                    context, page = self._new_page(session, cfg)
-                    warm = self._fetch_once(session, page, cfg, cfg.home_url, "home", task_id, cb_id, "")
-                    if warm.status != 200 or self._looks_blocked(warm.status, warm.title, warm.html):
-                        clear_state = True
-                        if self._should_quarantine_for_block(warm.status, warm.title, warm.html):
-                            self._mute_slot(cfg, slot["name"], f"home:{warm.status}")
-                        last_error = RuntimeError(f"WARM BLOCKED {warm.status}")
-                        continue
-                    session.warmed = True
-                    session.warming = False
-                    if not self._persist_and_verify_ready(cfg, session, stage="warmup"):
-                        clear_state = True
-                        last_error = RuntimeError(f"WARM NO COOKIES {cfg.site} {slot['name']}:{slot_idx}")
-                        continue
-
-                if mode == "index_browser":
-                    result = self._fetch_index_browser_once(
-                        session,
-                        cfg,
-                        url,
-                        kind,
-                        task_id,
-                        cb_id,
-                        referer or session.current_url,
-                    )
-                    if not self._persist_and_verify_ready(cfg, session, stage="index_browser"):
-                        clear_state = True
-                        last_error = RuntimeError(f"INDEX NO COOKIES {cfg.site} {slot['name']}:{slot_idx}")
-                        continue
-                elif mode == "http_only":
-                    result = self._fetch_http_once(
-                        session,
-                        cfg,
-                        url,
-                        kind,
-                        task_id,
-                        cb_id,
-                        referer or session.current_url,
-                    )
-                else:
-                    result = self._fetch_browser_click_once(
-                        session,
-                        cfg,
-                        url,
-                        kind,
-                        task_id,
-                        cb_id,
-                        referer or session.current_url,
-                    )
-                    if result is None:
-                        result = self._fetch_http_once(
-                            session,
-                            cfg,
-                            url,
-                            kind,
-                            task_id,
-                            cb_id,
-                            referer or session.current_url,
-                        )
-                if result.status != 200 or self._looks_blocked(result.status, result.title, result.html):
-                    clear_state = True
-                    if self._should_quarantine_for_block(result.status, result.title, result.html):
-                        self._mute_slot(cfg, slot["name"], f"{kind}:{result.status}")
-                    last_error = RuntimeError(f"BLOCKED {result.status}")
-                    continue
+                current_log_file = HTTP_CHROMIUM_LOG_FILE if needs_warm or effective_mode == "index_browser" else HTTP_LIGHT_LOG_FILE
+                result, current_log_file = self._execute_fetch_for_session(
+                    session,
+                    cfg,
+                    slot,
+                    needs_warm,
+                    url,
+                    kind,
+                    task_id,
+                    cb_id,
+                    referer=referer,
+                    mode=effective_mode,
+                    method=method,
+                    form=form,
+                    extra_headers=extra_headers,
+                )
                 return result
+            except RuntimeError as exc:
+                last_error = exc
+                clear_state = True
+                if not str(exc).startswith("BLOCKED ") and not str(exc).startswith("WARM BLOCKED "):
+                    self._log_fetch_error(
+                        log_file=current_log_file,
+                        site=site,
+                        has_cookies=bool(session.http_session.cookies) if current_log_file == HTTP_LIGHT_LOG_FILE else bool(session.storage_state.get("cookies") if isinstance(session.storage_state, dict) else []),
+                        tunnel=slot,
+                        url=str(session.current_url or (cfg.home_url if needs_warm else url) or url),
+                        status=0,
+                        ms=0,
+                        error=self._format_error_message(exc),
+                    )
             except PlaywrightTimeoutError as exc:
                 clear_state = True
                 last_error = exc
-                self._sys_log(
-                    ROUTER_HTTP_LOG_FILE,
-                    {
-                        "event": "response_error",
-                        "site": site,
-                        "kind": kind,
-                        "task_id": task_id,
-                        "cb_id": cb_id,
-                        "session_slot": int(slot_idx),
-                        "tunnel": slot,
-                        "url": url,
-                        "error": "TIMEOUT",
-                        "detail": str(exc),
-                    },
+                self._log_fetch_error(
+                    log_file=current_log_file,
+                    site=site,
+                    has_cookies=bool(session.http_session.cookies) if current_log_file == HTTP_LIGHT_LOG_FILE else bool(session.storage_state.get("cookies") if isinstance(session.storage_state, dict) else []),
+                    tunnel=slot,
+                    url=str(session.current_url or (cfg.home_url if needs_warm else url) or url),
+                    status=0,
+                    ms=0,
+                    error=self._format_error_message(exc),
                 )
             except Exception as exc:
                 clear_state = True
                 last_error = exc
-                self._sys_log(
-                    ROUTER_HTTP_LOG_FILE,
-                    {
-                        "event": "response_error",
-                        "site": site,
-                        "kind": kind,
-                        "task_id": task_id,
-                        "cb_id": cb_id,
-                        "session_slot": int(slot_idx),
-                        "tunnel": slot,
-                        "url": url,
-                        "error": type(exc).__name__,
-                        "detail": str(exc),
-                    },
+                self._log_fetch_error(
+                    log_file=current_log_file,
+                    site=site,
+                    has_cookies=bool(session.http_session.cookies) if current_log_file == HTTP_LIGHT_LOG_FILE else bool(session.storage_state.get("cookies") if isinstance(session.storage_state, dict) else []),
+                    tunnel=slot,
+                    url=str(session.current_url or (cfg.home_url if needs_warm else url) or url),
+                    status=0,
+                    ms=0,
+                    error=self._format_error_message(exc),
                 )
             finally:
-                if page is not None:
-                    try:
-                        page.close()
-                    except Exception:
-                        pass
-                if context is not None:
-                    try:
-                        context.close()
-                    except Exception:
-                        pass
-                if needs_warm:
-                    with self._runtime_cv:
-                        session.warming = False
-                        self._runtime_cv.notify_all()
-                self._release_runtime(cfg, session, clear_state=clear_state)
+                self._release_runtime(cfg, session, lease, clear_state=clear_state)
 
         raise RuntimeError(str(last_error or f"FETCH FAILED {site} {url}"))
 

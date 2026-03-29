@@ -1,13 +1,13 @@
 # FILE: engine/core_crawler/browser/http_fetch.py
 # DATE: 2026-03-27
-# PURPOSE: Lightweight HTTP fetch layer with requests+SOCKS for warmed crawler sessions.
+# PURPOSE: Lightweight HTTP fetch layer with curl_cffi browser impersonation for warmed crawler sessions.
 
 from __future__ import annotations
 
 from typing import Any
 from urllib.parse import urlsplit
 
-import requests
+from curl_cffi import requests as curl_requests
 
 from engine.core_crawler.browser.session_config import BrowserProfile
 
@@ -69,18 +69,50 @@ def _sec_ch_ua(profile: BrowserProfile) -> str:
     return ", ".join(out)
 
 
+def _sec_ch_ua_full_version_list(profile: BrowserProfile) -> str:
+    brands = profile.user_agent_metadata.get("fullVersionList") or []
+    out: list[str] = []
+    for row in brands:
+        brand = str((row or {}).get("brand") or "").replace('"', "")
+        version = str((row or {}).get("version") or "").replace('"', "")
+        if brand and version:
+            out.append(f'"{brand}";v="{version}"')
+    return ", ".join(out)
+
+
+def _quoted_client_hint(value: Any) -> str:
+    raw = str(value or "").replace('"', "")
+    return f"\"{raw}\""
+
+
+def _http_impersonate(profile: BrowserProfile) -> str:
+    major_version = str((profile.user_agent_metadata or {}).get("fullVersion") or "").split(".", 1)[0]
+    if major_version in {"116", "119", "120", "123", "124"}:
+        return f"chrome{major_version}"
+    raise RuntimeError(f"Unsupported browser profile for http impersonation: chrome{major_version}")
+
+
 def build_http_headers(profile: BrowserProfile, url: str, referer: str = "") -> dict[str, str]:
     same_site = _same_site(url, referer)
+    ua_meta = dict(profile.user_agent_metadata or {})
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
         "Accept-Language": profile.accept_language,
         "Cache-Control": "max-age=0",
         "Pragma": "no-cache",
+        "Priority": "u=0, i",
         "Upgrade-Insecure-Requests": "1",
         "User-Agent": profile.user_agent,
         "Sec-CH-UA": _sec_ch_ua(profile),
+        "Sec-CH-UA-Arch": _quoted_client_hint(ua_meta.get("architecture") or "x86"),
+        "Sec-CH-UA-Bitness": _quoted_client_hint(ua_meta.get("bitness") or "64"),
+        "Sec-CH-UA-Full-Version-List": _sec_ch_ua_full_version_list(profile),
+        "Sec-CH-UA-Model": _quoted_client_hint(ua_meta.get("model") or ""),
         "Sec-CH-UA-Mobile": "?0",
         "Sec-CH-UA-Platform": f"\"{profile.platform}\"",
+        "Sec-CH-UA-Platform-Version": _quoted_client_hint(ua_meta.get("platformVersion") or "10.0.0"),
+        "Sec-CH-UA-WoW64": "?1" if bool(ua_meta.get("wow64")) else "?0",
         "Sec-Fetch-Dest": "document",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Site": "same-origin" if same_site else "none",
@@ -93,40 +125,39 @@ def build_http_headers(profile: BrowserProfile, url: str, referer: str = "") -> 
     return headers
 
 
-def _load_cookies(session: requests.Session, storage_state: dict[str, Any] | None) -> None:
+def _load_cookies(session: Any, storage_state: dict[str, Any] | None) -> None:
     for row in _cookie_list_from_storage_state(storage_state):
         try:
-            rest = {"HttpOnly": bool(row.get("httpOnly") is True)}
-            same_site = _normalize_same_site(row.get("sameSite"))
-            if same_site:
-                rest["SameSite"] = same_site
             session.cookies.set(
                 name=str(row.get("name") or ""),
                 value=str(row.get("value") or ""),
                 domain=str(row.get("domain") or ""),
                 path=str(row.get("path") or "/"),
                 secure=bool(row.get("secure") is True),
-                expires=int(row.get("expires")) if row.get("expires") not in (None, "", -1) else None,
-                rest=rest,
             )
         except Exception:
             continue
 
 
-def build_http_session(profile: BrowserProfile, tunnel: dict[str, Any], storage_state: dict[str, Any] | None) -> requests.Session:
-    session = requests.Session()
-    session.trust_env = False
+def build_http_session(profile: BrowserProfile, tunnel: dict[str, Any], storage_state: dict[str, Any] | None) -> Any:
+    session = curl_requests.Session()
+    try:
+        session.trust_env = False
+    except Exception:
+        pass
     session.headers.update(build_http_headers(profile, "", ""))
     proxy_server = str(tunnel.get("proxy_server") or "")
     if proxy_server:
-        session.proxies.update({"http": proxy_server, "https": proxy_server})
+        session.proxies = {"http": proxy_server, "https": proxy_server}
     _load_cookies(session, storage_state)
     return session
 
 
-def export_storage_state(session: requests.Session, previous_state: dict[str, Any] | None) -> dict[str, Any]:
+def export_storage_state(session: Any, previous_state: dict[str, Any] | None) -> dict[str, Any]:
     cookies: list[dict[str, Any]] = []
-    for cookie in session.cookies:
+    jar = getattr(session.cookies, "jar", None)
+    source = jar if jar is not None else []
+    for cookie in source:
         row = {
             "name": cookie.name,
             "value": cookie.value,
@@ -146,32 +177,46 @@ def export_storage_state(session: requests.Session, previous_state: dict[str, An
     }
 
 
-def cookie_snapshot(session: requests.Session) -> list[dict[str, Any]]:
+def cookie_snapshot(session: Any) -> list[dict[str, Any]]:
     return export_storage_state(session, {}).get("cookies") or []
 
 
 def fetch_html(
-    session: requests.Session,
+    session: Any,
     profile: BrowserProfile,
     url: str,
     *,
     referer: str = "",
     timeout_ms: int = 90_000,
+    method: str = "GET",
+    form: dict[str, Any] | None = None,
+    extra_headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     headers = build_http_headers(profile, url, referer)
-    request = requests.Request("GET", url, headers=headers)
-    prepared = session.prepare_request(request)
-    response = session.send(
-        prepared,
+    if str(method or "GET").upper() == "POST" and referer:
+        referer_parts = urlsplit(referer)
+        if referer_parts.scheme and referer_parts.netloc:
+            headers["Origin"] = f"{referer_parts.scheme}://{referer_parts.netloc}"
+    for key, value in dict(extra_headers or {}).items():
+        k = str(key or "").strip()
+        if not k:
+            continue
+        headers[k] = str(value or "")
+    response = session.request(
+        str(method or "GET").upper(),
+        url,
+        headers=headers,
+        data=dict(form or {}) or None,
         timeout=max(1.0, float(timeout_ms) / 1000.0),
         allow_redirects=True,
         stream=False,
+        impersonate=_http_impersonate(profile),
     )
     return {
         "status": int(response.status_code),
         "url": str(url),
         "final_url": str(response.url),
         "html": str(response.text or ""),
-        "request_headers": dict(prepared.headers),
+        "request_headers": dict(headers),
         "response_headers": dict(response.headers),
     }

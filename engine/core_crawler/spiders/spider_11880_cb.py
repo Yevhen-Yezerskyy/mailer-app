@@ -1,6 +1,6 @@
 # FILE: engine/core_crawler/spiders/spider_11880_cb.py
-# DATE: 2026-03-27
-# PURPOSE: 11880 spider using the shared browser fetch layer.
+# DATE: 2026-03-29
+# PURPOSE: 11880 single-pair runner using the shared browser fetch layer without Scrapy runtime.
 
 from __future__ import annotations
 
@@ -8,10 +8,8 @@ import json
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
-import scrapy
-
 from engine.common.db import fetch_one
-from engine.common.logs import sys_log
+from engine.common.logs import log
 from engine.core_crawler.browser.fetcher import fetch_html, to_text_response
 from engine.core_crawler.spiders.spider_11880_card import parse_11880_card
 from engine.core_crawler.spiders.spider_11880_index_card import (
@@ -21,13 +19,8 @@ from engine.core_crawler.spiders.spider_11880_index_card import (
 from engine.core_crawler.spiders.spider_11880_store import save_11880_probe_run
 
 
-class OneOneEightZeroCBSpider(scrapy.Spider):
+class OneOneEightZeroCBSpider:
     name = "core_11880_cb"
-
-    custom_settings = {
-        "LOG_ENABLED": False,
-        "ROBOTSTXT_OBEY": False,
-    }
 
     def __init__(self, task_id: int, cb_id: int, plz: str, branch_slug: str, branch_name: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -51,25 +44,31 @@ class OneOneEightZeroCBSpider(scrapy.Spider):
         self._db_action: str = "skip"
         self._db_rows: int = 0
 
-    def _already_collected(self) -> bool:
-        row = fetch_one("SELECT collected FROM cb_crawl_pairs WHERE id=%s", (self.cb_id,))
-        return bool(row and row[0] is True)
-
-    @staticmethod
-    def _reason_is_fail(reason: str) -> bool:
-        r = (reason or "").strip()
-        return (
-            r.startswith("SEARCH HTTP")
-            or r.startswith("DETAIL HTTP")
-            or r.startswith("FAILED TO PARSE")
-            or r.startswith("FETCH EXCEPTION")
-        )
-
-    def _search_url(self) -> str:
-        return f"https://www.11880.com/suche/{self.branch_slug}/{self.plz}?query={self.branch_slug}"
+    def _remember_index_cards(
+        self,
+        cards: List[Dict[str, Any]],
+        *,
+        page_url: str,
+        seen_urls: set[str],
+        selected_urls: List[str],
+    ) -> None:
+        for card in cards:
+            row = dict(card)
+            url = urljoin(page_url, str(row.get("url") or ""))
+            plz = str(row.get("plz") or "").strip()
+            selected = bool(plz) and plz == self.plz
+            row["page_url"] = page_url
+            row["selected"] = selected
+            row["skip_reason"] = "" if selected else ("PLZ MISMATCH" if plz else "NO PLZ")
+            self.index_cards.append(row)
+            if not selected or not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            selected_urls.append(url)
+            self._detail_referers[url] = page_url
 
     def _run_fetch(self) -> None:
-        self._start_url = self._search_url()
+        self._start_url = f"https://www.11880.com/suche/{self.branch_slug}/{self.plz}?query={self.branch_slug}"
         current_search_url = self._start_url
         current_referer = ""
         selected_urls: List[str] = []
@@ -85,10 +84,10 @@ class OneOneEightZeroCBSpider(scrapy.Spider):
                 task_id=self.task_id,
                 cb_id=self.cb_id,
                 referer=current_referer,
-                mode="index_browser",
+                mode="http_only",
             )
             self._last_tunnel = dict(search_result.tunnel)
-            if search_result.status != 200:
+            if search_result.status not in {200, 404}:
                 self._final_reason = f"SEARCH HTTP {search_result.status}"
                 return
 
@@ -96,23 +95,14 @@ class OneOneEightZeroCBSpider(scrapy.Spider):
             search_response = to_text_response(search_result)
             parsed_index_cards = parse_11880_index_cards(search_response, self.branch_name)
             if not parsed_index_cards:
-                self._final_reason = f"FAILED TO PARSE {search_result.final_url}"
+                self._final_reason = "NO DETAIL ITEMS"
                 return
-
-            for card in parsed_index_cards:
-                row = dict(card)
-                url = urljoin(search_result.final_url, str(row.get("url") or ""))
-                plz = str(row.get("plz") or "").strip()
-                selected = bool(plz) and plz == self.plz
-                row["page_url"] = search_result.final_url
-                row["selected"] = selected
-                row["skip_reason"] = "" if selected else ("PLZ MISMATCH" if plz else "NO PLZ")
-                self.index_cards.append(row)
-                if not selected or not url or url in seen_urls:
-                    continue
-                seen_urls.add(url)
-                selected_urls.append(url)
-                self._detail_referers[url] = search_result.final_url
+            self._remember_index_cards(
+                parsed_index_cards,
+                page_url=search_result.final_url,
+                seen_urls=seen_urls,
+                selected_urls=selected_urls,
+            )
 
             next_search_url = extract_11880_next_page_url(search_response)
             if not next_search_url or next_search_url in seen_search_urls:
@@ -157,17 +147,17 @@ class OneOneEightZeroCBSpider(scrapy.Spider):
 
         self._final_reason = "OK" if self.items else "NO DETAIL ITEMS"
 
-    def start_requests(self):
-        if self._already_collected():
+    def run(self) -> None:
+        row = fetch_one("SELECT collected FROM cb_crawl_pairs WHERE id=%s", (self.cb_id,))
+        if bool(row and row[0] is True):
             self._final_reason = "ALREADY COLLECTED"
-            return
-        try:
-            self._run_fetch()
-        except Exception as exc:
-            self._final_reason = f"FETCH EXCEPTION {type(exc).__name__}: {exc}"
-            self.failed_urls.append({"kind": "run", "url": self._start_url or "", "reason": self._final_reason})
-        return
-        yield  # pragma: no cover
+        else:
+            try:
+                self._run_fetch()
+            except Exception as exc:
+                self._final_reason = f"FETCH EXCEPTION {type(exc).__name__}: {exc}"
+                self.failed_urls.append({"kind": "run", "url": self._start_url or "", "reason": self._final_reason})
+        self.closed(self._final_reason or "run")
 
     def _db_flush_items_and_mark(self) -> bool:
         payload = {
@@ -188,31 +178,35 @@ class OneOneEightZeroCBSpider(scrapy.Spider):
         self._db_rows = save_11880_probe_run(payload)
         return True
 
-    def _log_status(self, reason: str) -> None:
-        payload = {
-            "event": "11880_status",
-            "task_id": self.task_id,
-            "cb_id": self.cb_id,
-            "plz": self.plz,
-            "branch_slug": self.branch_slug,
-            "branch_name": self.branch_name,
-            "reason": str(reason or ""),
-            "list_seen": int(self._list_seen),
-            "paging_seen": int(self._paging_seen),
-            "detail_seen": int(self._detail_seen),
-            "detail_parsed": int(self._detail_parsed),
-            "index_cards": int(len(self.index_cards)),
-            "selected_urls": int(len(self.selected_urls)),
-            "items": int(len(self.items)),
-            "failed_urls": self.failed_urls,
-            "tunnel": self._last_tunnel,
-            "start_url": self._start_url,
-        }
-        sys_log(
-            "spider_11880",
-            folder="crawler",
-            message=json.dumps(payload, ensure_ascii=False, default=str, indent=2),
+    def _index_log_line(self, reason: str) -> str:
+        if str(reason or "") == "ALREADY COLLECTED":
+            return f"cb_id={self.cb_id} index skip already_collected"
+        selected = int(len(self.selected_urls))
+        indexed = int(len(self.index_cards))
+        if indexed <= 0:
+            return f"cb_id={self.cb_id} index fail reason={reason}"
+        if selected <= 0:
+            return f"cb_id={self.cb_id} index mismatch indexed={indexed} selected=0"
+        return f"cb_id={self.cb_id} index ok indexed={indexed} selected={selected} paging={int(self._paging_seen)}"
+
+    def _detail_log_line(self) -> str:
+        selected = int(len(self.selected_urls))
+        detail_seen = int(self._detail_seen)
+        detail_parsed = int(self._detail_parsed)
+        all_parsed = detail_seen > 0 and detail_seen == detail_parsed
+        return (
+            f"cb_id={self.cb_id} detail selected={selected} seen={detail_seen} "
+            f"parsed={detail_parsed} all_parsed={'yes' if all_parsed else 'no'}"
         )
+
+    def _result_log_line(self, reason: str) -> str:
+        ok = str(reason or "") == "OK"
+        return f"cb_id={self.cb_id} result {'ok' if ok else 'fail'} reason={reason} items={int(len(self.items))}"
+
+    def _log_status(self, reason: str) -> None:
+        log("spider_11880", folder="crawler", message=self._index_log_line(reason))
+        log("spider_11880", folder="crawler", message=self._detail_log_line())
+        log("spider_11880", folder="crawler", message=self._result_log_line(reason))
 
     def closed(self, reason):
         r = (self._final_reason or reason or "").strip() or "UNKNOWN"
@@ -229,7 +223,12 @@ class OneOneEightZeroCBSpider(scrapy.Spider):
             self._db_action = "skip_already"
             return
 
-        if self._reason_is_fail(r):
+        if (
+            r.startswith("SEARCH HTTP")
+            or r.startswith("DETAIL HTTP")
+            or r.startswith("FAILED TO PARSE")
+            or r.startswith("FETCH EXCEPTION")
+        ):
             self._db_action = "mark_fail"
             return
 

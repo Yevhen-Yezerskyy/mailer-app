@@ -5,18 +5,12 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
-HOST_LOG_DIR="${PG_BACKUP_HOST_LOG_DIR:-$ROOT_DIR/logs/postgres}"
-SYS_LOG_DIR="${PG_BACKUP_SYS_LOG_DIR:-/serenity-logs/postgres}"
-HOST_LOG_FILE="$HOST_LOG_DIR/pg_backup.log"
-SYS_LOG_FILE="$SYS_LOG_DIR/pg_backup.log"
+LOG_DIR="${PG_BACKUP_LOG_DIR:-/home/eee/mailer-app/logs/postgres}"
+LOG_FILE="$LOG_DIR/pg_backup.log"
 
-mkdir -p "$HOST_LOG_DIR"
-log_targets=("$HOST_LOG_FILE")
-if [ -d /serenity-logs ] && mkdir -p "$SYS_LOG_DIR" 2>/dev/null; then
-  log_targets+=("$SYS_LOG_FILE")
-fi
+mkdir -p "$LOG_DIR"
 
-exec > >(tee -a "${log_targets[@]}") 2>&1
+exec > >(tee -a "$LOG_FILE") 2>&1
 
 BACKUP_DIR="${HOME}/backup"
 CONTAINER="mailer-db"

@@ -47,9 +47,9 @@ OPENAI_ENV_VAR = "OPENAI_API_KEY"
 
 ALLOWED_SERVICE_TIERS: set[str] = {"flex", "standard", "priority"}
 
-HOST_STREAM_FILE = Path("/host-logs/gpt/stream.log")
-HOST_ERRORS_FILE = Path("/host-logs/gpt/errors.log")
-SYS_REQUESTS_FILE = Path("/serenity-logs/gpt/requests.log")
+HOST_STREAM_FILE = Path("/home/eee/mailer-app/logs/gpt/stream.log")
+HOST_ERRORS_FILE = Path("/home/eee/mailer-app/logs/gpt/errors.log")
+SYS_REQUESTS_FILE = Path("/home/eee/mailer-app/logs/gpt/requests.log")
 
 
 class GptConfigError(RuntimeError):

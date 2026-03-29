@@ -20,10 +20,21 @@ class BrowserProfile:
     languages: tuple[str, ...]
     hardware_concurrency: int
     device_memory: int
+    device_scale_factor: float
+    max_touch_points: int
     viewport_width: int
     viewport_height: int
     screen_width: int
     screen_height: int
+    avail_width: int
+    avail_height: int
+    outer_width: int
+    outer_height: int
+    color_depth: int
+    pixel_depth: int
+    connection_downlink: float
+    connection_rtt: int
+    connection_effective_type: str
     user_agent_metadata: dict
 
 
@@ -31,9 +42,7 @@ class BrowserProfile:
 class SiteSessionConfig:
     site: str
     home_url: str
-    http_log_file: str
     egress_slots: tuple[str, ...]
-    active_slot_count: int
     slot_quarantine_sec: int
     sessions_per_egress: int
     concurrent_pages_per_session: int
@@ -47,16 +56,31 @@ class SiteSessionConfig:
 
 
 LOG_FOLDER = "crawler"
-ROUTER_HTTP_LOG_FILE = "http_router"
 BROKER_WORKERS = 3
 BROKER_QUEUE_MAX = 256
 
 
-def _chrome_124_windows(name: str, width: int, height: int, concurrency: int, memory: int) -> BrowserProfile:
+def _chrome_windows(
+    name: str,
+    major_version: str,
+    full_version: str,
+    width: int,
+    height: int,
+    concurrency: int,
+    memory: int,
+    scale_factor: float,
+    max_touch_points: int,
+    avail_height_delta: int,
+    outer_width_delta: int,
+    outer_height_delta: int,
+    connection_effective_type: str,
+    connection_downlink: float,
+    connection_rtt: int,
+) -> BrowserProfile:
     ua = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.6367.91 Safari/537.36"
+        f"Chrome/{full_version} Safari/537.36"
     )
     return BrowserProfile(
         name=name,
@@ -70,22 +94,33 @@ def _chrome_124_windows(name: str, width: int, height: int, concurrency: int, me
         languages=("de-DE", "de", "en-US", "en"),
         hardware_concurrency=concurrency,
         device_memory=memory,
+        device_scale_factor=scale_factor,
+        max_touch_points=max_touch_points,
         viewport_width=width,
         viewport_height=height,
         screen_width=width,
         screen_height=height,
+        avail_width=width,
+        avail_height=max(640, height - avail_height_delta),
+        outer_width=width + outer_width_delta,
+        outer_height=height + outer_height_delta,
+        color_depth=24,
+        pixel_depth=24,
+        connection_downlink=connection_downlink,
+        connection_rtt=connection_rtt,
+        connection_effective_type=connection_effective_type,
         user_agent_metadata={
             "brands": [
-                {"brand": "Google Chrome", "version": "124"},
-                {"brand": "Chromium", "version": "124"},
+                {"brand": "Google Chrome", "version": major_version},
+                {"brand": "Chromium", "version": major_version},
                 {"brand": "Not.A/Brand", "version": "24"},
             ],
             "fullVersionList": [
-                {"brand": "Google Chrome", "version": "124.0.6367.91"},
-                {"brand": "Chromium", "version": "124.0.6367.91"},
+                {"brand": "Google Chrome", "version": full_version},
+                {"brand": "Chromium", "version": full_version},
                 {"brand": "Not.A/Brand", "version": "24.0.0.0"},
             ],
-            "fullVersion": "124.0.6367.91",
+            "fullVersion": full_version,
             "platform": "Windows",
             "platformVersion": "10.0.0",
             "architecture": "x86",
@@ -96,11 +131,60 @@ def _chrome_124_windows(name: str, width: int, height: int, concurrency: int, me
         },
     )
 
+CHROME_FULL_VERSIONS = (
+    ("116", "116.0.5845.180"),
+    ("119", "119.0.6045.200"),
+    ("120", "120.0.6099.225"),
+    ("123", "123.0.6312.123"),
+    ("124", "124.0.6367.91"),
+)
+
+WINDOWS_DESKTOP_SHAPES = (
+    ("a", 1366, 768, 4, 8, 1.0, 0, 40, 16, 88, "4g", 8.9, 60),
+    ("b", 1440, 900, 8, 8, 1.0, 0, 40, 16, 88, "4g", 10.4, 55),
+    ("c", 1536, 864, 8, 4, 1.25, 0, 40, 16, 88, "4g", 12.2, 45),
+    ("d", 1600, 900, 12, 8, 1.25, 5, 40, 16, 90, "4g", 9.7, 50),
+    ("e", 1920, 1080, 8, 8, 1.0, 0, 40, 16, 96, "4g", 13.6, 40),
+    ("f", 1280, 720, 4, 4, 1.0, 0, 40, 14, 84, "4g", 7.8, 70),
+)
+
 
 BROWSER_PROFILES = (
-    _chrome_124_windows("win_chrome_124_a", 1440, 900, 8, 8),
-    _chrome_124_windows("win_chrome_124_b", 1366, 768, 4, 8),
-    _chrome_124_windows("win_chrome_124_c", 1536, 864, 8, 4),
+    tuple(
+        _chrome_windows(
+            f"win_chrome_{major_version}_{suffix}",
+            major_version,
+            full_version,
+            width,
+            height,
+            concurrency,
+            memory,
+            scale_factor,
+            max_touch_points,
+            avail_height_delta,
+            outer_width_delta,
+            outer_height_delta,
+            connection_effective_type,
+            connection_downlink,
+            connection_rtt,
+        )
+        for major_version, full_version in CHROME_FULL_VERSIONS
+        for (
+            suffix,
+            width,
+            height,
+            concurrency,
+            memory,
+            scale_factor,
+            max_touch_points,
+            avail_height_delta,
+            outer_width_delta,
+            outer_height_delta,
+            connection_effective_type,
+            connection_downlink,
+            connection_rtt,
+        ) in WINDOWS_DESKTOP_SHAPES
+    )
 )
 
 
@@ -108,9 +192,7 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
     "probe11880": SiteSessionConfig(
         site="probe11880",
         home_url="https://dev.serenity-mail.de/__probe__/11880-http/?source=router_probe&step=0",
-        http_log_file="http_probe11880",
         egress_slots=("fenster_ukraine", "nowedel", "zenosolar"),
-        active_slot_count=3,
         slot_quarantine_sec=3 * 60 * 60,
         sessions_per_egress=2,
         concurrent_pages_per_session=1,
@@ -125,35 +207,31 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
     "11880": SiteSessionConfig(
         site="11880",
         home_url="https://www.11880.com/",
-        http_log_file="http_11880",
         egress_slots=("fenster_ukraine", "nowedel", "zenosolar", "direct"),
-        active_slot_count=3,
-        slot_quarantine_sec=10_800,
+        slot_quarantine_sec=4 * 60 * 60,
         sessions_per_egress=1,
-        concurrent_pages_per_session=1,
-        max_requests_per_session=8,
+        concurrent_pages_per_session=2,
+        max_requests_per_session=500,
         max_session_age_sec=1200,
         runtime_recycle_min_sec=300,
         runtime_recycle_max_sec=600,
-        pause_min_sec=2.5,
-        pause_max_sec=6.0,
+        pause_min_sec=0.7,
+        pause_max_sec=2.0,
         browser_timeout_ms=90_000,
     ),
     "gs": SiteSessionConfig(
         site="gs",
         home_url="https://www.gelbeseiten.de/",
-        http_log_file="http_gs",
         egress_slots=("fenster_ukraine", "nowedel", "zenosolar", "direct"),
-        active_slot_count=3,
-        slot_quarantine_sec=10_800,
+        slot_quarantine_sec=4 * 60 * 60,
         sessions_per_egress=1,
-        concurrent_pages_per_session=1,
-        max_requests_per_session=8,
+        concurrent_pages_per_session=2,
+        max_requests_per_session=500,
         max_session_age_sec=1200,
         runtime_recycle_min_sec=300,
         runtime_recycle_max_sec=600,
-        pause_min_sec=2.5,
-        pause_max_sec=6.0,
+        pause_min_sec=0.7,
+        pause_max_sec=2.0,
         browser_timeout_ms=90_000,
     ),
 }
