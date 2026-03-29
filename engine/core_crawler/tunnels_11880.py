@@ -310,6 +310,8 @@ def _ssh_args(user: str, tunnel: dict[str, Any]) -> list[str]:
         "-o",
         "StrictHostKeyChecking=accept-new",
         "-o",
+        "ConnectTimeout=10",
+        "-o",
         "PreferredAuthentications=password",
         "-o",
         "PubkeyAuthentication=no",
@@ -353,7 +355,7 @@ def _wait_tunnel_ready(cfg: dict[str, Any], tunnel: dict[str, Any], proc: subpro
 
     while time.time() < deadline:
         status = status_tunnel(cfg, tunnel)
-        if status["port_open"] and status["control_ok"]:
+        if status["port_open"]:
             return True, _tail_log(log_path)
         rc = proc.poll()
         transcript = _tail_log(log_path)
@@ -367,7 +369,7 @@ def _wait_tunnel_ready(cfg: dict[str, Any], tunnel: dict[str, Any], proc: subpro
         if "connection refused" in lower:
             return False, transcript
         time.sleep(0.2)
-    return False, _tail_log(log_path) or "timeout waiting for port_open+control_ok"
+    return False, _tail_log(log_path) or "timeout waiting for port_open"
 
 
 def _reap_bootstrap_ssh(proc: subprocess.Popen[bytes]) -> None:
@@ -530,7 +532,7 @@ def status_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]
         "name": name,
         "host": tunnel["host"],
         "local_port": int(tunnel["local_port"]),
-        "alive": bool(port_open and control_ok),
+        "alive": bool(port_open),
         "port_open": port_open,
         "control_ok": control_ok,
         "ctl_path": str(_ctl_path(name)),
