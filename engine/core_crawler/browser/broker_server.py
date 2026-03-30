@@ -724,8 +724,8 @@ def run_browser_broker(socket_path: str = BROKER_SOCKET_PATH) -> None:
         pass
 
     dispatcher = _BrokerDispatcher()
-    ensure_tunnel_watchdog()
     dispatcher.start()
+    ensure_tunnel_watchdog()
     server = _BrokerUnixServer(str(path), dispatcher)
     try:
         os.chmod(str(path), 0o666)
