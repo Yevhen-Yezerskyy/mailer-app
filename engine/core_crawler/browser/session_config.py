@@ -266,7 +266,7 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
         ),
         slot_quarantine_sec=1 * 60 * 60,
         sessions_per_egress=1,
-        concurrent_pages_per_session=2,
+        concurrent_pages_per_session=10,
         max_requests_per_session=500,
         max_session_age_sec=1200,
         runtime_recycle_min_sec=300,
