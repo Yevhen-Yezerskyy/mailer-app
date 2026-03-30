@@ -1406,6 +1406,23 @@ class BrowserSessionRouter:
             return True
         return self._looks_blocked(status_code, title, html)
 
+    @staticmethod
+    def _resolve_request_mode(
+        cfg: SiteSessionConfig,
+        kind: str,
+        requested_mode: str,
+        requests_total_before_fetch: int,
+    ) -> str:
+        requested = str(requested_mode or "")
+        if cfg.site != "11880":
+            return requested
+        browser_mode = "browser_click" if str(kind or "") == "detail" else "index_browser"
+        if int(requests_total_before_fetch) < 5:
+            return browser_mode
+        if random.random() < 0.7:
+            return "http_only"
+        return browser_mode
+
     def _should_try_click(self, session: BrowserSession, url: str, referer: str) -> bool:
         if not referer:
             return False
@@ -1967,12 +1984,7 @@ class BrowserSessionRouter:
         allowed_slot_names: list[str] | None = None,
     ) -> FetchResult:
         cfg = SITE_CONFIGS[site]
-        effective_mode = str(mode or "")
-        if cfg.site == "11880":
-            if str(kind or "") == "detail":
-                effective_mode = "browser_click"
-            else:
-                effective_mode = "index_browser"
+        requested_mode = str(mode or "")
         self.reap_idle_runtimes()
         last_error = None
         current_log_file = HTTP_LIGHT_LOG_FILE
@@ -2010,6 +2022,12 @@ class BrowserSessionRouter:
 
             session, lease = checked
             needs_warm = bool(lease.needs_warm)
+            effective_mode = self._resolve_request_mode(
+                cfg,
+                kind,
+                requested_mode,
+                int(session.requests_total) + (1 if needs_warm else 0),
+            )
             clear_state = False
             try:
                 current_log_file = (
