@@ -33,7 +33,12 @@ from engine.core_crawler.browser.session_config import (
     SITE_CONFIGS,
 )
 from engine.core_crawler.browser.session_router import BrowserSessionRouter
-from engine.core_crawler.tunnels_11880 import ensure_tunnel_watchdog, load_tunnel_statuses, stop_tunnel_watchdog
+from engine.core_crawler.tunnels_11880 import (
+    ensure_tunnel_watchdog,
+    load_tunnel_statuses,
+    refresh_tunnel_statuses,
+    stop_tunnel_watchdog,
+)
 
 BROKER_SOCKET_PATH = "/tmp/core_crawler_browser.sock"
 STATE_TTL_SEC = 7 * 24 * 60 * 60
@@ -413,6 +418,9 @@ def _compute_site_route_plan() -> dict[str, list[str]]:
     if not all_names:
         return {site: [] for site in ROUTE_SITES}
     statuses = load_tunnel_statuses(all_names)
+    missing_statuses = [name for name in all_names if name != "direct" and name not in statuses]
+    if missing_statuses:
+        statuses = refresh_tunnel_statuses(all_names)
     cfg_11880 = SITE_CONFIGS.get("11880")
     cfg_gs = SITE_CONFIGS.get("gs")
     slots_11880 = list(getattr(cfg_11880, "egress_slots", ()) or ())

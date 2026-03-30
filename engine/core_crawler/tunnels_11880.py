@@ -29,6 +29,7 @@ RUN_DIR = Path(__file__).resolve().parents[2] / "tmp" / "11880_tunnels"
 START_TIMEOUT_SEC = 30.0
 STOP_TIMEOUT_SEC = 10.0
 WATCH_INTERVAL_SEC = 5.0
+CONTROL_CHECK_TIMEOUT_SEC = 1.0
 LOG_FOLDER = "crawler"
 TUNNELS_LOG_FILE = "tunnels.log"
 STATE_TTL_SEC = 24 * 60 * 60
@@ -165,19 +166,27 @@ def _watch_state_signature(status: dict[str, Any]) -> tuple[bool, bool, bool]:
 def load_tunnel_statuses(configured_names: list[str] | tuple[str, ...] | None = None) -> dict[str, dict[str, Any]]:
     raw = _cache_get_obj(TUNNEL_STATUS_KEY) or {}
     if not isinstance(raw, dict):
-        return {}
+        raw = {}
     if configured_names is None:
-        return {str(name): dict(row or {}) for name, row in raw.items()}
+        if raw:
+            return {str(name): dict(row or {}) for name, row in raw.items()}
+        return refresh_tunnel_statuses()
     allowed: set[str] = set()
     for raw_name in configured_names:
         name = str(raw_name or "").strip()
         if name:
             allowed.add(name)
-    return {
+    filtered = {
         str(name): dict(row or {})
         for name, row in raw.items()
         if str(name or "") in allowed
     }
+    missing = [name for name in allowed if name not in filtered]
+    if missing:
+        refreshed = refresh_tunnel_statuses(list(allowed))
+        if refreshed:
+            return refreshed
+    return filtered
 
 
 def live_tunnel_names(configured_names: list[str] | tuple[str, ...] | None = None) -> list[str]:
@@ -520,8 +529,19 @@ def _control_ok(cfg: dict[str, Any], tunnel: dict[str, Any]) -> bool:
         str(ssh_port),
         f"{user}@{host}",
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
-    return proc.returncode == 0
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=CONTROL_CHECK_TIMEOUT_SEC,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError, RuntimeError):
+        return False
+    except Exception:
+        return False
+    return int(proc.returncode or 0) == 0
 
 
 def status_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]:
@@ -539,6 +559,51 @@ def status_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]
         "meta_path": str(_meta_path(name)),
         "log_path": str(_log_path(name)),
     }
+
+
+def _status_error_row(tunnel: dict[str, Any]) -> dict[str, Any]:
+    name = str(tunnel.get("name") or "")
+    return {
+        "name": name,
+        "host": str(tunnel.get("host") or ""),
+        "local_port": int(tunnel.get("local_port") or 0),
+        "alive": False,
+        "port_open": False,
+        "control_ok": False,
+        "ctl_path": str(_ctl_path(name)),
+        "meta_path": str(_meta_path(name)),
+        "log_path": str(_log_path(name)),
+    }
+
+
+def refresh_tunnel_statuses(configured_names: list[str] | tuple[str, ...] | None = None) -> dict[str, dict[str, Any]]:
+    cfg = _load_config()
+    requested: set[str] | None = None
+    if configured_names is not None:
+        requested = {str(raw_name or "").strip() for raw_name in configured_names if str(raw_name or "").strip()}
+    tunnels = [
+        dict(tunnel)
+        for tunnel in list(cfg.get("tunnels") or [])
+        if requested is None or str(tunnel.get("name") or "") in requested
+    ]
+    raw = _cache_get_obj(TUNNEL_STATUS_KEY) or {}
+    status_map: dict[str, dict[str, Any]] = {}
+    if isinstance(raw, dict):
+        status_map = {str(name): dict(row or {}) for name, row in raw.items()}
+    for tunnel in tunnels:
+        name = str(tunnel.get("name") or "")
+        if not name:
+            continue
+        try:
+            status = status_tunnel(cfg, tunnel)
+        except Exception:
+            status = _status_error_row(tunnel)
+        status["checked_at"] = float(time.time())
+        status_map[name] = dict(status)
+    _cache_set_obj(TUNNEL_STATUS_KEY, status_map)
+    if requested is None:
+        return status_map
+    return {name: dict(row or {}) for name, row in status_map.items() if name in requested}
 
 
 def _watchdog_restart_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> None:
@@ -562,14 +627,29 @@ def _watchdog_loop() -> None:
         try:
             cfg = _load_config()
             tunnels = list(cfg.get("tunnels") or [])
+            raw = _cache_get_obj(TUNNEL_STATUS_KEY) or {}
             status_map: dict[str, dict[str, Any]] = {}
+            if isinstance(raw, dict):
+                status_map = {str(name): dict(row or {}) for name, row in raw.items()}
             for tunnel in tunnels:
                 name = str(tunnel.get("name") or "")
                 if not name:
                     continue
-                status = status_tunnel(cfg, tunnel)
+                try:
+                    status = status_tunnel(cfg, tunnel)
+                except Exception as exc:
+                    status = dict(status_map.get(name) or _status_error_row(tunnel))
+                    status["checked_at"] = float(time.time())
+                    status_map[name] = dict(status)
+                    _cache_set_obj(TUNNEL_STATUS_KEY, status_map)
+                    _log_tunnel(
+                        f"watch_status_error name={name} local_port={status['local_port']} "
+                        f"error={type(exc).__name__}: {exc}"
+                    )
+                    continue
                 status["checked_at"] = float(time.time())
                 status_map[name] = dict(status)
+                _cache_set_obj(TUNNEL_STATUS_KEY, status_map)
                 signature = _watch_state_signature(status)
                 if _WATCHDOG_LAST_STATE.get(name) != signature:
                     _WATCHDOG_LAST_STATE[name] = signature
