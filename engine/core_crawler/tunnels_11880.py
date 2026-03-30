@@ -29,7 +29,6 @@ RUN_DIR = Path(__file__).resolve().parents[2] / "tmp" / "11880_tunnels"
 START_TIMEOUT_SEC = 30.0
 STOP_TIMEOUT_SEC = 10.0
 WATCH_INTERVAL_SEC = 5.0
-CONTROL_CHECK_TIMEOUT_SEC = 1.0
 TUNNEL_LOCK_WAIT_SEC = 1.0
 WATCHDOG_RESTART_MAX_CONCURRENCY = 1
 WATCHDOG_RESTART_BACKOFF_SEC = 20.0
@@ -136,6 +135,51 @@ def _tunnel_lock(name: str):
 
 def _write_meta(name: str, payload: dict[str, Any]) -> None:
     _meta_path(name).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _read_meta(name: str) -> dict[str, Any]:
+    path = _meta_path(name)
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _pid_alive(pid: Any) -> bool:
+    try:
+        pid_int = int(pid or 0)
+    except Exception:
+        return False
+    if pid_int <= 1:
+        return False
+    try:
+        os.kill(pid_int, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except Exception:
+        return False
+
+
+def _known_tunnel_pids(name: str, local_port: int) -> list[int]:
+    pids = set(_listener_pids(local_port))
+    meta = _read_meta(name)
+    launcher_pid = meta.get("launcher_pid")
+    if _pid_alive(launcher_pid):
+        try:
+            pids.add(int(launcher_pid))
+        except Exception:
+            pass
+    for raw_pid in list(meta.get("listener_pids") or []):
+        if _pid_alive(raw_pid):
+            try:
+                pids.add(int(raw_pid))
+            except Exception:
+                continue
+    return sorted(pid for pid in pids if int(pid) > 1)
 
 
 def _cache_get_obj(key: str) -> Any:
@@ -308,15 +352,14 @@ def _cleanup_stale_state(cfg: dict[str, Any], tunnel: dict[str, Any], force: boo
     status = status_tunnel(cfg, tunnel)
     if bool(status.get("alive")) and not force:
         return
-    if bool(status.get("port_open")) and not bool(status.get("control_ok")):
-        pids = _listener_pids(local_port)
-        if pids:
-            _log_tunnel(
-                f"stale_kill name={name} local_port={local_port} "
-                f"reason=port_open_control_missing pids={','.join(str(pid) for pid in pids)}"
-            )
-            _terminate_pids(pids)
-            _wait_port_closed(local_port, 5.0)
+    pids = _known_tunnel_pids(name, local_port)
+    if pids:
+        _log_tunnel(
+            f"stale_kill name={name} local_port={local_port} "
+            f"reason=stale_tunnel_state pids={','.join(str(pid) for pid in pids)}"
+        )
+        _terminate_pids(pids)
+        _wait_port_closed(local_port, 5.0)
     _cleanup_state(name)
 
 
@@ -325,12 +368,8 @@ def _ssh_args(user: str, tunnel: dict[str, Any]) -> list[str]:
     ssh_port = int(tunnel.get("ssh_port") or 22)
     local_port = int(tunnel["local_port"])
     log_file = str(_log_path(str(tunnel["name"])))
-    ctl_path = str(_ctl_path(str(tunnel["name"])))
     return [
         "ssh",
-        "-M",
-        "-S",
-        ctl_path,
         "-o",
         "ExitOnForwardFailure=yes",
         "-o",
@@ -347,8 +386,6 @@ def _ssh_args(user: str, tunnel: dict[str, Any]) -> list[str]:
         "PubkeyAuthentication=no",
         "-o",
         "NumberOfPasswordPrompts=1",
-        "-o",
-        "ControlPersist=yes",
         "-o",
         "LogLevel=ERROR",
         "-E",
@@ -385,7 +422,7 @@ def _wait_tunnel_ready(cfg: dict[str, Any], tunnel: dict[str, Any], proc: subpro
 
     while time.time() < deadline:
         status = status_tunnel(cfg, tunnel)
-        if status["port_open"]:
+        if status["alive"]:
             return True, _tail_log(log_path)
         rc = proc.poll()
         transcript = _tail_log(log_path)
@@ -470,7 +507,8 @@ def start_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]:
                 "host": tunnel["host"],
                 "ssh_port": int(tunnel.get("ssh_port") or 22),
                 "local_port": local_port,
-                "bootstrap_pid": int(proc.pid or 0),
+                "launcher_pid": int(proc.pid or 0),
+                "listener_pids": _listener_pids(local_port),
                 "started_at": int(time.time()),
                 "cmd": shlex.join(["sshpass", "-e", *_ssh_args(user, tunnel)]),
             }
@@ -497,48 +535,24 @@ def stop_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]:
     try:
         with _tunnel_lock(name):
             local_port = int(tunnel["local_port"])
-            ctl_path = _ctl_path(name)
-            if not ctl_path.exists():
-                pids = _listener_pids(local_port)
-                if pids:
-                    _terminate_pids(pids)
-                    _wait_port_closed(local_port, 5.0)
-                    _cleanup_state(name)
-                    _log_tunnel(
-                        f"stop_done name={name} host={tunnel['host']} local_port={local_port} "
-                        f"status=stopped_stale"
-                    )
-                    return {"name": name, "status": "stopped_stale"}
+            host = str(tunnel["host"])
+            pids = _known_tunnel_pids(name, local_port)
+            if not pids:
                 _cleanup_state(name)
                 _log_tunnel(f"stop_skip name={name} status=not_running")
                 return {"name": name, "status": "not_running"}
-            user = _tunnel_user(cfg, tunnel)
-            host = str(tunnel["host"])
-            ssh_port = int(tunnel.get("ssh_port") or 22)
-            cmd = [
-                "ssh",
-                "-S",
-                str(ctl_path),
-                "-O",
-                "exit",
-                "-p",
-                str(ssh_port),
-                f"{user}@{host}",
-            ]
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=STOP_TIMEOUT_SEC)
-            if proc.returncode != 0 and _port_open(local_port):
-                _terminate_pids(_listener_pids(local_port))
-                _wait_port_closed(local_port, 5.0)
+            _terminate_pids(pids)
+            _wait_port_closed(local_port, 5.0)
             _cleanup_state(name)
+            stopped = not _port_open(local_port)
             _log_tunnel(
                 f"stop_done name={name} host={host} local_port={local_port} "
-                f"status={'stopped' if proc.returncode == 0 else 'stop_failed'}"
+                f"status={'stopped' if stopped else 'stop_failed'}"
             )
             return {
                 "name": name,
-                "status": "stopped" if proc.returncode == 0 else "stop_failed",
-                "stdout": (proc.stdout or "").strip(),
-                "stderr": (proc.stderr or "").strip(),
+                "status": "stopped" if stopped else "stop_failed",
+                "pids": pids,
             }
     except TunnelLockBusyError as exc:
         return {
@@ -550,50 +564,23 @@ def stop_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]:
         }
 
 
-def _control_ok(cfg: dict[str, Any], tunnel: dict[str, Any]) -> bool:
-    name = str(tunnel["name"])
-    ctl_path = _ctl_path(name)
-    if not ctl_path.exists():
-        return False
-    user = _tunnel_user(cfg, tunnel)
-    host = str(tunnel["host"])
-    ssh_port = int(tunnel.get("ssh_port") or 22)
-    cmd = [
-        "ssh",
-        "-S",
-        str(ctl_path),
-        "-O",
-        "check",
-        "-p",
-        str(ssh_port),
-        f"{user}@{host}",
-    ]
-    try:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=CONTROL_CHECK_TIMEOUT_SEC,
-            check=False,
-        )
-    except (subprocess.TimeoutExpired, OSError, RuntimeError):
-        return False
-    except Exception:
-        return False
-    return int(proc.returncode or 0) == 0
+def _process_ok(name: str, local_port: int) -> bool:
+    return bool(_known_tunnel_pids(name, local_port))
 
 
 def status_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]:
     name = str(tunnel["name"])
-    port_open = _port_open(int(tunnel["local_port"]))
-    control_ok = _control_ok(cfg, tunnel)
+    local_port = int(tunnel["local_port"])
+    port_open = _port_open(local_port)
+    control_ok = _process_ok(name, local_port)
     return {
         "name": name,
         "host": tunnel["host"],
-        "local_port": int(tunnel["local_port"]),
-        "alive": bool(port_open),
+        "local_port": local_port,
+        "alive": bool(port_open and control_ok),
         "port_open": port_open,
         "control_ok": control_ok,
+        "listener_pids": _known_tunnel_pids(name, local_port),
         "ctl_path": str(_ctl_path(name)),
         "meta_path": str(_meta_path(name)),
         "log_path": str(_log_path(name)),
@@ -609,6 +596,7 @@ def _status_error_row(tunnel: dict[str, Any]) -> dict[str, Any]:
         "alive": False,
         "port_open": False,
         "control_ok": False,
+        "listener_pids": [],
         "ctl_path": str(_ctl_path(name)),
         "meta_path": str(_meta_path(name)),
         "log_path": str(_log_path(name)),
