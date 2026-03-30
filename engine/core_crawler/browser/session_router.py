@@ -722,20 +722,40 @@ class BrowserSessionRouter:
             return None
         return state
 
-    def _new_session_state(self, cfg: SiteSessionConfig, slot_idx: int) -> dict[str, Any]:
+    def _new_session_state(
+        self,
+        cfg: SiteSessionConfig,
+        slot_idx: int,
+        previous_state: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         now = time.time()
-        profile = self._pick_profile(cfg.site)
+        previous = dict(previous_state or {}) if isinstance(previous_state, dict) else {}
+        previous_requests_total = max(0, int(previous.get("requests_total") or 0))
+        if previous_requests_total >= int(cfg.max_requests_per_session):
+            previous_requests_total = 0
+            previous["warmed"] = False
+            previous["current_url"] = ""
+            previous["storage_state"] = {}
+        profile_name = str(previous.get("profile_name") or "").strip()
+        profile = None
+        if profile_name:
+            for candidate in BROWSER_PROFILES:
+                if candidate.name == profile_name:
+                    profile = candidate
+                    break
+        if profile is None:
+            profile = self._pick_profile(cfg.site)
         return {
             "session_id": uuid4().hex[:12],
             "profile_name": profile.name,
             "slot_idx": int(slot_idx),
             "created_at": now,
             "last_used_at": now,
-            "requests_total": 0,
-            "warmed": False,
-            "current_url": "",
+            "requests_total": previous_requests_total,
+            "warmed": bool(previous.get("warmed") is True),
+            "current_url": str(previous.get("current_url") or ""),
             "next_dispatch_ts": 0.0,
-            "storage_state": {},
+            "storage_state": dict(previous.get("storage_state") or {}),
         }
 
     def _apply_state_to_runtime(self, session: BrowserSession, state: dict[str, Any]) -> None:
@@ -790,9 +810,15 @@ class BrowserSessionRouter:
         if not gate_token:
             return None
         try:
+            session_key = self._session_key(cfg.site, slot_name, slot_idx)
+            raw_state = self._cache_get_obj(session_key)
             state = self._load_session_state(cfg, slot_name, slot_idx)
             if state is None:
-                state = self._new_session_state(cfg, slot_idx)
+                state = self._new_session_state(
+                    cfg,
+                    slot_idx,
+                    raw_state if isinstance(raw_state, dict) else None,
+                )
             needs_warm = not bool(state.get("warmed") is True)
             warm_lock_key = ""
             warm_lock_token = ""
@@ -818,9 +844,9 @@ class BrowserSessionRouter:
             state["slot_idx"] = int(slot_idx)
             state["last_used_at"] = max(float(state.get("last_used_at") or 0.0), time.time())
             state["next_dispatch_ts"] = 0.0
-            self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), state)
+            self._cache_set_obj(session_key, state)
             return SessionLease(
-                session_key=self._session_key(cfg.site, slot_name, slot_idx),
+                session_key=session_key,
                 slot_name=slot_name,
                 slot_idx=int(slot_idx),
                 session_id=str(state.get("session_id") or ""),
