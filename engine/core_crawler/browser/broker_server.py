@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import multiprocessing
 import os
@@ -48,6 +49,16 @@ ROUTE_SITES = ("11880", "gs")
 ROUTE_STATE_LOCK_TTL_SEC = 3.0
 ROUTE_STATE_WAIT_SEC = 2.0
 ROUTE_PLAN_CACHE_SEC = 60.0
+
+
+def _broker_worker_parallelism() -> int:
+    limit = 1
+    for cfg in SITE_CONFIGS.values():
+        try:
+            limit = max(limit, int(cfg.concurrent_pages_per_session))
+        except Exception:
+            continue
+    return max(1, limit)
 
 
 def _cleanup_browser_processes() -> None:
@@ -649,54 +660,106 @@ def _broker_worker_main(
     results: "multiprocessing.Queue[dict[str, Any] | None]",
 ) -> None:
     router = BrowserSessionRouter()
-    try:
-        while True:
-            item = jobs.get()
-            if item is None:
-                break
-            request_id = str(item.get("request_id") or "")
-            payload = _normalize_fetch_payload(dict(item.get("payload") or {}))
+    max_inflight = _broker_worker_parallelism()
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=max_inflight,
+        thread_name_prefix="core_crawler_broker_fetch",
+    )
+    active: set[concurrent.futures.Future[None]] = set()
+
+    def _flush_done(done_futures: set[concurrent.futures.Future[None]]) -> None:
+        for future in done_futures:
+            active.discard(future)
             try:
-                result = router.fetch(
-                    site=str(payload["site"]),
-                    url=str(payload["url"]),
-                    kind=str(payload["kind"]),
-                    task_id=int(payload["task_id"]),
-                    cb_id=int(payload["cb_id"]),
-                    referer=str(payload.get("referer") or ""),
-                    mode=str(payload.get("mode") or ""),
-                    method=str(payload.get("method") or "GET"),
-                    form=dict(payload.get("form") or {}) or None,
-                    extra_headers=dict(payload.get("extra_headers") or {}) or None,
-                    preferred_slot_name=str(payload.get("preferred_slot_name") or ""),
-                    preferred_slot_idx=_int_value(payload.get("preferred_slot_idx"), -1),
-                    allowed_slot_names=[str(name) for name in list(payload.get("allowed_slot_names") or []) if str(name or "").strip()],
+                future.result()
+            except Exception:
+                pass
+
+    def _run_one(item: dict[str, Any]) -> None:
+        request_id = str(item.get("request_id") or "")
+        payload = _normalize_fetch_payload(dict(item.get("payload") or {}))
+        try:
+            result = router.fetch(
+                site=str(payload["site"]),
+                url=str(payload["url"]),
+                kind=str(payload["kind"]),
+                task_id=int(payload["task_id"]),
+                cb_id=int(payload["cb_id"]),
+                referer=str(payload.get("referer") or ""),
+                mode=str(payload.get("mode") or ""),
+                method=str(payload.get("method") or "GET"),
+                form=dict(payload.get("form") or {}) or None,
+                extra_headers=dict(payload.get("extra_headers") or {}) or None,
+                preferred_slot_name=str(payload.get("preferred_slot_name") or ""),
+                preferred_slot_idx=_int_value(payload.get("preferred_slot_idx"), -1),
+                allowed_slot_names=[str(name) for name in list(payload.get("allowed_slot_names") or []) if str(name or "").strip()],
+            )
+            results.put(
+                {
+                    "request_id": request_id,
+                    "response": {"ok": True, "result": asdict(result), "_completed_ts": time.time()},
+                }
+            )
+        except Exception as exc:
+            print(
+                f"[browser-broker] fail request_id={request_id} "
+                f"site={payload.get('site')} cb_id={payload.get('cb_id')} "
+                f"error={type(exc).__name__}: {exc}",
+                flush=True,
+            )
+            results.put(
+                {
+                    "request_id": request_id,
+                    "response": {
+                        "ok": False,
+                        "error": type(exc).__name__,
+                        "detail": str(exc),
+                        "_completed_ts": time.time(),
+                    },
+                }
+            )
+
+    try:
+        stop_requested = False
+        while True:
+            if active:
+                done, _ = concurrent.futures.wait(
+                    active,
+                    timeout=0.0,
+                    return_when=concurrent.futures.FIRST_COMPLETED,
                 )
-                results.put(
-                    {
-                        "request_id": request_id,
-                        "response": {"ok": True, "result": asdict(result), "_completed_ts": time.time()},
-                    }
+                if done:
+                    _flush_done(set(done))
+            if stop_requested:
+                if not active:
+                    break
+                done, _ = concurrent.futures.wait(
+                    active,
+                    timeout=0.1,
+                    return_when=concurrent.futures.FIRST_COMPLETED,
                 )
-            except Exception as exc:
-                print(
-                    f"[browser-broker] fail request_id={request_id} "
-                    f"site={payload.get('site')} cb_id={payload.get('cb_id')} "
-                    f"error={type(exc).__name__}: {exc}",
-                    flush=True,
+                if done:
+                    _flush_done(set(done))
+                continue
+            if len(active) >= max_inflight:
+                done, _ = concurrent.futures.wait(
+                    active,
+                    timeout=0.1,
+                    return_when=concurrent.futures.FIRST_COMPLETED,
                 )
-                results.put(
-                    {
-                        "request_id": request_id,
-                        "response": {
-                            "ok": False,
-                            "error": type(exc).__name__,
-                            "detail": str(exc),
-                            "_completed_ts": time.time(),
-                        },
-                    }
-                )
+                if done:
+                    _flush_done(set(done))
+                continue
+            try:
+                item = jobs.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            if item is None:
+                stop_requested = True
+                continue
+            active.add(executor.submit(_run_one, item))
     finally:
+        executor.shutdown(wait=True, cancel_futures=False)
         router.close_all()
 
 
