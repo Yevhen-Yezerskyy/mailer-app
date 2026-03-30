@@ -1164,7 +1164,11 @@ class BrowserSessionRouter:
             raise RuntimeError(f"SESSION GATE BUSY {cfg.site} {slot_name}:{slot_idx}")
         try:
             current_state = self._load_session_state(cfg, slot_name, slot_idx) or {}
-            merged = self._merge_session_state(session, current_state, requests_delta=0)
+            requests_delta = max(
+                0,
+                int(session.requests_total) - int(current_state.get("requests_total") or 0),
+            )
+            merged = self._merge_session_state(session, current_state, requests_delta=requests_delta)
             session.requests_total = int(merged.get("requests_total") or session.requests_total)
             session.next_dispatch_ts = float(merged.get("next_dispatch_ts") or session.next_dispatch_ts)
             self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), merged)
