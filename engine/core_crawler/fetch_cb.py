@@ -10,6 +10,7 @@ import json
 import os
 import random
 import signal
+import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Optional
@@ -27,7 +28,8 @@ from engine.core_crawler.spiders.spider_11880_cb import OneOneEightZeroCBSpider
 
 LOCK_TTL_SEC = 1200.0
 RETRY_LOCK_TTL_SEC = 3 * 60 * 60.0
-ROUTE_LOCK_TTL_SEC = 2 * 60 * 60.0
+ROUTE_LOCK_TTL_SEC = 30.0
+ROUTE_LOCK_RENEW_SEC = 10.0
 
 
 @dataclass(frozen=True)
@@ -51,6 +53,12 @@ class RouteLease:
     slot_idx: int
     lock_key: str
     lock_token: str
+
+
+@dataclass(frozen=True)
+class RouteLeaseHeartbeat:
+    stop_event: Any
+    thread: Any
 
 
 def _make_item(
@@ -180,6 +188,46 @@ def _release_route(route: RouteLease | None) -> None:
         return
     try:
         CLIENT.lock_release(route.lock_key, token=route.lock_token)
+    except Exception:
+        pass
+
+
+def _start_route_heartbeat(route: RouteLease | None) -> RouteLeaseHeartbeat | None:
+    if route is None or not route.lock_key or not route.lock_token:
+        return None
+    stop_event = threading.Event()
+
+    def _heartbeat() -> None:
+        while not stop_event.wait(ROUTE_LOCK_RENEW_SEC):
+            try:
+                renewed = CLIENT.lock_renew(
+                    route.lock_key,
+                    ttl_sec=ROUTE_LOCK_TTL_SEC,
+                    token=route.lock_token,
+                )
+            except Exception:
+                renewed = False
+            if not renewed:
+                return
+
+    thread = threading.Thread(
+        target=_heartbeat,
+        name=f"route_lock:{route.site}:{route.slot_name}",
+        daemon=True,
+    )
+    thread.start()
+    return RouteLeaseHeartbeat(stop_event=stop_event, thread=thread)
+
+
+def _stop_route_heartbeat(heartbeat: RouteLeaseHeartbeat | None) -> None:
+    if heartbeat is None:
+        return
+    try:
+        heartbeat.stop_event.set()
+    except Exception:
+        pass
+    try:
+        heartbeat.thread.join(timeout=1.0)
     except Exception:
         pass
 
@@ -424,8 +472,10 @@ def worker_main_loop(catalog: str = "") -> None:
             if route is None:
                 time.sleep(0.25)
                 continue
+            heartbeat = _start_route_heartbeat(route)
             item = _claim_next_item(catalog_name)
             if item is None:
+                _stop_route_heartbeat(heartbeat)
                 _release_route(route)
                 time.sleep(0.25)
                 continue
@@ -433,6 +483,7 @@ def worker_main_loop(catalog: str = "") -> None:
                 _run_item(item, route)
             finally:
                 _finalize_item_lock(item)
+                _stop_route_heartbeat(heartbeat)
                 _release_route(route)
     finally:
         clear_fetch_route_context()

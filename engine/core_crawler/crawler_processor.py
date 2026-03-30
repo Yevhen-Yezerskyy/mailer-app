@@ -11,6 +11,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
+from engine.common.cache.client import CLIENT, _redis_call
 from engine.core_crawler.browser.broker_server import current_site_route_plan
 from engine.core_crawler.fetch_cb import pending_items_exist
 from engine.core_crawler.tunnels_11880 import ensure_tunnel_watchdog, stop_tunnel_watchdog
@@ -31,6 +32,35 @@ CATALOG_ROUTES_PER_WORKER = {
 class WorkerProcess:
     process: subprocess.Popen[Any]
     started_at: float
+
+
+def _scan_redis_keys(pattern: str) -> list[str]:
+    cursor = "0"
+    found: list[str] = []
+    seen: set[str] = set()
+    while True:
+        reply = _redis_call("SCAN", cursor, "MATCH", str(pattern), "COUNT", 200)
+        if not isinstance(reply, list) or len(reply) < 2:
+            break
+        next_cursor = reply[0]
+        raw_keys = reply[1] if isinstance(reply[1], list) else []
+        cursor = next_cursor.decode("utf-8", errors="replace") if isinstance(next_cursor, (bytes, bytearray)) else str(next_cursor)
+        for raw_key in raw_keys:
+            key = raw_key.decode("utf-8", errors="replace") if isinstance(raw_key, (bytes, bytearray)) else str(raw_key)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            found.append(key)
+        if cursor == "0":
+            break
+    return found
+
+
+def _clear_stale_route_worker_locks() -> int:
+    keys = _scan_redis_keys("lock:core_crawler:route_worker:*")
+    if not keys:
+        return 0
+    return int(CLIENT.delete_many(keys) or 0)
 
 
 def _target_parallelism_by_catalog() -> dict[str, int]:
@@ -131,6 +161,9 @@ def main() -> None:
     active_by_catalog: dict[str, list[WorkerProcess]] = {catalog: [] for catalog in CATALOGS}
     last_targets: dict[str, int] = {catalog: -1 for catalog in CATALOGS}
     try:
+        cleared = _clear_stale_route_worker_locks()
+        if cleared > 0:
+            print(f"[crawler_processor] cleared_stale_route_locks count={cleared}", flush=True)
         ensure_tunnel_watchdog()
         while not stop_requested["value"]:
             targets = _target_parallelism_by_catalog()
