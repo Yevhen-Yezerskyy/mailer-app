@@ -19,7 +19,7 @@ TICK_SEC = 1.0
 CATALOGS = ("11880", "gs")
 CATALOG_MAX_WORKERS = {
     "11880": 2,
-    "gs": 3,
+    "gs": 2,
 }
 CATALOG_ROUTES_PER_WORKER = {
     "11880": 1,
