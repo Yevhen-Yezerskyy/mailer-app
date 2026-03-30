@@ -13,6 +13,7 @@ from typing import Any
 
 from engine.core_crawler.browser.broker_server import current_site_route_plan
 from engine.core_crawler.fetch_cb import pending_items_exist
+from engine.core_crawler.tunnels_11880 import ensure_tunnel_watchdog, stop_tunnel_watchdog
 
 TICK_SEC = 1.0
 CATALOGS = ("11880", "gs")
@@ -113,6 +114,7 @@ def main() -> None:
     active_by_catalog: dict[str, list[WorkerProcess]] = {catalog: [] for catalog in CATALOGS}
     last_targets: dict[str, int] = {catalog: -1 for catalog in CATALOGS}
     try:
+        ensure_tunnel_watchdog()
         while not stop_requested["value"]:
             targets = _target_parallelism_by_catalog()
             for catalog in CATALOGS:
@@ -129,6 +131,7 @@ def main() -> None:
             time.sleep(TICK_SEC)
     finally:
         _stop_workers(active_by_catalog)
+        stop_tunnel_watchdog()
 
 
 if __name__ == "__main__":
