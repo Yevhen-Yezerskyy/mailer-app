@@ -5,12 +5,17 @@
 from __future__ import annotations
 
 import json
+import random
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
 from engine.common.db import fetch_one, get_connection
 from engine.common.logs import log
 from engine.core_crawler.browser.fetcher import fetch_html, to_text_response
+from engine.core_crawler.browser.session_config import (
+    ONE_ONE_EIGHTY_MISMATCH_VISIT_MAX,
+    ONE_ONE_EIGHTY_MISMATCH_VISIT_PROBABILITY,
+)
 from engine.core_crawler.spiders.spider_11880_card import parse_11880_card
 from engine.core_crawler.spiders.spider_11880_index_card import (
     extract_11880_next_page_url,
@@ -43,6 +48,7 @@ class OneOneEightZeroCBSpider:
         self._detail_referers: Dict[str, str] = {}
         self._db_action: str = "skip"
         self._db_rows: int = 0
+        self._noise_seen = 0
 
     def _remember_index_cards(
         self,
@@ -51,6 +57,7 @@ class OneOneEightZeroCBSpider:
         page_url: str,
         seen_urls: set[str],
         selected_urls: List[str],
+        mismatch_urls: List[str],
     ) -> None:
         for card in cards:
             row = dict(card)
@@ -61,18 +68,53 @@ class OneOneEightZeroCBSpider:
             row["selected"] = selected
             row["skip_reason"] = "" if selected else ("PLZ MISMATCH" if plz else "NO PLZ")
             self.index_cards.append(row)
-            if not selected or not url or url in seen_urls:
+            if not url or url in seen_urls:
                 continue
             seen_urls.add(url)
-            selected_urls.append(url)
             self._detail_referers[url] = page_url
+            if selected:
+                selected_urls.append(url)
+                continue
+            if plz:
+                mismatch_urls.append(url)
+
+    def _pick_noise_urls(self, mismatch_urls: List[str]) -> List[str]:
+        if not mismatch_urls:
+            return []
+        pool = list(mismatch_urls)
+        random.shuffle(pool)
+        picked: List[str] = []
+        for detail_url in pool:
+            if len(picked) >= int(ONE_ONE_EIGHTY_MISMATCH_VISIT_MAX):
+                break
+            if random.random() <= float(ONE_ONE_EIGHTY_MISMATCH_VISIT_PROBABILITY):
+                picked.append(detail_url)
+        return picked
+
+    def _visit_noise_details(self, mismatch_urls: List[str]) -> None:
+        for detail_url in self._pick_noise_urls(mismatch_urls):
+            try:
+                noise_result = fetch_html(
+                    site="11880",
+                    url=detail_url,
+                    kind="detail",
+                    task_id=self.task_id,
+                    cb_id=self.cb_id,
+                    referer=self._detail_referers.get(detail_url, self._start_url),
+                    mode="browser_click",
+                )
+            except Exception:
+                continue
+            self._noise_seen += 1
+            self._last_tunnel = dict(noise_result.tunnel)
 
     def _run_fetch(self) -> None:
-        # self._start_url = f"https://www.11880.com/suche/{self.branch_slug}/{self.plz}"
-        self._start_url = f"https://serenity-mail.de/suche/{self.branch_slug}/{self.plz}"
+        self._start_url = f"https://www.11880.com/suche/{self.branch_slug}/{self.plz}"
+        # self._start_url = f"https://serenity-mail.de/suche/{self.branch_slug}/{self.plz}"
         current_search_url = self._start_url
         current_referer = ""
         selected_urls: List[str] = []
+        mismatch_urls: List[str] = []
         seen_urls: set[str] = set()
 
         seen_search_urls: set[str] = set()
@@ -85,7 +127,7 @@ class OneOneEightZeroCBSpider:
                 task_id=self.task_id,
                 cb_id=self.cb_id,
                 referer=current_referer,
-                mode="http_only",
+                mode="index_browser",
             )
             self._last_tunnel = dict(search_result.tunnel)
             if search_result.status not in {200, 404}:
@@ -103,6 +145,7 @@ class OneOneEightZeroCBSpider:
                 page_url=search_result.final_url,
                 seen_urls=seen_urls,
                 selected_urls=selected_urls,
+                mismatch_urls=mismatch_urls,
             )
 
             next_search_url = extract_11880_next_page_url(search_response)
@@ -126,7 +169,7 @@ class OneOneEightZeroCBSpider:
                 task_id=self.task_id,
                 cb_id=self.cb_id,
                 referer=self._detail_referers.get(detail_url, self._start_url),
-                mode="http_only",
+                mode="browser_click",
             )
             self._last_tunnel = dict(detail_result.tunnel)
             if detail_result.status != 200:
@@ -146,6 +189,7 @@ class OneOneEightZeroCBSpider:
                 }
             )
 
+        self._visit_noise_details(mismatch_urls)
         self._final_reason = "OK" if self.items else "NO DETAIL ITEMS"
 
     def run(self) -> None:
@@ -226,7 +270,7 @@ class OneOneEightZeroCBSpider:
         all_parsed = detail_seen > 0 and detail_seen == detail_parsed
         return (
             f"cb_id={self.cb_id} detail selected={selected} seen={detail_seen} "
-            f"parsed={detail_parsed} all_parsed={'yes' if all_parsed else 'no'}"
+            f"parsed={detail_parsed} all_parsed={'yes' if all_parsed else 'no'} noise={int(self._noise_seen)}"
         )
 
     def _result_log_line(self, reason: str) -> str:
@@ -247,13 +291,13 @@ class OneOneEightZeroCBSpider:
             print(f"CORE_11880_CB cb_id={self.cb_id} result=skip reason={r}")
             return
 
-        # if not self._reason_marks_collected(r):
-        #     self._db_action = "leave_pending"
-        #     print(
-        #         f"CORE_11880_CB cb_id={self.cb_id} result=pending reason={r} "
-        #         f"indexed={len(self.index_cards)} selected={len(self.selected_urls)} parsed={self._detail_parsed}"
-        #     )
-        #     return
+        if not self._reason_marks_collected(r):
+            self._db_action = "leave_pending"
+            print(
+                f"CORE_11880_CB cb_id={self.cb_id} result=pending reason={r} "
+                f"indexed={len(self.index_cards)} selected={len(self.selected_urls)} parsed={self._detail_parsed}"
+            )
+            return
         if not self._start_url:
             self._db_action = "leave_pending"
             print(

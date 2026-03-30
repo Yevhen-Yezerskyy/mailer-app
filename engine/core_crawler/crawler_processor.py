@@ -16,6 +16,7 @@ from engine.core_crawler.browser.broker_server import current_site_route_plan, r
 from engine.core_crawler.fetch_cb import pending_items_exist
 
 TICK_SEC = 1.0
+CATALOGS = ("11880", "gs")
 
 
 @dataclass
@@ -24,41 +25,46 @@ class WorkerProcess:
     started_at: float
 
 
-def _target_parallelism() -> int:
+def _target_parallelism_by_catalog() -> dict[str, int]:
     route_plan = current_site_route_plan()
-    active_routes = 0
-    for site_name in ("11880", "gs"):
-        active_routes += len(route_plan.get(site_name) or [])
-    return max(0, int(active_routes * 2))
+    targets: dict[str, int] = {}
+    for site_name in CATALOGS:
+        targets[site_name] = max(0, int(len(route_plan.get(site_name) or [])))
+    return targets
 
 
-def _collect_finished_workers(active: list[WorkerProcess]) -> list[WorkerProcess]:
+def _collect_finished_workers(catalog: str, active: list[WorkerProcess]) -> list[WorkerProcess]:
     still_running: list[WorkerProcess] = []
     for worker in active:
         if worker.process.poll() is None:
             still_running.append(worker)
             continue
         print(
-            f"[crawler_processor] worker_done pid={worker.process.pid} "
+            f"[crawler_processor] worker_done catalog={catalog} pid={worker.process.pid} "
             f"rc={worker.process.returncode}",
             flush=True,
         )
     return still_running
 
 
-def _launch_worker() -> WorkerProcess:
+def _launch_worker(catalog: str) -> WorkerProcess:
     proc = subprocess.Popen(
-        [sys.executable, "-m", "engine.core_crawler.fetch_cb"],
+        [sys.executable, "-m", "engine.core_crawler.fetch_cb", "--catalog", str(catalog)],
         stdin=subprocess.DEVNULL,
         start_new_session=True,
         close_fds=True,
     )
-    print(f"[crawler_processor] worker_start pid={proc.pid}", flush=True)
+    print(f"[crawler_processor] worker_start catalog={catalog} pid={proc.pid}", flush=True)
     return WorkerProcess(process=proc, started_at=time.time())
 
 
-def _stop_workers(active: list[WorkerProcess]) -> None:
-    live = [worker for worker in active if worker.process.poll() is None]
+def _stop_workers(active_by_catalog: dict[str, list[WorkerProcess]]) -> None:
+    live = [
+        worker
+        for workers in active_by_catalog.values()
+        for worker in workers
+        if worker.process.poll() is None
+    ]
     if not live:
         return
     for worker in live:
@@ -94,22 +100,27 @@ def main() -> None:
     broker.start()
     print(f"[crawler_processor] broker_start pid={broker.pid}", flush=True)
 
-    active: list[WorkerProcess] = []
-    last_target = -1
+    active_by_catalog: dict[str, list[WorkerProcess]] = {catalog: [] for catalog in CATALOGS}
+    last_targets: dict[str, int] = {catalog: -1 for catalog in CATALOGS}
     try:
         while not stop_requested["value"]:
             if not broker.is_alive():
                 raise RuntimeError("browser broker stopped unexpectedly")
-            active = _collect_finished_workers(active)
-            target = _target_parallelism()
-            if target != last_target:
-                print(f"[crawler_processor] target_parallel={target}", flush=True)
-                last_target = target
-            if len(active) < target and pending_items_exist():
-                active.append(_launch_worker())
+            targets = _target_parallelism_by_catalog()
+            for catalog in CATALOGS:
+                active_by_catalog[catalog] = _collect_finished_workers(catalog, active_by_catalog[catalog])
+                target = int(targets.get(catalog) or 0)
+                if target != last_targets[catalog]:
+                    print(f"[crawler_processor] target_parallel catalog={catalog} value={target}", flush=True)
+                    last_targets[catalog] = target
+                if len(active_by_catalog[catalog]) >= target:
+                    continue
+                if not pending_items_exist(catalog):
+                    continue
+                active_by_catalog[catalog].append(_launch_worker(catalog))
             time.sleep(TICK_SEC)
     finally:
-        _stop_workers(active)
+        _stop_workers(active_by_catalog)
         if broker.is_alive():
             broker.terminate()
             broker.join(timeout=5.0)

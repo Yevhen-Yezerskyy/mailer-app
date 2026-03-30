@@ -21,7 +21,17 @@ from typing import Any
 from uuid import uuid4
 
 from engine.common.cache.client import CLIENT
-from engine.core_crawler.browser.session_config import BROKER_QUEUE_MAX, BROKER_WORKERS, SITE_CONFIGS
+from engine.core_crawler.browser.session_config import (
+    BROKER_QUEUE_MAX,
+    BROKER_WORKERS,
+    ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX,
+    ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO,
+    ONE_ONE_EIGHTY_WINDOW_COOLDOWN_SEC,
+    ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT,
+    ONE_ONE_EIGHTY_WINDOW_MAX_SEC,
+    ONE_ONE_EIGHTY_WINDOW_MIN_SEC,
+    SITE_CONFIGS,
+)
 from engine.core_crawler.browser.session_router import BrowserSessionRouter
 from engine.core_crawler.tunnels_11880 import ensure_tunnel_watchdog, load_tunnel_statuses, stop_tunnel_watchdog
 
@@ -30,6 +40,9 @@ STATE_TTL_SEC = 7 * 24 * 60 * 60
 SCHEDULE_ROTATE_MIN_SEC = 600.0
 SCHEDULE_ROTATE_MAX_SEC = 1200.0
 ROUTE_SITES = ("11880", "gs")
+ROUTE_STATE_LOCK_TTL_SEC = 3.0
+ROUTE_STATE_WAIT_SEC = 2.0
+ROUTE_PLAN_CACHE_SEC = 60.0
 
 
 def _cleanup_browser_processes() -> None:
@@ -141,11 +154,59 @@ def _rr_key(site: str) -> str:
     return f"core_crawler:slot_rr:{site_name}"
 
 
+def _route_plan_key() -> str:
+    return "core_crawler:route_plan"
+
+
+def _route_plan_lock_key() -> str:
+    return "core_crawler:route_plan_lock"
+
+
+def _window_key(site: str) -> str:
+    site_name = str(site or "").strip()
+    if not site_name:
+        raise ValueError("window key requires site")
+    return f"core_crawler:slot_window:{site_name}"
+
+
+def _window_lock_key(site: str) -> str:
+    site_name = str(site or "").strip()
+    if not site_name:
+        raise ValueError("window lock key requires site")
+    return f"core_crawler:slot_window_lock:{site_name}"
+
+
 def _quarantine_key(site: str) -> str:
     site_name = str(site or "").strip()
     if not site_name:
         raise ValueError("quarantine key requires site")
     return f"core_crawler:slot_quarantine:{site_name}"
+
+
+def _try_lock(key: str, ttl_sec: float, owner: str) -> str:
+    info = CLIENT.lock_try(key, ttl_sec=ttl_sec, owner=owner)
+    if not info or not bool(info.get("acquired")):
+        return ""
+    return str(info.get("token") or "")
+
+
+def _lock_until(key: str, ttl_sec: float, owner: str, wait_sec: float) -> str:
+    deadline = time.time() + max(0.1, float(wait_sec))
+    while time.time() < deadline:
+        token = _try_lock(key, ttl_sec, owner)
+        if token:
+            return token
+        time.sleep(0.05)
+    return ""
+
+
+def _release_lock(key: str, token: str) -> None:
+    if not key or not token:
+        return
+    try:
+        CLIENT.lock_release(key, token=token)
+    except Exception:
+        pass
 
 
 def _configured_slot_names() -> list[str]:
@@ -162,18 +223,6 @@ def _configured_slot_names() -> list[str]:
             seen.add(name)
             ordered.append(name)
     return ordered
-
-
-def _site_owned_slot_names() -> dict[str, list[str]]:
-    owned = {site: [] for site in ROUTE_SITES}
-    slots = _configured_slot_names()
-    if not slots:
-        return owned
-    site_count = len(ROUTE_SITES)
-    for idx, slot_name in enumerate(slots):
-        site = ROUTE_SITES[idx % site_count]
-        owned[site].append(slot_name)
-    return owned
 
 
 def _load_site_quarantine(site: str) -> dict[str, float]:
@@ -205,6 +254,125 @@ def _slot_is_live(slot_name: str, statuses: dict[str, dict[str, Any]]) -> bool:
     return bool((statuses.get(name) or {}).get("alive"))
 
 
+def _11880_target_active_count(live_count: int) -> int:
+    count = max(0, int(live_count))
+    if count <= 0:
+        return 0
+    limited = int(count * float(ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO))
+    return min(ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX, max(0, limited))
+
+
+def _load_window_state(site: str, active_names: list[str]) -> dict[str, dict[str, float | int]]:
+    raw = _cache_get_obj(_window_key(site)) or {}
+    if not isinstance(raw, dict):
+        return {}
+    now = time.time()
+    known_names = {str(name) for name in active_names}
+    out: dict[str, dict[str, float | int]] = {}
+    for slot_name, row in raw.items():
+        name = str(slot_name or "").strip()
+        if name not in known_names or not isinstance(row, dict):
+            continue
+        try:
+            active_until = float(row.get("active_until") or 0.0)
+            cool_until = float(row.get("cool_until") or 0.0)
+            main_requests = max(0, int(row.get("main_requests") or 0))
+        except Exception:
+            continue
+        if active_until <= now or main_requests >= ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT:
+            active_until = 0.0
+        if cool_until <= now and active_until <= 0.0:
+            cool_until = 0.0
+            main_requests = 0
+        out[name] = {
+            "active_until": active_until,
+            "cool_until": cool_until,
+            "main_requests": main_requests,
+        }
+    return out
+
+
+def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
+    if len(available) <= 1:
+        return list(available)
+    lock_key = _window_lock_key(site)
+    owner = f"{site}:window:{uuid4().hex}"
+    lock_token = _lock_until(lock_key, ROUTE_STATE_LOCK_TTL_SEC, owner, ROUTE_STATE_WAIT_SEC)
+    if not lock_token:
+        return []
+    try:
+        now = time.time()
+        state = _load_window_state(site, available)
+        active_names = [
+            name
+            for name in available
+            if float((state.get(name) or {}).get("active_until") or 0.0) > now
+            and int((state.get(name) or {}).get("main_requests") or 0) < ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT
+        ]
+        target_count = _11880_target_active_count(len(available))
+        if len(active_names) > target_count:
+            keep_names = set(active_names[:target_count])
+            for name in available:
+                if name not in keep_names and name in state:
+                    state[name]["active_until"] = 0.0
+            active_names = [name for name in active_names if name in keep_names]
+        if len(active_names) < target_count:
+            eligible_names = [
+                name
+                for name in available
+                if name not in active_names
+                and float((state.get(name) or {}).get("cool_until") or 0.0) <= now
+            ]
+            if eligible_names:
+                rr_state = _cache_get_obj(_rr_key(site)) or {"pos": 0}
+                rr_pos = int(rr_state.get("pos") or 0)
+                start_idx = rr_pos % len(eligible_names)
+                rotated_names = eligible_names[start_idx:] + eligible_names[:start_idx]
+                needed = target_count - len(active_names)
+                for name in rotated_names[:needed]:
+                    state[name] = {
+                        "active_until": now + random.uniform(ONE_ONE_EIGHTY_WINDOW_MIN_SEC, ONE_ONE_EIGHTY_WINDOW_MAX_SEC),
+                        "cool_until": now + float(ONE_ONE_EIGHTY_WINDOW_COOLDOWN_SEC),
+                        "main_requests": 0,
+                    }
+                    active_names.append(name)
+                _cache_set_obj(_rr_key(site), {"pos": rr_pos + max(1, needed)})
+        _cache_set_obj(_window_key(site), state)
+        return [name for name in available if name in active_names]
+    finally:
+        _release_lock(lock_key, lock_token)
+
+
+def _record_11880_main_request(site: str, slot_name: str) -> None:
+    name = str(slot_name or "").strip()
+    if site != "11880" or not name:
+        return
+    lock_key = _window_lock_key(site)
+    owner = f"{site}:count:{name}:{uuid4().hex}"
+    lock_token = _lock_until(lock_key, ROUTE_STATE_LOCK_TTL_SEC, owner, ROUTE_STATE_WAIT_SEC)
+    if not lock_token:
+        return
+    try:
+        cfg = SITE_CONFIGS.get(site)
+        configured_names = list(getattr(cfg, "egress_slots", ()) or ()) or [name]
+        state = _load_window_state(site, configured_names)
+        row = dict(state.get(name) or {})
+        row["main_requests"] = max(0, int(row.get("main_requests") or 0)) + 1
+        if int(row["main_requests"]) >= ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT:
+            row["active_until"] = 0.0
+        state[name] = row
+        _cache_set_obj(_window_key(site), state)
+    finally:
+        _release_lock(lock_key, lock_token)
+
+
+def _is_11880_main_request(kind: str) -> bool:
+    kind_name = str(kind or "").strip().lower()
+    if not kind_name:
+        return False
+    return kind_name not in {"home", "referer"}
+
+
 def _scheduled_rest_slot(site: str, active_names: list[str], has_quarantine: bool) -> str:
     if has_quarantine or len(active_names) <= 1:
         return ""
@@ -224,29 +392,85 @@ def _scheduled_rest_slot(site: str, active_names: list[str], has_quarantine: boo
     return excluded_name
 
 
-def site_active_slot_names(site: str) -> list[str]:
-    site_name = str(site or "").strip()
-    cfg = SITE_CONFIGS.get(site_name)
-    owned = _site_owned_slot_names().get(site_name) or []
-    if cfg is not None:
-        configured = {str(name or "").strip() for name in cfg.egress_slots if str(name or "").strip()}
-        owned = [name for name in owned if name in configured]
-    if not owned:
-        return []
-    statuses = load_tunnel_statuses(owned)
-    quarantine = _load_site_quarantine(site_name)
-    live_owned = [name for name in owned if _slot_is_live(name, statuses)]
-    available = [name for name in live_owned if name not in quarantine]
-    if not available:
-        return []
-    rest_name = _scheduled_rest_slot(site_name, available, bool(quarantine))
-    if not rest_name:
-        return available
-    return [name for name in available if name != rest_name]
+def _load_cached_route_plan() -> dict[str, list[str]] | None:
+    raw = _cache_get_obj(_route_plan_key()) or {}
+    if not isinstance(raw, dict):
+        return None
+    now = time.time()
+    until = float(raw.get("until") or 0.0)
+    plan = raw.get("plan") or {}
+    if until <= now or not isinstance(plan, dict):
+        return None
+    out: dict[str, list[str]] = {}
+    for site in ROUTE_SITES:
+        names = [str(name) for name in list(plan.get(site) or []) if str(name or "").strip()]
+        out[site] = names
+    return out
+
+
+def _compute_site_route_plan() -> dict[str, list[str]]:
+    all_names = _configured_slot_names()
+    if not all_names:
+        return {site: [] for site in ROUTE_SITES}
+    statuses = load_tunnel_statuses(all_names)
+    cfg_11880 = SITE_CONFIGS.get("11880")
+    cfg_gs = SITE_CONFIGS.get("gs")
+    slots_11880 = list(getattr(cfg_11880, "egress_slots", ()) or ())
+    slots_gs = list(getattr(cfg_gs, "egress_slots", ()) or ())
+    quarantine_11880 = _load_site_quarantine("11880")
+    quarantine_gs = _load_site_quarantine("gs")
+
+    live_11880 = [name for name in slots_11880 if _slot_is_live(name, statuses)]
+    available_11880 = [name for name in live_11880 if name not in quarantine_11880]
+    active_11880 = _activate_11880_windows("11880", available_11880) if available_11880 else []
+    used_11880 = set(active_11880)
+
+    live_gs = [name for name in slots_gs if _slot_is_live(name, statuses)]
+    available_gs = [name for name in live_gs if name not in quarantine_gs and name not in used_11880]
+    rest_name = _scheduled_rest_slot("gs", available_gs, bool(quarantine_gs))
+    active_gs = [name for name in available_gs if not rest_name or name != rest_name]
+
+    return {
+        "11880": list(active_11880),
+        "gs": list(active_gs),
+    }
 
 
 def current_site_route_plan() -> dict[str, list[str]]:
-    return {site: site_active_slot_names(site) for site in ROUTE_SITES}
+    cached = _load_cached_route_plan()
+    if cached is not None:
+        return cached
+    owner = f"route-plan:{uuid4().hex}"
+    lock_token = _lock_until(
+        _route_plan_lock_key(),
+        ROUTE_STATE_LOCK_TTL_SEC,
+        owner,
+        ROUTE_STATE_WAIT_SEC,
+    )
+    if not lock_token:
+        cached = _load_cached_route_plan()
+        if cached is not None:
+            return cached
+        return _compute_site_route_plan()
+    try:
+        cached = _load_cached_route_plan()
+        if cached is not None:
+            return cached
+        plan = _compute_site_route_plan()
+        _cache_set_obj(
+            _route_plan_key(),
+            {
+                "until": time.time() + float(ROUTE_PLAN_CACHE_SEC),
+                "plan": plan,
+            },
+        )
+        return plan
+    finally:
+        _release_lock(_route_plan_lock_key(), lock_token)
+
+
+def site_active_slot_names(site: str) -> list[str]:
+    return list((current_site_route_plan().get(str(site or "").strip()) or []))
 
 
 class _BrokerDispatcher:
@@ -354,6 +578,8 @@ class _BrokerDispatcher:
                 self._inflight.discard(request_id)
                 self._accepted_count = max(0, int(self._accepted_count) - 1)
             return {"ok": False, "error": "BROKER_BUSY", "detail": "TRY_AGAIN"}
+        if site == "11880" and _is_11880_main_request(str(payload.get("kind") or "")):
+            _record_11880_main_request(site, preferred_slot_name)
         return {"ok": True, "accepted": True, "request_id": request_id}
 
     def poll_result(self, request_id: str) -> dict[str, Any]:

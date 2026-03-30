@@ -56,8 +56,16 @@ class SiteSessionConfig:
 
 
 LOG_FOLDER = "crawler"
-BROKER_WORKERS = 3
+BROKER_WORKERS = 10
 BROKER_QUEUE_MAX = 256
+ONE_ONE_EIGHTY_WINDOW_MIN_SEC = 15 * 60
+ONE_ONE_EIGHTY_WINDOW_MAX_SEC = 20 * 60
+ONE_ONE_EIGHTY_WINDOW_COOLDOWN_SEC = 60 * 60
+ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT = 300
+ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO = 0.35
+ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX = 2
+ONE_ONE_EIGHTY_MISMATCH_VISIT_MAX = 2
+ONE_ONE_EIGHTY_MISMATCH_VISIT_PROBABILITY = 0.35
 
 
 def _chrome_windows(
@@ -206,8 +214,8 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
     ),
     "11880": SiteSessionConfig(
         site="11880",
-        # home_url="https://www.11880.com/",
-        home_url="https://serenity-mail.de",
+        home_url="https://www.11880.com/",
+        # home_url="https://serenity-mail.de",
         egress_slots=(
             "fenster_ukraine",
             "nowedel",
@@ -221,15 +229,15 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
             "aws_52_28_12_242",
             "direct",
         ),
-        slot_quarantine_sec=1 * 60 * 60,
+        slot_quarantine_sec=24 * 60 * 60,
         sessions_per_egress=1,
         concurrent_pages_per_session=2,
         max_requests_per_session=500,
         max_session_age_sec=1200,
         runtime_recycle_min_sec=300,
         runtime_recycle_max_sec=600,
-        pause_min_sec=0.7,
-        pause_max_sec=2.0,
+        pause_min_sec=3.0,
+        pause_max_sec=7.0,
         browser_timeout_ms=90_000,
     ),
     "gs": SiteSessionConfig(

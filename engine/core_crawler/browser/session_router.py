@@ -500,7 +500,11 @@ class BrowserSessionRouter:
             return
         state = self._load_quarantine(cfg)
         backoff = self._load_quarantine_backoff(cfg)
-        level, duration_sec = self._next_quarantine_level(cfg, slot_name)
+        if cfg.site == "11880":
+            level = 0
+            duration_sec = int(cfg.slot_quarantine_sec)
+        else:
+            level, duration_sec = self._next_quarantine_level(cfg, slot_name)
         until = time.time() + float(duration_sec)
         state[slot_name] = until
         self._cache_set_obj(self._quarantine_key(cfg.site), state)
@@ -1410,6 +1414,12 @@ class BrowserSessionRouter:
             return False
         return "Nur einen Moment" in title or "challenge-platform" in html or "error code: 1015" in html
 
+    def _should_quarantine_response(self, cfg: SiteSessionConfig, status: int, title: str, html: str) -> bool:
+        status_code = int(status or 0)
+        if cfg.site == "11880" and status_code in {403, 429}:
+            return True
+        return self._looks_blocked(status_code, title, html)
+
     def _should_try_click(self, session: BrowserSession, url: str, referer: str) -> bool:
         if not referer:
             return False
@@ -1423,6 +1433,8 @@ class BrowserSessionRouter:
         )
         if not same_origin:
             return False
+        if session.site == "11880":
+            return True
         if random.random() > 0.35:
             return False
         return True
@@ -1458,13 +1470,16 @@ class BrowserSessionRouter:
         return False
 
     def _simulate_index_clicks(self, page: Any, cfg: SiteSessionConfig) -> int:
-        if cfg.site != "gs":
+        if cfg.site not in {"gs", "11880"}:
             return 0
         try:
             clicked = page.evaluate(
                 """
-                () => {
-                  const roots = Array.from(document.querySelectorAll('article.mod.mod-Treffer a[href*="/gsbiz/"]'));
+                ({ site }) => {
+                  const selector = site === '11880'
+                    ? 'a[href*="/branchenbuch/"]'
+                    : 'article.mod.mod-Treffer a[href*="/gsbiz/"]';
+                  const roots = Array.from(document.querySelectorAll(selector));
                   const seen = new Set();
                   const links = [];
                   for (const a of roots) {
@@ -1501,7 +1516,8 @@ class BrowserSessionRouter:
                   document.removeEventListener('auxclick', stop, true);
                   return total;
                 }
-                """
+                """,
+                {"site": cfg.site},
             )
             try:
                 page.wait_for_timeout(100)
@@ -1809,6 +1825,30 @@ class BrowserSessionRouter:
             self._persist_session_state(cfg, session)
             return result, HTTP_CHROMIUM_LOG_FILE
 
+        if mode == "browser_click":
+            click_referer = referer or session.current_url
+            result = self._fetch_browser_click_once(
+                session,
+                cfg,
+                url,
+                kind,
+                task_id,
+                cb_id,
+                click_referer,
+            )
+            if result is None:
+                result = self._fetch_index_browser_once(
+                    session,
+                    cfg,
+                    url,
+                    kind,
+                    task_id,
+                    cb_id,
+                    click_referer,
+                )
+            self._persist_session_state(cfg, session)
+            return result, HTTP_CHROMIUM_LOG_FILE
+
         if mode == "http_only":
             if not self._session_has_live_cookies(session):
                 result = self._fetch_index_browser_once(
@@ -1900,10 +1940,10 @@ class BrowserSessionRouter:
         if needs_warm:
             warm = self._warm_session(session, cfg, task_id, cb_id)
             if warm.status != 200:
-                if self._looks_blocked(warm.status, warm.title, warm.html):
+                if self._should_quarantine_response(cfg, warm.status, warm.title, warm.html):
                     self._mute_slot(cfg, slot["name"], f"home:{warm.status}")
                 raise RuntimeError(f"WARM BLOCKED {warm.status}")
-            if self._looks_blocked(warm.status, warm.title, warm.html):
+            if self._should_quarantine_response(cfg, warm.status, warm.title, warm.html):
                 self._mute_slot(cfg, slot["name"], f"home:{warm.status}")
                 raise RuntimeError(f"WARM BLOCKED {warm.status}")
 
@@ -1920,8 +1960,8 @@ class BrowserSessionRouter:
             form=form,
             extra_headers=extra_headers,
         )
-        if result.status != 200 or self._looks_blocked(result.status, result.title, result.html):
-            if self._looks_blocked(result.status, result.title, result.html):
+        if self._should_quarantine_response(cfg, result.status, result.title, result.html):
+            if self._should_quarantine_response(cfg, result.status, result.title, result.html):
                 self._mute_slot(cfg, slot["name"], f"{kind}:{result.status}")
             raise RuntimeError(f"BLOCKED {result.status}")
         return result, current_log_file
@@ -1944,8 +1984,11 @@ class BrowserSessionRouter:
     ) -> FetchResult:
         cfg = SITE_CONFIGS[site]
         effective_mode = str(mode or "")
-        if cfg.site == "11880" and str(kind or "") == "search" and effective_mode == "index_browser":
-            effective_mode = "http_only"
+        if cfg.site == "11880":
+            if str(kind or "") == "detail":
+                effective_mode = "browser_click"
+            else:
+                effective_mode = "index_browser"
         self.reap_idle_runtimes()
         last_error = None
         current_log_file = HTTP_LIGHT_LOG_FILE
@@ -1985,7 +2028,11 @@ class BrowserSessionRouter:
             needs_warm = bool(lease.needs_warm)
             clear_state = False
             try:
-                current_log_file = HTTP_CHROMIUM_LOG_FILE if needs_warm or effective_mode == "index_browser" else HTTP_LIGHT_LOG_FILE
+                current_log_file = (
+                    HTTP_CHROMIUM_LOG_FILE
+                    if needs_warm or effective_mode in {"index_browser", "browser_click"}
+                    else HTTP_LIGHT_LOG_FILE
+                )
                 result, current_log_file = self._execute_fetch_for_session(
                     session,
                     cfg,

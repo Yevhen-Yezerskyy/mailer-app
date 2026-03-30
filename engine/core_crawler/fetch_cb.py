@@ -60,36 +60,58 @@ def _make_item(
     )
 
 
-def _pick_active_task_id() -> Optional[int]:
+def _catalog_clause(catalog: str) -> tuple[str, tuple[Any, ...]]:
+    catalog_name = str(catalog or "").strip()
+    if not catalog_name:
+        return "", ()
+    return " AND bs.catalog = %s ", (catalog_name,)
+
+
+def _pick_active_task_id(catalog: str = "") -> Optional[int]:
+    catalog_sql, catalog_params = _catalog_clause(catalog)
     row = fetch_one(
-        """
+        f"""
         SELECT t.id
         FROM public.aap_audience_audiencetask t
+        JOIN public.task_cb_ratings tcr
+          ON tcr.task_id = t.id
+        JOIN public.cb_crawl_pairs cp
+          ON cp.id = tcr.cb_id
+        JOIN public.branches_sys bs
+          ON bs.id = cp.branch_id
         WHERE t.ready = true
           AND t.archived = false
           AND t.collected = false
+          AND cp.collected = false
+          {catalog_sql}
         ORDER BY random()
         LIMIT 1
-        """
+        """,
+        catalog_params,
     )
     return int(row[0]) if row else None
 
 
-def pending_items_exist() -> bool:
+def pending_items_exist(catalog: str = "") -> bool:
+    catalog_sql, catalog_params = _catalog_clause(catalog)
     row = fetch_one(
-        """
+        f"""
         SELECT 1
         FROM public.task_cb_ratings tcr
         JOIN public.cb_crawl_pairs cp
           ON cp.id = tcr.cb_id
         JOIN public.aap_audience_audiencetask t
           ON t.id = tcr.task_id
+        JOIN public.branches_sys bs
+          ON bs.id = cp.branch_id
         WHERE t.ready = true
           AND t.archived = false
           AND t.collected = false
           AND cp.collected = false
+          {catalog_sql}
         LIMIT 1
-        """
+        """,
+        catalog_params,
     )
     return bool(row)
 
@@ -124,14 +146,15 @@ def _finalize_item_lock(item: QueueItem) -> None:
         pass
 
 
-def _claim_next_item() -> Optional[QueueItem]:
+def _claim_next_item(catalog: str = "") -> Optional[QueueItem]:
     with get_connection() as conn, conn.cursor() as cur:
-        task_id = _pick_active_task_id()
+        catalog_sql, catalog_params = _catalog_clause(catalog)
+        task_id = _pick_active_task_id(catalog)
         if not task_id:
             return None
 
         cur.execute(
-            """
+            f"""
             SELECT
               tcr.task_id,
               tcr.cb_id,
@@ -139,12 +162,15 @@ def _claim_next_item() -> Optional[QueueItem]:
             FROM public.task_cb_ratings tcr
             JOIN public.cb_crawl_pairs cp
               ON cp.id = tcr.cb_id
+            JOIN public.branches_sys bs
+              ON bs.id = cp.branch_id
             WHERE tcr.task_id = %s
               AND cp.collected = false
+              {catalog_sql}
             ORDER BY tcr.rate ASC NULLS LAST, tcr.id ASC
             LIMIT 50
             """,
-            (task_id,),
+            (task_id, *catalog_params),
         )
         candidates = cur.fetchall() or []
 
@@ -302,10 +328,14 @@ def _decode_run_one_b64(raw_b64: str) -> dict:
     return json.loads(base64.b64decode(str(raw_b64).encode("ascii")).decode("utf-8"))
 
 
-def worker_run_once() -> None:
-    item = _claim_next_item()
+def worker_run_once(catalog: str = "") -> None:
+    catalog_name = str(catalog or "").strip()
+    item = _claim_next_item(catalog_name)
     if not item:
-        print("[core_crawler] queue empty; nothing to do")
+        if catalog_name:
+            print(f"[core_crawler] queue empty catalog={catalog_name}; nothing to do")
+        else:
+            print("[core_crawler] queue empty; nothing to do")
         return
 
     try:
@@ -317,6 +347,7 @@ def worker_run_once() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-one-b64", default="")
+    parser.add_argument("--catalog", default="")
     args = parser.parse_args()
 
     if args.run_one_b64:
@@ -332,7 +363,7 @@ def main() -> None:
         )
         return
 
-    worker_run_once()
+    worker_run_once(str(args.catalog or "").strip())
 
 
 if __name__ == "__main__":
