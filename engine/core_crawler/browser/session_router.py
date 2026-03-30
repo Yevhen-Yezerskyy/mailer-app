@@ -1571,12 +1571,12 @@ class BrowserSessionRouter:
         referer: str = "",
     ) -> FetchResult:
         session.current_url = url
-        started = time.time()
         cookies_before = []
         try:
             cookies_before = page.context.cookies([url])
         except Exception:
             cookies_before = []
+        nav_started = time.time()
         self._log_fetch_start(
             log_file=HTTP_CHROMIUM_LOG_FILE,
             site=cfg.site,
@@ -1590,16 +1590,9 @@ class BrowserSessionRouter:
             wait_until="domcontentloaded",
             timeout=cfg.browser_timeout_ms,
         )
-        self._wait_minimal_ready(page, cfg, kind, url)
-        if str(kind or "") == "home":
-            self._humanize(page, session.profile)
-            self._wait_home_cookies(page, cfg, url)
-        html = page.content()
         final_url = str(page.url)
         status = int(response.status) if response else 0
-        title = page.title() or ""
-        finished = time.time()
-        elapsed_ms = int((finished - started) * 1000)
+        nav_elapsed_ms = int((time.time() - nav_started) * 1000)
         self._log_fetch_done(
             log_file=HTTP_CHROMIUM_LOG_FILE,
             site=cfg.site,
@@ -1607,8 +1600,14 @@ class BrowserSessionRouter:
             tunnel=session.tunnel,
             final_url=final_url or url,
             status=status,
-            ms=elapsed_ms,
+            ms=nav_elapsed_ms,
         )
+        self._wait_minimal_ready(page, cfg, kind, url)
+        if str(kind or "") == "home":
+            self._humanize(page, session.profile)
+            self._wait_home_cookies(page, cfg, url)
+        html = page.content()
+        title = page.title() or ""
         session.last_used_at = time.time()
         session.current_url = final_url or url
         session.requests_total += 1
@@ -1619,7 +1618,7 @@ class BrowserSessionRouter:
             final_url=final_url,
             html=html,
             title=title,
-            ms=elapsed_ms,
+            ms=nav_elapsed_ms,
             site=cfg.site,
             session_id=session.session_id,
             session_slot=int(session.slot_idx),
@@ -1714,42 +1713,33 @@ class BrowserSessionRouter:
         if not self._should_try_click(session, url, referer):
             return None
         session.current_url = url
-        started = time.time()
         context = None
         page = None
-        cookies_before = False
-        try:
-            cookies_before = bool(session.context.cookies([referer or url])) if session.context is not None else False
-        except Exception:
-            cookies_before = False
-        self._log_fetch_start(
-            log_file=HTTP_CHROMIUM_LOG_FILE,
-            site=cfg.site,
-            has_cookies=cookies_before,
-            tunnel=session.tunnel,
-            url=url,
-        )
         try:
             context, page = self._new_page(session, cfg)
             warm_ref = self._fetch_once(session, page, cfg, referer, "referer", task_id, cb_id, "")
             if warm_ref.status != 200 or self._looks_blocked(warm_ref.status, warm_ref.title, warm_ref.html):
                 return None
             self._humanize(page, session.profile)
+            cookies_before = False
+            try:
+                cookies_before = bool(page.context.cookies([url]))
+            except Exception:
+                cookies_before = False
+            click_started = time.time()
+            self._log_fetch_start(
+                log_file=HTTP_CHROMIUM_LOG_FILE,
+                site=cfg.site,
+                has_cookies=cookies_before,
+                tunnel=session.tunnel,
+                url=url,
+            )
             clicked = self._click_to_target(page, url, cfg.browser_timeout_ms)
             if not clicked:
                 return None
-            html = page.content()
             final_url = str(page.url)
-            title = page.title() or ""
             status = 200
-            finished = time.time()
-            elapsed_ms = int((finished - started) * 1000)
-            if final_url != url and not final_url.startswith(url):
-                return None
-            session.last_used_at = time.time()
-            session.current_url = final_url or url
-            session.requests_total += 1
-            self._capture_browser_state(session, page)
+            elapsed_ms = int((time.time() - click_started) * 1000)
             self._log_fetch_done(
                 log_file=HTTP_CHROMIUM_LOG_FILE,
                 site=cfg.site,
@@ -1759,6 +1749,14 @@ class BrowserSessionRouter:
                 status=status,
                 ms=elapsed_ms,
             )
+            html = page.content()
+            title = page.title() or ""
+            if final_url != url and not final_url.startswith(url):
+                return None
+            session.last_used_at = time.time()
+            session.current_url = final_url or url
+            session.requests_total += 1
+            self._capture_browser_state(session, page)
             return FetchResult(
                 status=status,
                 url=url,

@@ -18,12 +18,12 @@ from engine.core_crawler.tunnels_11880 import ensure_tunnel_watchdog, stop_tunne
 TICK_SEC = 1.0
 CATALOGS = ("11880", "gs")
 CATALOG_MAX_WORKERS = {
-    "11880": 5,
-    "gs": 3,
+    "11880": 3,
+    "gs": 5,
 }
 CATALOG_ROUTES_PER_WORKER = {
     "11880": 1,
-    "gs": 3,
+    "gs": 1,
 }
 
 
