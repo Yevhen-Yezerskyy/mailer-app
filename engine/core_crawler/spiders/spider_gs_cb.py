@@ -14,7 +14,7 @@ from urllib.parse import urljoin
 
 from engine.common.db import fetch_one, get_connection
 from engine.common.logs import log
-from engine.core_crawler.browser.fetcher import build_text_response, fetch_html, to_text_response
+from engine.core_crawler.browser.fetcher import build_text_response, close_current_fetch_router, fetch_html, to_text_response
 from engine.core_crawler.browser.session_config import SITE_CONFIGS
 from engine.core_crawler.spiders.spider_gs_card import parse_gs_card
 from engine.core_crawler.spiders.spider_helpers import clean_text
@@ -52,6 +52,13 @@ class GelbeSeitenCBSpider:
         self.selected_urls: List[str] = []
         self.failed_urls: List[Dict[str, str]] = []
 
+    @staticmethod
+    def _sleep_for_site(site_name: str) -> None:
+        cfg = SITE_CONFIGS[str(site_name or "").strip()]
+        pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
+        if pause_sec > 0:
+            time.sleep(pause_sec)
+
     def _run_detail_fetches(self) -> None:
         if not self.selected_urls:
             self._detail_seen = 0
@@ -61,36 +68,39 @@ class GelbeSeitenCBSpider:
         max_workers = max(1, min(int(cfg.concurrent_pages_per_session), int(len(self.selected_urls))))
 
         def _fetch_one(detail_url: str) -> dict[str, Any]:
-            pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
-            if pause_sec > 0:
-                time.sleep(pause_sec)
-            route = dict(self._detail_routes.get(detail_url) or {})
-            detail_result = fetch_html(
-                site="gs",
-                url=detail_url,
-                kind="detail",
-                task_id=self.task_id,
-                cb_id=self.cb_id,
-                referer=str(route.get("referer") or self._start_url or ""),
-                mode="http_only",
-                preferred_slot_name=str(route.get("slot_name") or ""),
-                preferred_slot_idx=-1 if route.get("slot_idx") in (None, "") else int(route.get("slot_idx")),
-            )
-            reason = ""
-            card = None
-            if detail_result.status != 200:
-                reason = f"DETAIL HTTP {detail_result.status}"
-            else:
-                detail_response = to_text_response(detail_result)
-                card = parse_gs_card(detail_response)
-                if not card:
-                    reason = "FAILED TO PARSE"
-            return {
-                "url": detail_url,
-                "result": detail_result,
-                "reason": reason,
-                "card": card,
-            }
+            try:
+                pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
+                if pause_sec > 0:
+                    time.sleep(pause_sec)
+                route = dict(self._detail_routes.get(detail_url) or {})
+                detail_result = fetch_html(
+                    site="gs",
+                    url=detail_url,
+                    kind="detail",
+                    task_id=self.task_id,
+                    cb_id=self.cb_id,
+                    referer=str(route.get("referer") or self._start_url or ""),
+                    mode="http_only",
+                    preferred_slot_name=str(route.get("slot_name") or ""),
+                    preferred_slot_idx=-1 if route.get("slot_idx") in (None, "") else int(route.get("slot_idx")),
+                )
+                reason = ""
+                card = None
+                if detail_result.status != 200:
+                    reason = f"DETAIL HTTP {detail_result.status}"
+                else:
+                    detail_response = to_text_response(detail_result)
+                    card = parse_gs_card(detail_response)
+                    if not card:
+                        reason = "FAILED TO PARSE"
+                return {
+                    "url": detail_url,
+                    "result": detail_result,
+                    "reason": reason,
+                    "card": card,
+                }
+            finally:
+                close_current_fetch_router()
 
         first_exc: Exception | None = None
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="gs_detail") as executor:
@@ -240,6 +250,7 @@ class GelbeSeitenCBSpider:
         page_guard = 0
         seen_page_urls: set[str] = set()
         seen_detail_urls: set[str] = set()
+        self._sleep_for_site("gs")
 
         while page_url and page_url not in seen_page_urls:
             seen_page_urls.add(page_url)

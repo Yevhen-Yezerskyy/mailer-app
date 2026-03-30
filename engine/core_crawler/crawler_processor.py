@@ -101,6 +101,23 @@ def _stop_workers(active_by_catalog: dict[str, list[WorkerProcess]]) -> None:
             continue
 
 
+def _trim_workers(active: list[WorkerProcess], target: int) -> list[WorkerProcess]:
+    running = list(active)
+    excess = max(0, len(running) - max(0, int(target)))
+    if excess <= 0:
+        return running
+    doomed = running[-excess:]
+    survivors = running[:-excess]
+    for worker in doomed:
+        if worker.process.poll() is not None:
+            continue
+        try:
+            worker.process.terminate()
+        except Exception:
+            continue
+    return survivors + [worker for worker in doomed if worker.process.poll() is None]
+
+
 def main() -> None:
     stop_requested = {"value": False}
 
@@ -123,6 +140,7 @@ def main() -> None:
                 if target != last_targets[catalog]:
                     print(f"[crawler_processor] target_parallel catalog={catalog} value={target}", flush=True)
                     last_targets[catalog] = target
+                active_by_catalog[catalog] = _trim_workers(active_by_catalog[catalog], target)
                 if len(active_by_catalog[catalog]) >= target:
                     continue
                 if not pending_items_exist(catalog):

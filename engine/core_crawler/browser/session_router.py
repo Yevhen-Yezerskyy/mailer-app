@@ -738,13 +738,6 @@ class BrowserSessionRouter:
             "storage_state": {},
         }
 
-    def _reserve_dispatch_ts(self, cfg: SiteSessionConfig, current_next: float) -> float:
-        now = time.time()
-        min_pause = max(0.1, float(cfg.pause_min_sec))
-        max_pause = max(min_pause, float(cfg.pause_max_sec))
-        reserved = max(now, float(current_next or 0.0)) + round(random.uniform(min_pause, max_pause), 2)
-        return reserved
-
     def _apply_state_to_runtime(self, session: BrowserSession, state: dict[str, Any]) -> None:
         if not isinstance(state, dict):
             return
@@ -779,10 +772,7 @@ class BrowserSessionRouter:
         merged["requests_total"] = int(merged.get("requests_total") or 0) + max(0, int(requests_delta))
         merged["warmed"] = bool(bool(merged.get("warmed") is True) or session.warmed)
         merged["current_url"] = str(session.current_url or merged.get("current_url") or "")
-        merged["next_dispatch_ts"] = max(
-            float(merged.get("next_dispatch_ts") or 0.0),
-            float(session.next_dispatch_ts or 0.0),
-        )
+        merged["next_dispatch_ts"] = 0.0
         exported_state = export_storage_state(session.http_session, session.storage_state)
         merged["storage_state"] = exported_state if exported_state else dict(merged.get("storage_state") or {})
         return merged
@@ -803,9 +793,6 @@ class BrowserSessionRouter:
             state = self._load_session_state(cfg, slot_name, slot_idx)
             if state is None:
                 state = self._new_session_state(cfg, slot_idx)
-            current_next = float(state.get("next_dispatch_ts") or 0.0)
-            if time.time() < current_next:
-                return None
             needs_warm = not bool(state.get("warmed") is True)
             warm_lock_key = ""
             warm_lock_token = ""
@@ -830,7 +817,7 @@ class BrowserSessionRouter:
             state = dict(state)
             state["slot_idx"] = int(slot_idx)
             state["last_used_at"] = max(float(state.get("last_used_at") or 0.0), time.time())
-            state["next_dispatch_ts"] = self._reserve_dispatch_ts(cfg, current_next)
+            state["next_dispatch_ts"] = 0.0
             self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), state)
             return SessionLease(
                 session_key=self._session_key(cfg.site, slot_name, slot_idx),
@@ -941,8 +928,6 @@ class BrowserSessionRouter:
                     preferred_rank = 0 if (str(slot["name"]) == str(preferred_slot_name) and int(slot_idx) == int(preferred_slot_idx)) else 1
                     runtime = self._runtimes.get(self._runtime_key(cfg.site, slot["name"], slot_idx))
                     state = self._load_session_state(cfg, slot["name"], slot_idx)
-                    if state and time.time() < float(state.get("next_dispatch_ts") or 0.0):
-                        continue
                     if runtime is not None and self._runtime_expired(cfg, runtime):
                         runtime = None
                     has_local_runtime = 0 if runtime is not None else 1

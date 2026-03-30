@@ -13,7 +13,7 @@ from urllib.parse import urljoin
 
 from engine.common.db import fetch_one, get_connection
 from engine.common.logs import log
-from engine.core_crawler.browser.fetcher import fetch_html, to_text_response
+from engine.core_crawler.browser.fetcher import close_current_fetch_router, fetch_html, to_text_response
 from engine.core_crawler.browser.session_config import (
     ONE_ONE_EIGHTY_MISMATCH_VISIT_MAX,
     ONE_ONE_EIGHTY_MISMATCH_VISIT_PROBABILITY,
@@ -53,42 +53,52 @@ class OneOneEightZeroCBSpider:
         self._db_rows: int = 0
         self._noise_seen = 0
 
+    @staticmethod
+    def _sleep_for_site(site_name: str) -> None:
+        cfg = SITE_CONFIGS[str(site_name or "").strip()]
+        pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
+        if pause_sec > 0:
+            time.sleep(pause_sec)
+
     def _run_detail_fetches(self) -> None:
         if not self.selected_urls:
             self._detail_seen = 0
             return
         cfg = SITE_CONFIGS["11880"]
         self._detail_seen = int(len(self.selected_urls))
-        max_workers = max(1, min(int(cfg.concurrent_pages_per_session), int(len(self.selected_urls))))
+        max_workers = max(1, min(3, int(cfg.concurrent_pages_per_session), int(len(self.selected_urls))))
 
         def _fetch_one(detail_url: str) -> dict[str, Any]:
-            pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
-            if pause_sec > 0:
-                time.sleep(pause_sec)
-            detail_result = fetch_html(
-                site="11880",
-                url=detail_url,
-                kind="detail",
-                task_id=self.task_id,
-                cb_id=self.cb_id,
-                referer=self._detail_referers.get(detail_url, self._start_url),
-                mode="browser_click",
-            )
-            reason = ""
-            card = None
-            if detail_result.status != 200:
-                reason = f"DETAIL HTTP {detail_result.status}"
-            else:
-                detail_response = to_text_response(detail_result)
-                card = parse_11880_card(detail_response)
-                if not card:
-                    reason = "FAILED TO PARSE"
-            return {
-                "url": detail_url,
-                "result": detail_result,
-                "reason": reason,
-                "card": card,
-            }
+            try:
+                pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
+                if pause_sec > 0:
+                    time.sleep(pause_sec)
+                detail_result = fetch_html(
+                    site="11880",
+                    url=detail_url,
+                    kind="detail",
+                    task_id=self.task_id,
+                    cb_id=self.cb_id,
+                    referer=self._detail_referers.get(detail_url, self._start_url),
+                    mode="browser_click",
+                )
+                reason = ""
+                card = None
+                if detail_result.status != 200:
+                    reason = f"DETAIL HTTP {detail_result.status}"
+                else:
+                    detail_response = to_text_response(detail_result)
+                    card = parse_11880_card(detail_response)
+                    if not card:
+                        reason = "FAILED TO PARSE"
+                return {
+                    "url": detail_url,
+                    "result": detail_result,
+                    "reason": reason,
+                    "card": card,
+                }
+            finally:
+                close_current_fetch_router()
 
         first_exc: Exception | None = None
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="11880_detail") as executor:
@@ -162,6 +172,7 @@ class OneOneEightZeroCBSpider:
     def _visit_noise_details(self, mismatch_urls: List[str]) -> None:
         for detail_url in self._pick_noise_urls(mismatch_urls):
             try:
+                self._sleep_for_site("11880")
                 noise_result = fetch_html(
                     site="11880",
                     url=detail_url,
@@ -184,6 +195,7 @@ class OneOneEightZeroCBSpider:
         selected_urls: List[str] = []
         mismatch_urls: List[str] = []
         seen_urls: set[str] = set()
+        self._sleep_for_site("11880")
 
         seen_search_urls: set[str] = set()
         while current_search_url and current_search_url not in seen_search_urls:

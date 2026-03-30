@@ -8,6 +8,7 @@ import argparse
 import base64
 import json
 import os
+import random
 import signal
 import time
 from dataclasses import dataclass
@@ -15,12 +16,18 @@ from typing import Any, Optional
 
 from engine.common.cache.client import CLIENT
 from engine.common.db import fetch_one, get_connection
-from engine.core_crawler.browser.fetcher import close_all_fetch_routers
+from engine.core_crawler.browser.broker_server import current_site_route_plan
+from engine.core_crawler.browser.fetcher import (
+    clear_fetch_route_context,
+    close_all_fetch_routers,
+    set_fetch_route_context,
+)
 from engine.core_crawler.spiders.spider_gs_cb import GelbeSeitenCBSpider
 from engine.core_crawler.spiders.spider_11880_cb import OneOneEightZeroCBSpider
 
 LOCK_TTL_SEC = 1200.0
 RETRY_LOCK_TTL_SEC = 3 * 60 * 60.0
+ROUTE_LOCK_TTL_SEC = 2 * 60 * 60.0
 
 
 @dataclass(frozen=True)
@@ -33,6 +40,15 @@ class QueueItem:
     branch_name: str
     branch_slug: str
     catalog: str
+    lock_key: str
+    lock_token: str
+
+
+@dataclass(frozen=True)
+class RouteLease:
+    site: str
+    slot_name: str
+    slot_idx: int
     lock_key: str
     lock_token: str
 
@@ -126,6 +142,46 @@ def _try_lock_cb(cb_id: int) -> Optional[tuple[str, str]]:
     if resp and resp.get("acquired") is True and isinstance(resp.get("token"), str):
         return lock_key, str(resp["token"])
     return None
+
+
+def _route_lock_key(site: str, slot_name: str) -> str:
+    site_name = str(site or "").strip()
+    tunnel_name = str(slot_name or "").strip()
+    if not site_name or not tunnel_name:
+        raise ValueError("route lock key requires site and slot_name")
+    return f"core_crawler:route_worker:{site_name}:{tunnel_name}"
+
+
+def _claim_route(site: str) -> RouteLease | None:
+    site_name = str(site or "").strip()
+    available = [str(name or "").strip() for name in list((current_site_route_plan().get(site_name) or [])) if str(name or "").strip()]
+    if not available:
+        return None
+    shuffled = list(available)
+    random.shuffle(shuffled)
+    for slot_name in shuffled:
+        owner = f"{os.getpid()}:{site_name}:{slot_name}"
+        lock_key = _route_lock_key(site_name, slot_name)
+        info = CLIENT.lock_try(lock_key, ttl_sec=ROUTE_LOCK_TTL_SEC, owner=owner)
+        if not info or not bool(info.get("acquired")) or not str(info.get("token") or "").strip():
+            continue
+        return RouteLease(
+            site=site_name,
+            slot_name=slot_name,
+            slot_idx=0,
+            lock_key=lock_key,
+            lock_token=str(info["token"]),
+        )
+    return None
+
+
+def _release_route(route: RouteLease | None) -> None:
+    if route is None or not route.lock_key or not route.lock_token:
+        return
+    try:
+        CLIENT.lock_release(route.lock_key, token=route.lock_token)
+    except Exception:
+        pass
 
 
 def _finalize_item_lock(item: QueueItem) -> None:
@@ -266,11 +322,13 @@ def _run_spider(item: QueueItem) -> Any | None:
     return None
 
 
-def _run_item(item: QueueItem) -> None:
+def _run_item(item: QueueItem, route: RouteLease | None = None) -> None:
     try:
+        if route is not None:
+            set_fetch_route_context(route.site, route.slot_name, route.slot_idx)
         print(
             f"[core_crawler] start cb_id={item.cb_id} catalog={item.catalog} "
-            f"plz={item.plz} branch={item.branch_slug}"
+            f"plz={item.plz} branch={item.branch_slug} slot={getattr(route, 'slot_name', '')}"
         )
 
         if not item.branch_slug or not item.plz:
@@ -305,7 +363,7 @@ def _run_item(item: QueueItem) -> None:
                 f"reason={final_reason or 'UNKNOWN'}"
             )
     finally:
-        close_all_fetch_routers()
+        clear_fetch_route_context()
 
 
 def run_fixed_pair(
@@ -360,15 +418,25 @@ def worker_main_loop(catalog: str = "") -> None:
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
 
-    while not stop_requested["value"]:
-        item = _claim_next_item(catalog_name)
-        if item is None:
-            time.sleep(0.25)
-            continue
-        try:
-            _run_item(item)
-        finally:
-            _finalize_item_lock(item)
+    try:
+        while not stop_requested["value"]:
+            route = _claim_route(catalog_name)
+            if route is None:
+                time.sleep(0.25)
+                continue
+            item = _claim_next_item(catalog_name)
+            if item is None:
+                _release_route(route)
+                time.sleep(0.25)
+                continue
+            try:
+                _run_item(item, route)
+            finally:
+                _finalize_item_lock(item)
+                _release_route(route)
+    finally:
+        clear_fetch_route_context()
+        close_all_fetch_routers()
 
 
 def main() -> None:
