@@ -31,6 +31,9 @@ STOP_TIMEOUT_SEC = 10.0
 WATCH_INTERVAL_SEC = 5.0
 CONTROL_CHECK_TIMEOUT_SEC = 1.0
 TUNNEL_LOCK_WAIT_SEC = 1.0
+WATCHDOG_RESTART_MAX_CONCURRENCY = 1
+WATCHDOG_RESTART_BACKOFF_SEC = 20.0
+WATCHDOG_LOCK_BUSY_BACKOFF_SEC = 3.0
 LOG_FOLDER = "crawler"
 TUNNELS_LOG_FILE = "tunnels.log"
 STATE_TTL_SEC = 24 * 60 * 60
@@ -40,6 +43,7 @@ _WATCHDOG_STOP = threading.Event()
 _WATCHDOG_LAST_STATE: dict[str, tuple[bool, bool, bool]] = {}
 _WATCHDOG_RESTART_MU = threading.Lock()
 _WATCHDOG_RESTARTING: set[str] = set()
+_WATCHDOG_RESTART_BACKOFF_UNTIL: dict[str, float] = {}
 
 
 class TunnelLockBusyError(RuntimeError):
@@ -386,8 +390,8 @@ def _wait_tunnel_ready(cfg: dict[str, Any], tunnel: dict[str, Any], proc: subpro
         rc = proc.poll()
         transcript = _tail_log(log_path)
         lower = transcript.lower()
-        if rc is not None and rc != 0:
-            return False, transcript or f"ssh exited rc={rc}"
+        if rc is not None:
+            return False, transcript or f"ssh exited rc={rc} before port_open"
         if "permission denied" in lower:
             return False, transcript
         if "could not resolve hostname" in lower:
@@ -645,13 +649,24 @@ def _watchdog_restart_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> Non
     name = str(tunnel.get("name") or "")
     try:
         result = start_tunnel(cfg, tunnel)
+        status_name = str(result.get("status") or "")
         detail = _short_detail(result.get("transcript") or result.get("stderr") or "")
         _log_tunnel(
             f"watch_restart_result name={name} status={result.get('status')} "
             f"detail={json.dumps(detail, ensure_ascii=False)}"
         )
+        now = time.time()
+        with _WATCHDOG_RESTART_MU:
+            if status_name in {"started", "already_up"}:
+                _WATCHDOG_RESTART_BACKOFF_UNTIL.pop(name, None)
+            elif status_name == "lock_busy":
+                _WATCHDOG_RESTART_BACKOFF_UNTIL[name] = now + float(WATCHDOG_LOCK_BUSY_BACKOFF_SEC)
+            else:
+                _WATCHDOG_RESTART_BACKOFF_UNTIL[name] = now + float(WATCHDOG_RESTART_BACKOFF_SEC)
     except Exception as exc:
         _log_tunnel(f"watch_restart_result name={name} status=error detail={json.dumps(_short_detail(exc), ensure_ascii=False)}")
+        with _WATCHDOG_RESTART_MU:
+            _WATCHDOG_RESTART_BACKOFF_UNTIL[name] = time.time() + float(WATCHDOG_RESTART_BACKOFF_SEC)
     finally:
         with _WATCHDOG_RESTART_MU:
             _WATCHDOG_RESTARTING.discard(name)
@@ -660,6 +675,7 @@ def _watchdog_restart_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> Non
 def _watchdog_loop() -> None:
     while not _WATCHDOG_STOP.is_set():
         try:
+            loop_now = time.time()
             cfg = _load_config()
             tunnels = list(cfg.get("tunnels") or [])
             raw = _cache_get_obj(TUNNEL_STATUS_KEY) or {}
@@ -693,9 +709,15 @@ def _watchdog_loop() -> None:
                         f"control_ok={status['control_ok']} local_port={status['local_port']}"
                     )
                 if status["alive"]:
+                    with _WATCHDOG_RESTART_MU:
+                        _WATCHDOG_RESTART_BACKOFF_UNTIL.pop(name, None)
                     continue
                 with _WATCHDOG_RESTART_MU:
                     if name in _WATCHDOG_RESTARTING:
+                        continue
+                    if len(_WATCHDOG_RESTARTING) >= int(WATCHDOG_RESTART_MAX_CONCURRENCY):
+                        continue
+                    if float(_WATCHDOG_RESTART_BACKOFF_UNTIL.get(name) or 0.0) > loop_now:
                         continue
                     _WATCHDOG_RESTARTING.add(name)
                 _log_tunnel(f"watch_restart name={name} local_port={status['local_port']}")
