@@ -4,8 +4,10 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import random
+import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
@@ -15,6 +17,7 @@ from engine.core_crawler.browser.fetcher import fetch_html, to_text_response
 from engine.core_crawler.browser.session_config import (
     ONE_ONE_EIGHTY_MISMATCH_VISIT_MAX,
     ONE_ONE_EIGHTY_MISMATCH_VISIT_PROBABILITY,
+    SITE_CONFIGS,
 )
 from engine.core_crawler.spiders.spider_11880_card import parse_11880_card
 from engine.core_crawler.spiders.spider_11880_index_card import (
@@ -49,6 +52,71 @@ class OneOneEightZeroCBSpider:
         self._db_action: str = "skip"
         self._db_rows: int = 0
         self._noise_seen = 0
+
+    def _run_detail_fetches(self) -> None:
+        if not self.selected_urls:
+            self._detail_seen = 0
+            return
+        cfg = SITE_CONFIGS["11880"]
+        self._detail_seen = int(len(self.selected_urls))
+        max_workers = max(1, min(int(cfg.concurrent_pages_per_session), int(len(self.selected_urls))))
+
+        def _fetch_one(detail_url: str) -> dict[str, Any]:
+            pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
+            if pause_sec > 0:
+                time.sleep(pause_sec)
+            detail_result = fetch_html(
+                site="11880",
+                url=detail_url,
+                kind="detail",
+                task_id=self.task_id,
+                cb_id=self.cb_id,
+                referer=self._detail_referers.get(detail_url, self._start_url),
+                mode="browser_click",
+            )
+            reason = ""
+            card = None
+            if detail_result.status != 200:
+                reason = f"DETAIL HTTP {detail_result.status}"
+            else:
+                detail_response = to_text_response(detail_result)
+                card = parse_11880_card(detail_response)
+                if not card:
+                    reason = "FAILED TO PARSE"
+            return {
+                "url": detail_url,
+                "result": detail_result,
+                "reason": reason,
+                "card": card,
+            }
+
+        first_exc: Exception | None = None
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="11880_detail") as executor:
+            futures = [executor.submit(_fetch_one, detail_url) for detail_url in self.selected_urls]
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    row = future.result()
+                except Exception as exc:
+                    if first_exc is None:
+                        first_exc = exc
+                    continue
+                detail_result = row["result"]
+                detail_url = str(row["url"] or "")
+                self._last_tunnel = dict(detail_result.tunnel)
+                reason = str(row["reason"] or "")
+                if reason:
+                    self.failed_urls.append({"kind": "detail", "url": detail_url, "reason": reason})
+                    continue
+                self._detail_parsed += 1
+                self.items.append(
+                    {
+                        "cb_id": self.cb_id,
+                        "url": detail_result.final_url,
+                        "card": row["card"],
+                    }
+                )
+        if first_exc is not None:
+            raise first_exc
 
     def _remember_index_cards(
         self,
@@ -160,34 +228,7 @@ class OneOneEightZeroCBSpider:
             self._final_reason = f"FAILED TO PARSE {self._start_url}"
             return
 
-        for detail_url in self.selected_urls:
-            self._detail_seen += 1
-            detail_result = fetch_html(
-                site="11880",
-                url=detail_url,
-                kind="detail",
-                task_id=self.task_id,
-                cb_id=self.cb_id,
-                referer=self._detail_referers.get(detail_url, self._start_url),
-                mode="browser_click",
-            )
-            self._last_tunnel = dict(detail_result.tunnel)
-            if detail_result.status != 200:
-                self.failed_urls.append({"kind": "detail", "url": detail_url, "reason": f"DETAIL HTTP {detail_result.status}"})
-                continue
-            detail_response = to_text_response(detail_result)
-            card = parse_11880_card(detail_response)
-            if not card:
-                self.failed_urls.append({"kind": "detail", "url": detail_url, "reason": "FAILED TO PARSE"})
-                continue
-            self._detail_parsed += 1
-            self.items.append(
-                {
-                    "cb_id": self.cb_id,
-                    "url": detail_result.final_url,
-                    "card": card,
-                }
-            )
+        self._run_detail_fetches()
 
         self._visit_noise_details(mismatch_urls)
         self._final_reason = "OK" if self.items else "NO DETAIL ITEMS"
