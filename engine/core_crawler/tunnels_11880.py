@@ -33,6 +33,7 @@ TUNNEL_LOCK_WAIT_SEC = 1.0
 WATCHDOG_RESTART_MAX_CONCURRENCY = 1
 WATCHDOG_RESTART_BACKOFF_SEC = 20.0
 WATCHDOG_LOCK_BUSY_BACKOFF_SEC = 3.0
+WATCHDOG_SNAPSHOT_SEC = 60.0
 LOG_FOLDER = "crawler"
 TUNNELS_LOG_FILE = "tunnels.log"
 STATE_TTL_SEC = 24 * 60 * 60
@@ -40,6 +41,7 @@ TUNNEL_STATUS_KEY = "core_crawler:tunnel_status:global"
 _WATCHDOG_THREAD: threading.Thread | None = None
 _WATCHDOG_STOP = threading.Event()
 _WATCHDOG_LAST_STATE: dict[str, tuple[bool, bool, bool]] = {}
+_WATCHDOG_LAST_SNAPSHOT_TS = 0.0
 _WATCHDOG_RESTART_MU = threading.Lock()
 _WATCHDOG_RESTARTING: set[str] = set()
 _WATCHDOG_RESTART_BACKOFF_UNTIL: dict[str, float] = {}
@@ -226,6 +228,83 @@ def _watch_state_signature(status: dict[str, Any]) -> tuple[bool, bool, bool]:
     port_open = bool(status.get("port_open"))
     control_ok = bool(status.get("control_ok"))
     return (alive, port_open, control_ok)
+
+
+def _site_quarantine_key(site: str) -> str:
+    site_name = str(site or "").strip()
+    if not site_name:
+        raise ValueError("site quarantine key requires site")
+    return f"core_crawler:slot_quarantine:{site_name}"
+
+
+def _format_hhmm(seconds_left: float) -> str:
+    total_sec = max(0, int(seconds_left))
+    hours = total_sec // 3600
+    minutes = (total_sec % 3600) // 60
+    return f"{hours:02d}:{minutes:02d}"
+
+
+def _load_quarantine_snapshot(site: str) -> dict[str, str]:
+    raw = _cache_get_obj(_site_quarantine_key(site)) or {}
+    if not isinstance(raw, dict):
+        return {}
+    now = time.time()
+    out: dict[str, str] = {}
+    for slot_name, until in raw.items():
+        try:
+            until_ts = float(until or 0.0)
+        except Exception:
+            continue
+        if until_ts <= now:
+            continue
+        out[str(slot_name or "").strip()] = _format_hhmm(until_ts - now)
+    return out
+
+
+def _format_snapshot_tunnels(status_map: dict[str, dict[str, Any]], configured_names: list[str]) -> str:
+    rows: list[str] = []
+    for name in configured_names:
+        row = dict(status_map.get(name) or {})
+        alive = bool(row.get("alive"))
+        port_open = bool(row.get("port_open"))
+        control_ok = bool(row.get("control_ok"))
+        state = "up" if alive else "down"
+        rows.append(f"{name}:{state}(p={1 if port_open else 0},c={1 if control_ok else 0})")
+    return ", ".join(rows)
+
+
+def _format_snapshot_quarantine(site: str, snapshot: dict[str, str]) -> str:
+    if not snapshot:
+        return f"{site}=-"
+    parts = [f"{name}({left})" for name, left in sorted(snapshot.items())]
+    return f"{site}=" + ",".join(parts)
+
+
+def _format_snapshot_active(site: str, active_names: list[str]) -> str:
+    names = [str(name or "").strip() for name in list(active_names or []) if str(name or "").strip()]
+    if not names:
+        return f"{site}=0[-]"
+    return f"{site}={len(names)}[" + ",".join(names) + "]"
+
+
+def _log_watchdog_snapshot(status_map: dict[str, dict[str, Any]], configured_names: list[str]) -> None:
+    try:
+        from engine.core_crawler.browser.broker_server import current_site_route_plan
+
+        route_plan = dict(current_site_route_plan() or {})
+    except Exception:
+        route_plan = {}
+    quarantine_11880 = _load_quarantine_snapshot("11880")
+    quarantine_gs = _load_quarantine_snapshot("gs")
+    alive_count = sum(1 for name in configured_names if bool((status_map.get(name) or {}).get("alive")))
+    down_count = max(0, len(configured_names) - alive_count)
+    _log_tunnel(
+        "watch_snapshot "
+        f"alive={alive_count} down={down_count} "
+        f"tunnels=\"{_format_snapshot_tunnels(status_map, configured_names)}\" "
+        f"quarantine=\"{_format_snapshot_quarantine('11880', quarantine_11880)}; { _format_snapshot_quarantine('gs', quarantine_gs)}\" "
+        f"active=\"{_format_snapshot_active('11880', list(route_plan.get('11880') or []))}; { _format_snapshot_active('gs', list(route_plan.get('gs') or []))}\""
+    )
 
 
 def load_tunnel_statuses(configured_names: list[str] | tuple[str, ...] | None = None) -> dict[str, dict[str, Any]]:
@@ -661,11 +740,17 @@ def _watchdog_restart_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> Non
 
 
 def _watchdog_loop() -> None:
+    global _WATCHDOG_LAST_SNAPSHOT_TS
     while not _WATCHDOG_STOP.is_set():
         try:
             loop_now = time.time()
             cfg = _load_config()
             tunnels = list(cfg.get("tunnels") or [])
+            configured_names = [
+                str(tunnel.get("name") or "").strip()
+                for tunnel in tunnels
+                if str(tunnel.get("name") or "").strip()
+            ]
             raw = _cache_get_obj(TUNNEL_STATUS_KEY) or {}
             status_map: dict[str, dict[str, Any]] = {}
             if isinstance(raw, dict):
@@ -715,6 +800,9 @@ def _watchdog_loop() -> None:
                     name=f"core_crawler_tunnel_restart_{name}",
                     daemon=True,
                 ).start()
+            if (loop_now - float(_WATCHDOG_LAST_SNAPSHOT_TS or 0.0)) >= float(WATCHDOG_SNAPSHOT_SEC):
+                _log_watchdog_snapshot(status_map, configured_names)
+                _WATCHDOG_LAST_SNAPSHOT_TS = loop_now
             _cache_set_obj(TUNNEL_STATUS_KEY, status_map)
         except Exception as exc:
             _log_tunnel(f"watch_error error={type(exc).__name__}: {exc}")
