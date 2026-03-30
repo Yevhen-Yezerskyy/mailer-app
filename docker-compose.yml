@@ -427,7 +427,7 @@ services:
       - mailer-app-prod:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
-    cpus: "0.30"
+    cpus: "0.80"
     command:
       [
         "/app/config/sh/with-secrets.sh",

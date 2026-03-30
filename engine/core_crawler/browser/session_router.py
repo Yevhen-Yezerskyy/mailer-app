@@ -1457,7 +1457,7 @@ class BrowserSessionRouter:
         browser_mode = "browser_click" if str(kind or "") == "detail" else "index_browser"
         if int(requests_total_before_fetch) < 5:
             return browser_mode
-        if random.random() < 0.7:
+        if random.random() < 0.9:
             return "http_only"
         return browser_mode
 

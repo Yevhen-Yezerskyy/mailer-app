@@ -261,30 +261,29 @@ def _load_quarantine_snapshot(site: str) -> dict[str, str]:
     return out
 
 
-def _format_snapshot_tunnels(status_map: dict[str, dict[str, Any]], configured_names: list[str]) -> str:
-    rows: list[str] = []
+def _snapshot_tunnels(status_map: dict[str, dict[str, Any]], configured_names: list[str]) -> dict[str, dict[str, Any]]:
+    out: dict[str, dict[str, Any]] = {}
     for name in configured_names:
         row = dict(status_map.get(name) or {})
         alive = bool(row.get("alive"))
         port_open = bool(row.get("port_open"))
         control_ok = bool(row.get("control_ok"))
-        state = "up" if alive else "down"
-        rows.append(f"{name}:{state}(p={1 if port_open else 0},c={1 if control_ok else 0})")
-    return ", ".join(rows)
+        out[name] = {
+            "state": "up" if alive else "down",
+            "alive": alive,
+            "port_open": port_open,
+            "control_ok": control_ok,
+            "local_port": row.get("local_port"),
+        }
+    return out
 
 
-def _format_snapshot_quarantine(site: str, snapshot: dict[str, str]) -> str:
-    if not snapshot:
-        return f"{site}=-"
-    parts = [f"{name}({left})" for name, left in sorted(snapshot.items())]
-    return f"{site}=" + ",".join(parts)
-
-
-def _format_snapshot_active(site: str, active_names: list[str]) -> str:
+def _snapshot_active(active_names: list[str]) -> dict[str, Any]:
     names = [str(name or "").strip() for name in list(active_names or []) if str(name or "").strip()]
-    if not names:
-        return f"{site}=0[-]"
-    return f"{site}={len(names)}[" + ",".join(names) + "]"
+    return {
+        "count": len(names),
+        "names": names,
+    }
 
 
 def _log_watchdog_snapshot(status_map: dict[str, dict[str, Any]], configured_names: list[str]) -> None:
@@ -298,13 +297,21 @@ def _log_watchdog_snapshot(status_map: dict[str, dict[str, Any]], configured_nam
     quarantine_gs = _load_quarantine_snapshot("gs")
     alive_count = sum(1 for name in configured_names if bool((status_map.get(name) or {}).get("alive")))
     down_count = max(0, len(configured_names) - alive_count)
-    _log_tunnel(
-        "watch_snapshot "
-        f"alive={alive_count} down={down_count} "
-        f"tunnels=\"{_format_snapshot_tunnels(status_map, configured_names)}\" "
-        f"quarantine=\"{_format_snapshot_quarantine('11880', quarantine_11880)}; { _format_snapshot_quarantine('gs', quarantine_gs)}\" "
-        f"active=\"{_format_snapshot_active('11880', list(route_plan.get('11880') or []))}; { _format_snapshot_active('gs', list(route_plan.get('gs') or []))}\""
-    )
+    payload = {
+        "event": "watch_snapshot",
+        "alive": alive_count,
+        "down": down_count,
+        "tunnels": _snapshot_tunnels(status_map, configured_names),
+        "quarantine": {
+            "11880": quarantine_11880,
+            "gs": quarantine_gs,
+        },
+        "active": {
+            "11880": _snapshot_active(list(route_plan.get("11880") or [])),
+            "gs": _snapshot_active(list(route_plan.get("gs") or [])),
+        },
+    }
+    _log_tunnel(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
 def load_tunnel_statuses(configured_names: list[str] | tuple[str, ...] | None = None) -> dict[str, dict[str, Any]]:
