@@ -511,7 +511,7 @@ class BrowserSessionRouter:
         self._cache_set_obj(self._quarantine_key(cfg.site), state)
         backoff[str(slot_name)] = {"level": int(level), "until": float(until)}
         self._cache_set_obj(self._quarantine_backoff_key(cfg.site), backoff)
-        self._drop_egress_session_state(cfg, slot_name)
+        self._drop_egress_session_state(cfg, slot_name, clear_state=False)
         log(
             ROUTER_STATE_LOG_FILE,
             folder=LOG_FOLDER,
@@ -861,11 +861,12 @@ class BrowserSessionRouter:
         finally:
             self._release_lock(gate_key, gate_token)
 
-    def _drop_egress_session_state(self, cfg: SiteSessionConfig, slot_name: str) -> None:
+    def _drop_egress_session_state(self, cfg: SiteSessionConfig, slot_name: str, *, clear_state: bool = True) -> None:
         doomed: list[BrowserSession] = []
         doomed_browser: BrowserRuntime | None = None
         for slot_idx in range(cfg.sessions_per_egress):
-            self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), {})
+            if clear_state:
+                self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), {})
         with self._runtime_cv:
             for runtime_key, runtime in list(self._runtimes.items()):
                 if runtime.site != cfg.site or str(runtime.tunnel.get("name") or "") != str(slot_name):
@@ -882,6 +883,11 @@ class BrowserSessionRouter:
                 doomed_browser = self._browsers.pop(browser_key, None)
             self._runtime_cv.notify_all()
         for runtime in doomed:
+            if not clear_state:
+                try:
+                    self._persist_session_state(cfg, runtime)
+                except Exception:
+                    pass
             self._close_session(runtime)
         if doomed_browser is not None:
             self._close_browser_runtime(doomed_browser)
@@ -905,10 +911,11 @@ class BrowserSessionRouter:
                 if runtime.active_pages > 0:
                     continue
                 cfg = SITE_CONFIGS[runtime.site]
-                clear_state = self._slot_is_quarantined(cfg, runtime.tunnel["name"])
-                if not clear_state:
+                drop_runtime = self._slot_is_quarantined(cfg, runtime.tunnel["name"])
+                clear_state = False
+                if not drop_runtime:
                     clear_state = self._runtime_expired(cfg, runtime)
-                if not clear_state and (now - float(runtime.last_used_at or 0.0)) < RUNTIME_IDLE_REAP_SEC:
+                if not drop_runtime and not clear_state and (now - float(runtime.last_used_at or 0.0)) < RUNTIME_IDLE_REAP_SEC:
                     continue
                 self._runtimes.pop(runtime_key, None)
                 doomed.append((cfg, runtime, clear_state))
@@ -1195,6 +1202,7 @@ class BrowserSessionRouter:
         lease: SessionLease,
         *,
         clear_state: bool = False,
+        drop_runtime: bool = False,
     ) -> None:
         runtime_key = self._runtime_key(cfg.site, session.tunnel["name"], session.slot_idx)
         browser_key = self._browser_key(cfg.site, session.tunnel["name"])
@@ -1215,7 +1223,7 @@ class BrowserSessionRouter:
             if str(current_state.get("session_id") or session.session_id) != str(session.session_id):
                 current_state = {}
             requests_delta = max(0, int(session.requests_total) - int(lease.base_requests_total))
-            if not clear_state and not self._slot_is_quarantined(cfg, slot_name):
+            if not clear_state:
                 merged_state = self._merge_session_state(session, current_state, requests_delta)
                 session.requests_total = int(merged_state.get("requests_total") or session.requests_total)
                 session.next_dispatch_ts = float(merged_state.get("next_dispatch_ts") or session.next_dispatch_ts)
@@ -1233,7 +1241,7 @@ class BrowserSessionRouter:
                         int(merged_state.get("requests_total") or 0) >= cfg.max_requests_per_session
                         or (session.last_used_at - float(merged_state.get("created_at") or session.created_at or 0.0)) >= float(cfg.max_session_age_sec)
                     )
-                if session.active_pages <= 0 and (clear_state or self._slot_is_quarantined(cfg, slot_name) or runtime_is_expired or self._runtime_expired(cfg, session)):
+                if session.active_pages <= 0 and (drop_runtime or clear_state or self._slot_is_quarantined(cfg, slot_name) or runtime_is_expired or self._runtime_expired(cfg, session)):
                     self._runtimes.pop(runtime_key, None)
                     should_close = True
                     if not any(self._browser_key(row.site, row.tunnel["name"]) == browser_key for row in self._runtimes.values()):
@@ -1251,7 +1259,7 @@ class BrowserSessionRouter:
                             close_browser = self._browsers.pop(browser_key, None)
                 self._runtime_cv.notify_all()
 
-            if clear_state or self._slot_is_quarantined(cfg, slot_name):
+            if clear_state:
                 self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), {})
             elif merged_state is not None:
                 self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), merged_state)
@@ -2055,6 +2063,7 @@ class BrowserSessionRouter:
                 int(session.requests_total) + (1 if needs_warm else 0),
             )
             clear_state = False
+            drop_runtime = False
             try:
                 current_log_file = (
                     HTTP_CHROMIUM_LOG_FILE
@@ -2079,7 +2088,7 @@ class BrowserSessionRouter:
                 return result
             except RuntimeError as exc:
                 last_error = exc
-                clear_state = True
+                drop_runtime = True
                 if not str(exc).startswith("BLOCKED ") and not str(exc).startswith("WARM BLOCKED "):
                     self._log_fetch_error(
                         log_file=current_log_file,
@@ -2092,7 +2101,7 @@ class BrowserSessionRouter:
                         error=self._format_error_message(exc),
                     )
             except PlaywrightTimeoutError as exc:
-                clear_state = True
+                drop_runtime = True
                 last_error = exc
                 self._log_fetch_error(
                     log_file=current_log_file,
@@ -2105,7 +2114,7 @@ class BrowserSessionRouter:
                     error=self._format_error_message(exc),
                 )
             except Exception as exc:
-                clear_state = True
+                drop_runtime = True
                 last_error = exc
                 self._log_fetch_error(
                     log_file=current_log_file,
@@ -2118,7 +2127,7 @@ class BrowserSessionRouter:
                     error=self._format_error_message(exc),
                 )
             finally:
-                self._release_runtime(cfg, session, lease, clear_state=clear_state)
+                self._release_runtime(cfg, session, lease, clear_state=clear_state, drop_runtime=drop_runtime)
 
         raise RuntimeError(str(last_error or f"FETCH FAILED {site} {url}"))
 
