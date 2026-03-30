@@ -18,8 +18,8 @@ from engine.core_crawler.fetch_cb import pending_items_exist
 TICK_SEC = 1.0
 CATALOGS = ("11880", "gs")
 CATALOG_MAX_WORKERS = {
-    "11880": 2,
-    "gs": 2,
+    "11880": 5,
+    "gs": 3,
 }
 CATALOG_ROUTES_PER_WORKER = {
     "11880": 1,

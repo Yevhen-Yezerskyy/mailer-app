@@ -56,14 +56,14 @@ class SiteSessionConfig:
 
 
 LOG_FOLDER = "crawler"
-BROKER_WORKERS = 8
+BROKER_WORKERS = 10
 BROKER_QUEUE_MAX = 256
 ONE_ONE_EIGHTY_WINDOW_MIN_SEC = 15 * 60
 ONE_ONE_EIGHTY_WINDOW_MAX_SEC = 20 * 60
 ONE_ONE_EIGHTY_WINDOW_COOLDOWN_SEC = 60 * 60
 ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT = 300
-ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO = 0.35
-ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX = 2
+ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO = 0.55
+ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX = 3
 ONE_ONE_EIGHTY_MISMATCH_VISIT_MAX = 2
 ONE_ONE_EIGHTY_MISMATCH_VISIT_PROBABILITY = 0.35
 
@@ -235,7 +235,7 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
         ),
         slot_quarantine_sec=24 * 60 * 60,
         sessions_per_egress=1,
-        concurrent_pages_per_session=2,
+        concurrent_pages_per_session=8,
         max_requests_per_session=500,
         max_session_age_sec=1200,
         runtime_recycle_min_sec=300,
@@ -271,8 +271,8 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
         max_session_age_sec=1200,
         runtime_recycle_min_sec=300,
         runtime_recycle_max_sec=600,
-        pause_min_sec=0.7,
-        pause_max_sec=2.0,
+        pause_min_sec=0.5,
+        pause_max_sec=1.5,
         browser_timeout_ms=90_000,
     ),
 }
