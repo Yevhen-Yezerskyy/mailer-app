@@ -659,13 +659,25 @@ def _broker_worker_main(
     jobs: "multiprocessing.Queue[dict[str, Any] | None]",
     results: "multiprocessing.Queue[dict[str, Any] | None]",
 ) -> None:
-    router = BrowserSessionRouter()
     max_inflight = _broker_worker_parallelism()
+    router_local = threading.local()
+    router_mu = threading.Lock()
+    routers: list[BrowserSessionRouter] = []
     executor = concurrent.futures.ThreadPoolExecutor(
         max_workers=max_inflight,
         thread_name_prefix="core_crawler_broker_fetch",
     )
     active: set[concurrent.futures.Future[None]] = set()
+
+    def _get_router() -> BrowserSessionRouter:
+        router = getattr(router_local, "router", None)
+        if router is not None:
+            return router
+        router = BrowserSessionRouter()
+        router_local.router = router
+        with router_mu:
+            routers.append(router)
+        return router
 
     def _flush_done(done_futures: set[concurrent.futures.Future[None]]) -> None:
         for future in done_futures:
@@ -678,6 +690,7 @@ def _broker_worker_main(
     def _run_one(item: dict[str, Any]) -> None:
         request_id = str(item.get("request_id") or "")
         payload = _normalize_fetch_payload(dict(item.get("payload") or {}))
+        router = _get_router()
         try:
             result = router.fetch(
                 site=str(payload["site"]),
@@ -760,7 +773,11 @@ def _broker_worker_main(
             active.add(executor.submit(_run_one, item))
     finally:
         executor.shutdown(wait=True, cancel_futures=False)
-        router.close_all()
+        for router in list(routers):
+            try:
+                router.close_all()
+            except Exception:
+                pass
 
 
 class _BrokerUnixServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
