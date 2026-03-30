@@ -14,7 +14,6 @@ from engine.core_crawler.browser.broker_server import BROKER_SOCKET_PATH
 from engine.core_crawler.browser.session_router import FetchResult
 
 BROKER_TIMEOUT_SEC = 180.0
-BROKER_POLL_INTERVAL_SEC = 0.05
 
 
 def _recv_exact(sock: socket.socket, size: int) -> bytes:
@@ -129,22 +128,14 @@ def fetch_html_via_broker(
         preferred_slot_name=str(preferred_slot_name or ""),
         preferred_slot_idx=int(preferred_slot_idx),
     )
-    deadline = time.time() + float(BROKER_TIMEOUT_SEC)
-    response: dict[str, Any] | None = None
-    while time.time() < deadline:
-        response = _rpc(
-            {
-                "action": "result",
-                "request_id": str(request_id or ""),
-            },
-            timeout_sec=5.0,
-        )
-        if response.get("ok") is True and response.get("pending") is True:
-            time.sleep(BROKER_POLL_INTERVAL_SEC)
-            continue
-        break
-    if response is None:
-        raise RuntimeError("BROKER_ERROR: EMPTY_RESPONSE")
+    response = _rpc(
+        {
+            "action": "wait_result",
+            "request_id": str(request_id or ""),
+            "timeout_sec": float(BROKER_TIMEOUT_SEC),
+        },
+        timeout_sec=float(BROKER_TIMEOUT_SEC) + 5.0,
+    )
     if response.get("ok") is True and response.get("pending") is True:
         raise RuntimeError("BROKER_TIMEOUT: RESULT_NOT_READY")
     if response.get("ok") is not True:

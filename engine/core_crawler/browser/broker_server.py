@@ -490,6 +490,7 @@ class _BrokerDispatcher:
         ]
         self._results: "multiprocessing.Queue[dict[str, Any] | None]" = multiprocessing.Queue()
         self._state_mu = threading.Lock()
+        self._state_cv = threading.Condition(self._state_mu)
         self._accepted_count = 0
         self._inflight: set[str] = set()
         self._completed: dict[str, dict[str, Any]] = {}
@@ -526,11 +527,12 @@ class _BrokerDispatcher:
         self._results.put(None)
         if self._collector is not None:
             self._collector.join(timeout=5.0)
-        with self._state_mu:
+        with self._state_cv:
             for request_id in list(self._inflight):
                 self._completed[request_id] = {"ok": False, "error": "BROKER_STOPPED", "detail": "dispatcher stopped"}
             self._inflight.clear()
             self._accepted_count = 0
+            self._state_cv.notify_all()
 
     def _pick_slot_for_site(self, site: str, allowed_slot_names: list[str]) -> tuple[str, int]:
         cfg = SITE_CONFIGS.get(site)
@@ -602,6 +604,23 @@ class _BrokerDispatcher:
                 return {"ok": True, "pending": True}
         return {"ok": False, "error": "NOT_FOUND", "detail": "UNKNOWN_REQUEST_ID"}
 
+    def wait_result(self, request_id: str, timeout_sec: float) -> dict[str, Any]:
+        request_id = str(request_id or "")
+        if not request_id:
+            return {"ok": False, "error": "BAD_REQUEST", "detail": "request_id required"}
+        deadline = time.time() + max(0.1, float(timeout_sec or 0.0))
+        with self._state_cv:
+            while True:
+                ready = self._completed.pop(request_id, None)
+                if ready is not None:
+                    return dict(ready)
+                if request_id not in self._inflight:
+                    return {"ok": False, "error": "NOT_FOUND", "detail": "UNKNOWN_REQUEST_ID"}
+                remaining = deadline - time.time()
+                if remaining <= 0:
+                    return {"ok": True, "pending": True}
+                self._state_cv.wait(timeout=remaining)
+
     def _collect_results(self) -> None:
         while not self._stop.is_set():
             try:
@@ -614,7 +633,7 @@ class _BrokerDispatcher:
             if not request_id:
                 continue
             response = dict(item.get("response") or {})
-            with self._state_mu:
+            with self._state_cv:
                 self._inflight.discard(request_id)
                 self._accepted_count = max(0, int(self._accepted_count) - 1)
                 self._completed[request_id] = response
@@ -622,6 +641,7 @@ class _BrokerDispatcher:
                     doomed = sorted(self._completed.items(), key=lambda row: float((row[1] or {}).get("_completed_ts") or 0.0))
                     for doomed_request_id, _ in doomed[: max(1, len(self._completed) - (self._queue_maxsize * 4))]:
                         self._completed.pop(doomed_request_id, None)
+                self._state_cv.notify_all()
 
 
 def _broker_worker_main(
@@ -704,6 +724,11 @@ class _BrokerHandler(socketserver.BaseRequestHandler):
             return
         if action == "submit":
             response = self.server.dispatcher.submit(payload)
+        elif action == "wait_result":
+            response = self.server.dispatcher.wait_result(
+                str(payload.get("request_id") or ""),
+                float(payload.get("timeout_sec") or 0.0),
+            )
         elif action == "result":
             response = self.server.dispatcher.poll_result(str(payload.get("request_id") or ""))
         else:
