@@ -64,6 +64,7 @@ services:
       - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - ./config/redis/redis-prod.conf:/etc/redis/redis.conf:ro
       - serenity-redis-run:/app/run/redis
+      - serenity-redis-data:/data
 
   mailer-db:
     image: postgres:16
@@ -407,34 +408,34 @@ services:
         "engine.core_tasks.expand_cb_ready_task_processor"
       ]
 
-  mailer-engine-crawler-prod:
-    image: mailer-python:latest
-    container_name: mailer-engine-crawler-prod
-    init: true
-    working_dir: /app
-    restart: unless-stopped
-    depends_on:
-      mailer-set-env:
-        condition: service_started
-      mailer-db:
-        condition: service_started
-      mailer-redis:
-        condition: service_started
-    environment:
-      PYTHONPATH: /app
-    volumes:
-      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
-      - mailer-app-prod:/app
-      - serenity-redis-run:/app/run/redis
-      - serenity-secrets:/run/serenity-secrets:ro
-    cpus: "0.80"
-    command:
-      [
-        "/app/config/sh/with-secrets.sh",
-        "python",
-        "-m",
-        "engine.core_crawler.crawler_processor"
-      ]
+  # mailer-engine-crawler-prod:
+  #   image: mailer-python:latest
+  #   container_name: mailer-engine-crawler-prod
+  #   init: true
+  #   working_dir: /app
+  #   restart: unless-stopped
+  #   depends_on:
+  #     mailer-set-env:
+  #       condition: service_started
+  #     mailer-db:
+  #       condition: service_started
+  #     mailer-redis:
+  #       condition: service_started
+  #   environment:
+  #     PYTHONPATH: /app
+  #   volumes:
+  #     - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
+  #     - mailer-app-prod:/app
+  #     - serenity-redis-run:/app/run/redis
+  #     - serenity-secrets:/run/serenity-secrets:ro
+  #   cpus: "0.80"
+  #   command:
+  #     [
+  #       "/app/config/sh/with-secrets.sh",
+  #       "python",
+  #       "-m",
+  #       "engine.core_crawler.crawler_processor"
+  #     ]
 
   # mailer-engine-stat-prod:
   #   image: mailer-python:latest
@@ -627,6 +628,7 @@ volumes:
       type: tmpfs
       device: tmpfs
       o: "size=64m,uid=1001,gid=1001,mode=0777"
+  serenity-redis-data:
   serenity-secrets:
     driver: local
     driver_opts:

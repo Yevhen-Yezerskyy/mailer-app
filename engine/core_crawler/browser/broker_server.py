@@ -27,7 +27,8 @@ from engine.core_crawler.browser.session_config import (
     BROKER_WORKERS,
     ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX,
     ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO,
-    ONE_ONE_EIGHTY_WINDOW_COOLDOWN_SEC,
+    ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC,
+    ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC,
     ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT,
     ONE_ONE_EIGHTY_WINDOW_MAX_SEC,
     ONE_ONE_EIGHTY_WINDOW_MIN_SEC,
@@ -368,7 +369,10 @@ def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
                 for name in rotated_names[:needed]:
                     state[name] = {
                         "active_until": now + random.uniform(ONE_ONE_EIGHTY_WINDOW_MIN_SEC, ONE_ONE_EIGHTY_WINDOW_MAX_SEC),
-                        "cool_until": now + float(ONE_ONE_EIGHTY_WINDOW_COOLDOWN_SEC),
+                        "cool_until": now + random.uniform(
+                            ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC,
+                            ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC,
+                        ),
                         "main_requests": 0,
                     }
                     active_names.append(name)
