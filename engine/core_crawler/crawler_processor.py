@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import multiprocessing
 import signal
 import subprocess
 import sys
@@ -12,7 +11,7 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from engine.core_crawler.browser.broker_server import current_site_route_plan, run_browser_broker
+from engine.core_crawler.browser.broker_server import current_site_route_plan
 from engine.core_crawler.fetch_cb import pending_items_exist
 
 TICK_SEC = 1.0
@@ -64,7 +63,7 @@ def _collect_finished_workers(catalog: str, active: list[WorkerProcess]) -> list
 
 def _launch_worker(catalog: str) -> WorkerProcess:
     proc = subprocess.Popen(
-        [sys.executable, "-m", "engine.core_crawler.fetch_cb", "--catalog", str(catalog)],
+        [sys.executable, "-m", "engine.core_crawler.fetch_cb", "--catalog", str(catalog), "--worker-loop"],
         stdin=subprocess.DEVNULL,
         start_new_session=True,
         close_fds=True,
@@ -111,16 +110,10 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
 
-    broker = multiprocessing.Process(target=run_browser_broker, name="core_crawler_browser_broker")
-    broker.start()
-    print(f"[crawler_processor] broker_start pid={broker.pid}", flush=True)
-
     active_by_catalog: dict[str, list[WorkerProcess]] = {catalog: [] for catalog in CATALOGS}
     last_targets: dict[str, int] = {catalog: -1 for catalog in CATALOGS}
     try:
         while not stop_requested["value"]:
-            if not broker.is_alive():
-                raise RuntimeError("browser broker stopped unexpectedly")
             targets = _target_parallelism_by_catalog()
             for catalog in CATALOGS:
                 active_by_catalog[catalog] = _collect_finished_workers(catalog, active_by_catalog[catalog])
@@ -136,12 +129,6 @@ def main() -> None:
             time.sleep(TICK_SEC)
     finally:
         _stop_workers(active_by_catalog)
-        if broker.is_alive():
-            broker.terminate()
-            broker.join(timeout=5.0)
-        if broker.is_alive():
-            broker.kill()
-            broker.join(timeout=5.0)
 
 
 if __name__ == "__main__":

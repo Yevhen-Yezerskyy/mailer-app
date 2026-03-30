@@ -8,11 +8,14 @@ import argparse
 import base64
 import json
 import os
+import signal
+import time
 from dataclasses import dataclass
 from typing import Any, Optional
 
 from engine.common.cache.client import CLIENT
 from engine.common.db import fetch_one, get_connection
+from engine.core_crawler.browser.fetcher import close_all_fetch_routers
 from engine.core_crawler.spiders.spider_gs_cb import GelbeSeitenCBSpider
 from engine.core_crawler.spiders.spider_11880_cb import OneOneEightZeroCBSpider
 
@@ -264,42 +267,45 @@ def _run_spider(item: QueueItem) -> Any | None:
 
 
 def _run_item(item: QueueItem) -> None:
-    print(
-        f"[core_crawler] start cb_id={item.cb_id} catalog={item.catalog} "
-        f"plz={item.plz} branch={item.branch_slug}"
-    )
-
-    if not item.branch_slug or not item.plz:
+    try:
         print(
-            f"[core_crawler] done cb_id={item.cb_id} action=skip_invalid "
-            f"catalog={item.catalog} plz={item.plz} branch={item.branch_slug}"
+            f"[core_crawler] start cb_id={item.cb_id} catalog={item.catalog} "
+            f"plz={item.plz} branch={item.branch_slug}"
         )
-        return
 
-    spider = _run_spider(item)
-    if spider is None:
+        if not item.branch_slug or not item.plz:
+            print(
+                f"[core_crawler] done cb_id={item.cb_id} action=skip_invalid "
+                f"catalog={item.catalog} plz={item.plz} branch={item.branch_slug}"
+            )
+            return
+
+        spider = _run_spider(item)
+        if spider is None:
+            print(
+                f"[core_crawler] done cb_id={item.cb_id} action=skip_unsupported "
+                f"catalog={item.catalog}"
+            )
+            return
+
+        db_action = str(getattr(spider, "_db_action", "") or "")
+        db_rows = int(getattr(spider, "_db_rows", 0) or 0)
+        final_reason = str(getattr(spider, "_final_reason", "") or "")
+        selected = int(len(getattr(spider, "selected_urls", []) or []))
+        parsed = int(getattr(spider, "_detail_parsed", 0) or 0)
         print(
-            f"[core_crawler] done cb_id={item.cb_id} action=skip_unsupported "
-            f"catalog={item.catalog}"
+            f"[core_crawler] done cb_id={item.cb_id} catalog={item.catalog} "
+            f"action={db_action or 'unknown'} rows={db_rows} selected={selected} "
+            f"parsed={parsed} reason={final_reason}"
         )
-        return
 
-    db_action = str(getattr(spider, "_db_action", "") or "")
-    db_rows = int(getattr(spider, "_db_rows", 0) or 0)
-    final_reason = str(getattr(spider, "_final_reason", "") or "")
-    selected = int(len(getattr(spider, "selected_urls", []) or []))
-    parsed = int(getattr(spider, "_detail_parsed", 0) or 0)
-    print(
-        f"[core_crawler] done cb_id={item.cb_id} catalog={item.catalog} "
-        f"action={db_action or 'unknown'} rows={db_rows} selected={selected} "
-        f"parsed={parsed} reason={final_reason}"
-    )
-
-    if not _pair_is_collected(item.cb_id):
-        print(
-            f"[core_crawler] pending cb_id={item.cb_id} catalog={item.catalog} "
-            f"reason={final_reason or 'UNKNOWN'}"
-        )
+        if not _pair_is_collected(item.cb_id):
+            print(
+                f"[core_crawler] pending cb_id={item.cb_id} catalog={item.catalog} "
+                f"reason={final_reason or 'UNKNOWN'}"
+            )
+    finally:
+        close_all_fetch_routers()
 
 
 def run_fixed_pair(
@@ -344,10 +350,32 @@ def worker_run_once(catalog: str = "") -> None:
         _finalize_item_lock(item)
 
 
+def worker_main_loop(catalog: str = "") -> None:
+    catalog_name = str(catalog or "").strip()
+    stop_requested = {"value": False}
+
+    def _handle_signal(_signum, _frame) -> None:
+        stop_requested["value"] = True
+
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
+
+    while not stop_requested["value"]:
+        item = _claim_next_item(catalog_name)
+        if item is None:
+            time.sleep(0.25)
+            continue
+        try:
+            _run_item(item)
+        finally:
+            _finalize_item_lock(item)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-one-b64", default="")
     parser.add_argument("--catalog", default="")
+    parser.add_argument("--worker-loop", action="store_true")
     args = parser.parse_args()
 
     if args.run_one_b64:
@@ -361,6 +389,10 @@ def main() -> None:
             branch_slug=str(data["branch_slug"] or "").strip(),
             catalog=str(data["catalog"] or "").strip(),
         )
+        return
+
+    if bool(args.worker_loop):
+        worker_main_loop(str(args.catalog or "").strip())
         return
 
     worker_run_once(str(args.catalog or "").strip())

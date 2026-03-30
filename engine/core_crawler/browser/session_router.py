@@ -112,13 +112,14 @@ class SessionLease:
 
 
 class BrowserSessionRouter:
-    def __init__(self) -> None:
+    def __init__(self, register_atexit: bool = True) -> None:
         self._pw_mu = threading.Lock()
         self._playwright = None
         self._runtime_cv = threading.Condition()
         self._runtimes: dict[str, BrowserSession] = {}
         self._browsers: dict[str, BrowserRuntime] = {}
-        atexit.register(self.close_all)
+        if register_atexit:
+            atexit.register(self.close_all)
 
     def close_all(self) -> None:
         with self._runtime_cv:

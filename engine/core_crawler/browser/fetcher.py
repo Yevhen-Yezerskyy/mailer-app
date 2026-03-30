@@ -4,10 +4,41 @@
 
 from __future__ import annotations
 
+import threading
+
 from parsel import Selector
 
-from engine.core_crawler.browser.broker_client import fetch_html_via_broker
-from engine.core_crawler.browser.session_router import FetchResult
+from engine.core_crawler.browser.session_router import BrowserSessionRouter, FetchResult
+
+_ROUTER_LOCAL = threading.local()
+_ROUTER_REGISTRY_MU = threading.Lock()
+_ROUTER_REGISTRY: list[BrowserSessionRouter] = []
+
+
+def _get_router() -> BrowserSessionRouter:
+    router = getattr(_ROUTER_LOCAL, "router", None)
+    if router is not None:
+        return router
+    router = BrowserSessionRouter(register_atexit=False)
+    _ROUTER_LOCAL.router = router
+    with _ROUTER_REGISTRY_MU:
+        _ROUTER_REGISTRY.append(router)
+    return router
+
+
+def close_all_fetch_routers() -> None:
+    with _ROUTER_REGISTRY_MU:
+        routers = list(_ROUTER_REGISTRY)
+        _ROUTER_REGISTRY.clear()
+    try:
+        _ROUTER_LOCAL.router = None
+    except Exception:
+        pass
+    for router in routers:
+        try:
+            router.close_all()
+        except Exception:
+            pass
 
 
 class HtmlTextResponse:
@@ -44,10 +75,10 @@ def fetch_html(
     preferred_slot_name: str = "",
     preferred_slot_idx: int = -1,
 ) -> FetchResult:
-    return fetch_html_via_broker(
-        site=site,
-        url=url,
-        kind=kind,
+    return _get_router().fetch(
+        site=str(site),
+        url=str(url),
+        kind=str(kind),
         task_id=int(task_id),
         cb_id=int(cb_id),
         referer=str(referer or ""),
