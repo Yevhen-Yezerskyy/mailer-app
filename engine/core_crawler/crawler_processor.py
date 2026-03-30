@@ -17,6 +17,14 @@ from engine.core_crawler.fetch_cb import pending_items_exist
 
 TICK_SEC = 1.0
 CATALOGS = ("11880", "gs")
+CATALOG_MAX_WORKERS = {
+    "11880": 2,
+    "gs": 3,
+}
+CATALOG_ROUTES_PER_WORKER = {
+    "11880": 1,
+    "gs": 3,
+}
 
 
 @dataclass
@@ -29,7 +37,14 @@ def _target_parallelism_by_catalog() -> dict[str, int]:
     route_plan = current_site_route_plan()
     targets: dict[str, int] = {}
     for site_name in CATALOGS:
-        targets[site_name] = max(0, int(len(route_plan.get(site_name) or [])))
+        route_count = max(0, int(len(route_plan.get(site_name) or [])))
+        if route_count <= 0:
+            targets[site_name] = 0
+            continue
+        routes_per_worker = max(1, int(CATALOG_ROUTES_PER_WORKER.get(site_name, 1)))
+        max_workers = max(1, int(CATALOG_MAX_WORKERS.get(site_name, 1)))
+        target = max(1, int((route_count + routes_per_worker - 1) // routes_per_worker))
+        targets[site_name] = min(max_workers, target)
     return targets
 
 
