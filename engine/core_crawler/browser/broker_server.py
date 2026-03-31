@@ -24,6 +24,7 @@ from uuid import uuid4
 from engine.common.cache.client import CLIENT
 from engine.core_crawler.browser.session_config import (
     BROKER_QUEUE_MAX,
+    GS_ACTIVE_TUNNEL_MAX,
     ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX,
     ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO,
     ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC,
@@ -279,6 +280,13 @@ def _11880_target_active_count(live_count: int) -> int:
     return min(ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX, max(0, limited))
 
 
+def _gs_target_active_count(live_count: int) -> int:
+    count = max(0, int(live_count))
+    if count <= 0:
+        return 0
+    return min(GS_ACTIVE_TUNNEL_MAX, count)
+
+
 def _load_window_state(site: str, active_names: list[str]) -> dict[str, dict[str, float | int]]:
     raw = _cache_get_obj(_window_key(site)) or {}
     if not isinstance(raw, dict):
@@ -474,6 +482,11 @@ def _compute_site_route_plan() -> dict[str, list[str]]:
     available_gs = [name for name in live_gs if name not in quarantine_gs and name not in used_11880]
     rest_name = _scheduled_rest_slot("gs", available_gs, bool(quarantine_gs))
     active_gs = [name for name in available_gs if not rest_name or name != rest_name]
+    gs_target = _gs_target_active_count(len(active_gs))
+    if gs_target > 0:
+        active_gs = active_gs[:gs_target]
+    else:
+        active_gs = []
 
     return {
         "11880": list(active_11880),
