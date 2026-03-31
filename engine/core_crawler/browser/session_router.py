@@ -1287,6 +1287,30 @@ class BrowserSessionRouter:
         except Exception as exc:
             return {"_error": f"{source_name}_headers_unavailable: {type(exc).__name__}: {exc}"}
 
+    @staticmethod
+    def _blocked_resource_types(cfg: SiteSessionConfig) -> set[str]:
+        if cfg.site in {"11880", "gs"}:
+            return {"image", "font", "media", "texttrack", "object", "manifest"}
+        return set()
+
+    def _install_page_resource_filter(self, context: Any, cfg: SiteSessionConfig) -> None:
+        blocked_types = self._blocked_resource_types(cfg)
+        if not blocked_types:
+            return
+
+        def _handle_route(route: Any) -> None:
+            try:
+                request = route.request
+                resource_type = str(getattr(request, "resource_type", "") or "").strip().lower()
+                if resource_type in blocked_types:
+                    route.abort()
+                    return
+            except Exception:
+                pass
+            route.continue_()
+
+        context.route("**/*", _handle_route)
+
     def _new_page(self, session: BrowserSession, cfg: SiteSessionConfig) -> tuple[Any, Any]:
         browser_runtime = self._checkout_browser_runtime(cfg, session.tunnel)
         context_kwargs: dict[str, Any] = {
@@ -1306,6 +1330,7 @@ class BrowserSessionRouter:
             context_kwargs["storage_state"] = session.storage_state
         context = browser_runtime.browser.new_context(**context_kwargs)
         context.add_init_script(self._profile_script(session.profile))
+        self._install_page_resource_filter(context, cfg)
         page = context.new_page()
         cdp = context.new_cdp_session(page)
         cdp.send(
