@@ -31,10 +31,14 @@ _ALLOWLIST = load_email_domains_allowlist()
 _MX_CACHE: Dict[str, bool] = {}
 
 
-def _p(message: str) -> None:
-    line = f"[core_expander] {message}"
+def _log_line(branch: str, message: str) -> None:
+    line = f"[core_expander:{branch}] {message}"
     print(line, flush=True)
     log("expander.log", "crawler", line)
+
+
+def _log_json(branch: str, payload: Dict[str, Any]) -> None:
+    _log_line(branch, json.dumps(payload, ensure_ascii=True, default=str))
 
 
 def _trim_str(value: Any) -> str:
@@ -604,12 +608,12 @@ def run_batch() -> Dict[str, int]:
                 _mark_raw_processed(cur, int(raw_id))
                 cur.execute(f"RELEASE SAVEPOINT {savepoint_name}")
                 counts["processed_raw"] += 1
-                _p(f"raw_id={int(raw_id)} cb_id={int(cb_id)} error={type(exc).__name__}: {exc}")
+                _log_line("raw_to_aggr", f"raw_id={int(raw_id)} cb_id={int(cb_id)} error={type(exc).__name__}: {exc}")
 
         conn.commit()
 
     counts["duration_ms"] = int((time.time() - started_at) * 1000)
-    _p(json.dumps(counts, ensure_ascii=True, default=str))
+    _log_json("raw_to_aggr", counts)
     return counts
 
 
@@ -711,7 +715,7 @@ def run_sending_list_batch() -> Dict[str, int]:
         task_id = _pick_sending_task(cur)
         if not task_id:
             counts["duration_ms"] = int((time.time() - started_at) * 1000)
-            _p(json.dumps({"event": "sending_lists", "reason": "no_ready_task", **counts}, ensure_ascii=True, default=str))
+            _log_json("sending_lists", {"reason": "no_ready_task", **counts})
             return counts
 
         counts["task_id"] = int(task_id)
@@ -720,7 +724,7 @@ def run_sending_list_batch() -> Dict[str, int]:
         conn.commit()
 
     counts["duration_ms"] = int((time.time() - started_at) * 1000)
-    _p(json.dumps({"event": "sending_lists", **counts}, ensure_ascii=True, default=str))
+    _log_json("sending_lists", counts)
     return counts
 
 
