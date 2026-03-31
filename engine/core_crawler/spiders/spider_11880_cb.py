@@ -15,11 +15,7 @@ from urllib.parse import urljoin
 from engine.common.db import fetch_one, get_connection
 from engine.common.logs import log
 from engine.core_crawler.browser.fetcher import close_current_fetch_router, fetch_html, to_text_response
-from engine.core_crawler.browser.session_config import (
-    ONE_ONE_EIGHTY_MISMATCH_VISIT_MAX,
-    ONE_ONE_EIGHTY_MISMATCH_VISIT_PROBABILITY,
-    SITE_CONFIGS,
-)
+from engine.core_crawler.browser.session_config import SITE_CONFIGS
 from engine.core_crawler.spiders.spider_11880_card import parse_11880_card
 from engine.core_crawler.spiders.spider_11880_index_card import (
     extract_11880_next_page_url,
@@ -105,7 +101,7 @@ class OneOneEightZeroCBSpider:
                     task_id=self.task_id,
                     cb_id=self.cb_id,
                     referer=self._detail_referers.get(detail_url, self._start_url),
-                    mode="browser_click",
+                    mode="index_browser",
                 )
                 reason = ""
                 card = None
@@ -160,7 +156,6 @@ class OneOneEightZeroCBSpider:
         page_url: str,
         seen_urls: set[str],
         selected_urls: List[str],
-        mismatch_urls: List[str],
     ) -> None:
         for card in cards:
             row = dict(card)
@@ -177,39 +172,6 @@ class OneOneEightZeroCBSpider:
             self._detail_referers[url] = page_url
             if selected:
                 selected_urls.append(url)
-                continue
-            if plz:
-                mismatch_urls.append(url)
-
-    def _pick_noise_urls(self, mismatch_urls: List[str]) -> List[str]:
-        if not mismatch_urls:
-            return []
-        pool = list(mismatch_urls)
-        random.shuffle(pool)
-        picked: List[str] = []
-        for detail_url in pool:
-            if len(picked) >= int(ONE_ONE_EIGHTY_MISMATCH_VISIT_MAX):
-                break
-            if random.random() <= float(ONE_ONE_EIGHTY_MISMATCH_VISIT_PROBABILITY):
-                picked.append(detail_url)
-        return picked
-
-    def _visit_noise_details(self, mismatch_urls: List[str]) -> None:
-        for detail_url in self._pick_noise_urls(mismatch_urls):
-            try:
-                noise_result = self._fetch_html_gated(
-                    site="11880",
-                    url=detail_url,
-                    kind="detail",
-                    task_id=self.task_id,
-                    cb_id=self.cb_id,
-                    referer=self._detail_referers.get(detail_url, self._start_url),
-                    mode="browser_click",
-                )
-            except Exception:
-                continue
-            self._noise_seen += 1
-            self._last_tunnel = dict(noise_result.tunnel)
 
     def _run_fetch(self) -> None:
         self._start_url = f"https://www.11880.com/suche/{self.branch_slug}/{self.plz}"
@@ -217,7 +179,6 @@ class OneOneEightZeroCBSpider:
         current_search_url = self._start_url
         current_referer = ""
         selected_urls: List[str] = []
-        mismatch_urls: List[str] = []
         seen_urls: set[str] = set()
 
         seen_search_urls: set[str] = set()
@@ -248,7 +209,6 @@ class OneOneEightZeroCBSpider:
                 page_url=search_result.final_url,
                 seen_urls=seen_urls,
                 selected_urls=selected_urls,
-                mismatch_urls=mismatch_urls,
             )
 
             next_search_url = extract_11880_next_page_url(search_response)
@@ -264,8 +224,6 @@ class OneOneEightZeroCBSpider:
             return
 
         self._run_detail_fetches()
-
-        self._visit_noise_details(mismatch_urls)
         self._final_reason = "OK" if self.items else "NO DETAIL ITEMS"
 
     def run(self) -> None:

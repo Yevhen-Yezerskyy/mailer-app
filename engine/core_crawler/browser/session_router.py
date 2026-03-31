@@ -1477,9 +1477,11 @@ class BrowserSessionRouter:
         requests_total_before_fetch: int,
     ) -> str:
         requested = str(requested_mode or "")
+        if requested == "browser_click":
+            requested = "index_browser"
         if cfg.site != "11880":
             return requested
-        browser_mode = "browser_click" if str(kind or "") == "detail" else "index_browser"
+        browser_mode = "index_browser"
         if int(requests_total_before_fetch) < 2:
             return browser_mode
         if random.random() < 0.9:
@@ -1609,7 +1611,6 @@ class BrowserSessionRouter:
             context, page = self._new_page(session, cfg)
             result = self._fetch_once(session, page, cfg, url, kind, task_id, cb_id, referer)
             if result.status == 200 and not self._looks_blocked(result.status, result.title, result.html):
-                self._simulate_index_clicks(page, cfg)
                 self._capture_browser_state(session, page)
             return result
         finally:
@@ -1890,26 +1891,15 @@ class BrowserSessionRouter:
             return result, HTTP_CHROMIUM_LOG_FILE
 
         if mode == "browser_click":
-            click_referer = referer or session.current_url
-            result = self._fetch_browser_click_once(
+            result = self._fetch_index_browser_once(
                 session,
                 cfg,
                 url,
                 kind,
                 task_id,
                 cb_id,
-                click_referer,
+                referer or session.current_url,
             )
-            if result is None:
-                result = self._fetch_index_browser_once(
-                    session,
-                    cfg,
-                    url,
-                    kind,
-                    task_id,
-                    cb_id,
-                    click_referer,
-                )
             self._persist_session_state(cfg, session)
             return result, HTTP_CHROMIUM_LOG_FILE
 
@@ -1941,20 +1931,6 @@ class BrowserSessionRouter:
                 ),
                 HTTP_LIGHT_LOG_FILE,
             )
-
-        click_referer = referer or session.current_url
-        if self._should_try_click(session, url, click_referer):
-            result = self._fetch_browser_click_once(
-                session,
-                cfg,
-                url,
-                kind,
-                task_id,
-                cb_id,
-                click_referer,
-            )
-            if result is not None:
-                return result, HTTP_CHROMIUM_LOG_FILE
 
         if not self._session_has_live_cookies(session):
             result = self._fetch_index_browser_once(
