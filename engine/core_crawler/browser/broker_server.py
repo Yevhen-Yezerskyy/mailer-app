@@ -24,7 +24,6 @@ from uuid import uuid4
 from engine.common.cache.client import CLIENT
 from engine.core_crawler.browser.session_config import (
     BROKER_QUEUE_MAX,
-    BROKER_WORKERS,
     ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX,
     ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO,
     ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC,
@@ -50,6 +49,7 @@ ROUTE_SITES = ("11880", "gs")
 ROUTE_STATE_LOCK_TTL_SEC = 3.0
 ROUTE_STATE_WAIT_SEC = 2.0
 ROUTE_PLAN_CACHE_SEC = 60.0
+BROKER_WORKERS = 10
 
 
 def _broker_worker_parallelism() -> int:

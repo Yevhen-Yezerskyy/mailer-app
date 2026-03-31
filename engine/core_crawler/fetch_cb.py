@@ -30,6 +30,7 @@ LOCK_TTL_SEC = 1200.0
 RETRY_LOCK_TTL_SEC = 3 * 60 * 60.0
 ROUTE_LOCK_TTL_SEC = 30.0
 ROUTE_LOCK_RENEW_SEC = 10.0
+ITEM_TIMEOUT_SEC = 180.0
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,12 @@ class RouteLease:
 
 @dataclass(frozen=True)
 class RouteLeaseHeartbeat:
+    stop_event: Any
+    thread: Any
+
+
+@dataclass(frozen=True)
+class ItemTimeoutWatchdog:
     stop_event: Any
     thread: Any
 
@@ -249,6 +256,55 @@ def _finalize_item_lock(item: QueueItem) -> None:
         )
         if renewed:
             return
+    except Exception:
+        pass
+
+
+def _start_item_timeout_watchdog(
+    item: QueueItem,
+    route: RouteLease | None,
+    heartbeat: RouteLeaseHeartbeat | None,
+) -> ItemTimeoutWatchdog:
+    stop_event = threading.Event()
+
+    def _watchdog() -> None:
+        if stop_event.wait(ITEM_TIMEOUT_SEC):
+            return
+        try:
+            print(
+                f"[core_crawler] timeout cb_id={item.cb_id} catalog={item.catalog} "
+                f"slot={getattr(route, 'slot_name', '')} sec={int(ITEM_TIMEOUT_SEC)}"
+            )
+        except Exception:
+            pass
+        try:
+            _stop_route_heartbeat(heartbeat)
+        except Exception:
+            pass
+        try:
+            _release_route(route)
+        except Exception:
+            pass
+        os._exit(124)
+
+    thread = threading.Thread(
+        target=_watchdog,
+        name=f"item_timeout:{item.catalog}:{item.cb_id}",
+        daemon=True,
+    )
+    thread.start()
+    return ItemTimeoutWatchdog(stop_event=stop_event, thread=thread)
+
+
+def _stop_item_timeout_watchdog(watchdog: ItemTimeoutWatchdog | None) -> None:
+    if watchdog is None:
+        return
+    try:
+        watchdog.stop_event.set()
+    except Exception:
+        pass
+    try:
+        watchdog.thread.join(timeout=1.0)
     except Exception:
         pass
 
@@ -479,9 +535,11 @@ def worker_main_loop(catalog: str = "") -> None:
                 _release_route(route)
                 time.sleep(0.25)
                 continue
+            watchdog = _start_item_timeout_watchdog(item, route, heartbeat)
             try:
                 _run_item(item, route)
             finally:
+                _stop_item_timeout_watchdog(watchdog)
                 _finalize_item_lock(item)
                 _stop_route_heartbeat(heartbeat)
                 _release_route(route)
