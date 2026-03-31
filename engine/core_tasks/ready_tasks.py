@@ -1,7 +1,6 @@
 # FILE: engine/core_tasks/ready_tasks.py
 # DATE: 2026-03-25
-# PURPOSE: Recomputes the ready flag for active audience tasks based on the presence
-# and completeness of branch/city ratings.
+# PURPOSE: Recomputes ready/collected flags for audience tasks in the new flow.
 
 from __future__ import annotations
 
@@ -81,4 +80,58 @@ def run_once() -> Dict[str, Any]:
         "sql_ms": int(sql_ms),
     }
     log(LOG_FILE, folder=LOG_FOLDER, message=json.dumps({"event": "ready_tasks", **result}, ensure_ascii=False))
+    return result
+
+
+def run_collected_once() -> Dict[str, Any]:
+    import time
+
+    t0 = time.perf_counter()
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            WITH eligible AS (
+              SELECT t.id
+              FROM public.aap_audience_audiencetask t
+              WHERE t.ready = true
+                AND t.collected = false
+                AND t.archived = false
+            ),
+            reached_limit AS (
+              SELECT e.id AS task_id
+              FROM eligible e
+              WHERE EXISTS (
+                SELECT 1
+                FROM public.sending_lists sl
+                WHERE sl.task_id = e.id
+                OFFSET 49999
+                LIMIT 1
+              )
+            ),
+            upd AS (
+              UPDATE public.aap_audience_audiencetask t
+              SET collected = true,
+                  updated_at = now()
+              FROM reached_limit rl
+              WHERE t.id = rl.task_id
+                AND t.collected = false
+              RETURNING t.id
+            )
+            SELECT
+              (SELECT COUNT(*)::int FROM eligible) AS scanned_cnt,
+              (SELECT COUNT(*)::int FROM reached_limit) AS reached_limit_cnt,
+              (SELECT COUNT(*)::int FROM upd) AS updated_cnt
+            """
+        )
+        row = cur.fetchone()
+    sql_ms = int((time.perf_counter() - t0) * 1000)
+
+    result = {
+        "mode": "ok",
+        "scanned_cnt": int(row[0] or 0),
+        "reached_limit_cnt": int(row[1] or 0),
+        "updated_cnt": int(row[2] or 0),
+        "sql_ms": int(sql_ms),
+    }
+    log(LOG_FILE, folder=LOG_FOLDER, message=json.dumps({"event": "collected_tasks", **result}, ensure_ascii=False))
     return result

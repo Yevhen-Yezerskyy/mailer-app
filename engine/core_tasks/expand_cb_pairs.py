@@ -343,7 +343,7 @@ def run_once() -> Dict[str, Any]:
         full_pairs_cnt = 0
         selected_pairs: List[PairRate] = []
         written = 0
-        has_1000th_unprocessed = False
+        has_1000th_uncollected = False
         stale = False
         need_full_refresh = False
         need_topup = False
@@ -352,7 +352,7 @@ def run_once() -> Dict[str, Any]:
         sql_full_snapshot_ms = 0
         sql_check_has_pairs_ms = 0
         sql_check_full_ms = 0
-        sql_check_unprocessed_ms = 0
+        sql_check_uncollected_ms = 0
         sql_existing_keys_ms = 0
         sql_stage_ms = 0
         sql_upsert_ms = 0
@@ -438,20 +438,22 @@ def run_once() -> Dict[str, Any]:
                         with get_connection() as conn, conn.cursor() as cur:
                             cur.execute(
                                 """
-                                SELECT 1
-                                FROM public.task_cb_ratings
-                                WHERE task_id = %s
-                                  AND processed = false
-                                ORDER BY rate ASC, cb_id ASC
-                                OFFSET %s
-                                LIMIT 1
-                                """,
+                            SELECT 1
+                            FROM public.task_cb_ratings tcr
+                            JOIN public.cb_crawl_pairs cp
+                              ON cp.id = tcr.cb_id
+                            WHERE tcr.task_id = %s
+                              AND cp.collected = false
+                            ORDER BY tcr.rate ASC NULLS LAST, tcr.cb_id ASC
+                            OFFSET %s
+                            LIMIT 1
+                            """,
                                 (int(task_id), int(LOW_WATERMARK - 1)),
                             )
-                            has_1000th_unprocessed = cur.fetchone() is not None
-                        sql_check_unprocessed_ms = int((time.perf_counter() - started_at) * 1000)
+                            has_1000th_uncollected = cur.fetchone() is not None
+                        sql_check_uncollected_ms = int((time.perf_counter() - started_at) * 1000)
 
-                        need_topup = bool(not has_1000th_unprocessed)
+                        need_topup = bool(not has_1000th_uncollected)
                         if not need_topup:
                             mode = "update_noop"
                         else:
@@ -561,7 +563,7 @@ def run_once() -> Dict[str, Any]:
             "city_hash": int(city_hash),
             "branch_hash": int(branch_hash),
             "has_pairs": bool(has_pairs),
-            "has_1000th_unprocessed": bool(has_1000th_unprocessed),
+            "has_1000th_uncollected": bool(has_1000th_uncollected),
             "stale": bool(stale),
             "need_full_refresh": bool(need_full_refresh),
             "need_topup": bool(need_topup),
@@ -578,7 +580,7 @@ def run_once() -> Dict[str, Any]:
             "sql_full_snapshot_ms": int(sql_full_snapshot_ms),
             "sql_check_has_pairs_ms": int(sql_check_has_pairs_ms),
             "sql_check_full_ms": int(sql_check_full_ms),
-            "sql_check_unprocessed_ms": int(sql_check_unprocessed_ms),
+            "sql_check_uncollected_ms": int(sql_check_uncollected_ms),
             "sql_existing_keys_ms": int(sql_existing_keys_ms),
             "sql_stage_ms": int(sql_stage_ms),
             "sql_upsert_ms": int(sql_upsert_ms),

@@ -7,6 +7,7 @@ from engine.core_tasks import expand_cb_pairs, ready_tasks
 
 EXPAND_TIMEOUT_SEC = 900
 READY_TIMEOUT_SEC = 120
+COLLECTED_TIMEOUT_SEC = 120
 
 
 def main() -> None:
@@ -24,6 +25,16 @@ def main() -> None:
         singleton=True,
         heavy=False,
         priority=10,
+    )
+
+    w.register(
+        name="collected_once",
+        fn=ready_tasks.run_collected_once,
+        every_sec=10,
+        timeout_sec=COLLECTED_TIMEOUT_SEC,
+        singleton=True,
+        heavy=False,
+        priority=20,
     )
 
     w.register(

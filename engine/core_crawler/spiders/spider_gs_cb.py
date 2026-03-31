@@ -8,6 +8,7 @@ import concurrent.futures
 import re
 import json
 import random
+import threading
 import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
@@ -25,6 +26,13 @@ TREFFER_RE = re.compile(r"\b(\d+)\s*Treffer\b", re.IGNORECASE)
 SPELL_SUGGEST_RE = re.compile(r"rechtschreibvorschl(?:a|ä)ge", re.IGNORECASE)
 LOG_FILE = "spider_gs"
 LOG_FOLDER = "crawler"
+
+# One process handles one tunnel, so a file-local gate is enough to serialize request starts.
+_REQUEST_GATE_COND = threading.Condition()
+_REQUEST_GATE_NEXT_START_TS = 0.0
+_REQUEST_GATE_WAITERS = 0
+_REQUEST_GATE_MAX_WAITERS = 10
+_REQUEST_GATE_ERROR = "INTERNAL THROTTLE QUEUE OVERFLOW"
 
 
 class GelbeSeitenCBSpider:
@@ -53,11 +61,32 @@ class GelbeSeitenCBSpider:
         self.failed_urls: List[Dict[str, str]] = []
 
     @staticmethod
-    def _sleep_for_site(site_name: str) -> None:
-        cfg = SITE_CONFIGS[str(site_name or "").strip()]
-        pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
-        if pause_sec > 0:
-            time.sleep(pause_sec)
+    def _wait_for_request_slot() -> None:
+        global _REQUEST_GATE_NEXT_START_TS, _REQUEST_GATE_WAITERS
+
+        cfg = SITE_CONFIGS["gs"]
+        with _REQUEST_GATE_COND:
+            while True:
+                now = time.monotonic()
+                wait_for = float(_REQUEST_GATE_NEXT_START_TS) - float(now)
+                if wait_for <= 0:
+                    pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
+                    _REQUEST_GATE_NEXT_START_TS = float(now) + max(0.0, float(pause_sec))
+                    return
+
+                _REQUEST_GATE_WAITERS += 1
+                if _REQUEST_GATE_WAITERS > int(_REQUEST_GATE_MAX_WAITERS):
+                    _REQUEST_GATE_WAITERS -= 1
+                    raise RuntimeError(_REQUEST_GATE_ERROR)
+                try:
+                    _REQUEST_GATE_COND.wait(timeout=wait_for)
+                finally:
+                    _REQUEST_GATE_WAITERS -= 1
+
+    @staticmethod
+    def _fetch_html_gated(**kwargs):
+        GelbeSeitenCBSpider._wait_for_request_slot()
+        return fetch_html(**kwargs)
 
     def _run_detail_fetches(self) -> None:
         if not self.selected_urls:
@@ -69,11 +98,8 @@ class GelbeSeitenCBSpider:
 
         def _fetch_one(detail_url: str) -> dict[str, Any]:
             try:
-                pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
-                if pause_sec > 0:
-                    time.sleep(pause_sec)
                 route = dict(self._detail_routes.get(detail_url) or {})
-                detail_result = fetch_html(
+                detail_result = self._fetch_html_gated(
                     site="gs",
                     url=detail_url,
                     kind="detail",
@@ -206,8 +232,8 @@ class GelbeSeitenCBSpider:
             "amount": amount,
         }
 
-    @staticmethod
     def _post_ajaxsuche(
+        self,
         *,
         task_id: int,
         cb_id: int,
@@ -217,7 +243,7 @@ class GelbeSeitenCBSpider:
         preferred_slot_name: str,
         preferred_slot_idx: int,
     ) -> dict[str, Any]:
-        ajax_result = fetch_html(
+        ajax_result = self._fetch_html_gated(
             site="gs",
             url=action_url,
             kind="search_ajax",
@@ -250,12 +276,11 @@ class GelbeSeitenCBSpider:
         page_guard = 0
         seen_page_urls: set[str] = set()
         seen_detail_urls: set[str] = set()
-        self._sleep_for_site("gs")
 
         while page_url and page_url not in seen_page_urls:
             seen_page_urls.add(page_url)
             page_guard += 1
-            search_result = fetch_html(
+            search_result = self._fetch_html_gated(
                 site="gs",
                 url=page_url,
                 kind="search",
@@ -402,15 +427,20 @@ class GelbeSeitenCBSpider:
         return True
 
     @staticmethod
+    def _is_http_error_reason(reason: str) -> bool:
+        reason_s = str(reason or "").strip()
+        return bool(
+            reason_s.startswith("SEARCH HTTP")
+            or reason_s.startswith("DETAIL HTTP")
+            or "AJAX HTTP" in reason_s
+        )
+
+    @staticmethod
     def _reason_marks_collected(reason: str) -> bool:
         reason_s = str(reason or "").strip()
         if not reason_s:
             return False
         if reason_s in {"OK", "NO DETAIL ITEMS", "SPELL SUGGESTION"}:
-            return True
-        if reason_s.startswith("SEARCH HTTP"):
-            return True
-        if reason_s.startswith("DETAIL HTTP"):
             return True
         return False
 
@@ -430,6 +460,54 @@ class GelbeSeitenCBSpider:
                 (collected_num, error_value, self.cb_id),
             )
             conn.commit()
+
+    def _handle_http_error_result(self, reason: str) -> int:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT error FROM public.cb_crawl_pairs WHERE id = %s FOR UPDATE",
+                (self.cb_id,),
+            )
+            row = cur.fetchone()
+            current_error = str((row or [None])[0] or "").strip()
+
+            if current_error == "HTTP ERROR 1":
+                cur.execute(
+                    """
+                    UPDATE public.cb_crawl_pairs
+                    SET error = 'HTTP ERROR 2',
+                        updated_at = NOW()
+                    WHERE id = %s
+                    """,
+                    (self.cb_id,),
+                )
+                conn.commit()
+                return 2
+
+            if current_error == "HTTP ERROR 2":
+                cur.execute(
+                    """
+                    UPDATE public.cb_crawl_pairs
+                    SET collected = true,
+                        error = %s,
+                        updated_at = NOW()
+                    WHERE id = %s
+                    """,
+                    (str(reason or "").strip() or "HTTP ERROR", self.cb_id),
+                )
+                conn.commit()
+                return 3
+
+            cur.execute(
+                """
+                UPDATE public.cb_crawl_pairs
+                SET error = 'HTTP ERROR 1',
+                    updated_at = NOW()
+                WHERE id = %s
+                """,
+                (self.cb_id,),
+            )
+            conn.commit()
+            return 1
 
     def _index_log_line(self, reason: str) -> str:
         if str(reason or "") == "ALREADY COLLECTED":
@@ -468,6 +546,16 @@ class GelbeSeitenCBSpider:
         if r == "ALREADY COLLECTED":
             self._db_action = "skip_already"
             print(f"CORE_GS_CB cb_id={self.cb_id} result=skip reason={r}")
+            return
+
+        if self._is_http_error_reason(r):
+            http_attempt = int(self._handle_http_error_result(r))
+            if http_attempt >= 3:
+                self._db_action = "commit_http"
+                print(f"CORE_GS_CB cb_id={self.cb_id} result=commit_http reason={r} http_attempt={http_attempt}")
+            else:
+                self._db_action = "leave_pending_http"
+                print(f"CORE_GS_CB cb_id={self.cb_id} result=pending_http reason={r} http_attempt={http_attempt}")
             return
 
         if not self._reason_marks_collected(r):

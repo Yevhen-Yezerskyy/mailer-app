@@ -63,7 +63,7 @@ ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC = 50 * 60
 ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC = 60 * 60
 ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT = 300
 ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO = 0.55
-ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX = 4
+ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX = 7
 ONE_ONE_EIGHTY_MISMATCH_VISIT_MAX = 2
 ONE_ONE_EIGHTY_MISMATCH_VISIT_PROBABILITY = 0.35
 
@@ -197,21 +197,6 @@ BROWSER_PROFILES = (
 
 
 SITE_CONFIGS: dict[str, SiteSessionConfig] = {
-    "probe11880": SiteSessionConfig(
-        site="probe11880",
-        home_url="https://dev.serenity-mail.de/__probe__/11880-http/?source=router_probe&step=0",
-        egress_slots=("fenster_ukraine", "nowedel", "zenosolar"),
-        slot_quarantine_sec=3 * 60 * 60,
-        sessions_per_egress=2,
-        concurrent_pages_per_session=1,
-        max_requests_per_session=500,
-        max_session_age_sec=60 * 60,
-        runtime_recycle_min_sec=5 * 60,
-        runtime_recycle_max_sec=10 * 60,
-        pause_min_sec=0.1,
-        pause_max_sec=2.0,
-        browser_timeout_ms=90_000,
-    ),
     "11880": SiteSessionConfig(
         site="11880",
         home_url="https://www.11880.com/",
@@ -231,17 +216,22 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
             "aws_3_76_124_90",
             "aws_3_66_88_254",
             "aws_18_153_80_121",
+            "aws_3_120_39_180",
+            "aws_3_68_216_17",
+            "aws_3_70_100_238",
+            "aws_18_192_129_122",
+            "aws_63_177_248_144",
             "direct",
         ),
-        slot_quarantine_sec=24 * 60 * 60,
+        slot_quarantine_sec=26 * 60 * 60,
         sessions_per_egress=1,
-        concurrent_pages_per_session=8,
+        concurrent_pages_per_session=5,
         max_requests_per_session=500,
         max_session_age_sec=1200,
         runtime_recycle_min_sec=300,
         runtime_recycle_max_sec=600,
-        pause_min_sec=1.0,
-        pause_max_sec=5.0,
+        pause_min_sec=4.0,
+        pause_max_sec=9.0,
         browser_timeout_ms=90_000,
     ),
     "gs": SiteSessionConfig(
@@ -262,6 +252,11 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
             "aws_3_76_124_90",
             "aws_3_66_88_254",
             "aws_18_153_80_121",
+            "aws_3_120_39_180",
+            "aws_3_68_216_17",
+            "aws_3_70_100_238",
+            "aws_18_192_129_122",
+            "aws_63_177_248_144",
             "direct",
         ),
         slot_quarantine_sec=1 * 60 * 60,

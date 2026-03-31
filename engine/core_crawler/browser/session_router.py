@@ -1985,6 +1985,9 @@ class BrowserSessionRouter:
             if self._should_quarantine_response(cfg, warm.status, warm.title, warm.html):
                 self._mute_slot(cfg, slot["name"], f"home:{warm.status}")
                 raise RuntimeError(f"WARM BLOCKED {warm.status}")
+            pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
+            if pause_sec > 0:
+                time.sleep(float(pause_sec))
 
         result, current_log_file = self._run_mode_fetch(
             session,
