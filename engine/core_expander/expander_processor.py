@@ -27,6 +27,16 @@ def main() -> None:
         priority=10,
     )
 
+    worker.register(
+        name="core_expander_run_sending_list_batch",
+        fn=expander.run_sending_list_batch,
+        every_sec=5,
+        timeout_sec=TASK_TIMEOUT_SEC,
+        singleton=True,
+        heavy=False,
+        priority=20,
+    )
+
     worker.run_forever()
 
 

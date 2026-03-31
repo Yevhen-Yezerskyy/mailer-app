@@ -19,7 +19,8 @@ from engine.common.utils import (
     load_email_domains_allowlist,
 )
 
-BATCH_SIZE = 100
+RAW_BATCH_SIZE = 100
+SENDING_LIST_LIMIT = 50000
 
 STATUS_EMPTY = "EMPTY"
 STATUS_INVALID = "INVALID"
@@ -573,7 +574,7 @@ def run_batch() -> Dict[str, int]:
     """
 
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute(sql_pick, (int(BATCH_SIZE),))
+        cur.execute(sql_pick, (int(RAW_BATCH_SIZE),))
         rows = cur.fetchall() or []
         counts["picked"] = len(rows)
 
@@ -609,6 +610,117 @@ def run_batch() -> Dict[str, int]:
 
     counts["duration_ms"] = int((time.time() - started_at) * 1000)
     _p(json.dumps(counts, ensure_ascii=True, default=str))
+    return counts
+
+
+def _pick_sending_task(cur) -> Optional[int]:
+    cur.execute(
+        """
+        SELECT id
+        FROM public.aap_audience_audiencetask
+        WHERE ready = true
+          AND archived = false
+          AND collected = false
+        ORDER BY random()
+        LIMIT 1
+        """
+    )
+    row = cur.fetchone()
+    return int(row[0]) if row else None
+
+
+def _sending_candidates_cte() -> str:
+    return """
+        WITH candidate_best AS (
+            SELECT DISTINCT ON (cc.aggr_contact_id)
+                tcr.task_id,
+                cc.aggr_contact_id AS aggr_contact_cb_id,
+                tcr.cb_id,
+                tcr.rate AS rate_cb
+            FROM public.task_cb_ratings tcr
+            JOIN public.cb_contacts cc
+              ON cc.cb_id = tcr.cb_id
+            WHERE tcr.task_id = %s
+            ORDER BY cc.aggr_contact_id, tcr.rate ASC NULLS LAST, tcr.cb_id ASC
+        ),
+        candidate_top AS (
+            SELECT task_id, cb_id, aggr_contact_cb_id, rate_cb
+            FROM candidate_best
+            ORDER BY rate_cb ASC NULLS LAST, aggr_contact_cb_id ASC
+            LIMIT %s
+        )
+    """
+
+
+def _upsert_sending_list(cur, task_id: int) -> int:
+    cur.execute(
+        _sending_candidates_cte()
+        + """
+        INSERT INTO public.sending_lists (
+            task_id,
+            cb_id,
+            aggr_contact_cb_id,
+            rate_cb
+        )
+        SELECT
+            task_id,
+            cb_id,
+            aggr_contact_cb_id,
+            rate_cb
+        FROM candidate_top
+        ON CONFLICT (task_id, aggr_contact_cb_id) DO UPDATE
+        SET cb_id = EXCLUDED.cb_id,
+            rate_cb = EXCLUDED.rate_cb,
+            updated_at = now()
+        WHERE public.sending_lists.cb_id IS DISTINCT FROM EXCLUDED.cb_id
+           OR public.sending_lists.rate_cb IS DISTINCT FROM EXCLUDED.rate_cb
+        """,
+        (int(task_id), int(SENDING_LIST_LIMIT)),
+    )
+    return int(cur.rowcount or 0)
+
+
+def _delete_sending_list_tail(cur, task_id: int) -> int:
+    cur.execute(
+        _sending_candidates_cte()
+        + """
+        DELETE FROM public.sending_lists sl
+        WHERE sl.task_id = %s
+          AND NOT EXISTS (
+              SELECT 1
+              FROM candidate_top ct
+              WHERE ct.task_id = sl.task_id
+                AND ct.aggr_contact_cb_id = sl.aggr_contact_cb_id
+          )
+        """,
+        (int(task_id), int(SENDING_LIST_LIMIT), int(task_id)),
+    )
+    return int(cur.rowcount or 0)
+
+
+def run_sending_list_batch() -> Dict[str, int]:
+    started_at = time.time()
+    counts = {
+        "task_id": 0,
+        "upserted_rows": 0,
+        "deleted_rows": 0,
+        "duration_ms": 0,
+    }
+
+    with get_connection() as conn, conn.cursor() as cur:
+        task_id = _pick_sending_task(cur)
+        if not task_id:
+            counts["duration_ms"] = int((time.time() - started_at) * 1000)
+            _p(json.dumps({"event": "sending_lists", "reason": "no_ready_task", **counts}, ensure_ascii=True, default=str))
+            return counts
+
+        counts["task_id"] = int(task_id)
+        counts["upserted_rows"] = _upsert_sending_list(cur, int(task_id))
+        counts["deleted_rows"] = _delete_sending_list_tail(cur, int(task_id))
+        conn.commit()
+
+    counts["duration_ms"] = int((time.time() - started_at) * 1000)
+    _p(json.dumps({"event": "sending_lists", **counts}, ensure_ascii=True, default=str))
     return counts
 
 
