@@ -1,13 +1,19 @@
-# FILE: engine/common/utils.py  (обновлено — 2025-12-26)
-# CHANGE: h64 теперь принимает ТОЛЬКО str (текст). Любой другой тип -> TypeError.
-# PURPOSE: короткий стабильный 64-bit хеш (BIGINT) для текста (UTF-8), совпадающий с Postgres-функцией.
+# FILE: engine/common/utils.py  (обновлено — 2026-03-31)
+# PURPOSE: common utilities: stable text hash, JSON parsing, and reusable email helpers.
 
 from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
-from typing import Any
+import subprocess
+from typing import Any, Optional, Set
+
+_EMAIL_DOMAINS_JSON_PATH = os.path.join(os.path.dirname(__file__), "email_domains.json")
+
+_RE_HAS_SPACE_OR_CTRL = re.compile(r"[\s\x00-\x1f\x7f]")
+_RE_DOMAIN_ALLOWED = re.compile(r"^[a-z0-9.-]+$")
 
 
 def h64_text(text: str) -> int:
@@ -48,3 +54,107 @@ def parse_json_response(text: str) -> Any | None:
             return json.loads(raw[start : end + 1])
         except Exception:
             return None
+
+
+def load_email_domains_allowlist() -> Set[str]:
+    try:
+        with open(_EMAIL_DOMAINS_JSON_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return set()
+
+    out: Set[str] = set()
+    for item in data or []:
+        domain = ""
+        if isinstance(item, dict):
+            domain = str(item.get("domain") or "").strip().lower()
+        elif isinstance(item, str):
+            domain = str(item).strip().lower()
+        if domain:
+            out.add(domain)
+    return out
+
+
+def _split_email(email: str) -> tuple[Optional[str], Optional[str]]:
+    if email.count("@") != 1:
+        return None, None
+    local, domain = email.split("@", 1)
+    if not local or not domain:
+        return None, None
+    return local, domain
+
+
+def email_is_bad_syntax(email: str) -> bool:
+    if len(email) > 254:
+        return True
+
+    local, domain = _split_email(email)
+    if local is None or domain is None:
+        return True
+
+    if len(local) > 64:
+        return True
+
+    if _RE_HAS_SPACE_OR_CTRL.search(email):
+        return True
+
+    if local.startswith(".") or local.endswith("."):
+        return True
+    if ".." in local:
+        return True
+
+    d = domain.strip().lower()
+    if "." not in d:
+        return True
+    if not _RE_DOMAIN_ALLOWED.match(d):
+        return True
+
+    labels = d.split(".")
+    for label in labels:
+        if not label:
+            return True
+        if len(label) > 63:
+            return True
+        if label.startswith("-") or label.endswith("-"):
+            return True
+
+    return False
+
+
+def email_domain_from_email(email: str) -> Optional[str]:
+    _local, domain = _split_email(email)
+    if domain is None:
+        return None
+    return domain.strip().lower()
+
+
+def email_has_mx(domain: str) -> bool:
+    try:
+        import dns.resolver  # type: ignore
+
+        ans = dns.resolver.resolve(domain, "MX", lifetime=3.0)
+        return bool(list(ans))
+    except Exception:
+        pass
+
+    try:
+        result = subprocess.run(
+            ["dig", "+short", "MX", domain],
+            capture_output=True,
+            text=True,
+            timeout=4,
+        )
+        return result.returncode == 0 and bool(result.stdout.strip())
+    except Exception:
+        pass
+
+    try:
+        result = subprocess.run(
+            ["nslookup", "-type=mx", domain],
+            capture_output=True,
+            text=True,
+            timeout=4,
+        )
+        return result.returncode == 0 and ("mail exchanger" in (result.stdout + result.stderr).lower())
+    except Exception:
+        return False
