@@ -16,12 +16,20 @@ from typing import Any
 from urllib.parse import urlsplit
 from uuid import uuid4
 
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 from engine.common.cache.client import CLIENT
 from engine.common.logs import log
-from engine.core_crawler.browser.http_fetch import build_http_session, cookie_snapshot, export_storage_state, fetch_html, storage_state_has_cookies
+from engine.core_crawler.browser.http_fetch import (
+    SkippedFetchError,
+    build_http_session,
+    cookie_snapshot,
+    export_storage_state,
+    fetch_html,
+    storage_state_has_cookies,
+)
 from engine.core_crawler.browser.session_config import (
     BROWSER_PROFILES,
     LOG_FOLDER,
@@ -1293,25 +1301,42 @@ class BrowserSessionRouter:
             return {"image", "font", "media", "texttrack", "object", "manifest"}
         return set()
 
-    def _install_page_resource_filter(self, context: Any, cfg: SiteSessionConfig) -> None:
+    def _install_page_resource_filter(self, context: Any, cfg: SiteSessionConfig) -> dict[str, str]:
         blocked_types = self._blocked_resource_types(cfg)
-        if not blocked_types:
-            return
+        state = {"skipped_reason": ""}
 
         def _handle_route(route: Any) -> None:
             try:
                 request = route.request
                 resource_type = str(getattr(request, "resource_type", "") or "").strip().lower()
+                if resource_type == "document":
+                    response = route.fetch(max_redirects=1, timeout=float(cfg.browser_timeout_ms))
+                    route.fulfill(response=response)
+                    return
                 if resource_type in blocked_types:
                     route.abort()
                     return
-            except Exception:
-                pass
-            route.continue_()
+                route.continue_()
+                return
+            except Exception as exc:
+                msg = str(exc or "").strip()
+                if "redirect" in msg.lower():
+                    state["skipped_reason"] = "SKIPPED REDIRECT LIMIT"
+                    try:
+                        route.abort(error_code="blockedbyclient")
+                    except Exception:
+                        pass
+                    return
+                try:
+                    route.continue_()
+                except Exception:
+                    pass
+                return
 
         context.route("**/*", _handle_route)
+        return state
 
-    def _new_page(self, session: BrowserSession, cfg: SiteSessionConfig) -> tuple[Any, Any]:
+    def _new_page(self, session: BrowserSession, cfg: SiteSessionConfig) -> tuple[Any, Any, dict[str, str]]:
         browser_runtime = self._checkout_browser_runtime(cfg, session.tunnel)
         context_kwargs: dict[str, Any] = {
             "user_agent": session.profile.user_agent,
@@ -1330,7 +1355,7 @@ class BrowserSessionRouter:
             context_kwargs["storage_state"] = session.storage_state
         context = browser_runtime.browser.new_context(**context_kwargs)
         context.add_init_script(self._profile_script(session.profile))
-        self._install_page_resource_filter(context, cfg)
+        route_state = self._install_page_resource_filter(context, cfg)
         page = context.new_page()
         cdp = context.new_cdp_session(page)
         cdp.send(
@@ -1342,7 +1367,7 @@ class BrowserSessionRouter:
                 "userAgentMetadata": session.profile.user_agent_metadata,
             },
         )
-        return context, page
+        return context, page, route_state
 
     @staticmethod
     def _close_page_context(page: Any, context: Any) -> None:
@@ -1607,9 +1632,10 @@ class BrowserSessionRouter:
     ) -> FetchResult:
         context = None
         page = None
+        route_state: dict[str, str] | None = None
         try:
-            context, page = self._new_page(session, cfg)
-            result = self._fetch_once(session, page, cfg, url, kind, task_id, cb_id, referer)
+            context, page, route_state = self._new_page(session, cfg)
+            result = self._fetch_once(session, page, cfg, url, kind, task_id, cb_id, referer, route_state=route_state)
             if result.status == 200 and not self._looks_blocked(result.status, result.title, result.html):
                 self._capture_browser_state(session, page)
             return result
@@ -1635,6 +1661,7 @@ class BrowserSessionRouter:
         task_id: int,
         cb_id: int,
         referer: str = "",
+        route_state: dict[str, str] | None = None,
     ) -> FetchResult:
         session.current_url = url
         cookies_before = []
@@ -1650,12 +1677,29 @@ class BrowserSessionRouter:
             tunnel=session.tunnel,
             url=url,
         )
-        response = page.goto(
-            url,
-            referer=referer or None,
-            wait_until="domcontentloaded",
-            timeout=cfg.browser_timeout_ms,
-        )
+        try:
+            response = page.goto(
+                url,
+                referer=referer or None,
+                wait_until="domcontentloaded",
+                timeout=cfg.browser_timeout_ms,
+            )
+        except PlaywrightError as exc:
+            nav_elapsed_ms = int((time.time() - nav_started) * 1000)
+            skipped_reason = str((route_state or {}).get("skipped_reason") or "").strip()
+            if skipped_reason or "ERR_TOO_MANY_REDIRECTS" in str(exc or ""):
+                final_url = str(getattr(page, "url", "") or url)
+                self._log_fetch_done(
+                    log_file=HTTP_CHROMIUM_LOG_FILE,
+                    site=cfg.site,
+                    has_cookies=bool(cookies_before),
+                    tunnel=session.tunnel,
+                    final_url=final_url or url,
+                    status=0,
+                    ms=nav_elapsed_ms,
+                )
+                raise SkippedFetchError(skipped_reason or "SKIPPED REDIRECT LIMIT") from exc
+            raise
         final_url = str(page.url)
         status = int(response.status) if response else 0
         nav_elapsed_ms = int((time.time() - nav_started) * 1000)
@@ -1708,6 +1752,7 @@ class BrowserSessionRouter:
         method_s = str(method or "GET").upper()
         started = time.time()
         had_cookies = False
+        payload: dict[str, Any] | None = None
         with session.http_mu:
             cookies_before = cookie_snapshot(session.http_session)
             had_cookies = bool(cookies_before)
@@ -1718,18 +1763,33 @@ class BrowserSessionRouter:
             tunnel=session.tunnel,
             url=url,
         )
-        with session.http_mu:
-            payload = fetch_html(
-                session.http_session,
-                session.profile,
-                url,
-                referer=referer or "",
-                timeout_ms=cfg.browser_timeout_ms,
-                method=method_s,
-                form=dict(form or {}) or None,
-                extra_headers=dict(extra_headers or {}) or None,
+        try:
+            with session.http_mu:
+                try:
+                    payload = fetch_html(
+                        session.http_session,
+                        session.profile,
+                        url,
+                        referer=referer or "",
+                        timeout_ms=cfg.browser_timeout_ms,
+                        method=method_s,
+                        form=dict(form or {}) or None,
+                        extra_headers=dict(extra_headers or {}) or None,
+                    )
+                finally:
+                    session.storage_state = export_storage_state(session.http_session, session.storage_state)
+        except SkippedFetchError:
+            elapsed_ms = int((time.time() - started) * 1000)
+            self._log_fetch_done(
+                log_file=HTTP_LIGHT_LOG_FILE,
+                site=cfg.site,
+                has_cookies=had_cookies,
+                tunnel=session.tunnel,
+                final_url=url,
+                status=0,
+                ms=elapsed_ms,
             )
-            session.storage_state = export_storage_state(session.http_session, session.storage_state)
+            raise
         final_url = str(payload.get("final_url") or url)
         status = int(payload.get("status") or 0)
         html = str(payload.get("html") or "")
@@ -1781,9 +1841,10 @@ class BrowserSessionRouter:
         session.current_url = url
         context = None
         page = None
+        route_state: dict[str, str] | None = None
         try:
-            context, page = self._new_page(session, cfg)
-            warm_ref = self._fetch_once(session, page, cfg, referer, "referer", task_id, cb_id, "")
+            context, page, route_state = self._new_page(session, cfg)
+            warm_ref = self._fetch_once(session, page, cfg, referer, "referer", task_id, cb_id, "", route_state=route_state)
             if warm_ref.status != 200 or self._looks_blocked(warm_ref.status, warm_ref.title, warm_ref.html):
                 return None
             self._humanize(page, session.profile)
@@ -1852,9 +1913,10 @@ class BrowserSessionRouter:
     def _warm_session(self, session: BrowserSession, cfg: SiteSessionConfig, task_id: int, cb_id: int) -> FetchResult:
         context = None
         page = None
+        route_state: dict[str, str] | None = None
         try:
-            context, page = self._new_page(session, cfg)
-            warm = self._fetch_once(session, page, cfg, cfg.home_url, "home", task_id, cb_id, "")
+            context, page, route_state = self._new_page(session, cfg)
+            warm = self._fetch_once(session, page, cfg, cfg.home_url, "home", task_id, cb_id, "", route_state=route_state)
             if warm.status != 200 or self._looks_blocked(warm.status, warm.title, warm.html):
                 return warm
             session.warmed = True
@@ -2094,6 +2156,8 @@ class BrowserSessionRouter:
                     extra_headers=extra_headers,
                 )
                 return result
+            except SkippedFetchError:
+                raise
             except RuntimeError as exc:
                 last_error = exc
                 drop_runtime = True

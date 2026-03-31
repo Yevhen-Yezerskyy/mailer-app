@@ -16,6 +16,7 @@ from urllib.parse import urljoin
 from engine.common.db import fetch_one, get_connection
 from engine.common.logs import log
 from engine.core_crawler.browser.fetcher import build_text_response, close_current_fetch_router, fetch_html, to_text_response
+from engine.core_crawler.browser.http_fetch import SkippedFetchError
 from engine.core_crawler.browser.session_config import SITE_CONFIGS
 from engine.core_crawler.spiders.spider_gs_card import parse_gs_card
 from engine.core_crawler.spiders.spider_helpers import clean_text
@@ -403,6 +404,9 @@ class GelbeSeitenCBSpider:
         else:
             try:
                 self._run_fetch()
+            except SkippedFetchError as exc:
+                self._final_reason = str(exc or "").strip() or "SKIPPED"
+                self.failed_urls.append({"kind": "run", "url": self._start_url or "", "reason": self._final_reason})
             except Exception as exc:
                 self._final_reason = f"FETCH EXCEPTION {type(exc).__name__}: {exc}"
                 self.failed_urls.append({"kind": "run", "url": self._start_url or "", "reason": self._final_reason})
@@ -440,7 +444,7 @@ class GelbeSeitenCBSpider:
         reason_s = str(reason or "").strip()
         if not reason_s:
             return False
-        if reason_s in {"OK", "NO DETAIL ITEMS", "SPELL SUGGESTION"}:
+        if reason_s in {"OK", "NO DETAIL ITEMS", "SPELL SUGGESTION"} or reason_s.startswith("SKIPPED"):
             return True
         return False
 

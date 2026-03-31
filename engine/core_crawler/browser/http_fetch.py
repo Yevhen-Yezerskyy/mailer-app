@@ -5,11 +5,15 @@
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 from curl_cffi import requests as curl_requests
 
 from engine.core_crawler.browser.session_config import BrowserProfile
+
+
+class SkippedFetchError(RuntimeError):
+    pass
 
 
 def _cookie_list_from_storage_state(storage_state: dict[str, Any] | None) -> list[dict[str, Any]]:
@@ -181,6 +185,30 @@ def cookie_snapshot(session: Any) -> list[dict[str, Any]]:
     return export_storage_state(session, {}).get("cookies") or []
 
 
+def _redirect_location(response: Any) -> str:
+    headers = getattr(response, "headers", {}) or {}
+    location = ""
+    try:
+        location = str(headers.get("location") or headers.get("Location") or "").strip()
+    except Exception:
+        location = ""
+    return location
+
+
+def _follow_redirect_request(
+    method: str,
+    form: dict[str, Any] | None,
+    status_code: int,
+) -> tuple[str, dict[str, Any] | None]:
+    method_s = str(method or "GET").upper()
+    code = int(status_code or 0)
+    if code == 303:
+        return "GET", None
+    if code in {301, 302} and method_s == "POST":
+        return "GET", None
+    return method_s, dict(form or {}) or None
+
+
 def fetch_html(
     session: Any,
     profile: BrowserProfile,
@@ -192,28 +220,48 @@ def fetch_html(
     form: dict[str, Any] | None = None,
     extra_headers: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    headers = build_http_headers(profile, url, referer)
-    if str(method or "GET").upper() == "POST" and referer:
-        referer_parts = urlsplit(referer)
-        if referer_parts.scheme and referer_parts.netloc:
-            headers["Origin"] = f"{referer_parts.scheme}://{referer_parts.netloc}"
-    for key, value in dict(extra_headers or {}).items():
-        k = str(key or "").strip()
-        if not k:
-            continue
-        headers[k] = str(value or "")
-    response = session.request(
-        str(method or "GET").upper(),
-        url,
-        headers=headers,
-        data=dict(form or {}) or None,
-        timeout=max(1.0, float(timeout_ms) / 1000.0),
-        allow_redirects=True,
-        stream=False,
-        impersonate=_http_impersonate(profile),
-    )
+    current_url = str(url or "")
+    current_referer = str(referer or "")
+    current_method = str(method or "GET").upper()
+    current_form = dict(form or {}) or None
+    redirect_count = 0
+    timeout_sec = max(1.0, float(timeout_ms) / 1000.0)
+
+    while True:
+        headers = build_http_headers(profile, current_url, current_referer)
+        if current_method == "POST" and current_referer:
+            referer_parts = urlsplit(current_referer)
+            if referer_parts.scheme and referer_parts.netloc:
+                headers["Origin"] = f"{referer_parts.scheme}://{referer_parts.netloc}"
+        for key, value in dict(extra_headers or {}).items():
+            k = str(key or "").strip()
+            if not k:
+                continue
+            headers[k] = str(value or "")
+        response = session.request(
+            current_method,
+            current_url,
+            headers=headers,
+            data=current_form,
+            timeout=timeout_sec,
+            allow_redirects=False,
+            stream=False,
+            impersonate=_http_impersonate(profile),
+        )
+        status_code = int(response.status_code or 0)
+        location = _redirect_location(response)
+        if status_code not in {301, 302, 303, 307, 308} or not location:
+            break
+        redirect_count += 1
+        if redirect_count > 1:
+            raise SkippedFetchError("SKIPPED REDIRECT LIMIT")
+        next_url = urljoin(current_url, location)
+        current_referer = current_url
+        current_method, current_form = _follow_redirect_request(current_method, current_form, status_code)
+        current_url = str(next_url or current_url)
+
     return {
-        "status": int(response.status_code),
+        "status": status_code,
         "url": str(url),
         "final_url": str(response.url),
         "html": str(response.text or ""),
