@@ -1484,7 +1484,7 @@ class BrowserSessionRouter:
         browser_mode = "index_browser"
         if int(requests_total_before_fetch) < 2:
             return browser_mode
-        if random.random() < 0.9:
+        if random.random() < 0.97:
             return "http_only"
         return browser_mode
 
