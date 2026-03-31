@@ -9,7 +9,9 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from engine.common.cache.client import CLIENT, _redis_call
 from engine.core_crawler.browser.broker_server import current_site_route_plan
@@ -17,6 +19,7 @@ from engine.core_crawler.fetch_cb import pending_items_exist
 from engine.core_crawler.tunnels_11880 import ensure_tunnel_watchdog, stop_tunnel_watchdog
 
 TICK_SEC = 1.0
+_TZ_BERLIN = ZoneInfo("Europe/Berlin")
 CATALOGS = ("11880", "gs")
 CATALOG_MAX_WORKERS = {
     "11880": 4,
@@ -32,6 +35,14 @@ CATALOG_ROUTES_PER_WORKER = {
 class WorkerProcess:
     process: subprocess.Popen[Any]
     started_at: float
+
+
+def _ts() -> str:
+    return datetime.now(_TZ_BERLIN).isoformat(timespec="seconds")
+
+
+def _log(message: str) -> None:
+    print(f"{_ts()}\t{message}", flush=True)
 
 
 def _scan_redis_keys(pattern: str) -> list[str]:
@@ -84,10 +95,9 @@ def _collect_finished_workers(catalog: str, active: list[WorkerProcess]) -> list
         if worker.process.poll() is None:
             still_running.append(worker)
             continue
-        print(
+        _log(
             f"[crawler_processor] worker_done catalog={catalog} pid={worker.process.pid} "
-            f"rc={worker.process.returncode}",
-            flush=True,
+            f"rc={worker.process.returncode}"
         )
     return still_running
 
@@ -99,7 +109,7 @@ def _launch_worker(catalog: str) -> WorkerProcess:
         start_new_session=True,
         close_fds=True,
     )
-    print(f"[crawler_processor] worker_start catalog={catalog} pid={proc.pid}", flush=True)
+    _log(f"[crawler_processor] worker_start catalog={catalog} pid={proc.pid}")
     return WorkerProcess(process=proc, started_at=time.time())
 
 
@@ -153,7 +163,7 @@ def main() -> None:
 
     def _handle_signal(signum, _frame) -> None:
         stop_requested["value"] = True
-        print(f"[crawler_processor] signal={int(signum)} stop_requested=yes", flush=True)
+        _log(f"[crawler_processor] signal={int(signum)} stop_requested=yes")
 
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
@@ -163,7 +173,7 @@ def main() -> None:
     try:
         cleared = _clear_stale_route_worker_locks()
         if cleared > 0:
-            print(f"[crawler_processor] cleared_stale_route_locks count={cleared}", flush=True)
+            _log(f"[crawler_processor] cleared_stale_route_locks count={cleared}")
         ensure_tunnel_watchdog()
         while not stop_requested["value"]:
             targets = _target_parallelism_by_catalog()
@@ -171,7 +181,7 @@ def main() -> None:
                 active_by_catalog[catalog] = _collect_finished_workers(catalog, active_by_catalog[catalog])
                 target = int(targets.get(catalog) or 0)
                 if target != last_targets[catalog]:
-                    print(f"[crawler_processor] target_parallel catalog={catalog} value={target}", flush=True)
+                    _log(f"[crawler_processor] target_parallel catalog={catalog} value={target}")
                     last_targets[catalog] = target
                 active_by_catalog[catalog] = _trim_workers(active_by_catalog[catalog], target)
                 if len(active_by_catalog[catalog]) >= target:

@@ -480,13 +480,13 @@ def _compute_site_route_plan() -> dict[str, list[str]]:
 
     live_gs = [name for name in slots_gs if _slot_is_live(name, statuses)]
     available_gs = [name for name in live_gs if name not in quarantine_gs and name not in used_11880]
-    rest_name = _scheduled_rest_slot("gs", available_gs, bool(quarantine_gs))
-    active_gs = [name for name in available_gs if not rest_name or name != rest_name]
-    gs_target = _gs_target_active_count(len(active_gs))
-    if gs_target > 0:
-        active_gs = active_gs[:gs_target]
-    else:
+    gs_target = _gs_target_active_count(len(available_gs))
+    if gs_target <= 0:
         active_gs = []
+    elif len(available_gs) <= gs_target:
+        active_gs = list(available_gs)
+    else:
+        active_gs = random.sample(list(available_gs), gs_target)
 
     return {
         "11880": list(active_11880),

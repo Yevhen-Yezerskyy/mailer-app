@@ -7,12 +7,14 @@ SUMMARY: Single file logger writing only into the shared absolute project log ro
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 
 LOG_ROOT = Path("/home/eee/mailer-app/logs")
+_TZ_BERLIN = ZoneInfo("Europe/Berlin")
 
 
 def _safe_part(value: str) -> str:
@@ -33,7 +35,7 @@ def _build_path(root: Path, log_file: str, folder: str | None = None) -> Path:
 
 
 def _line(message: Any) -> str:
-    ts = datetime.now(timezone.utc).isoformat()
+    ts = datetime.now(_TZ_BERLIN).isoformat()
     return f"{ts}\t{message}\n"
 
 

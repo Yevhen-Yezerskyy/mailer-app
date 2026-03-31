@@ -14,6 +14,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from multiprocessing import Process, Queue
 from typing import Any, Callable, Dict, Optional
+from zoneinfo import ZoneInfo
+
+
+_TZ_BERLIN = ZoneInfo("Europe/Berlin")
 
 
 def _now_ts() -> float:
@@ -23,7 +27,7 @@ def _now_ts() -> float:
 def _iso(ts: Optional[float] = None) -> str:
     if ts is None:
         ts = _now_ts()
-    return datetime.utcfromtimestamp(ts).isoformat(timespec="seconds") + "Z"
+    return datetime.fromtimestamp(ts, tz=_TZ_BERLIN).isoformat(timespec="seconds")
 
 
 def _safe_json(obj: Any, max_len: int = 4000) -> str:
