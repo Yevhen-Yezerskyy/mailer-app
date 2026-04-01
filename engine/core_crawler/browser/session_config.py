@@ -63,8 +63,8 @@ ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC = 50 * 60
 ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC = 60 * 60
 ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT = 300
 ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO = 0.50
-ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX = 3
-GS_ACTIVE_TUNNEL_MAX = 3
+ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX = 2
+GS_ACTIVE_TUNNEL_MAX = 2
 ONE_ONE_EIGHTY_MISMATCH_VISIT_MAX = 2
 ONE_ONE_EIGHTY_MISMATCH_VISIT_PROBABILITY = 0.35
 
@@ -226,7 +226,7 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
         ),
         slot_quarantine_sec=26 * 60 * 60,
         sessions_per_egress=1,
-        concurrent_pages_per_session=1,
+        concurrent_pages_per_session=2,
         max_requests_per_session=500,
         max_session_age_sec=1200,
         runtime_recycle_min_sec=300,
@@ -267,8 +267,8 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
         max_session_age_sec=1200,
         runtime_recycle_min_sec=300,
         runtime_recycle_max_sec=600,
-        pause_min_sec=1.0,
-        pause_max_sec=2.0,
+        pause_min_sec=1.5,
+        pause_max_sec=3.0,
         browser_timeout_ms=90_000,
     ),
 }
