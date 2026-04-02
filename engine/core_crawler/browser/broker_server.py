@@ -24,6 +24,8 @@ from uuid import uuid4
 from engine.common.cache.client import CLIENT
 from engine.core_crawler.browser.session_config import (
     BROKER_QUEUE_MAX,
+    CRAWLER_SLOT_HOLD_MAX_SEC,
+    CRAWLER_SLOT_HOLD_MIN_SEC,
     GS_ACTIVE_TUNNEL_MAX,
     ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX,
     ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO,
@@ -44,8 +46,6 @@ from engine.core_crawler.tunnels_11880 import (
 
 BROKER_SOCKET_PATH = "/tmp/core_crawler_browser.sock"
 STATE_TTL_SEC = 7 * 24 * 60 * 60
-SCHEDULE_ROTATE_MIN_SEC = 600.0
-SCHEDULE_ROTATE_MAX_SEC = 1200.0
 ROUTE_SITES = ("11880", "gs")
 ROUTE_STATE_LOCK_TTL_SEC = 3.0
 ROUTE_STATE_WAIT_SEC = 2.0
@@ -421,23 +421,28 @@ def _is_11880_main_request(kind: str) -> bool:
     return kind_name not in {"home", "referer"}
 
 
-def _scheduled_rest_slot(site: str, active_names: list[str], has_quarantine: bool) -> str:
-    if has_quarantine or len(active_names) <= 1:
-        return ""
+def _activate_fixed_slots(site: str, available: list[str], target_count: int) -> list[str]:
+    if target_count <= 0 or not available:
+        return []
+    if len(available) <= target_count:
+        return list(available)
     now = time.time()
     state = _cache_get_obj(_schedule_key(site)) or {}
-    excluded_name = str(state.get("name") or "")
+    active_names = [str(name) for name in list(state.get("names") or []) if str(name or "").strip()]
     until = float(state.get("until") or 0.0)
-    is_current = excluded_name in active_names and until > now and until <= (now + SCHEDULE_ROTATE_MAX_SEC + 5.0)
-    if is_current:
-        return excluded_name
+    if until > now:
+        current = [name for name in active_names if name in available]
+        if len(current) >= target_count:
+            return current[:target_count]
     rr_state = _cache_get_obj(_rr_key(site)) or {"pos": 0}
     rr_pos = int(rr_state.get("pos") or 0)
-    excluded_name = active_names[rr_pos % len(active_names)]
-    _cache_set_obj(_rr_key(site), {"pos": rr_pos + 1})
-    until = now + random.uniform(SCHEDULE_ROTATE_MIN_SEC, SCHEDULE_ROTATE_MAX_SEC)
-    _cache_set_obj(_schedule_key(site), {"name": excluded_name, "until": until})
-    return excluded_name
+    start_idx = rr_pos % len(available)
+    rotated = list(available[start_idx:] + available[:start_idx])
+    selected = rotated[:target_count]
+    _cache_set_obj(_rr_key(site), {"pos": rr_pos + max(1, target_count)})
+    until = now + random.uniform(CRAWLER_SLOT_HOLD_MIN_SEC, CRAWLER_SLOT_HOLD_MAX_SEC)
+    _cache_set_obj(_schedule_key(site), {"names": list(selected), "until": until})
+    return list(selected)
 
 
 def _load_cached_route_plan() -> dict[str, list[str]] | None:
@@ -481,12 +486,7 @@ def _compute_site_route_plan() -> dict[str, list[str]]:
     live_gs = [name for name in slots_gs if _slot_is_live(name, statuses)]
     available_gs = [name for name in live_gs if name not in quarantine_gs and name not in used_11880]
     gs_target = _gs_target_active_count(len(available_gs))
-    if gs_target <= 0:
-        active_gs = []
-    elif len(available_gs) <= gs_target:
-        active_gs = list(available_gs)
-    else:
-        active_gs = random.sample(list(available_gs), gs_target)
+    active_gs = _activate_fixed_slots("gs", available_gs, gs_target)
 
     return {
         "11880": list(active_11880),
