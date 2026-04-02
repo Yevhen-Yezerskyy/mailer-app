@@ -157,8 +157,7 @@ class GelbeSeitenCBSpider:
         if first_exc is not None:
             raise first_exc
 
-    @staticmethod
-    def _parse_index_cards(response) -> List[Dict[str, str]]:
+    def _parse_index_cards(self, response) -> List[Dict[str, str]]:
         parsed_index_cards: List[Dict[str, str]] = []
         seen_index_urls: set[str] = set()
         for card_sel in response.css("article.mod.mod-Treffer"):
