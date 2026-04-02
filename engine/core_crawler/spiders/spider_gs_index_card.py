@@ -12,7 +12,7 @@ from engine.core_crawler.spiders.spider_helpers import clean_tel, clean_text, cl
 PLZ_RE = re.compile(r"\b(\d{5})\b")
 
 
-def parse_gs_index_card(card_sel) -> dict[str, str] | None:
+def parse_gs_index_card(card_sel, expected_plz: str = "") -> dict[str, str] | None:
     url = clean_url(card_sel.css('a[href*="/gsbiz/"]::attr(href)').get())
     if not url:
         return None
@@ -32,6 +32,9 @@ def parse_gs_index_card(card_sel) -> dict[str, str] | None:
     if mm:
         plz = mm.group(1)
         city = clean_text(ort.replace(plz, "", 1)) or ""
+    expected_plz = clean_text(expected_plz) or ""
+    if expected_plz and plz != expected_plz:
+        return None
 
     address = ""
     if street and ort:

@@ -201,7 +201,11 @@ class OneOneEightZeroCBSpider:
 
             self._list_seen += 1
             search_response = to_text_response(search_result)
-            parsed_index_cards = parse_11880_index_cards(search_response, self.branch_name)
+            parsed_index_cards = parse_11880_index_cards(
+                search_response,
+                self.branch_name,
+                expected_plz=self.plz,
+            )
             if not parsed_index_cards:
                 self._final_reason = "NO DETAIL ITEMS"
                 return

@@ -1177,7 +1177,7 @@ def contact_modal_view(request):
               ON cp.id = cc.cb_id
             WHERE cc.aggr_contact_id = %s
             ORDER BY cc.cb_id DESC
-            LIMIT 150
+            LIMIT 1
             """,
             [int(row[0])],
         )

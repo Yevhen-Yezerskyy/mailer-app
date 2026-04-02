@@ -21,7 +21,10 @@
             {% for row in contacts_collect_rows %}
               <tr class="YY-TB_TR align-top">
                 <td class="YY-TB_TD">
-                  <strong>{{ row.company_name|default:"-" }}</strong><br>
+                  <a href="#"
+                     data-yy-modal="url={{ row.contact_modal_url|escape }}">
+                    <strong>{{ row.company_name|default:"-" }}</strong>
+                  </a><br>
                   {{ row.address }}
                 </td>
                 <td class="YY-TB_TD">

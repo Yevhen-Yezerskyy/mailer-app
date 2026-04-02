@@ -162,7 +162,7 @@ class GelbeSeitenCBSpider:
         parsed_index_cards: List[Dict[str, str]] = []
         seen_index_urls: set[str] = set()
         for card_sel in response.css("article.mod.mod-Treffer"):
-            card = parse_gs_index_card(card_sel)
+            card = parse_gs_index_card(card_sel, expected_plz=self.plz)
             if not card:
                 continue
             url = str(card.get("url") or "")

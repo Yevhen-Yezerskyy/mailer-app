@@ -789,11 +789,12 @@
     });
   }
 
-  function refreshContactsSectionPanel() {
+  function refreshContactsSectionPanel(urlOverride) {
     const wrapper = contactsSectionWrapper();
     if (!wrapper || contactsSectionPollInFlight) return;
 
-    const url = String(wrapper.getAttribute("data-contacts-section-url") || "").trim();
+    const defaultUrl = String(wrapper.getAttribute("data-contacts-section-url") || "").trim();
+    const url = String(urlOverride || "").trim() || defaultUrl;
     if (!url) return;
 
     contactsSectionPollInFlight = true;
@@ -821,6 +822,23 @@
     });
   }
 
+  function refreshContactsAllSectionPanel(pageValue, queryValue) {
+    const page = String(pageValue || "").trim();
+    if (!/^\d+$/.test(page)) return;
+    showContactsSection("all");
+    const wrapper = contactsSectionWrapper("all");
+    if (!wrapper) return;
+    const baseUrl = String(wrapper.getAttribute("data-contacts-section-url") || "").trim();
+    if (!baseUrl) return;
+    const query = String(queryValue || "").trim();
+    const args = ["page=" + encodeURIComponent(page)];
+    if (query) {
+      args.push("q=" + encodeURIComponent(query));
+    }
+    const separator = baseUrl.indexOf("?") === -1 ? "?" : "&";
+    refreshContactsSectionPanel(baseUrl + separator + args.join("&"));
+  }
+
   function scrollBranchesToLastGreen() {
     const box = document.querySelector("[data-branches-scroll-box='1']");
     if (!box) return;
@@ -843,6 +861,32 @@
   }
 
   document.addEventListener("click", function (event) {
+    const allPageLink = event.target.closest("[data-contacts-all-page]");
+    if (allPageLink) {
+      event.preventDefault();
+      const page = String(allPageLink.getAttribute("data-contacts-all-page") || "").trim();
+      const query = String(allPageLink.getAttribute("data-contacts-all-q") || "").trim();
+      refreshContactsAllSectionPanel(page, query);
+      return;
+    }
+
+    const allSearchButton = event.target.closest("[data-contacts-all-search-button='1']");
+    if (allSearchButton) {
+      event.preventDefault();
+      const searchWrap = allSearchButton.closest("[data-contacts-all-search-wrap='1']");
+      const input = searchWrap ? searchWrap.querySelector("[data-contacts-all-search-input='1']") : null;
+      const query = String(input && input.value ? input.value : "").trim();
+      refreshContactsAllSectionPanel("1", query);
+      return;
+    }
+
+    const allSearchClear = event.target.closest("[data-contacts-all-search-clear='1']");
+    if (allSearchClear) {
+      event.preventDefault();
+      refreshContactsAllSectionPanel("1", "");
+      return;
+    }
+
     const sectionButton = event.target.closest("[data-contacts-section-button]");
     if (sectionButton) {
       const sectionKey = String(sectionButton.getAttribute("data-contacts-section-button") || "").trim();
@@ -896,6 +940,15 @@
         deleteInput.value = "";
       }
       syncBranchDeleteState();
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter") return;
+    const input = event.target.closest("[data-contacts-all-search-input='1']");
+    if (!input) return;
+    event.preventDefault();
+    const query = String(input.value || "").trim();
+    refreshContactsAllSectionPanel("1", query);
   });
 
   scrollBranchesToLastGreen();

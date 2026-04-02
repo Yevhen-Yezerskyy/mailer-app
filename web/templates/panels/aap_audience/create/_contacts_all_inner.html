@@ -1,6 +1,222 @@
 {% load i18n %}
 <!-- FILE: web/templates/panels/aap_audience/create/_contacts_all_inner.html -->
-<!-- DATE: 2026-04-01 -->
-<!-- PURPOSE: Placeholder inner section for all contacts. -->
+<!-- DATE: 2026-04-02 -->
+<!-- PURPOSE: All contacts inner section content with pagination. -->
 
-<div class="YY-STATUS_GRAY w-full">{% trans "Все контакты - раздел пока в разработке." %}</div>
+<table class="YY-MAIN_TABLE !mt-0 !mb-3">
+  <tr>
+    <td class="YY-MAIN_TOP_TD">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-MAIN_TEXT flex items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <span>{% trans "Страница:" %}</span>
+            {% if contacts_all_page_items %}
+              {% if contacts_all_has_prev %}
+                <a href="#"
+                   class="YY-LINK inline-flex items-center"
+                   data-contacts-all-page="{{ contacts_all_prev_page }}"
+                   data-contacts-all-q="{{ contacts_all_query|escape }}">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[21px] shrink-0 relative top-[0px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+              {% for item in contacts_all_page_items %}
+                {% if item.kind == "gap" %}
+                  <span>...</span>
+                {% elif item.is_current %}
+                  <strong class="font-semibold text-[#016b09]">{{ item.number }}</strong>
+                {% else %}
+                  <a href="#"
+                     class="YY-LINK"
+                     data-contacts-all-page="{{ item.number }}"
+                     data-contacts-all-q="{{ contacts_all_query|escape }}">{{ item.number }}</a>
+                {% endif %}
+              {% endfor %}
+              {% if contacts_all_has_next %}
+                <a href="#"
+                   class="YY-LINK inline-flex items-center"
+                   data-contacts-all-page="{{ contacts_all_next_page }}"
+                   data-contacts-all-q="{{ contacts_all_query|escape }}">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[21px] shrink-0 rotate-180 relative top-[2px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+            {% else %}
+              <strong class="font-semibold text-[#016b09]">{{ contacts_all_page }}</strong>
+            {% endif %}
+          </div>
+          <div class="flex items-center gap-2 ml-auto" data-contacts-all-search-wrap="1">
+            <input type="text"
+                   class="YY-INPUT !mb-0 !w-[340px]"
+                   placeholder="{% trans 'Поиск по компании или email' %}"
+                   value="{{ contacts_all_query }}"
+                   data-contacts-all-search-input="1">
+            <button type="button"
+                    class="YY-BUTTON_MAIN !mb-0 !w-fit"
+                    data-contacts-all-search-button="1">
+              {% trans "Искать" %}
+            </button>
+            {% if contacts_all_query %}
+              <button type="button"
+                      class="YY-BUTTON_MAIN !mb-0 !w-fit"
+                      data-contacts-all-search-clear="1">
+                {% trans "Очистить" %}
+              </button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE !mt-0">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD !pb-0">
+      <div class="YY-MAIN_BOTTOM_DIV overflow-x-auto">
+        <table class="w-full text-left">
+          <thead>
+            <tr class="YY-TH_TR">
+              <th class="YY-TH_TH w-[40%]">{% trans "Контакт" %}</th>
+              <th class="YY-TH_TH w-[40%]">{% trans "Категория - Город" %}</th>
+              <th class="YY-TH_TH text-center whitespace-nowrap">{% trans "Pair-R" %}</th>
+              <th class="YY-TH_TH whitespace-nowrap">{% trans "Добавлено" %}</th>
+              <th class="YY-TH_TH">&nbsp;</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in contacts_all_rows %}
+              <tr class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">
+                  <a href="#"
+                     data-yy-modal="url={{ row.contact_modal_url|escape }}">
+                    <strong>{{ row.company_name|default:"-" }}</strong>
+                  </a><br>
+                  {{ row.address }}
+                </td>
+                <td class="YY-TB_TD">
+                  {{ row.branch_name|default:"-" }}<br>
+                  {{ row.city_title }}
+                </td>
+                <td class="YY-TB_TD text-center">{{ row.pair_rate|default_if_none:"-" }}</td>
+                <td class="YY-TB_TD whitespace-nowrap">
+                    {{ row.created_at|date:"d.m.Y" }}<br>
+                    {{ row.created_at|date:"H:i:s" }}
+                </td>
+                <td class="YY-TB_TD">
+                  <a href="#"
+                     class="YY-LINK flex items-center gap-1 whitespace-nowrap"
+                     data-yy-modal="url={{ row.contact_modal_url|escape }}">
+                    <span>{% trans "Подробнее" %}</span>
+                    <svg class="size-4 shrink-0" aria-hidden="true">
+                      <use href="#icon-arrow-circle"></use>
+                    </svg>
+                  </a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD" colspan="5">{% trans "Здесь пока нет данных" %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE !mt-3">
+  <tr>
+    <td class="YY-MAIN_TOP_TD">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-MAIN_TEXT flex items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <span>{% trans "Страница:" %}</span>
+            {% if contacts_all_page_items %}
+              {% if contacts_all_has_prev %}
+                <a href="#"
+                   class="YY-LINK inline-flex items-center"
+                   data-contacts-all-page="{{ contacts_all_prev_page }}"
+                   data-contacts-all-q="{{ contacts_all_query|escape }}">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[21px] shrink-0 relative top-[0px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+              {% for item in contacts_all_page_items %}
+                {% if item.kind == "gap" %}
+                  <span>...</span>
+                {% elif item.is_current %}
+                  <strong class="font-semibold text-[#016b09]">{{ item.number }}</strong>
+                {% else %}
+                  <a href="#"
+                     class="YY-LINK"
+                     data-contacts-all-page="{{ item.number }}"
+                     data-contacts-all-q="{{ contacts_all_query|escape }}">{{ item.number }}</a>
+                {% endif %}
+              {% endfor %}
+              {% if contacts_all_has_next %}
+                <a href="#"
+                   class="YY-LINK inline-flex items-center"
+                   data-contacts-all-page="{{ contacts_all_next_page }}"
+                   data-contacts-all-q="{{ contacts_all_query|escape }}">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[21px] shrink-0 rotate-180 relative top-[2px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+            {% else %}
+              <strong class="font-semibold text-[#016b09]">{{ contacts_all_page }}</strong>
+            {% endif %}
+          </div>
+          <div class="flex items-center gap-2 ml-auto" data-contacts-all-search-wrap="1">
+            <input type="text"
+                   class="YY-INPUT !mb-0 !w-[340px]"
+                   placeholder="{% trans 'Поиск по компании или email' %}"
+                   value="{{ contacts_all_query }}"
+                   data-contacts-all-search-input="1">
+            <button type="button"
+                    class="YY-BUTTON_MAIN !mb-0 !w-fit"
+                    data-contacts-all-search-button="1">
+              {% trans "Искать" %}
+            </button>
+            {% if contacts_all_query %}
+              <button type="button"
+                      class="YY-BUTTON_MAIN !mb-0 !w-fit"
+                      data-contacts-all-search-clear="1">
+                {% trans "Очистить" %}
+              </button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>

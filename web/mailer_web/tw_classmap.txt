@@ -45,8 +45,8 @@ YY-TEXT-BOLD: block mb-3 font-semibold
 YY-BLOCK: flex
 
 #MAIN GRID
-YY-CARD_WHITE: w-[100%] h-[100%] box-border px-4 py-4 rounded-md bg-[#FFFFFF] border border-[#71d0f4] text-[#006991]
-YY-CARD_BLUE: w-[100%] h-[100%] box-border px-4 py-4 rounded-md bg-[#f8fdff] border border-[#71d0f4] text-[#006991]
+YY-CARD_WHITE: w-[100%] h-[100%] box-border px-4 py-4 rounded-md bg-[#FFFFFF] border border-[#71d0f4] text-[#006991] text-sm
+YY-CARD_BLUE: w-[100%] h-[100%] box-border px-4 py-4 rounded-md bg-[#f8fdff] border border-[#71d0f4] text-[#006991] text-sm
 
 YY-MAIN_TABLE:     w-full max-w-[2000px] table-fixed border-collapse mt-10
 YY-MAIN_TABLE_TOP: w-full max-w-[2000px] table-fixed border-collapse

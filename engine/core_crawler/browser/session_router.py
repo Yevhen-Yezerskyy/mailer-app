@@ -39,7 +39,8 @@ from engine.core_crawler.browser.session_config import (
 )
 from engine.core_crawler.tunnels_11880 import list_tunnels, load_tunnel_statuses
 
-STATE_TTL_SEC = 7 * 24 * 60 * 60
+STATE_TTL_SEC = 30
+SESSION_STATE_IDLE_MAX_SEC = 3 * 60
 WAIT_TIMEOUT_SEC = 60.0
 RUNTIME_IDLE_REAP_SEC = 90.0
 SESSION_GATE_TTL_SEC = 5.0
@@ -717,17 +718,23 @@ class BrowserSessionRouter:
         return random.choice(BROWSER_PROFILES)
 
     def _load_session_state(self, cfg: SiteSessionConfig, slot_name: str, slot_idx: int) -> dict[str, Any] | None:
-        state = self._cache_get_obj(self._session_key(cfg.site, slot_name, slot_idx))
+        session_key = self._session_key(cfg.site, slot_name, slot_idx)
+        state = self._cache_get_obj(session_key)
         if not isinstance(state, dict):
             return None
         if not state:
             return None
+        last_used_at = float(state.get("last_used_at") or 0.0)
         created_at = float(state.get("created_at") or 0.0)
         requests_total = int(state.get("requests_total") or 0)
         if requests_total >= cfg.max_requests_per_session:
             return None
         if created_at and (time.time() - created_at) >= cfg.max_session_age_sec:
             return None
+        if last_used_at and (time.time() - last_used_at) >= SESSION_STATE_IDLE_MAX_SEC:
+            self._cache_set_obj(session_key, {}, ttl_sec=STATE_TTL_SEC)
+            return None
+        self._cache_set_obj(session_key, state, ttl_sec=STATE_TTL_SEC)
         return state
 
     def _new_session_state(

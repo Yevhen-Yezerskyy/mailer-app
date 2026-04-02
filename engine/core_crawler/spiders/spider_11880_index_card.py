@@ -33,7 +33,7 @@ def _iter_json_scripts(response) -> Iterable[Any]:
             continue
 
 
-def _build_index_card(item: Dict[str, Any], category_11880: str) -> Dict[str, str] | None:
+def _build_index_card(item: Dict[str, Any], category_11880: str, expected_plz: str = "") -> Dict[str, str] | None:
     url = clean_url(item.get("url"))
     name = clean_text(item.get("name"))
     if not url or not name:
@@ -43,6 +43,9 @@ def _build_index_card(item: Dict[str, Any], category_11880: str) -> Dict[str, st
     street = clean_text(address.get("streetAddress")) or ""
     plz = clean_text(address.get("postalCode")) or ""
     city = clean_text(address.get("addressLocality")) or ""
+    expected_plz = clean_text(expected_plz) or ""
+    if expected_plz and plz != expected_plz:
+        return None
     full_address = clean_text(" ".join(x for x in [street + "," if street else "", plz, city] if x)) or ""
 
     email = clean_email(item.get("email")) or ""
@@ -78,7 +81,7 @@ def _build_index_card(item: Dict[str, Any], category_11880: str) -> Dict[str, st
     }
 
 
-def parse_11880_index_cards(response, category_11880: str) -> List[Dict[str, str]]:
+def parse_11880_index_cards(response, category_11880: str, expected_plz: str = "") -> List[Dict[str, str]]:
     out: List[Dict[str, str]] = []
     seen: set[str] = set()
 
@@ -95,7 +98,7 @@ def parse_11880_index_cards(response, category_11880: str) -> List[Dict[str, str
                 item = row.get("item")
                 if not isinstance(item, dict):
                     continue
-                card = _build_index_card(item, category_11880)
+                card = _build_index_card(item, category_11880, expected_plz=expected_plz)
                 if not card:
                     continue
                 url = card["url"]
