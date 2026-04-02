@@ -234,8 +234,8 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
         max_session_age_sec=1200,
         runtime_recycle_min_sec=300,
         runtime_recycle_max_sec=600,
-        pause_min_sec=1.0,
-        pause_max_sec=2.0,
+        pause_min_sec=1.5,
+        pause_max_sec=3.0,
         browser_timeout_ms=90_000,
     ),
     "gs": SiteSessionConfig(
