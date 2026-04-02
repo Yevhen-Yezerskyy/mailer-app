@@ -40,7 +40,7 @@ from engine.core_crawler.browser.session_config import (
 from engine.core_crawler.tunnels_11880 import list_tunnels, load_tunnel_statuses
 
 ROUTER_BOOT_ID = uuid4().hex
-SESSION_STATE_TTL_SEC = 30
+SESSION_STATE_TTL_SEC = 3 * 60
 SESSION_STATE_CLEAR_TTL_SEC = 1
 QUARANTINE_BACKOFF_TTL_SEC = 7 * 24 * 60 * 60
 SESSION_STATE_IDLE_MAX_SEC = 3 * 60
