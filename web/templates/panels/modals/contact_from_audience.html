@@ -1,0 +1,134 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/modals/contact_from_audience.html -->
+<!-- DATE: 2026-04-01 -->
+<!-- PURPOSE: Centralized contact modal for aggr_contacts_cb.id with static norm fields. -->
+
+<div class="YY-CARD_WHITE overflow-hidden" style="max-height:90vh;width:800px;">
+  <button type="button" class="YY-BUTTON_MAIN !w-fit" data-yy-modal-close style="position:absolute;top:16px;right:16px;">✕</button>
+
+  <div class="overflow-auto mt-10 mb-4 max-h-[calc(85vh-5rem)]">
+    <div class="YY-MAIN_BOTTOM_DIV mb-4">
+      <table class="w-full text-left">
+        <tbody>
+          <tr class="YY-TB_TR">
+            <td class="YY-TB_TD w-[28%]">{% trans "Название компании" %}:</td>
+            <td class="YY-TB_TD"><strong>{{ title_company_name }}</strong></td>
+          </tr>
+          <tr class="YY-TB_TR">
+            <td class="YY-TB_TD">{% trans "Адрес" %}:</td>
+            <td class="YY-TB_TD">{{ title_address }}</td>
+          </tr>
+          <tr class="YY-TB_TR">
+            <td class="YY-TB_TD">Email:</td>
+            <td class="YY-TB_TD">{{ title_email }}</td>
+          </tr>
+          <tr class="YY-TB_TR">
+            <td class="YY-TB_TD">{% trans "Телефоны" %}:</td>
+            <td class="YY-TB_TD">{{ title_phones|linebreaksbr }}</td>
+          </tr>
+          {% if title_fax and title_fax != "-" %}
+            <tr class="YY-TB_TR">
+              <td class="YY-TB_TD">{% trans "Факс" %}:</td>
+              <td class="YY-TB_TD">{{ title_fax|linebreaksbr }}</td>
+            </tr>
+          {% endif %}
+          {% if title_websites and title_websites != "-" %}
+            <tr class="YY-TB_TR">
+              <td class="YY-TB_TD">{% trans "Сайты" %}:</td>
+              <td class="YY-TB_TD">
+                {% for it in title_websites_items %}
+                  <a href="{{ it.href }}" target="_blank" rel="noopener noreferrer">{{ it.label }}</a>{% if not forloop.last %}<br>{% endif %}
+                {% endfor %}
+              </td>
+            </tr>
+          {% endif %}
+          {% if title_socials and title_socials != "-" %}
+            <tr class="YY-TB_TR">
+              <td class="YY-TB_TD">{% trans "Социальные сети" %}:</td>
+              <td class="YY-TB_TD">
+                {% for it in title_socials_items %}
+                  <a href="{{ it.href }}" target="_blank" rel="noopener noreferrer">{{ it.label }}</a>{% if not forloop.last %}<br>{% endif %}
+                {% endfor %}
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="YY-MAIN_BOTTOM_DIV mb-4">
+      <table class="w-full text-left">
+        <tbody>
+          <tr class="YY-TB_TR">
+            <td class="YY-TB_TD w-[28%]">{% trans "Города (поиск)" %}:</td>
+            <td class="YY-TB_TD">{{ title_search_cities|linebreaksbr }}</td>
+          </tr>
+          <tr class="YY-TB_TR">
+            <td class="YY-TB_TD">{% trans "Категории (поиск)" %}:</td>
+            <td class="YY-TB_TD">{{ title_search_categories|linebreaksbr }}</td>
+          </tr>
+          <tr class="YY-TB_TR">
+            <td class="YY-TB_TD">{% trans "Категории справочников" %}:</td>
+            <td class="YY-TB_TD">{{ title_categories }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {% if title_description and title_description != "-" %}
+      <div class="YY-MAIN_BOTTOM_DIV mb-4">
+        <table class="w-full text-left">
+          <tbody>
+            <tr class="YY-TB_TR">
+              <td class="YY-TB_TD">{{ title_description|linebreaksbr }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+
+    <div class="YY-MAIN_BOTTOM_DIV">
+      <table class="w-full text-left">
+        <tbody>
+          <tr class="YY-TB_TR">
+            <td class="YY-TB_TD w-[28%]">{% trans "Источники" %}:</td>
+            <td class="YY-TB_TD">
+              {% for it in title_source_items %}
+                <a href="{{ it.href }}" target="_blank" rel="noopener noreferrer">{{ it.label }}</a>{% if not forloop.last %}<br>{% endif %}
+              {% empty %}
+                -
+              {% endfor %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {% if title_company_names and title_company_names != "-" or title_emails and title_emails != "-" or title_addresses and title_addresses != "-" %}
+      <div class="YY-MAIN_BOTTOM_DIV mt-4">
+        <table class="w-full text-left">
+          <tbody>
+            {% if title_company_names and title_company_names != "-" %}
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD w-[28%]">{% trans "Все названия компании" %}:</td>
+                <td class="YY-TB_TD">{{ title_company_names|linebreaksbr }}</td>
+              </tr>
+            {% endif %}
+            {% if title_emails and title_emails != "-" %}
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD">{% trans "Все email" %}:</td>
+                <td class="YY-TB_TD">{{ title_emails|linebreaksbr }}</td>
+              </tr>
+            {% endif %}
+            {% if title_addresses and title_addresses != "-" %}
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD">{% trans "Все адреса" %}:</td>
+                <td class="YY-TB_TD">{{ title_addresses|linebreaksbr }}</td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
+</div>

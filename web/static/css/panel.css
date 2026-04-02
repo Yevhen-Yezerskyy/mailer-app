@@ -131,3 +131,20 @@ input[type="radio"] {
   margin-top: 0;
   margin-bottom: 0;
 }
+
+strong,
+b {
+  --tw-font-weight: 600;
+  font-weight: var(--tw-font-weight) !important;
+}
+
+a {
+  text-decoration: underline !important;
+}
+
+a:hover,
+a:focus,
+a:focus-visible {
+  color: #016b09 !important;
+  text-decoration: underline !important;
+}

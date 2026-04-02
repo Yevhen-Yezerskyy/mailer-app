@@ -13,11 +13,12 @@ import signal
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Sequence
 
-from engine.common.cache.client import CLIENT
+from engine.common.cache.client import CLIENT, _redis_call
 from engine.common.db import fetch_one, get_connection
 from engine.core_crawler.browser.broker_server import current_site_route_plan
+from engine.core_crawler.browser.session_config import CRAWLER_ACTIVE_TUNNEL_CAP
 from engine.core_crawler.browser.fetcher import (
     clear_fetch_route_context,
     close_all_fetch_routers,
@@ -28,7 +29,7 @@ from engine.core_crawler.spiders.spider_11880_cb import OneOneEightZeroCBSpider
 
 LOCK_TTL_SEC = 1200.0
 RETRY_LOCK_TTL_SEC = 3 * 60 * 60.0
-ROUTE_LOCK_TTL_SEC = 30.0
+ROUTE_LOCK_TTL_SEC = 20.0
 ROUTE_LOCK_RENEW_SEC = 10.0
 ITEM_TIMEOUT_SEC = 180.0
 
@@ -94,15 +95,36 @@ def _make_item(
     )
 
 
-def _catalog_clause(catalog: str) -> tuple[str, tuple[Any, ...]]:
-    catalog_name = str(catalog or "").strip()
-    if not catalog_name:
+def _normalize_catalogs(catalogs: Sequence[str] | str | None = None) -> tuple[str, ...]:
+    if catalogs is None:
+        return ()
+    if isinstance(catalogs, str):
+        raw_values = [catalogs]
+    else:
+        raw_values = list(catalogs or [])
+    seen: set[str] = set()
+    out: list[str] = []
+    for raw_value in raw_values:
+        value = str(raw_value or "").strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        out.append(value)
+    return tuple(out)
+
+
+def _catalog_clause(catalogs: Sequence[str] | str | None = None) -> tuple[str, tuple[Any, ...]]:
+    normalized = _normalize_catalogs(catalogs)
+    if not normalized:
         return "", ()
-    return " AND bs.catalog = %s ", (catalog_name,)
+    if len(normalized) == 1:
+        return " AND bs.catalog = %s ", (normalized[0],)
+    placeholders = ", ".join(["%s"] * len(normalized))
+    return f" AND bs.catalog IN ({placeholders}) ", tuple(normalized)
 
 
-def _pick_active_task_id(catalog: str = "") -> Optional[int]:
-    catalog_sql, catalog_params = _catalog_clause(catalog)
+def _pick_active_task_id(catalogs: Sequence[str] | str | None = None) -> Optional[int]:
+    catalog_sql, catalog_params = _catalog_clause(catalogs)
     row = fetch_one(
         f"""
         SELECT t.id
@@ -126,8 +148,8 @@ def _pick_active_task_id(catalog: str = "") -> Optional[int]:
     return int(row[0]) if row else None
 
 
-def pending_items_exist(catalog: str = "") -> bool:
-    catalog_sql, catalog_params = _catalog_clause(catalog)
+def pending_items_exist(catalogs: Sequence[str] | str | None = None) -> bool:
+    catalog_sql, catalog_params = _catalog_clause(catalogs)
     row = fetch_one(
         f"""
         SELECT 1
@@ -148,6 +170,32 @@ def pending_items_exist(catalog: str = "") -> bool:
         catalog_params,
     )
     return bool(row)
+
+
+def _scan_redis_keys(pattern: str) -> list[str]:
+    cursor = "0"
+    found: list[str] = []
+    seen: set[str] = set()
+    while True:
+        reply = _redis_call("SCAN", cursor, "MATCH", str(pattern), "COUNT", 200)
+        if not isinstance(reply, list) or len(reply) < 2:
+            break
+        next_cursor = reply[0]
+        raw_keys = reply[1] if isinstance(reply[1], list) else []
+        cursor = next_cursor.decode("utf-8", errors="replace") if isinstance(next_cursor, (bytes, bytearray)) else str(next_cursor)
+        for raw_key in raw_keys:
+            key = raw_key.decode("utf-8", errors="replace") if isinstance(raw_key, (bytes, bytearray)) else str(raw_key)
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            found.append(key)
+        if cursor == "0":
+            break
+    return found
+
+
+def _active_route_lock_count() -> int:
+    return len(_scan_redis_keys("lock:core_crawler:route_worker:*"))
 
 
 def _try_lock_cb(cb_id: int) -> Optional[tuple[str, str]]:
@@ -258,6 +306,19 @@ def _finalize_item_lock(item: QueueItem) -> None:
             return
     except Exception:
         pass
+    try:
+        CLIENT.lock_release(item.lock_key, token=item.lock_token)
+    except Exception:
+        pass
+
+
+def _release_item_lock(item: QueueItem) -> None:
+    if not item.lock_key or not item.lock_token:
+        return
+    try:
+        CLIENT.lock_release(item.lock_key, token=item.lock_token)
+    except Exception:
+        pass
 
 
 def _start_item_timeout_watchdog(
@@ -309,10 +370,10 @@ def _stop_item_timeout_watchdog(watchdog: ItemTimeoutWatchdog | None) -> None:
         pass
 
 
-def _claim_next_item(catalog: str = "") -> Optional[QueueItem]:
+def _claim_next_item(catalogs: Sequence[str] | str | None = None) -> Optional[QueueItem]:
     with get_connection() as conn, conn.cursor() as cur:
-        catalog_sql, catalog_params = _catalog_clause(catalog)
-        task_id = _pick_active_task_id(catalog)
+        catalog_sql, catalog_params = _catalog_clause(catalogs)
+        task_id = _pick_active_task_id(catalogs)
         if not task_id:
             return None
 
@@ -524,17 +585,19 @@ def worker_main_loop(catalog: str = "") -> None:
 
     try:
         while not stop_requested["value"]:
-            route = _claim_route(catalog_name)
+            if _active_route_lock_count() >= int(CRAWLER_ACTIVE_TUNNEL_CAP):
+                time.sleep(0.25)
+                continue
+            item = _claim_next_item(catalog_name)
+            if item is None:
+                time.sleep(0.25)
+                continue
+            route = _claim_route(item.catalog)
             if route is None:
+                _release_item_lock(item)
                 time.sleep(0.25)
                 continue
             heartbeat = _start_route_heartbeat(route)
-            item = _claim_next_item(catalog_name)
-            if item is None:
-                _stop_route_heartbeat(heartbeat)
-                _release_route(route)
-                time.sleep(0.25)
-                continue
             watchdog = _start_item_timeout_watchdog(item, route, heartbeat)
             try:
                 _run_item(item, route)

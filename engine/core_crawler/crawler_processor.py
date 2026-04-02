@@ -15,20 +15,12 @@ from zoneinfo import ZoneInfo
 
 from engine.common.cache.client import CLIENT, _redis_call
 from engine.core_crawler.browser.broker_server import current_site_route_plan
+from engine.core_crawler.browser.session_config import CRAWLER_ACTIVE_TUNNEL_CAP
 from engine.core_crawler.fetch_cb import pending_items_exist
 from engine.core_crawler.tunnels_11880 import ensure_tunnel_watchdog, stop_tunnel_watchdog
 
 TICK_SEC = 1.0
 _TZ_BERLIN = ZoneInfo("Europe/Berlin")
-CATALOGS = ("11880", "gs")
-CATALOG_MAX_WORKERS = {
-    "11880": 4,
-    "gs": 3,
-}
-CATALOG_ROUTES_PER_WORKER = {
-    "11880": 1,
-    "gs": 1,
-}
 
 
 @dataclass
@@ -74,52 +66,39 @@ def _clear_stale_route_worker_locks() -> int:
     return int(CLIENT.delete_many(keys) or 0)
 
 
-def _target_parallelism_by_catalog() -> dict[str, int]:
+def _target_parallelism() -> tuple[int, dict[str, int]]:
     route_plan = current_site_route_plan()
-    targets: dict[str, int] = {}
-    for site_name in CATALOGS:
-        route_count = max(0, int(len(route_plan.get(site_name) or [])))
-        if route_count <= 0:
-            targets[site_name] = 0
-            continue
-        routes_per_worker = max(1, int(CATALOG_ROUTES_PER_WORKER.get(site_name, 1)))
-        max_workers = max(1, int(CATALOG_MAX_WORKERS.get(site_name, 1)))
-        target = max(1, int((route_count + routes_per_worker - 1) // routes_per_worker))
-        targets[site_name] = min(max_workers, target)
-    return targets
+    per_site = {
+        str(site_name): max(0, int(len(route_plan.get(site_name) or [])))
+        for site_name in sorted(route_plan.keys())
+    }
+    total = min(int(CRAWLER_ACTIVE_TUNNEL_CAP), sum(per_site.values()))
+    return total, per_site
 
 
-def _collect_finished_workers(catalog: str, active: list[WorkerProcess]) -> list[WorkerProcess]:
+def _collect_finished_workers(active: list[WorkerProcess]) -> list[WorkerProcess]:
     still_running: list[WorkerProcess] = []
     for worker in active:
         if worker.process.poll() is None:
             still_running.append(worker)
             continue
-        _log(
-            f"[crawler_processor] worker_done catalog={catalog} pid={worker.process.pid} "
-            f"rc={worker.process.returncode}"
-        )
+        _log(f"[crawler_processor] worker_done pid={worker.process.pid} rc={worker.process.returncode}")
     return still_running
 
 
-def _launch_worker(catalog: str) -> WorkerProcess:
+def _launch_worker() -> WorkerProcess:
     proc = subprocess.Popen(
-        [sys.executable, "-m", "engine.core_crawler.fetch_cb", "--catalog", str(catalog), "--worker-loop"],
+        [sys.executable, "-m", "engine.core_crawler.fetch_cb", "--worker-loop"],
         stdin=subprocess.DEVNULL,
         start_new_session=True,
         close_fds=True,
     )
-    _log(f"[crawler_processor] worker_start catalog={catalog} pid={proc.pid}")
+    _log(f"[crawler_processor] worker_start pid={proc.pid}")
     return WorkerProcess(process=proc, started_at=time.time())
 
 
-def _stop_workers(active_by_catalog: dict[str, list[WorkerProcess]]) -> None:
-    live = [
-        worker
-        for workers in active_by_catalog.values()
-        for worker in workers
-        if worker.process.poll() is None
-    ]
+def _stop_workers(active: list[WorkerProcess]) -> None:
+    live = [worker for worker in active if worker.process.poll() is None]
     if not live:
         return
     for worker in live:
@@ -168,30 +147,26 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
 
-    active_by_catalog: dict[str, list[WorkerProcess]] = {catalog: [] for catalog in CATALOGS}
-    last_targets: dict[str, int] = {catalog: -1 for catalog in CATALOGS}
+    active_workers: list[WorkerProcess] = []
+    last_total_target = -1
     try:
         cleared = _clear_stale_route_worker_locks()
         if cleared > 0:
             _log(f"[crawler_processor] cleared_stale_route_locks count={cleared}")
         ensure_tunnel_watchdog()
         while not stop_requested["value"]:
-            targets = _target_parallelism_by_catalog()
-            for catalog in CATALOGS:
-                active_by_catalog[catalog] = _collect_finished_workers(catalog, active_by_catalog[catalog])
-                target = int(targets.get(catalog) or 0)
-                if target != last_targets[catalog]:
-                    _log(f"[crawler_processor] target_parallel catalog={catalog} value={target}")
-                    last_targets[catalog] = target
-                active_by_catalog[catalog] = _trim_workers(active_by_catalog[catalog], target)
-                if len(active_by_catalog[catalog]) >= target:
-                    continue
-                if not pending_items_exist(catalog):
-                    continue
-                active_by_catalog[catalog].append(_launch_worker(catalog))
+            total_target, per_site = _target_parallelism()
+            active_workers = _collect_finished_workers(active_workers)
+            if total_target != last_total_target:
+                details = " ".join(f"{site}={count}" for site, count in sorted(per_site.items()))
+                _log(f"[crawler_processor] target_parallel total={total_target} {details}".rstrip())
+                last_total_target = total_target
+            active_workers = _trim_workers(active_workers, total_target)
+            if len(active_workers) < total_target and pending_items_exist():
+                active_workers.append(_launch_worker())
             time.sleep(TICK_SEC)
     finally:
-        _stop_workers(active_by_catalog)
+        _stop_workers(active_workers)
         stop_tunnel_watchdog()
 
 

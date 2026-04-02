@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 from datetime import timedelta
 
+import phonenumbers
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login as auth_login
@@ -17,7 +18,9 @@ from django.views.decorators.http import require_POST
 from django.utils import timezone
 
 from mailer_web.access import encode_id, decode_id
+from mailer_web.format_contact import get_category_title, get_city_title
 from mailer_web.models import ClientUser
+from engine.common.utils import parse_json_object
 from panel.aap_audience.models import AudienceTask
 from panel.aap_campaigns.models import Campaign
 
@@ -935,3 +938,294 @@ def switch_user_login_view(request):
     auth_login(request, target, backend=backend)
     messages.info(request, f"Вход выполнен как {target.email}")
     return redirect("dashboard")
+
+
+def contact_modal_view(request):
+    def _flat_text(value):
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value.strip()
+        if isinstance(value, (int, float, bool)):
+            return str(value).strip()
+        if isinstance(value, dict):
+            return json.dumps(value, ensure_ascii=False, sort_keys=True).strip()
+        if isinstance(value, list):
+            parts = []
+            for item in value:
+                text = _flat_text(item)
+                if text:
+                    parts.append(text)
+            return "\n".join(parts).strip()
+        return str(value).strip()
+
+    def _text_or_dash(value):
+        text = _flat_text(value)
+        return text if text else "-"
+
+    def _comma_text_or_dash(value):
+        if isinstance(value, list):
+            out = []
+            for item in value:
+                text = _flat_text(item)
+                if text and text not in out:
+                    out.append(text)
+            return ", ".join(out) if out else "-"
+        text = _flat_text(value)
+        if not text:
+            return "-"
+        if "\n" not in text:
+            return text
+        out = []
+        for part in text.split("\n"):
+            clean = part.strip()
+            if clean and clean not in out:
+                out.append(clean)
+        return ", ".join(out) if out else "-"
+
+    def _format_phone_one(raw: str) -> str:
+        text = str(raw or "").strip()
+        if not text:
+            return ""
+        try:
+            parsed = phonenumbers.parse(text, "DE")
+            if phonenumbers.is_possible_number(parsed):
+                return phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL).strip()
+        except Exception:
+            return text
+        return text
+
+    def _format_phone_block(value):
+        if isinstance(value, list):
+            out = []
+            for item in value:
+                text = _format_phone_one(item)
+                if text and text not in out:
+                    out.append(text)
+            return "\n".join(out) if out else "-"
+        text = _flat_text(value)
+        if not text:
+            return "-"
+        parts = [part.strip() for part in text.split(",")]
+        if len(parts) <= 1:
+            return _format_phone_one(text) or "-"
+        out = []
+        for part in parts:
+            phone = _format_phone_one(part)
+            if phone and phone not in out:
+                out.append(phone)
+        return "\n".join(out) if out else "-"
+
+    def _format_link_block(value):
+        if isinstance(value, list):
+            out = []
+            for item in value:
+                text = _flat_text(item)
+                if text and text not in out:
+                    out.append(text)
+            return "\n".join(out) if out else "-"
+        text = _flat_text(value)
+        if not text:
+            return "-"
+        parts = [part.strip() for part in text.split(",")]
+        if len(parts) <= 1:
+            return text
+        out = []
+        for part in parts:
+            if part and part not in out:
+                out.append(part)
+        return "\n".join(out) if out else "-"
+
+    def _link_items(value):
+        def _label(url_text: str) -> str:
+            text = str(url_text or "").strip()
+            text = text.removeprefix("https://")
+            text = text.removeprefix("http://")
+            if text.endswith("/"):
+                text = text[:-1]
+            return text
+
+        items = []
+        if isinstance(value, list):
+            for item in value:
+                href = _flat_text(item)
+                if not href:
+                    continue
+                label = _label(href)
+                if not label:
+                    continue
+                pair = {"href": href, "label": label}
+                if pair not in items:
+                    items.append(pair)
+            return items
+
+        text = _flat_text(value)
+        if not text:
+            return items
+        for part in text.split(","):
+            href = part.strip()
+            if not href:
+                continue
+            label = _label(href)
+            if not label:
+                continue
+            pair = {"href": href, "label": label}
+            if pair not in items:
+                items.append(pair)
+        return items
+
+    def _build_empty_context(status_text):
+        return {
+            "status_class": "YY-STATUS_GRAY",
+            "status_text": status_text,
+            "contact_id": "-",
+            "title_company_name": "-",
+            "title_company_names": "-",
+            "title_email": "-",
+            "title_emails": "-",
+            "title_phones": "-",
+            "title_fax": "-",
+            "title_websites": "-",
+            "title_socials": "-",
+            "title_address": "-",
+            "title_addresses": "-",
+            "title_city": "-",
+            "title_land": "-",
+            "title_categories": "-",
+            "title_search_cities": "-",
+            "title_search_categories": "-",
+            "title_statuses_11880": "-",
+            "title_keywords_11880": "-",
+            "title_description": "-",
+        }
+
+    if not request.user.is_authenticated:
+        return render(
+            request,
+            "panels/modals/contact_from_audience.html",
+            _build_empty_context("Здесь пока нет данных"),
+            status=401,
+        )
+
+    ws_id = getattr(request, "workspace_id", None)
+    if ws_id is None:
+        return render(
+            request,
+            "panels/modals/contact_from_audience.html",
+            _build_empty_context("Здесь пока нет данных"),
+            status=403,
+        )
+
+    token = (request.GET.get("id") or "").strip()
+    if not token:
+        return render(
+            request,
+            "panels/modals/contact_from_audience.html",
+            _build_empty_context("Здесь пока нет данных"),
+        )
+
+    try:
+        aggr_contact_id = int(decode_id(token))
+    except Exception:
+        return render(
+            request,
+            "panels/modals/contact_from_audience.html",
+            _build_empty_context("Здесь пока нет данных"),
+        )
+
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                ac.id::bigint,
+                ac.company_name,
+                ac.email,
+                ac.company_data
+            FROM public.aggr_contacts_cb ac
+            WHERE ac.id = %s
+            LIMIT 1
+            """,
+            [int(aggr_contact_id)],
+        )
+        row = cur.fetchone()
+
+    if not row:
+        return render(
+            request,
+            "panels/modals/contact_from_audience.html",
+            _build_empty_context("Здесь пока нет данных"),
+        )
+
+    company_data = parse_json_object(row[3], field_name="aggr_contacts_cb.company_data")
+    norm = company_data.get("norm") if isinstance(company_data.get("norm"), dict) else {}
+    cards = company_data.get("cards") if isinstance(company_data.get("cards"), dict) else {}
+    source_urls = []
+    for _, card_wrap in cards.items():
+        if not isinstance(card_wrap, dict):
+            continue
+        src = _flat_text(card_wrap.get("url"))
+        if src:
+            source_urls.append(src)
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                cp.plz_id,
+                cp.branch_id
+            FROM public.cb_contacts cc
+            JOIN public.cb_crawl_pairs cp
+              ON cp.id = cc.cb_id
+            WHERE cc.aggr_contact_id = %s
+            ORDER BY cc.cb_id DESC
+            LIMIT 150
+            """,
+            [int(row[0])],
+        )
+        search_rows = cur.fetchall() or []
+
+    search_cities = []
+    search_categories = []
+    seen_plz_ids = set()
+    seen_branch_ids = set()
+    for plz_id, branch_id in search_rows:
+        if plz_id is not None:
+            plz_id_int = int(plz_id)
+            if plz_id_int not in seen_plz_ids:
+                seen_plz_ids.add(plz_id_int)
+                search_cities.append(get_city_title(plz_id_int, request, land=True, plz=False))
+        if branch_id is not None:
+            branch_id_int = int(branch_id)
+            if branch_id_int not in seen_branch_ids:
+                seen_branch_ids.add(branch_id_int)
+                search_categories.append(get_category_title(branch_id_int, request))
+
+    return render(
+        request,
+        "panels/modals/contact_from_audience.html",
+        {
+            "status_class": "YY-STATUS_BLUE",
+            "status_text": "Карточка компании",
+            "contact_id": int(row[0]),
+            "title_company_name": _text_or_dash(norm.get("company_name")),
+            "title_company_names": _text_or_dash(norm.get("company_names")),
+            "title_email": _text_or_dash(norm.get("email")),
+            "title_emails": _text_or_dash(norm.get("emails")),
+            "title_phones": _format_phone_block(norm.get("phones")),
+            "title_fax": _format_phone_block(norm.get("fax")),
+            "title_websites": _format_link_block(norm.get("websites")),
+            "title_socials": _format_link_block(norm.get("socials")),
+            "title_websites_items": _link_items(norm.get("websites")),
+            "title_socials_items": _link_items(norm.get("socials")),
+            "title_source_items": _link_items(source_urls),
+            "title_address": _text_or_dash(norm.get("address")),
+            "title_addresses": _text_or_dash(norm.get("addresses")),
+            "title_city": _text_or_dash(norm.get("city")),
+            "title_land": _text_or_dash(norm.get("land")),
+            "title_categories": _comma_text_or_dash(norm.get("categories")),
+            "title_search_cities": "\n".join(search_cities) if search_cities else "-",
+            "title_search_categories": "\n".join(search_categories) if search_categories else "-",
+            "title_statuses_11880": _text_or_dash(norm.get("statuses_11880")),
+            "title_keywords_11880": _text_or_dash(norm.get("keywords_11880")),
+            "title_description": _text_or_dash(norm.get("description")),
+        },
+    )

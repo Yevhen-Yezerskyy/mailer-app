@@ -56,6 +56,29 @@ def parse_json_response(text: str) -> Any | None:
             return None
 
 
+def parse_json_object(value: Any, *, field_name: str = "json") -> dict[str, Any]:
+    if value is None:
+        return {}
+    if isinstance(value, dict):
+        return value
+
+    raw = ""
+    if isinstance(value, str):
+        raw = value.strip()
+    elif isinstance(value, (bytes, bytearray, memoryview)):
+        raw = bytes(value).decode("utf-8", errors="ignore").strip()
+    else:
+        raise TypeError(f"{field_name} expects dict/json string/bytes, got {type(value).__name__}")
+
+    if not raw:
+        return {}
+
+    parsed = json.loads(raw)
+    if not isinstance(parsed, dict):
+        raise TypeError(f"{field_name} JSON must be object")
+    return parsed
+
+
 def load_email_domains_allowlist() -> Set[str]:
     try:
         with open(_EMAIL_DOMAINS_JSON_PATH, "r", encoding="utf-8") as f:

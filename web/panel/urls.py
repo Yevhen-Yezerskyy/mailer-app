@@ -10,7 +10,14 @@ from django.urls import path, include
 from django.views.generic import RedirectView
 from django.urls.resolvers import URLPattern, URLResolver
 
-from panel.views import dashboard, stats_view, stats_campaign_view, switch_user_modal_view, switch_user_login_view
+from panel.views import (
+    dashboard,
+    stats_view,
+    stats_campaign_view,
+    switch_user_modal_view,
+    switch_user_login_view,
+    contact_modal_view,
+)
 
 
 _FLAG_ATTR = "_tw_classmap_enabled"
@@ -51,6 +58,7 @@ urlpatterns = [
     path("stats/campaign/<str:uid>/", _flag_view(stats_campaign_view), name="stats_campaign"),
     path("switch-user/modal/", _flag_view(switch_user_modal_view), name="switch_user_modal"),
     path("switch-user/login/", _flag_view(switch_user_login_view), name="switch_user_login"),
+    path("contact/modal/", _flag_view(contact_modal_view), name="contact_modal"),
 
     path("audience/", include_flagged("panel.aap_audience.urls")),
     path("lists/", include_flagged("panel.aap_lists.urls")),

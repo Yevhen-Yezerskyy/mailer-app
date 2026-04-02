@@ -1,5 +1,5 @@
 // FILE: web/static/js/aap_audience/create_edit_flow.js
-// DATE: 2026-03-21
+// DATE: 2026-04-01
 // PURPOSE: Shared unsaved-changes and flow-step navigation logic for create/edit buy/sell pages.
 
 (function () {
@@ -18,6 +18,10 @@
   const bypassSubmit = new WeakMap();
   let cityRatingPollTimer = 0;
   let cityRatingPollInFlight = false;
+  let contactsTotalPollTimer = 0;
+  let contactsTotalPollInFlight = false;
+  let contactsSectionPollTimer = 0;
+  let contactsSectionPollInFlight = false;
 
   function isWaitAction(submitter) {
     const action = submitter && submitter.name === "action" ? String(submitter.value || "") : "";
@@ -614,10 +618,80 @@
     return document.querySelector("[data-city-rating-panel='1']");
   }
 
+  function contactsTotalPanel() {
+    return document.querySelector("[data-contacts-total-panel='1']");
+  }
+
+  function contactsSectionsRoot() {
+    return document.querySelector("[data-contacts-sections-root='1']");
+  }
+
+  function contactsSectionButtons() {
+    return Array.from(document.querySelectorAll("[data-contacts-section-button]"));
+  }
+
+  function contactsActiveSectionKey() {
+    const rootNode = contactsSectionsRoot();
+    if (!rootNode) return "";
+    return String(rootNode.getAttribute("data-contacts-active-section") || "").trim();
+  }
+
+  function contactsSectionWrapper(sectionKey) {
+    const key = String(sectionKey || contactsActiveSectionKey()).trim();
+    if (!key) return null;
+    return document.querySelector("[data-contacts-section-wrapper='" + key + "']");
+  }
+
+  function syncContactsSectionButtons() {
+    const activeKey = contactsActiveSectionKey();
+    contactsSectionButtons().forEach(function (button) {
+      const buttonKey = String(button.getAttribute("data-contacts-section-button") || "").trim();
+      const activeClass = String(button.getAttribute("data-contacts-section-active-class") || "").trim();
+      const inactiveClass = String(button.getAttribute("data-contacts-section-inactive-class") || "").trim();
+      const className = buttonKey && buttonKey === activeKey ? activeClass : inactiveClass;
+      button.disabled = false;
+      if (className) {
+        button.setAttribute("class", mappedButtonClass(className));
+      }
+    });
+  }
+
+  function showContactsSection(sectionKey) {
+    const rootNode = contactsSectionsRoot();
+    const nextKey = String(sectionKey || "").trim();
+    if (!rootNode || !nextKey) return;
+    rootNode.setAttribute("data-contacts-active-section", nextKey);
+    Array.from(document.querySelectorAll("[data-contacts-section-wrapper]")).forEach(function (wrapper) {
+      const wrapperKey = String(wrapper.getAttribute("data-contacts-section-wrapper") || "").trim();
+      wrapper.hidden = wrapperKey !== nextKey;
+    });
+    syncContactsSectionButtons();
+  }
+
+  function formatContactsTotal(value) {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number)) {
+      return String(value || "0");
+    }
+    return new Intl.NumberFormat("ru-RU").format(number);
+  }
+
   function stopCityRatingPolling() {
     if (!cityRatingPollTimer) return;
     window.clearInterval(cityRatingPollTimer);
     cityRatingPollTimer = 0;
+  }
+
+  function stopContactsTotalPolling() {
+    if (!contactsTotalPollTimer) return;
+    window.clearInterval(contactsTotalPollTimer);
+    contactsTotalPollTimer = 0;
+  }
+
+  function stopContactsSectionPolling() {
+    if (!contactsSectionPollTimer) return;
+    window.clearInterval(contactsSectionPollTimer);
+    contactsSectionPollTimer = 0;
   }
 
   function startCityRatingPolling() {
@@ -626,6 +700,23 @@
     if (!panel) return;
     if (panel.getAttribute("data-city-rating-running") !== "1") return;
     cityRatingPollTimer = window.setInterval(refreshCityRatingPanel, 2000);
+  }
+
+  function startContactsTotalPolling() {
+    stopContactsTotalPolling();
+    const panel = contactsTotalPanel();
+    if (!panel) return;
+    if (!String(panel.getAttribute("data-contacts-total-url") || "").trim()) return;
+    contactsTotalPollTimer = window.setInterval(refreshContactsTotalPanel, 10000);
+  }
+
+  function startContactsSectionPolling() {
+    stopContactsSectionPolling();
+    const wrapper = contactsSectionWrapper();
+    if (!wrapper) return;
+    if (wrapper.getAttribute("data-contacts-section-running") !== "1") return;
+    if (!String(wrapper.getAttribute("data-contacts-section-url") || "").trim()) return;
+    contactsSectionPollTimer = window.setInterval(refreshContactsSectionPanel, 10000);
   }
 
   function refreshCityRatingPanel() {
@@ -657,6 +748,79 @@
     });
   }
 
+  function refreshContactsTotalPanel() {
+    const panel = contactsTotalPanel();
+    const valueNode = panel ? panel.querySelector("[data-contacts-total-value='1']") : null;
+    if (!panel || !valueNode || contactsTotalPollInFlight) return;
+
+    const url = String(panel.getAttribute("data-contacts-total-url") || "").trim();
+    if (!url) return;
+
+    contactsTotalPollInFlight = true;
+    window.fetch(url, {
+      credentials: "same-origin",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    }).then(function (response) {
+      return response.json().catch(function () {
+        return { ok: false };
+      }).then(function (payload) {
+        return { response: response, payload: payload };
+      });
+    }).then(function (result) {
+      const payload = result.payload || {};
+      if (!result.response.ok || !payload.ok) {
+        stopContactsTotalPolling();
+        return;
+      }
+      valueNode.textContent = formatContactsTotal(payload.contacts_total || 0);
+      if (payload.is_active === false) {
+        const collectWrapper = contactsSectionWrapper("collect");
+        if (collectWrapper) {
+          collectWrapper.setAttribute("data-contacts-section-running", "0");
+        }
+        stopContactsTotalPolling();
+        stopContactsSectionPolling();
+      }
+    }).catch(function () {
+    }).finally(function () {
+      contactsTotalPollInFlight = false;
+    });
+  }
+
+  function refreshContactsSectionPanel() {
+    const wrapper = contactsSectionWrapper();
+    if (!wrapper || contactsSectionPollInFlight) return;
+
+    const url = String(wrapper.getAttribute("data-contacts-section-url") || "").trim();
+    if (!url) return;
+
+    contactsSectionPollInFlight = true;
+    window.fetch(url, {
+      credentials: "same-origin",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    }).then(function (response) {
+      return response.text();
+    }).then(function (html) {
+      const sectionKey = String(wrapper.getAttribute("data-contacts-section-wrapper") || "").trim();
+      const inner = wrapper.querySelector("[data-contacts-section-inner='" + sectionKey + "']");
+      if (!sectionKey || !inner) return;
+      inner.style.transition = "opacity 140ms ease";
+      inner.style.opacity = "0.35";
+      window.setTimeout(function () {
+        inner.innerHTML = html;
+        inner.style.opacity = "1";
+        startContactsSectionPolling();
+      }, 140);
+    }).catch(function () {
+    }).finally(function () {
+      contactsSectionPollInFlight = false;
+    });
+  }
+
   function scrollBranchesToLastGreen() {
     const box = document.querySelector("[data-branches-scroll-box='1']");
     if (!box) return;
@@ -679,6 +843,17 @@
   }
 
   document.addEventListener("click", function (event) {
+    const sectionButton = event.target.closest("[data-contacts-section-button]");
+    if (sectionButton) {
+      const sectionKey = String(sectionButton.getAttribute("data-contacts-section-button") || "").trim();
+      if (sectionKey) {
+        showContactsSection(sectionKey);
+        refreshContactsSectionPanel();
+        startContactsSectionPolling();
+      }
+      return;
+    }
+
     const button = event.target.closest("[data-branch-delete-toggle='1']");
     if (!button) return;
     const row = button.closest("[data-branch-row='1']");
@@ -772,5 +947,9 @@
   });
 
   syncCityDeleteState();
+  syncContactsSectionButtons();
+  showContactsSection(contactsActiveSectionKey() || "collect");
   startCityRatingPolling();
+  startContactsTotalPolling();
+  startContactsSectionPolling();
 })();

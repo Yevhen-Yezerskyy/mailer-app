@@ -16,6 +16,13 @@ from .views.modal_edit_city_rate import modal_edit_city_rate_view
 from .views.modal_edit_title import modal_edit_title_view
 from .views.modal_insert_company import modal_insert_company_view
 from .views.create_list import create_list_view
+from .views.create_edit_flow_contacts import (
+    contacts_all_partial_view,
+    contacts_branch_city_partial_view,
+    contacts_collect_partial_view,
+    contacts_pairs_partial_view,
+    contacts_total_view,
+)
 from .views.create_edit_buy import (
     create_edit_buy_view,
     create_edit_buy_product_view,
@@ -52,6 +59,15 @@ urlpatterns = [
     path("create/city-rate/modal/", modal_edit_city_rate_view, name="create_city_rate_modal"),
     path("create/title/modal/", modal_edit_title_view, name="create_title_modal"),
     path("create/company/insert/modal/", modal_insert_company_view, name="create_company_insert_modal"),
+    path("create/contacts-total/", contacts_total_view, name="create_contacts_total"),
+    path("create/contacts-collect/", contacts_collect_partial_view, name="create_contacts_collect_partial"),
+    path("create/contacts-all/", contacts_all_partial_view, name="create_contacts_all_partial"),
+    path(
+        "create/contacts-branch-city/",
+        contacts_branch_city_partial_view,
+        name="create_contacts_branch_city_partial",
+    ),
+    path("create/contacts-pairs/", contacts_pairs_partial_view, name="create_contacts_pairs_partial"),
     path("create/", create_list_view, name="create_list"),
     path("create/edit-buy/", create_edit_buy_view, name="create_edit_buy"),
     path("create/edit-buy/product/", create_edit_buy_product_view, name="create_edit_buy_product"),

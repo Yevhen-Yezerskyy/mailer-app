@@ -1507,9 +1507,7 @@ class BrowserSessionRouter:
         if cfg.site != "11880":
             return requested
         browser_mode = "index_browser"
-        if int(requests_total_before_fetch) < 2:
-            return browser_mode
-        if random.random() < 0.97:
+        if random.random() < 0.99:
             return "http_only"
         return browser_mode
 

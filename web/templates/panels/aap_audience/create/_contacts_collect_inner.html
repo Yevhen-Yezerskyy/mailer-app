@@ -1,0 +1,57 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/create/_contacts_collect_inner.html -->
+<!-- DATE: 2026-04-01 -->
+<!-- PURPOSE: Collect contacts inner section content. -->
+
+<table class="YY-MAIN_TABLE !mt-0">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <div class="YY-MAIN_BOTTOM_DIV overflow-x-auto">
+        <table class="w-full text-left">
+          <thead>
+            <tr class="YY-TH_TR">
+              <th class="YY-TH_TH w-[40%]">{% trans "Контакт" %}</th>
+              <th class="YY-TH_TH w-[40%]">{% trans "Категория - Город" %}</th>
+              <th class="YY-TH_TH text-center whitespace-nowrap">{% trans "Pair-R" %}</th>
+              <th class="YY-TH_TH whitespace-nowrap">{% trans "Добавлено" %}</th>
+              <th class="YY-TH_TH">&nbsp;</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in contacts_collect_rows %}
+              <tr class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">
+                  <strong>{{ row.company_name|default:"-" }}</strong><br>
+                  {{ row.address }}
+                </td>
+                <td class="YY-TB_TD">
+                  {{ row.branch_name|default:"-" }}<br>
+                  {{ row.city_title }}
+                </td>
+                <td class="YY-TB_TD text-center">{{ row.pair_rate|default_if_none:"-" }}</td>
+                <td class="YY-TB_TD whitespace-nowrap">
+                    {{ row.created_at|date:"d.m.Y" }}<br>
+                    {{ row.created_at|date:"H:i:s" }}
+                </td>
+                <td class="YY-TB_TD">
+                  <a href="#"
+                     class="YY-LINK flex items-center gap-1 whitespace-nowrap"
+                     data-yy-modal="url={{ row.contact_modal_url|escape }}">
+                    <span>{% trans "Подробнее" %}</span>
+                    <svg class="size-4 shrink-0" aria-hidden="true">
+                      <use href="#icon-arrow-circle"></use>
+                    </svg>
+                  </a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD" colspan="5">{% trans "Здесь пока нет данных" %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </td>
+  </tr>
+</table>
