@@ -39,7 +39,10 @@ from engine.core_crawler.browser.session_config import (
 )
 from engine.core_crawler.tunnels_11880 import list_tunnels, load_tunnel_statuses
 
-STATE_TTL_SEC = 30
+ROUTER_BOOT_ID = uuid4().hex
+SESSION_STATE_TTL_SEC = 30
+SESSION_STATE_CLEAR_TTL_SEC = 1
+QUARANTINE_BACKOFF_TTL_SEC = 7 * 24 * 60 * 60
 SESSION_STATE_IDLE_MAX_SEC = 3 * 60
 WAIT_TIMEOUT_SEC = 60.0
 RUNTIME_IDLE_REAP_SEC = 90.0
@@ -286,7 +289,7 @@ class BrowserSessionRouter:
 
     @staticmethod
     def _cache_get_obj(key: str) -> Any:
-        payload = CLIENT.get(key, ttl_sec=STATE_TTL_SEC)
+        payload = CLIENT.get(key, ttl_sec=SESSION_STATE_TTL_SEC)
         if not payload:
             return None
         try:
@@ -295,12 +298,44 @@ class BrowserSessionRouter:
             raise RuntimeError(f"BAD CACHE PAYLOAD {key}: {type(exc).__name__}: {exc}") from exc
 
     @staticmethod
-    def _cache_set_obj(key: str, value: Any, ttl_sec: int = STATE_TTL_SEC) -> None:
+    def _cache_set_obj(key: str, value: Any, ttl_sec: int = SESSION_STATE_TTL_SEC) -> None:
         try:
             payload = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
         except Exception as exc:
             raise RuntimeError(f"CACHE ENCODE FAILED {key}: {type(exc).__name__}: {exc}") from exc
         CLIENT.set(key, payload, ttl_sec=ttl_sec)
+
+    @classmethod
+    def _clear_cache_obj(cls, key: str) -> None:
+        cls._cache_set_obj(key, {}, ttl_sec=SESSION_STATE_CLEAR_TTL_SEC)
+
+    @staticmethod
+    def _quarantine_ttl_sec(state: dict[str, float]) -> int:
+        now = time.time()
+        max_left = 0.0
+        for until in state.values():
+            try:
+                until_f = float(until or 0.0)
+            except Exception:
+                continue
+            max_left = max(max_left, until_f - now)
+        return max(60, int(max_left) if max_left > 0.0 else 60)
+
+    @staticmethod
+    def _quarantine_backoff_ttl_sec(backoff: dict[str, dict[str, float | int]], grace_sec: float) -> int:
+        now = time.time()
+        max_left = 0.0
+        for row in backoff.values():
+            if not isinstance(row, dict):
+                continue
+            try:
+                until_f = float(row.get("until") or 0.0)
+            except Exception:
+                continue
+            max_left = max(max_left, (until_f + float(grace_sec)) - now)
+        if max_left <= 0.0:
+            return 60
+        return max(60, min(int(max_left), QUARANTINE_BACKOFF_TTL_SEC))
 
     @staticmethod
     def _runtime_key(site: str, slot_name: str, slot_idx: int) -> str:
@@ -364,6 +399,18 @@ class BrowserSessionRouter:
             raise ValueError("session page key requires site and slot_name")
         return f"core_crawler:browser_session_page:{site_name}:{tunnel_name}:{int(slot_idx)}:{int(page_idx)}"
 
+    @staticmethod
+    def _slot_launch_id(slot: dict[str, Any] | None) -> str:
+        return str((slot or {}).get("launch_id") or "").strip()
+
+    @classmethod
+    def _runtime_matches_slot(cls, runtime: BrowserSession | BrowserRuntime, slot: dict[str, Any]) -> bool:
+        current_launch_id = cls._slot_launch_id(slot)
+        runtime_launch_id = cls._slot_launch_id(getattr(runtime, "tunnel", None))
+        if not current_launch_id:
+            return True
+        return runtime_launch_id == current_launch_id
+
     def _try_lock(self, key: str, ttl_sec: float, owner: str) -> str:
         info = CLIENT.lock_try(key, ttl_sec=ttl_sec, owner=owner)
         if not info or not bool(info.get("acquired")):
@@ -413,6 +460,7 @@ class BrowserSessionRouter:
                         "host": "direct",
                         "local_port": 0,
                         "proxy_server": "",
+                        "launch_id": f"direct:{ROUTER_BOOT_ID}",
                     }
                 )
                 continue
@@ -431,12 +479,17 @@ class BrowserSessionRouter:
             if not port:
                 slot_errors.append(f"{name}: missing local_port")
                 continue
+            launch_id = str(status.get("launch_id") or "").strip()
+            if not launch_id:
+                slot_errors.append(f"{name}: missing launch_id")
+                continue
             resolved.append(
                 {
                     "name": name,
                     "host": str(row.get("host") or ""),
                     "local_port": port,
                     "proxy_server": f"socks5://127.0.0.1:{port}",
+                    "launch_id": launch_id,
                 }
             )
         if not resolved:
@@ -460,7 +513,11 @@ class BrowserSessionRouter:
             if until_f > now:
                 out[str(name)] = until_f
         if out != raw:
-            self._cache_set_obj(self._quarantine_key(cfg.site), out)
+            self._cache_set_obj(
+                self._quarantine_key(cfg.site),
+                out,
+                ttl_sec=self._quarantine_ttl_sec(out),
+            )
         return out
 
     def _slot_is_quarantined(self, cfg: SiteSessionConfig, slot_name: str) -> bool:
@@ -488,7 +545,11 @@ class BrowserSessionRouter:
                 continue
             out[str(name)] = {"until": until, "level": max(0, int(level))}
         if out != raw:
-            self._cache_set_obj(self._quarantine_backoff_key(cfg.site), out)
+            self._cache_set_obj(
+                self._quarantine_backoff_key(cfg.site),
+                out,
+                ttl_sec=self._quarantine_backoff_ttl_sec(out, grace_sec),
+            )
         return out
 
     def _next_quarantine_level(self, cfg: SiteSessionConfig, slot_name: str) -> tuple[int, int]:
@@ -517,10 +578,18 @@ class BrowserSessionRouter:
             level, duration_sec = self._next_quarantine_level(cfg, slot_name)
         until = time.time() + float(duration_sec)
         state[slot_name] = until
-        self._cache_set_obj(self._quarantine_key(cfg.site), state)
+        self._cache_set_obj(
+            self._quarantine_key(cfg.site),
+            state,
+            ttl_sec=self._quarantine_ttl_sec(state),
+        )
         backoff[str(slot_name)] = {"level": int(level), "until": float(until)}
-        self._cache_set_obj(self._quarantine_backoff_key(cfg.site), backoff)
-        self._drop_egress_session_state(cfg, slot_name, clear_state=False)
+        self._cache_set_obj(
+            self._quarantine_backoff_key(cfg.site),
+            backoff,
+            ttl_sec=self._quarantine_backoff_ttl_sec(backoff, max(60.0, float(cfg.slot_quarantine_sec))),
+        )
+        self._drop_egress_session_state(cfg, slot_name, clear_state=True)
         log(
             ROUTER_STATE_LOG_FILE,
             folder=LOG_FOLDER,
@@ -717,40 +786,50 @@ class BrowserSessionRouter:
             raise RuntimeError("NO BROWSER PROFILES CONFIGURED")
         return random.choice(BROWSER_PROFILES)
 
-    def _load_session_state(self, cfg: SiteSessionConfig, slot_name: str, slot_idx: int) -> dict[str, Any] | None:
+    def _load_session_state(
+        self,
+        cfg: SiteSessionConfig,
+        slot_name: str,
+        slot_idx: int,
+        slot_launch_id: str = "",
+    ) -> dict[str, Any] | None:
         session_key = self._session_key(cfg.site, slot_name, slot_idx)
         state = self._cache_get_obj(session_key)
         if not isinstance(state, dict):
             return None
         if not state:
             return None
+        if str(state.get("router_boot_id") or "").strip() != ROUTER_BOOT_ID:
+            self._clear_cache_obj(session_key)
+            return None
+        current_launch_id = str(slot_launch_id or "").strip()
+        if current_launch_id and str(state.get("slot_launch_id") or "").strip() != current_launch_id:
+            self._clear_cache_obj(session_key)
+            return None
         last_used_at = float(state.get("last_used_at") or 0.0)
         created_at = float(state.get("created_at") or 0.0)
         requests_total = int(state.get("requests_total") or 0)
         if requests_total >= cfg.max_requests_per_session:
+            self._clear_cache_obj(session_key)
             return None
         if created_at and (time.time() - created_at) >= cfg.max_session_age_sec:
+            self._clear_cache_obj(session_key)
             return None
         if last_used_at and (time.time() - last_used_at) >= SESSION_STATE_IDLE_MAX_SEC:
-            self._cache_set_obj(session_key, {}, ttl_sec=STATE_TTL_SEC)
+            self._clear_cache_obj(session_key)
             return None
-        self._cache_set_obj(session_key, state, ttl_sec=STATE_TTL_SEC)
+        self._cache_set_obj(session_key, state, ttl_sec=SESSION_STATE_TTL_SEC)
         return state
 
     def _new_session_state(
         self,
         cfg: SiteSessionConfig,
         slot_idx: int,
+        slot_launch_id: str = "",
         previous_state: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         now = time.time()
         previous = dict(previous_state or {}) if isinstance(previous_state, dict) else {}
-        previous_requests_total = max(0, int(previous.get("requests_total") or 0))
-        if previous_requests_total >= int(cfg.max_requests_per_session):
-            previous_requests_total = 0
-            previous["warmed"] = False
-            previous["current_url"] = ""
-            previous["storage_state"] = {}
         profile_name = str(previous.get("profile_name") or "").strip()
         profile = None
         if profile_name:
@@ -766,11 +845,13 @@ class BrowserSessionRouter:
             "slot_idx": int(slot_idx),
             "created_at": now,
             "last_used_at": now,
-            "requests_total": previous_requests_total,
-            "warmed": bool(previous.get("warmed") is True),
-            "current_url": str(previous.get("current_url") or ""),
+            "requests_total": 0,
+            "warmed": False,
+            "current_url": "",
             "next_dispatch_ts": 0.0,
-            "storage_state": dict(previous.get("storage_state") or {}),
+            "storage_state": {},
+            "router_boot_id": ROUTER_BOOT_ID,
+            "slot_launch_id": str(slot_launch_id or ""),
         }
 
     def _apply_state_to_runtime(self, session: BrowserSession, state: dict[str, Any]) -> None:
@@ -808,6 +889,8 @@ class BrowserSessionRouter:
         merged["warmed"] = bool(bool(merged.get("warmed") is True) or session.warmed)
         merged["current_url"] = str(session.current_url or merged.get("current_url") or "")
         merged["next_dispatch_ts"] = 0.0
+        merged["router_boot_id"] = ROUTER_BOOT_ID
+        merged["slot_launch_id"] = self._slot_launch_id(session.tunnel)
         exported_state = export_storage_state(session.http_session, session.storage_state)
         merged["storage_state"] = exported_state if exported_state else dict(merged.get("storage_state") or {})
         return merged
@@ -827,12 +910,14 @@ class BrowserSessionRouter:
         try:
             session_key = self._session_key(cfg.site, slot_name, slot_idx)
             raw_state = self._cache_get_obj(session_key)
-            state = self._load_session_state(cfg, slot_name, slot_idx)
+            current_launch_id = self._slot_launch_id(slot)
+            state = self._load_session_state(cfg, slot_name, slot_idx, current_launch_id)
             if state is None:
                 state = self._new_session_state(
                     cfg,
                     slot_idx,
-                    raw_state if isinstance(raw_state, dict) else None,
+                    slot_launch_id=current_launch_id,
+                    previous_state=raw_state if isinstance(raw_state, dict) else None,
                 )
             needs_warm = not bool(state.get("warmed") is True)
             warm_lock_key = ""
@@ -881,7 +966,7 @@ class BrowserSessionRouter:
         doomed_browser: BrowserRuntime | None = None
         for slot_idx in range(cfg.sessions_per_egress):
             if clear_state:
-                self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), {})
+                self._clear_cache_obj(self._session_key(cfg.site, slot_name, slot_idx))
         with self._runtime_cv:
             for runtime_key, runtime in list(self._runtimes.items()):
                 if runtime.site != cfg.site or str(runtime.tunnel.get("name") or "") != str(slot_name):
@@ -947,7 +1032,7 @@ class BrowserSessionRouter:
 
         for cfg, runtime, clear_state in doomed:
             if clear_state:
-                self._cache_set_obj(self._session_key(cfg.site, runtime.tunnel["name"], runtime.slot_idx), {})
+                self._clear_cache_obj(self._session_key(cfg.site, runtime.tunnel["name"], runtime.slot_idx))
             else:
                 self._persist_session_state(cfg, runtime)
             self._close_session(runtime)
@@ -975,7 +1060,9 @@ class BrowserSessionRouter:
                         continue
                     preferred_rank = 0 if (str(slot["name"]) == str(preferred_slot_name) and int(slot_idx) == int(preferred_slot_idx)) else 1
                     runtime = self._runtimes.get(self._runtime_key(cfg.site, slot["name"], slot_idx))
-                    state = self._load_session_state(cfg, slot["name"], slot_idx)
+                    state = self._load_session_state(cfg, slot["name"], slot_idx, self._slot_launch_id(slot))
+                    if runtime is not None and not self._runtime_matches_slot(runtime, slot):
+                        runtime = None
                     if runtime is not None and self._runtime_expired(cfg, runtime):
                         runtime = None
                     has_local_runtime = 0 if runtime is not None else 1
@@ -1065,18 +1152,34 @@ class BrowserSessionRouter:
 
     def _checkout_browser_runtime(self, cfg: SiteSessionConfig, tunnel: dict[str, Any]) -> BrowserRuntime:
         browser_key = self._browser_key(cfg.site, tunnel["name"])
+        doomed: BrowserRuntime | None = None
         with self._runtime_cv:
             existing = self._browsers.get(browser_key)
             if existing is not None:
-                existing.last_used_at = time.time()
-                return existing
+                if not self._runtime_matches_slot(existing, tunnel):
+                    self._browsers.pop(browser_key, None)
+                    doomed = existing
+                    existing = None
+                else:
+                    existing.last_used_at = time.time()
+                    return existing
+        if doomed is not None:
+            self._close_browser_runtime(doomed)
         created = self._launch_browser_runtime(cfg, tunnel)
+        doomed = None
         with self._runtime_cv:
             existing = self._browsers.get(browser_key)
             if existing is not None:
-                existing.last_used_at = time.time()
-                self._close_browser_runtime(created)
-                return existing
+                if not self._runtime_matches_slot(existing, tunnel):
+                    self._browsers.pop(browser_key, None)
+                    doomed = existing
+                    existing = None
+                else:
+                    existing.last_used_at = time.time()
+                    self._close_browser_runtime(created)
+                    return existing
+            if doomed is not None:
+                self._close_browser_runtime(doomed)
             self._browsers[browser_key] = created
             self._runtime_cv.notify_all()
             return created
@@ -1095,7 +1198,10 @@ class BrowserSessionRouter:
         with self._runtime_cv:
             runtime = self._runtimes.get(runtime_key)
             if runtime is not None:
-                if str(runtime.session_id) != str(lease.session_id):
+                if (
+                    str(runtime.session_id) != str(lease.session_id)
+                    or not self._runtime_matches_slot(runtime, slot)
+                ):
                     if runtime.active_pages > 0:
                         self._release_lock(lease.page_lock_key, lease.page_lock_token)
                         self._release_lock(lease.warm_lock_key, lease.warm_lock_token)
@@ -1122,7 +1228,10 @@ class BrowserSessionRouter:
             with self._runtime_cv:
                 existing = self._runtimes.get(runtime_key)
                 if existing is not None:
-                    if str(existing.session_id) != str(lease.session_id):
+                    if (
+                        str(existing.session_id) != str(lease.session_id)
+                        or not self._runtime_matches_slot(existing, slot)
+                    ):
                         if existing.active_pages > 0:
                             self._release_lock(lease.page_lock_key, lease.page_lock_token)
                             self._release_lock(lease.warm_lock_key, lease.warm_lock_token)
@@ -1178,7 +1287,12 @@ class BrowserSessionRouter:
         if not gate_token:
             raise RuntimeError(f"SESSION GATE BUSY {cfg.site} {slot_name}:{slot_idx}")
         try:
-            current_state = self._load_session_state(cfg, slot_name, slot_idx) or {}
+            current_state = self._load_session_state(
+                cfg,
+                slot_name,
+                slot_idx,
+                self._slot_launch_id(session.tunnel),
+            ) or {}
             requests_delta = max(
                 0,
                 int(session.requests_total) - int(current_state.get("requests_total") or 0),
@@ -1238,7 +1352,12 @@ class BrowserSessionRouter:
             raise RuntimeError(f"SESSION GATE BUSY {cfg.site} {slot_name}:{slot_idx}")
 
         try:
-            current_state = self._load_session_state(cfg, slot_name, slot_idx) or {}
+            current_state = self._load_session_state(
+                cfg,
+                slot_name,
+                slot_idx,
+                self._slot_launch_id(session.tunnel),
+            ) or {}
             if str(current_state.get("session_id") or session.session_id) != str(session.session_id):
                 current_state = {}
             requests_delta = max(0, int(session.requests_total) - int(lease.base_requests_total))
@@ -1279,7 +1398,7 @@ class BrowserSessionRouter:
                 self._runtime_cv.notify_all()
 
             if clear_state:
-                self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), {})
+                self._clear_cache_obj(self._session_key(cfg.site, slot_name, slot_idx))
             elif merged_state is not None:
                 self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), merged_state)
         finally:

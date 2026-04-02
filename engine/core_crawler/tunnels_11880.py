@@ -19,6 +19,7 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from engine.common.cache.client import CLIENT
 from engine.common.logs import log
@@ -593,6 +594,7 @@ def start_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]:
                 "host": tunnel["host"],
                 "ssh_port": int(tunnel.get("ssh_port") or 22),
                 "local_port": local_port,
+                "launch_id": uuid4().hex,
                 "launcher_pid": int(proc.pid or 0),
                 "listener_pids": _listener_pids(local_port),
                 "started_at": int(time.time()),
@@ -659,6 +661,7 @@ def status_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]
     local_port = int(tunnel["local_port"])
     port_open = _port_open(local_port)
     control_ok = _process_ok(name, local_port)
+    meta = _read_meta(name)
     return {
         "name": name,
         "host": tunnel["host"],
@@ -666,6 +669,8 @@ def status_tunnel(cfg: dict[str, Any], tunnel: dict[str, Any]) -> dict[str, Any]
         "alive": bool(port_open and control_ok),
         "port_open": port_open,
         "control_ok": control_ok,
+        "launch_id": str(meta.get("launch_id") or ""),
+        "started_at": int(meta.get("started_at") or 0),
         "listener_pids": _known_tunnel_pids(name, local_port),
         "ctl_path": str(_ctl_path(name)),
         "meta_path": str(_meta_path(name)),
@@ -682,6 +687,8 @@ def _status_error_row(tunnel: dict[str, Any]) -> dict[str, Any]:
         "alive": False,
         "port_open": False,
         "control_ok": False,
+        "launch_id": "",
+        "started_at": 0,
         "listener_pids": [],
         "ctl_path": str(_ctl_path(name)),
         "meta_path": str(_meta_path(name)),
