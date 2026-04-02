@@ -57,7 +57,7 @@ class SiteSessionConfig:
 
 LOG_FOLDER = "crawler"
 BROKER_QUEUE_MAX = 256
-CRAWLER_ACTIVE_TUNNEL_CAP = 4
+CRAWLER_ACTIVE_TUNNEL_CAP = 3
 ONE_ONE_EIGHTY_WINDOW_MIN_SEC = 8 * 60
 ONE_ONE_EIGHTY_WINDOW_MAX_SEC = 12 * 60
 ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC = 50 * 60
@@ -232,8 +232,8 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
         max_session_age_sec=1200,
         runtime_recycle_min_sec=300,
         runtime_recycle_max_sec=600,
-        pause_min_sec=1.5,
-        pause_max_sec=3.0,
+        pause_min_sec=1.0,
+        pause_max_sec=2.0,
         browser_timeout_ms=90_000,
     ),
     "gs": SiteSessionConfig(
@@ -268,8 +268,8 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
         max_session_age_sec=1200,
         runtime_recycle_min_sec=300,
         runtime_recycle_max_sec=600,
-        pause_min_sec=1.5,
-        pause_max_sec=3.0,
+        pause_min_sec=1.0,
+        pause_max_sec=2.0,
         browser_timeout_ms=90_000,
     ),
 }
