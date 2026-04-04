@@ -1,0 +1,54 @@
+{% extends "panels/base.html" %}
+
+{% block title %}Типы доступа{% endblock %}
+
+{% block content %}
+<!-- FILE: web-admin/web_admin/templates/panels/limits_access_types.html -->
+<!-- DATE: 2026-04-04 -->
+<!-- PURPOSE: Inline editing table for common workspace limits by access type. -->
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <form method="post">
+        {% csrf_token %}
+
+        <div class="YY-MAIN_BOTTOM_DIV">
+          <table class="w-full border-collapse">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH">Тип доступа</th>
+                <th class="YY-TH_TH">sending_workspace_limit</th>
+                <th class="YY-TH_TH">sending_task_limit</th>
+                <th class="YY-TH_TH">active_tasks_limit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in rows %}
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD"><b>{{ row.access_type }}</b></td>
+                <td class="YY-TB_TD">
+                  {{ row.form.sending_workspace_limit }}
+                  {% if row.form.sending_workspace_limit.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ row.form.sending_workspace_limit.errors }}</div>{% endif %}
+                </td>
+                <td class="YY-TB_TD">
+                  {{ row.form.sending_task_limit }}
+                  {% if row.form.sending_task_limit.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ row.form.sending_task_limit.errors }}</div>{% endif %}
+                </td>
+                <td class="YY-TB_TD">
+                  {{ row.form.active_tasks_limit }}
+                  {% if row.form.active_tasks_limit.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ row.form.active_tasks_limit.errors }}</div>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="mt-4 flex gap-3">
+          <button type="submit" class="YY-BUTTON_GREEN">Сохранить</button>
+        </div>
+      </form>
+    </td>
+  </tr>
+</table>
+{% endblock %}

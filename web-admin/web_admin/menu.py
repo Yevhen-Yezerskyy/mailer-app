@@ -42,4 +42,22 @@ PANEL_MENU = [
             },
         ],
     },
+    {
+        "title": _("Лимиты"),
+        "open_prefixes": ["/limits/"],
+        "items": [
+            {
+                "title": _("Типы доступа"),
+                "page_title": _("Типы доступа"),
+                "url_name": "limits_access_types",
+                "active_prefixes": ["/limits/access-types/"],
+            },
+            {
+                "title": _("Спец.лимиты"),
+                "page_title": _("Спец.лимиты"),
+                "url_name": "limits_special",
+                "active_prefixes": ["/limits/special/"],
+            },
+        ],
+    },
 ]

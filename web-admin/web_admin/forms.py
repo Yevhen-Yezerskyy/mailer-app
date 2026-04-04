@@ -9,6 +9,22 @@ from mailer_web.models_accounts import ClientUser, Workspace
 
 
 class WorkspaceForm(forms.ModelForm):
+    sending_workspace_limit = forms.IntegerField(
+        label="Лимит workspace sending",
+        required=False,
+        min_value=0,
+    )
+    sending_task_limit = forms.IntegerField(
+        label="Лимит sending task",
+        required=False,
+        min_value=0,
+    )
+    active_tasks_limit = forms.IntegerField(
+        label="Лимит активных задач",
+        required=False,
+        min_value=0,
+    )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         _apply_panel_styles(self)
@@ -22,6 +38,8 @@ class WorkspaceForm(forms.ModelForm):
             "company_phone",
             "company_email",
             "access_type",
+            "billing_day",
+            "registration_date",
         ]
         labels = {
             "company_name": "Название компании",
@@ -29,6 +47,8 @@ class WorkspaceForm(forms.ModelForm):
             "company_phone": "Телефон компании",
             "company_email": "Электронная почта компании",
             "access_type": "Вид доступа",
+            "billing_day": "День биллинга",
+            "registration_date": "Дата регистрации",
         }
         widgets = {
             "company_address": forms.Textarea(attrs={"rows": 4}),
@@ -109,6 +129,31 @@ class ClientUserForm(forms.ModelForm):
         return user
 
 
+class WorkspaceLimitsForm(forms.Form):
+    sending_workspace_limit = forms.IntegerField(
+        required=False,
+        min_value=0,
+    )
+    sending_task_limit = forms.IntegerField(
+        required=False,
+        min_value=0,
+    )
+    active_tasks_limit = forms.IntegerField(
+        required=False,
+        min_value=0,
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _apply_panel_styles(self)
+
+    def has_values(self) -> bool:
+        return any(
+            self.cleaned_data.get(name) is not None
+            for name in ("sending_workspace_limit", "sending_task_limit", "active_tasks_limit")
+        )
+
+
 class MailLetterForm(forms.ModelForm):
     class Meta:
         model = MailLetter
@@ -126,7 +171,7 @@ class MailLetterForm(forms.ModelForm):
         _apply_panel_styles(self)
 
 
-def _apply_panel_styles(form: forms.ModelForm) -> None:
+def _apply_panel_styles(form: forms.BaseForm) -> None:
     for name, field in form.fields.items():
         widget = field.widget
         attrs = dict(widget.attrs or {})

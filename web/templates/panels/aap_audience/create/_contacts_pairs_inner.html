@@ -1,6 +1,46 @@
 {% load i18n %}
 <!-- FILE: web/templates/panels/aap_audience/create/_contacts_pairs_inner.html -->
-<!-- DATE: 2026-04-01 -->
-<!-- PURPOSE: Placeholder inner section for branch/city pairs. -->
+<!-- DATE: 2026-04-03 -->
+<!-- PURPOSE: Processed category/city pairs with ratings and collected counters. -->
 
-<div class="YY-STATUS_GRAY w-full">{% trans "Пары категории / города - раздел пока в разработке." %}</div>
+<table class="YY-MAIN_TABLE !mt-3" data-contacts-pairs-root="1">
+  <tr>
+    <td class="YY-MAIN_TOP_TD">
+      <div class="YY-CARD_WHITE flex flex-col" data-contacts-pairs-card="1">
+        {% if type == "buy" %}
+          <div class="YY-STATUS_YELLOW !mb-3">{% trans "Пары категории / города (необработанные данные)" %}</div>
+        {% else %}
+          <div class="YY-STATUS_GREEN !mb-3">{% trans "Пары категории / города (необработанные данные)" %}</div>
+        {% endif %}
+        <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+          {% if contacts_pairs_rows %}
+            <div class="flex flex-col gap-[2px]">
+              {% for row in contacts_pairs_rows %}
+                <div
+                  class="grid w-full items-start gap-x-2 px-1 {% if row.collected_num > 0 %}bg-[#f0fff0]{% else %}bg-[#ffffe3]{% endif %}"
+                  data-contacts-pair-row-key="{{ row.cb_id }}"
+                  style="{% if contacts_pairs_show_catalog %}grid-template-columns:7ch max-content 4ch minmax(0,1.45fr) minmax(0,1fr) max-content;{% else %}grid-template-columns:max-content 4ch minmax(0,1.45fr) minmax(0,1fr) max-content;{% endif %}">
+                  {% if contacts_pairs_show_catalog %}
+                    <div class="YY-TEXT !mb-0 !py-1 whitespace-nowrap text-center">{{ row.catalog_display }}</div>
+                  {% endif %}
+                  <div
+                    class="YY-TEXT !mb-0 !py-1 whitespace-nowrap text-left"
+                    data-contacts-pair-time="1"
+                    data-utc-iso="{{ row.processed_at_utc_iso|default_if_none:''|escape }}">
+                    {% if row.processed_at_display %}{{ row.processed_at_display }} (UTC){% else %}-{% endif %}
+                  </div>
+                  <div class="YY-TEXT !mb-0 !py-1 whitespace-nowrap text-center">{{ row.pair_rate_display }}</div>
+                  <div class="YY-TEXT !mb-0 !py-1 min-w-0 whitespace-normal break-words">{{ row.category_with_rate }}</div>
+                  <div class="YY-TEXT !mb-0 !py-1 min-w-0 whitespace-normal break-words">{{ row.city_with_rate }}</div>
+                  <div class="YY-TEXT !mb-0 !py-1 whitespace-nowrap text-right">{{ row.collected_num_display }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="YY-TEXT !mb-0">{% trans "Здесь пока нет данных" %}</div>
+          {% endif %}
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>

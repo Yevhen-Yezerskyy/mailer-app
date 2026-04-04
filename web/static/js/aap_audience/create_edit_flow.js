@@ -18,9 +18,8 @@
   const bypassSubmit = new WeakMap();
   let cityRatingPollTimer = 0;
   let cityRatingPollInFlight = false;
-  let contactsTotalPollTimer = 0;
+  let contactsPollTimer = 0;
   let contactsTotalPollInFlight = false;
-  let contactsSectionPollTimer = 0;
   let contactsSectionPollInFlight = false;
 
   function isWaitAction(submitter) {
@@ -682,16 +681,10 @@
     cityRatingPollTimer = 0;
   }
 
-  function stopContactsTotalPolling() {
-    if (!contactsTotalPollTimer) return;
-    window.clearInterval(contactsTotalPollTimer);
-    contactsTotalPollTimer = 0;
-  }
-
-  function stopContactsSectionPolling() {
-    if (!contactsSectionPollTimer) return;
-    window.clearInterval(contactsSectionPollTimer);
-    contactsSectionPollTimer = 0;
+  function stopContactsPolling() {
+    if (!contactsPollTimer) return;
+    window.clearInterval(contactsPollTimer);
+    contactsPollTimer = 0;
   }
 
   function startCityRatingPolling() {
@@ -702,21 +695,36 @@
     cityRatingPollTimer = window.setInterval(refreshCityRatingPanel, 2000);
   }
 
-  function startContactsTotalPolling() {
-    stopContactsTotalPolling();
+  function contactsShouldPoll() {
     const panel = contactsTotalPanel();
-    if (!panel) return;
-    if (!String(panel.getAttribute("data-contacts-total-url") || "").trim()) return;
-    contactsTotalPollTimer = window.setInterval(refreshContactsTotalPanel, 10000);
+    if (!panel) return false;
+    if (!String(panel.getAttribute("data-contacts-total-url") || "").trim()) return false;
+    const wrapper = contactsSectionWrapper("collect");
+    if (!wrapper) return true;
+    if (wrapper.getAttribute("data-contacts-section-running") === "1") {
+      if (!String(wrapper.getAttribute("data-contacts-section-url") || "").trim()) return false;
+    }
+    return true;
   }
 
-  function startContactsSectionPolling() {
-    stopContactsSectionPolling();
-    const wrapper = contactsSectionWrapper();
-    if (!wrapper) return;
-    if (wrapper.getAttribute("data-contacts-section-running") !== "1") return;
-    if (!String(wrapper.getAttribute("data-contacts-section-url") || "").trim()) return;
-    contactsSectionPollTimer = window.setInterval(refreshContactsSectionPanel, 10000);
+  function refreshContactsTick() {
+    refreshContactsTotalPanel();
+    const activeSection = contactsActiveSectionKey();
+    if (activeSection && activeSection !== "collect") {
+      refreshContactsSectionPanel();
+      return;
+    }
+    const collectWrapper = contactsSectionWrapper("collect");
+    if (!collectWrapper) return;
+    if (collectWrapper.getAttribute("data-contacts-section-running") !== "1") return;
+    if (activeSection !== "collect") return;
+    refreshContactsSectionPanel();
+  }
+
+  function startContactsPolling() {
+    stopContactsPolling();
+    if (!contactsShouldPoll()) return;
+    contactsPollTimer = window.setInterval(refreshContactsTick, 10000);
   }
 
   function refreshCityRatingPanel() {
@@ -741,6 +749,8 @@
       if (!nextPanel || !currentPanel) return;
       currentPanel.replaceWith(nextPanel);
       syncCityDeleteState();
+      scheduleCitiesWorkHeightSync();
+      window.setTimeout(scheduleCitiesWorkHeightSync, 0);
       startCityRatingPolling();
     }).catch(function () {
     }).finally(function () {
@@ -771,7 +781,7 @@
     }).then(function (result) {
       const payload = result.payload || {};
       if (!result.response.ok || !payload.ok) {
-        stopContactsTotalPolling();
+        stopContactsPolling();
         return;
       }
       valueNode.textContent = formatContactsTotal(payload.contacts_total || 0);
@@ -780,8 +790,7 @@
         if (collectWrapper) {
           collectWrapper.setAttribute("data-contacts-section-running", "0");
         }
-        stopContactsTotalPolling();
-        stopContactsSectionPolling();
+        stopContactsPolling();
       }
     }).catch(function () {
     }).finally(function () {
@@ -809,17 +818,111 @@
       const sectionKey = String(wrapper.getAttribute("data-contacts-section-wrapper") || "").trim();
       const inner = wrapper.querySelector("[data-contacts-section-inner='" + sectionKey + "']");
       if (!sectionKey || !inner) return;
-      inner.style.transition = "opacity 140ms ease";
-      inner.style.opacity = "0.35";
+      const previousPairsLayout = sectionKey === "pairs" ? snapshotContactsPairsLayout(inner) : null;
+      const useFadeSwap = sectionKey !== "pairs";
+      if (useFadeSwap) {
+        inner.style.transition = "opacity 140ms ease";
+        inner.style.opacity = "0.35";
+      } else {
+        inner.style.removeProperty("transition");
+        inner.style.removeProperty("opacity");
+      }
       window.setTimeout(function () {
         inner.innerHTML = html;
-        inner.style.opacity = "1";
-        startContactsSectionPolling();
-      }, 140);
+        if (useFadeSwap) {
+          inner.style.opacity = "1";
+        }
+        if (sectionKey === "pairs") {
+          animatePairsRefresh(inner, previousPairsLayout);
+        }
+        scheduleContactsBranchCityHeightSync();
+        scheduleContactsPairsHeightSync();
+        formatPairProcessedTimes();
+        window.setTimeout(scheduleContactsBranchCityHeightSync, 0);
+        window.setTimeout(scheduleContactsPairsHeightSync, 0);
+        startContactsPolling();
+      }, useFadeSwap ? 140 : 0);
     }).catch(function () {
     }).finally(function () {
       contactsSectionPollInFlight = false;
     });
+  }
+
+  function snapshotContactsPairsLayout(container) {
+    if (!container) return "";
+    const rows = Array.from(container.querySelectorAll("[data-contacts-pair-row-key]"));
+    if (!rows.length) return null;
+    const positions = {};
+    rows.forEach(function (row) {
+      const key = String(row.getAttribute("data-contacts-pair-row-key") || "").trim();
+      if (!key) return;
+      positions[key] = { top: row.getBoundingClientRect().top };
+    });
+    const topKey = String(rows[0].getAttribute("data-contacts-pair-row-key") || "").trim();
+    return { topKey: topKey, positions: positions };
+  }
+
+  function animatePairsRefresh(container, previousLayout) {
+    if (!container || !previousLayout || !previousLayout.positions) return;
+
+    try {
+      if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        return;
+      }
+    } catch (e) {
+    }
+
+    const rows = Array.from(container.querySelectorAll("[data-contacts-pair-row-key]"));
+    if (!rows.length) return;
+    const currentTopKey = String(rows[0].getAttribute("data-contacts-pair-row-key") || "").trim();
+    if (!previousLayout.topKey || !currentTopKey || previousLayout.topKey === currentTopKey) return;
+
+    const animatedRows = [];
+    const durationMs = 620;
+    const easing = "cubic-bezier(0.22, 0.61, 0.36, 1)";
+
+    rows.forEach(function (row) {
+      const key = String(row.getAttribute("data-contacts-pair-row-key") || "").trim();
+      if (!key) return;
+      const nowTop = row.getBoundingClientRect().top;
+      const prev = previousLayout.positions[key];
+      if (prev && Number.isFinite(prev.top)) {
+        const dy = prev.top - nowTop;
+        if (Math.abs(dy) >= 1) {
+          row.style.transition = "none";
+          row.style.transform = "translateY(" + String(dy) + "px)";
+          row.style.willChange = "transform";
+          animatedRows.push(row);
+        }
+        return;
+      }
+      if (key === currentTopKey) {
+        row.style.transition = "none";
+        row.style.transform = "translateY(-14px)";
+        row.style.opacity = "0";
+        row.style.willChange = "transform, opacity";
+        animatedRows.push(row);
+      }
+    });
+
+    if (!animatedRows.length) return;
+
+    void container.offsetHeight;
+
+    animatedRows.forEach(function (row) {
+      row.style.transition = "transform " + String(durationMs) + "ms " + easing + ", opacity " + String(durationMs) + "ms ease";
+      row.style.transform = "translateY(0)";
+      row.style.opacity = "1";
+    });
+
+    window.setTimeout(function () {
+      animatedRows.forEach(function (row) {
+        row.style.removeProperty("transition");
+        row.style.removeProperty("transform");
+        row.style.removeProperty("opacity");
+        row.style.removeProperty("will-change");
+      });
+    }, durationMs + 40);
   }
 
   function refreshContactsAllSectionPanel(pageValue, queryValue) {
@@ -853,11 +956,224 @@
       return;
     }
 
-    const greenRect = lastGreen.getBoundingClientRect();
+    const boxRect = box.getBoundingClientRect();
     const yellowRect = firstYellow.getBoundingClientRect();
-    const gap = Math.max(0, yellowRect.top - greenRect.bottom);
-    const targetTop = firstYellow.offsetTop - lastGreen.offsetHeight - gap - 70;
+    const greenRect = lastGreen.getBoundingClientRect();
+    const halfLastGreen = Math.max(0, Math.floor(greenRect.height / 2));
+    const gapBetweenBlocks = Math.max(0, yellowRect.top - greenRect.bottom);
+    const targetTop = box.scrollTop + (yellowRect.top - boxRect.top) - halfLastGreen - gapBetweenBlocks;
     box.scrollTop = Math.max(0, targetTop);
+  }
+
+  let branchesWorkHeightRaf = 0;
+  let citiesWorkHeightRaf = 0;
+  let contactsBranchCityHeightRaf = 0;
+  let contactsPairsHeightRaf = 0;
+
+  function fitBranchesWorkHeight() {
+    const rootNode = document.querySelector("[data-branches-work-root='1']");
+    if (!rootNode) return;
+
+    const leftCard = rootNode.querySelector("[data-branches-work-left-card='1']");
+    const scrollBox = rootNode.querySelector("[data-branches-scroll-box='1']");
+    if (!leftCard || !scrollBox) return;
+
+    leftCard.style.height = "";
+
+    const top = leftCard.getBoundingClientRect().top;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    if (!viewportHeight) return;
+
+    const topGap = Math.max(0, Math.floor(top));
+    const mirroredGap = Math.min(topGap, 120);
+    const bottomGap = Math.floor(mirroredGap * 0.3);
+    const minHeight = 420;
+    const height = Math.max(minHeight, Math.floor(viewportHeight - top - bottomGap));
+    const px = String(height) + "px";
+    leftCard.style.height = px;
+  }
+
+  function scheduleBranchesWorkHeightSync() {
+    if (branchesWorkHeightRaf) return;
+    branchesWorkHeightRaf = window.requestAnimationFrame(function () {
+      branchesWorkHeightRaf = 0;
+      fitBranchesWorkHeight();
+      scrollBranchesToLastGreen();
+    });
+  }
+
+  function fitCitiesWorkHeight() {
+    const rootNode = document.querySelector("[data-cities-work-root='1']");
+    if (!rootNode) return;
+
+    const leftCard = rootNode.querySelector("[data-cities-work-left-card='1']");
+    if (!leftCard) return;
+
+    leftCard.style.removeProperty("height");
+
+    const top = leftCard.getBoundingClientRect().top;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    if (!viewportHeight) return;
+
+    const topGap = Math.max(0, Math.floor(top));
+    const mirroredGap = Math.min(topGap, 120);
+    const bottomGap = Math.floor(mirroredGap * 0.3);
+    const minHeight = 420;
+    const height = Math.max(minHeight, Math.floor(viewportHeight - top - bottomGap));
+    const px = String(height) + "px";
+    leftCard.style.setProperty("height", px, "important");
+  }
+
+  function scheduleCitiesWorkHeightSync() {
+    if (citiesWorkHeightRaf) return;
+    citiesWorkHeightRaf = window.requestAnimationFrame(function () {
+      citiesWorkHeightRaf = 0;
+      fitCitiesWorkHeight();
+    });
+  }
+
+  function fitContactsBranchCityHeight() {
+    const rootNode = document.querySelector("[data-contacts-branch-city-root='1']");
+    if (!rootNode) return;
+
+    const leftCard = rootNode.querySelector("[data-contacts-branch-city-left-card='1']");
+    const rightCard = rootNode.querySelector("[data-contacts-branch-city-right-card='1']");
+    if (!leftCard || !rightCard) return;
+
+    leftCard.style.removeProperty("height");
+    rightCard.style.removeProperty("height");
+
+    const leftTop = leftCard.getBoundingClientRect().top;
+    const rightTop = rightCard.getBoundingClientRect().top;
+    const top = Math.min(leftTop, rightTop);
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    if (!viewportHeight) return;
+
+    const topGap = Math.max(0, Math.floor(top));
+    const mirroredGap = Math.min(topGap, 120);
+    const bottomGap = Math.floor(mirroredGap * 0.3);
+    const minHeight = 420;
+    const height = Math.max(minHeight, Math.floor(viewportHeight - top - bottomGap));
+    const px = String(height) + "px";
+    leftCard.style.setProperty("height", px, "important");
+    rightCard.style.setProperty("height", px, "important");
+  }
+
+  function scheduleContactsBranchCityHeightSync() {
+    if (contactsBranchCityHeightRaf) return;
+    contactsBranchCityHeightRaf = window.requestAnimationFrame(function () {
+      contactsBranchCityHeightRaf = 0;
+      fitContactsBranchCityHeight();
+    });
+  }
+
+  function fitContactsPairsHeight() {
+    const rootNode = document.querySelector("[data-contacts-pairs-root='1']");
+    if (!rootNode) return;
+
+    const card = rootNode.querySelector("[data-contacts-pairs-card='1']");
+    if (!card) return;
+
+    card.style.removeProperty("height");
+
+    const top = card.getBoundingClientRect().top;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    if (!viewportHeight) return;
+
+    const topGap = Math.max(0, Math.floor(top));
+    const mirroredGap = Math.min(topGap, 120);
+    const bottomGap = Math.floor(mirroredGap * 0.3);
+    const minHeight = 420;
+    const height = Math.max(minHeight, Math.floor(viewportHeight - top - bottomGap));
+    const px = String(height) + "px";
+    card.style.setProperty("height", px, "important");
+  }
+
+  function scheduleContactsPairsHeightSync() {
+    if (contactsPairsHeightRaf) return;
+    contactsPairsHeightRaf = window.requestAnimationFrame(function () {
+      contactsPairsHeightRaf = 0;
+      fitContactsPairsHeight();
+    });
+  }
+
+  function twoDigits(value) {
+    const number = Number(value || 0);
+    if (!Number.isFinite(number)) return "00";
+    return String(number).padStart(2, "0");
+  }
+
+  function formatPairProcessedTimes() {
+    const nodes = Array.from(document.querySelectorAll("[data-contacts-pair-time='1']"));
+    if (!nodes.length) return;
+
+    let preferredTz = "UTC";
+    try {
+      const browserTz = String(Intl.DateTimeFormat().resolvedOptions().timeZone || "").trim();
+      if (browserTz) preferredTz = browserTz;
+    } catch (e) {
+      preferredTz = "UTC";
+    }
+
+    nodes.forEach(function (node) {
+      const isoRaw = String(node.getAttribute("data-utc-iso") || "").trim();
+      if (!isoRaw) return;
+
+      const sourceDate = new Date(isoRaw);
+      if (!Number.isFinite(sourceDate.getTime())) return;
+
+      let tz = preferredTz;
+      let localDate;
+      try {
+        localDate = new Date(sourceDate.toLocaleString("en-US", { timeZone: tz }));
+      } catch (e) {
+        tz = "UTC";
+        localDate = new Date(sourceDate.toLocaleString("en-US", { timeZone: "UTC" }));
+      }
+      if (!Number.isFinite(localDate.getTime())) {
+        tz = "UTC";
+        localDate = sourceDate;
+      }
+
+      const display =
+        String(localDate.getFullYear()) +
+        "-" +
+        twoDigits(localDate.getMonth() + 1) +
+        "-" +
+        twoDigits(localDate.getDate()) +
+        " " +
+        twoDigits(localDate.getHours()) +
+        ":" +
+        twoDigits(localDate.getMinutes()) +
+        ":" +
+        twoDigits(localDate.getSeconds());
+
+      let offsetLabel = "UTC";
+      try {
+        const offsetFmt = new Intl.DateTimeFormat("en-US", {
+          timeZone: tz,
+          timeZoneName: "shortOffset",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        const tzPart = offsetFmt.formatToParts(sourceDate).find(function (part) {
+          return part.type === "timeZoneName";
+        });
+        const rawOffset = String((tzPart && tzPart.value) || "").trim();
+        if (rawOffset) {
+          offsetLabel = rawOffset.replace("GMT", "UTC");
+        } else if (tz !== "UTC") {
+          offsetLabel = tz;
+        }
+      } catch (e) {
+        if (tz !== "UTC") {
+          offsetLabel = tz;
+        }
+      }
+
+      const decoded = offsetLabel || "UTC";
+      node.textContent = display + " (" + decoded + ")";
+    });
   }
 
   document.addEventListener("click", function (event) {
@@ -893,7 +1209,7 @@
       if (sectionKey) {
         showContactsSection(sectionKey);
         refreshContactsSectionPanel();
-        startContactsSectionPolling();
+        startContactsPolling();
       }
       return;
     }
@@ -907,13 +1223,19 @@
     if (!selected) {
       row.classList.remove("bg-[#f0fff0]");
       row.classList.remove("bg-[#FFF7E0]");
+      row.classList.remove("bg-[#ffffd6]");
+      row.classList.remove("bg-[#ffffdc]");
+      row.classList.remove("bg-[#ffffe3]");
       row.classList.add("bg-[#fff3f3]");
     } else {
       row.classList.remove("bg-[#f0fff0]");
       row.classList.remove("bg-[#FFF7E0]");
+      row.classList.remove("bg-[#ffffd6]");
+      row.classList.remove("bg-[#ffffdc]");
+      row.classList.remove("bg-[#ffffe3]");
       row.classList.remove("bg-[#fff3f3]");
       if (row.getAttribute("data-branch-yellow") === "1") {
-        row.classList.add("bg-[#FFF7E0]");
+        row.classList.add("bg-[#ffffe3]");
       } else {
         row.classList.add("bg-[#f0fff0]");
       }
@@ -930,8 +1252,11 @@
         row.classList.remove("bg-[#fff3f3]");
         row.classList.remove("bg-[#f0fff0]");
         row.classList.remove("bg-[#FFF7E0]");
+        row.classList.remove("bg-[#ffffd6]");
+        row.classList.remove("bg-[#ffffdc]");
+        row.classList.remove("bg-[#ffffe3]");
         if (row.getAttribute("data-branch-yellow") === "1") {
-          row.classList.add("bg-[#FFF7E0]");
+          row.classList.add("bg-[#ffffe3]");
         } else {
           row.classList.add("bg-[#f0fff0]");
         }
@@ -951,8 +1276,12 @@
     refreshContactsAllSectionPanel("1", query);
   });
 
-  scrollBranchesToLastGreen();
   syncBranchDeleteState();
+  scheduleBranchesWorkHeightSync();
+  window.setTimeout(scheduleBranchesWorkHeightSync, 0);
+  window.setTimeout(scheduleBranchesWorkHeightSync, 140);
+  window.addEventListener("resize", scheduleBranchesWorkHeightSync);
+  window.addEventListener("orientationchange", scheduleBranchesWorkHeightSync);
 
   document.addEventListener("click", function (event) {
     const button = event.target.closest("[data-city-delete-toggle='1']");
@@ -964,13 +1293,15 @@
     if (!selected) {
       row.classList.remove("bg-[#f0fff0]");
       row.classList.remove("bg-[#FFF7E0]");
+      row.classList.remove("bg-[#ffffe3]");
       row.classList.add("bg-[#fff3f3]");
     } else {
       row.classList.remove("bg-[#f0fff0]");
       row.classList.remove("bg-[#FFF7E0]");
+      row.classList.remove("bg-[#ffffe3]");
       row.classList.remove("bg-[#fff3f3]");
       if (row.getAttribute("data-city-yellow") === "1") {
-        row.classList.add("bg-[#FFF7E0]");
+        row.classList.add("bg-[#ffffe3]");
       } else {
         row.classList.add("bg-[#f0fff0]");
       }
@@ -987,8 +1318,9 @@
         row.classList.remove("bg-[#fff3f3]");
         row.classList.remove("bg-[#f0fff0]");
         row.classList.remove("bg-[#FFF7E0]");
+        row.classList.remove("bg-[#ffffe3]");
         if (row.getAttribute("data-city-yellow") === "1") {
-          row.classList.add("bg-[#FFF7E0]");
+          row.classList.add("bg-[#ffffe3]");
         } else {
           row.classList.add("bg-[#f0fff0]");
         }
@@ -1000,9 +1332,24 @@
   });
 
   syncCityDeleteState();
+  scheduleCitiesWorkHeightSync();
+  window.setTimeout(scheduleCitiesWorkHeightSync, 0);
+  window.setTimeout(scheduleCitiesWorkHeightSync, 140);
+  window.addEventListener("resize", scheduleCitiesWorkHeightSync);
+  window.addEventListener("orientationchange", scheduleCitiesWorkHeightSync);
+  scheduleContactsBranchCityHeightSync();
+  window.setTimeout(scheduleContactsBranchCityHeightSync, 0);
+  window.setTimeout(scheduleContactsBranchCityHeightSync, 140);
+  window.addEventListener("resize", scheduleContactsBranchCityHeightSync);
+  window.addEventListener("orientationchange", scheduleContactsBranchCityHeightSync);
+  scheduleContactsPairsHeightSync();
+  window.setTimeout(scheduleContactsPairsHeightSync, 0);
+  window.setTimeout(scheduleContactsPairsHeightSync, 140);
+  window.addEventListener("resize", scheduleContactsPairsHeightSync);
+  window.addEventListener("orientationchange", scheduleContactsPairsHeightSync);
+  formatPairProcessedTimes();
   syncContactsSectionButtons();
   showContactsSection(contactsActiveSectionKey() || "collect");
   startCityRatingPolling();
-  startContactsTotalPolling();
-  startContactsSectionPolling();
+  startContactsPolling();
 })();

@@ -18,7 +18,7 @@ from engine.common.cache.client import CLIENT
 from engine.common.gpt import GPTClient
 from engine.common.utils import h64_text, parse_json_response
 from engine.common.prompts.process import get_prompt, translate_text
-from mailer_web.format_data import get_branches_sys_translations, normalize_city
+from mailer_web.format_contact import get_category_title, get_city_title_by_city_id
 
 from .create_edit_flow_shared import (
     build_flow_render_context,
@@ -33,21 +33,6 @@ FORM_TTL_SEC = 24 * 60 * 60
 BRANCH_EXPAND_ADJACENT_RU = "Расширь текущий список за счет других использований продукта, которые не были перечислены в описании продукта. Расширь список категорий за счет смежных категорий, похожих категорий, дополнительных синонимов, аналогов. Используй контекст бизнес-справочников."
 BRANCH_EXPAND_MIDDLEMEN_RU = "Расширь текущий список за счет релевантных посредников и перекупщиков, оптовых торговцев и покупателей. Если по компании-продавцу понятно, что это экспорт в Германию, расширь список за счет релевантных посредников импорт-экспорт."
 CITY_RADIUS_RE = re.compile(r"__RADIUS_FROM_CITY__\('((?:[^']|'')+)',\s*([0-9]+)\)")
-
-
-def _render_branch_items(records: list[dict[str, Any]], ui_lang: str) -> list[str]:
-    if not records:
-        return ["Ничего не найдено."]
-    if ui_lang == "de":
-        return [str(item["branch_name"]) for item in records]
-    translated = get_branches_sys_translations([int(item["id"]) for item in records], ui_lang)
-
-    return [
-        f"{item['branch_name']} / {translated[int(item['id'])]}"
-        if translated.get(int(item["id"])) and translated[int(item["id"])] != str(item["branch_name"])
-        else str(item["branch_name"])
-        for item in records
-    ] or ["Ничего не найдено."]
 
 
 def _collapse_branch_rows_for_display(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -65,7 +50,6 @@ def _collapse_branch_rows_for_display(rows: list[dict[str, Any]]) -> list[dict[s
                 "ids_csv": str(branch_id),
                 "rate_display": str(row.get("rate_display") or "-"),
                 "branch_name": branch_name,
-                "translated_name": str(row.get("translated_name") or "").strip(),
             }
             index[key] = item
             out.append(item)
@@ -73,8 +57,6 @@ def _collapse_branch_rows_for_display(rows: list[dict[str, Any]]) -> list[dict[s
         item = index[key]
         item["ids"].append(branch_id)
         item["ids_csv"] = ",".join(str(v) for v in item["ids"])
-        if not item["translated_name"] and str(row.get("translated_name") or "").strip():
-            item["translated_name"] = str(row.get("translated_name") or "").strip()
     return out
 
 
@@ -266,7 +248,7 @@ def _current_city_hash(task, geo_text: str) -> int:
     return int(h64_text((task.source_product or "") + (task.source_company or "") + str(geo_text or "")))
 
 
-def _build_city_rows_context(task, geo_text: str) -> dict[str, Any]:
+def _build_city_rows_context(request, task, geo_text: str) -> dict[str, Any]:
     with connection.cursor() as cur:
         cur.execute(
             "SELECT tcr.city_id, tcr.rate, tcr.hash_task, cs.name, cs.state_name "
@@ -281,27 +263,38 @@ def _build_city_rows_context(task, geo_text: str) -> dict[str, Any]:
     city_task_hash = _current_city_hash(task, geo_text)
     city_hash_changed = bool(city_rows) and any(row[2] != city_task_hash for row in city_rows)
 
+    def _city_title(city_id: int, fallback_name: str, fallback_state: str) -> str:
+        try:
+            title = " ".join(str(get_city_title_by_city_id(city_id, request, land=True)).split()).strip()
+        except Exception:
+            title = ""
+        fallback_city = " ".join(str(fallback_name or "").split()).strip()
+        fallback_state_title = " ".join(str(fallback_state or "").split()).strip()
+        if fallback_city and fallback_state_title:
+            fallback = f"{fallback_city}, {fallback_state_title}"
+        else:
+            fallback = fallback_city or fallback_state_title
+        return title or fallback
+
     city_rating_rows = [
         {
             "id": int(row[0]),
             "ids_csv": str(int(row[0])),
             "rate_display": str(row[1]) if row[1] is not None else "-",
-            "city_name": normalize_city(str(row[3] or "").strip()),
-            "state_name": str(row[4] or "").strip(),
+            "city_title": _city_title(int(row[0]), str(row[3] or "").strip(), str(row[4] or "").strip()),
         }
         for row in city_rows
-        if row and row[3] and row[4] and row[1] is not None
+        if row and row[1] is not None
     ]
     city_expand_rows = [
         {
             "id": int(row[0]),
             "ids_csv": str(int(row[0])),
             "rate_display": "-",
-            "city_name": normalize_city(str(row[3] or "").strip()),
-            "state_name": str(row[4] or "").strip(),
+            "city_title": _city_title(int(row[0]), str(row[3] or "").strip(), str(row[4] or "").strip()),
         }
         for row in city_rows
-        if row and row[3] and row[4] and row[1] is None
+        if row and row[1] is None
     ]
     total_count = len(city_rating_rows) + len(city_expand_rows)
     unrated_count = len(city_expand_rows)
@@ -319,7 +312,7 @@ def _build_city_rows_context(task, geo_text: str) -> dict[str, Any]:
     }
 
 
-def handle_branches_cities_step_view(
+def handle_branches_step_view(
     request,
     *,
     flow_type: str,
@@ -329,9 +322,53 @@ def handle_branches_cities_step_view(
     saved_values: Mapping[str, Any],
     flow_status: Mapping[str, Any],
 ):
+    return _handle_branches_cities_step_view(
+        request,
+        flow_type=flow_type,
+        current_step_key=current_step_key,
+        item_id=item_id,
+        task=task,
+        saved_values=saved_values,
+        flow_status=flow_status,
+        view_mode="branches",
+    )
+
+
+def handle_cities_step_view(
+    request,
+    *,
+    flow_type: str,
+    current_step_key: str,
+    item_id: str,
+    task,
+    saved_values: Mapping[str, Any],
+    flow_status: Mapping[str, Any],
+):
+    return _handle_branches_cities_step_view(
+        request,
+        flow_type=flow_type,
+        current_step_key=current_step_key,
+        item_id=item_id,
+        task=task,
+        saved_values=saved_values,
+        flow_status=flow_status,
+        view_mode="cities",
+    )
+
+
+def _handle_branches_cities_step_view(
+    request,
+    *,
+    flow_type: str,
+    current_step_key: str,
+    item_id: str,
+    task,
+    saved_values: Mapping[str, Any],
+    flow_status: Mapping[str, Any],
+    view_mode: str,
+):
     flow_conf = get_flow_config(flow_type)
     step_definitions = build_step_definitions(flow_type)
-    ui_lang = request.ui_lang_code
     is_city_partial = request.method == "GET" and str(request.GET.get("cities_partial") or "").strip() == "1"
     branch_rating_rows: list[dict[str, Any]] = []
     branch_expand_rows: list[dict[str, Any]] = []
@@ -445,9 +482,6 @@ def handle_branches_cities_step_view(
     city_key = f"aap:create_flow:city_form:{city_form}" if city_form else ""
 
     branch_instruction = ""
-    branch_records: list[dict[str, Any]] = []
-
-    branch_items = _render_branch_items(branch_records, ui_lang) if branch_records else []
 
     branch_state_payload = CLIENT.get(branch_key, ttl_sec=FORM_TTL_SEC) if branch_key else None
     try:
@@ -496,6 +530,13 @@ def handle_branches_cities_step_view(
         city_probe["radio_questions"] = radio_questions
 
     if task and not is_city_partial:
+        def _branch_title(branch_id: int, fallback_name: str) -> str:
+            try:
+                title = " ".join(str(get_category_title(branch_id, request)).split()).strip()
+            except Exception:
+                title = ""
+            return title or fallback_name
+
         branch_state = _ensure_saved_branch_ratings(
             request,
             task=task,
@@ -518,23 +559,12 @@ def handle_branches_cities_step_view(
 
         branch_hash_changed = bool(rows) and any(row[2] != current_task_hash for row in rows)
 
-        translated = (
-            get_branches_sys_translations([int(row[0]) for row in rows], ui_lang)
-            if rows and ui_lang != "de"
-            else {}
-        )
-
         branch_db_ids = [int(row[0]) for row in rows if row and row[3]]
         branch_rating_rows = _collapse_branch_rows_for_display([
             {
                 "id": int(row[0]),
                 "rate_display": str(row[1]) if row[1] is not None else "-",
-                "branch_name": str(row[3] or "").strip(),
-                "translated_name": (
-                    str(translated.get(int(row[0])) or "").strip()
-                    if ui_lang != "de"
-                    else ""
-                ),
+                "branch_name": _branch_title(int(row[0]), str(row[3] or "").strip()),
             }
             for row in rows
             if row and row[3]
@@ -568,28 +598,18 @@ def handle_branches_cities_step_view(
                 expanded_rows = cur.fetchall() or []
 
             expanded_map = {int(row[0]): str(row[1] or "").strip() for row in expanded_rows if row and row[1]}
-            expanded_translated = (
-                get_branches_sys_translations(list(expanded_map.keys()), ui_lang)
-                if expanded_map and ui_lang != "de"
-                else {}
-            )
             branch_expand_rows = _collapse_branch_rows_for_display([
                 {
                     "id": branch_id,
                     "rate_display": "-",
-                    "branch_name": expanded_map[branch_id],
-                    "translated_name": (
-                        str(expanded_translated.get(branch_id) or "").strip()
-                        if ui_lang != "de"
-                        else ""
-                    ),
+                    "branch_name": _branch_title(branch_id, expanded_map[branch_id]),
                 }
                 for branch_id in yellow_ids
                 if branch_id in expanded_map
             ])
 
     if task:
-        city_ctx = _build_city_rows_context(task, geo_text)
+        city_ctx = _build_city_rows_context(request, task, geo_text)
         city_hash_changed = bool(city_ctx["city_hash_changed"])
         city_rating_rows = list(city_ctx["city_rating_rows"])
         city_expand_rows = list(city_ctx["city_expand_rows"])
@@ -1409,8 +1429,13 @@ def handle_branches_cities_step_view(
     params["cities_partial"] = "1"
     city_partial_url = f"{request.path}?{params.urlencode()}"
 
+    has_branch_rows = bool(branch_rating_rows or branch_expand_rows)
+    branches_mode = "work" if has_branch_rows else "empty"
     branches_cities_context = {
-        "branch_items": branch_items,
+        "branches_mode": branches_mode,
+        "branch_show_hash_alert": bool(branch_hash_changed and branches_mode == "work"),
+        "branch_show_expand_save_actions": bool(branch_expand_rows and branches_mode == "work"),
+        "branch_show_expand_controls": bool(branches_mode == "work"),
         "branch_rating_rows": branch_rating_rows,
         "branch_expand_rows": branch_expand_rows,
         "city_items": [],
@@ -1440,13 +1465,18 @@ def handle_branches_cities_step_view(
     if is_city_partial:
         return render(
             request,
-            "panels/aap_audience/create/_cities_panel.html",
+            "panels/aap_audience/create/step_cities.html",
             {
                 "type": flow_type,
                 "branches_cities_step": branches_cities_context,
             },
         )
 
+    step_template = (
+        "panels/aap_audience/create/step_cities.html"
+        if str(view_mode or "").strip() == "cities"
+        else "panels/aap_audience/create/step_branches.html"
+    )
     return render(
         request,
         flow_conf["template_name"],
@@ -1458,7 +1488,7 @@ def handle_branches_cities_step_view(
             step_definitions=step_definitions,
             flow_status=flow_status,
             current_step_key=current_step_key,
-            step_template="panels/aap_audience/create/step_branches_cities.html",
+            step_template=step_template,
             extra_context={
                 "branches_cities_step": branches_cities_context,
             },

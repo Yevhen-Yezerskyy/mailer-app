@@ -21,7 +21,8 @@ FLOW_STEP_ORDER = (
     "product",
     "company",
     "geo",
-    "branches_cities",
+    "branches",
+    "cities",
     "contacts",
     "mailing_list",
 )
@@ -33,7 +34,8 @@ STEP_URL_PARTS = {
     "product": "product",
     "company": "company",
     "geo": "geo",
-    "branches_cities": "branches_cities",
+    "branches": "branches",
+    "cities": "cities",
     "contacts": "contacts",
     "mailing_list": "mailing_list",
 }
@@ -45,18 +47,23 @@ COMMON_AI_HELP_TEXT = _(
 )
 
 COMMON_FUTURE_STEPS = {
-    "branches_cities": {
-        "nav_label": _("Категории / Города"),
-        "summary_label": _("Категории / Города"),
-        "dirty_label": _("Категории / Города"),
+    "branches": {
+        "nav_label": _("Категории"),
+        "summary_label": _("Категории"),
+        "dirty_label": _("Категории"),
+    },
+    "cities": {
+        "nav_label": _("Города"),
+        "summary_label": _("Города"),
+        "dirty_label": _("Города"),
     },
     "contacts": {
-        "nav_label": _("Сбор контактов"),
+        "nav_label": _("Наполнение"),
         "summary_label": _("Сбор контактов"),
         "dirty_label": _("Сбор контактов"),
     },
     "mailing_list": {
-        "nav_label": _("Список рассылки"),
+        "nav_label": _("Список"),
         "summary_label": _("Список рассылки"),
         "dirty_label": _("Список рассылки"),
     },
@@ -105,7 +112,13 @@ BASE_STEP_DEFINITIONS = {
         "implemented": True,
         "depends_on": ("product", "company"),
     },
-    "branches_cities": {
+    "branches": {
+        "completion_type": "never",
+        "visible": True,
+        "implemented": True,
+        "depends_on": ("product", "company", "geo"),
+    },
+    "cities": {
         "completion_type": "never",
         "visible": True,
         "implemented": True,

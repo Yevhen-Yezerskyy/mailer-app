@@ -1,9 +1,10 @@
 # FILE: web/panel/aap_audience/views/create_edit_flow_contacts.py
-# DATE: 2026-04-01
-# PURPOSE: Contacts step handlers and partials for the create/edit flow.
+# DATE: 2026-04-03
+# PURPOSE: Contacts step handlers and partials with server-routed sub-sections.
 
 from __future__ import annotations
 
+from datetime import timezone
 from typing import Any, Mapping
 
 from django.db import connection
@@ -13,7 +14,11 @@ from django.urls import reverse
 
 from engine.common.utils import parse_json_object
 from mailer_web.access import encode_id
-from mailer_web.format_contact import get_category_title, get_city_title
+from mailer_web.format_contact import (
+    get_category_title,
+    get_city_title,
+    get_city_title_by_city_id,
+)
 
 from .create_edit_flow_shared import (
     build_flow_render_context,
@@ -34,6 +39,13 @@ CONTACTS_SECTION_KEYS = {
     CONTACTS_SECTION_PAIRS,
 }
 CONTACTS_ALL_PAGE_SIZE = 50
+
+
+def _is_super_workspace_user(request) -> bool:
+    user = getattr(request, "user", None)
+    ws = getattr(user, "workspace", None)
+    return bool(ws and str(getattr(ws, "access_type", "") or "").strip() == "super")
+
 
 def _fetch_contacts_total(task_id: int) -> int:
     with connection.cursor() as cur:
@@ -212,94 +224,278 @@ def _fetch_contacts_branch_city_rows(request, task_id: int) -> dict[str, Any]:
         cur.execute(
             """
             SELECT
-                tbr.branch_id::bigint,
-                tbr.rate,
-                COALESCE(bs.branch_name, '') AS branch_name,
-                COALESCE(cnt.contacts_count, 0)::int
-            FROM public.task_branch_ratings tbr
-            LEFT JOIN public.branches_sys bs
-              ON bs.id = tbr.branch_id
-            LEFT JOIN (
+                cp.branch_id::bigint AS branch_id,
+                SUM(cb_counts.contacts_count)::bigint AS contacts_count
+            FROM (
                 SELECT
-                    cp.branch_id::bigint AS branch_id,
-                    COUNT(*)::int AS contacts_count
+                    sl.cb_id::bigint AS cb_id,
+                    COUNT(*)::bigint AS contacts_count
                 FROM public.sending_lists sl
-                JOIN public.cb_crawl_pairs cp
-                  ON cp.id = sl.cb_id
                 WHERE sl.task_id = %s
-                  AND COALESCE(sl.removed, false) = false
-                  AND cp.branch_id IS NOT NULL
-                GROUP BY cp.branch_id
-            ) cnt
-              ON cnt.branch_id = tbr.branch_id
-            WHERE tbr.task_id = %s
-            ORDER BY tbr.rate ASC NULLS LAST, tbr.branch_id ASC
+                GROUP BY sl.cb_id
+                HAVING COUNT(*) > 0
+            ) cb_counts
+            JOIN public.task_cb_ratings tcb
+              ON tcb.task_id = %s
+             AND tcb.cb_id = cb_counts.cb_id
+            JOIN public.cb_crawl_pairs cp
+              ON cp.id = tcb.cb_id
+            GROUP BY cp.branch_id
+            HAVING SUM(cb_counts.contacts_count) > 0
             """,
             [int(task_id), int(task_id)],
         )
-        branch_rows = cur.fetchall() or []
+        branch_count_rows = cur.fetchall() or []
+
+        cur.execute(
+            """
+            SELECT
+                tbr.branch_id::bigint,
+                tbr.rate
+            FROM public.task_branch_ratings tbr
+            WHERE tbr.task_id = %s
+            ORDER BY tbr.rate ASC NULLS LAST, tbr.branch_id ASC
+            """,
+            [int(task_id)],
+        )
+        branch_rating_rows = cur.fetchall() or []
+
+        cur.execute(
+            """
+            SELECT
+                city_map.city_id::bigint AS city_id,
+                SUM(cb_counts.contacts_count)::bigint AS contacts_count
+            FROM (
+                SELECT
+                    sl.cb_id::bigint AS cb_id,
+                    COUNT(*)::bigint AS contacts_count
+                FROM public.sending_lists sl
+                WHERE sl.task_id = %s
+                GROUP BY sl.cb_id
+                HAVING COUNT(*) > 0
+            ) cb_counts
+            JOIN public.task_cb_ratings tcb
+              ON tcb.task_id = %s
+             AND tcb.cb_id = cb_counts.cb_id
+            JOIN public.cb_crawl_pairs cp
+              ON cp.id = tcb.cb_id
+            LEFT JOIN public.plz_sys ps
+              ON ps.id = cp.plz_id
+            JOIN (
+                SELECT plz, MIN(city_id) AS city_id
+                FROM public.__city__plz_map
+                GROUP BY plz
+            ) city_map
+              ON city_map.plz = ps.plz
+            GROUP BY city_map.city_id
+            HAVING SUM(cb_counts.contacts_count) > 0
+            """,
+            [int(task_id), int(task_id)],
+        )
+        city_count_rows = cur.fetchall() or []
 
         cur.execute(
             """
             SELECT
                 tcr.city_id::bigint,
-                tcr.rate,
-                COALESCE(cs.name, '') AS city_name,
-                COALESCE(cs.state_name, '') AS state_name,
-                COALESCE(cnt.contacts_count, 0)::int
+                tcr.rate
             FROM public.task_city_ratings tcr
-            LEFT JOIN public.cities_sys cs
-              ON cs.id = tcr.city_id
-            LEFT JOIN (
-                SELECT
-                    city_map.city_id::bigint AS city_id,
-                    COUNT(*)::int AS contacts_count
-                FROM public.sending_lists sl
-                JOIN public.cb_crawl_pairs cp
-                  ON cp.id = sl.cb_id
-                LEFT JOIN public.plz_sys ps
-                  ON ps.id = cp.plz_id
-                LEFT JOIN (
-                    SELECT plz, MIN(city_id) AS city_id
-                    FROM public.__city__plz_map
-                    GROUP BY plz
-                ) city_map
-                  ON city_map.plz = ps.plz
-                WHERE sl.task_id = %s
-                  AND COALESCE(sl.removed, false) = false
-                  AND city_map.city_id IS NOT NULL
-                GROUP BY city_map.city_id
-            ) cnt
-              ON cnt.city_id = tcr.city_id
             WHERE tcr.task_id = %s
             ORDER BY tcr.rate ASC NULLS LAST, tcr.city_id ASC
             """,
-            [int(task_id), int(task_id)],
+            [int(task_id)],
         )
-        city_rows = cur.fetchall() or []
+        city_rating_rows = cur.fetchall() or []
+
+    branch_counts_by_id: dict[int, int] = {
+        int(row[0]): int(row[1] or 0) for row in branch_count_rows if row and row[0] is not None
+    }
+    city_counts_by_id: dict[int, int] = {
+        int(row[0]): int(row[1] or 0) for row in city_count_rows if row and row[0] is not None
+    }
+
+    def _branch_title(branch_id: int) -> str:
+        try:
+            return " ".join(str(get_category_title(int(branch_id), request)).split()).strip()
+        except Exception:
+            return str(int(branch_id))
+
+    def _city_title(city_id: int) -> str:
+        try:
+            return " ".join(str(get_city_title_by_city_id(int(city_id), request, land=True)).split()).strip()
+        except Exception:
+            return str(int(city_id))
+
+    branch_rows_collapsed: list[dict[str, Any]] = []
+    branch_rows_index: dict[str, dict[str, Any]] = {}
+    for row in branch_rating_rows:
+        branch_id = int(row[0])
+        rate_display = str(row[1]) if row[1] is not None else "-"
+        branch_title = _branch_title(branch_id)
+        key = branch_title.casefold()
+        contacts_count = int(branch_counts_by_id.get(branch_id, 0))
+        if key not in branch_rows_index:
+            item = {
+                "branch_id": branch_id,
+                "rate_display": rate_display,
+                "branch_title": branch_title,
+                "contacts_count": contacts_count,
+            }
+            branch_rows_index[key] = item
+            branch_rows_collapsed.append(item)
+            continue
+        branch_rows_index[key]["contacts_count"] = int(branch_rows_index[key]["contacts_count"]) + contacts_count
 
     return {
         "contacts_branch_rows": [
-            {
-                "branch_id": int(row[0]),
-                "rate_display": str(row[1]) if row[1] is not None else "-",
-                "branch_name": str(row[2] or "").strip(),
-                "contacts_count": int(row[3] or 0),
-                "contacts_count_display": _format_contacts_total(int(row[3] or 0)),
-            }
-            for row in branch_rows
+            {**item, "contacts_count_display": _format_contacts_total(int(item["contacts_count"]))}
+            for item in branch_rows_collapsed
         ],
         "contacts_city_rows": [
             {
                 "city_id": int(row[0]),
                 "rate_display": str(row[1]) if row[1] is not None else "-",
-                "city_name": str(row[2] or "").strip(),
-                "state_name": str(row[3] or "").strip(),
-                "contacts_count": int(row[4] or 0),
-                "contacts_count_display": _format_contacts_total(int(row[4] or 0)),
+                "city_title": _city_title(int(row[0])),
+                "contacts_count": int(city_counts_by_id.get(int(row[0]), 0)),
+                "contacts_count_display": _format_contacts_total(int(city_counts_by_id.get(int(row[0]), 0))),
             }
-            for row in city_rows
+            for row in city_rating_rows
         ],
+    }
+
+
+def _fetch_contacts_pairs_rows(request, task_id: int) -> dict[str, Any]:
+    show_catalog_column = _is_super_workspace_user(request)
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                tcb.cb_id::bigint AS cb_id,
+                tcb.rate AS pair_rate,
+                cp.branch_id::bigint AS branch_id,
+                cp.plz_id::bigint AS plz_id,
+                COALESCE(cp.collected_num, 0)::bigint AS collected_num,
+                cp.updated_at,
+                COALESCE(bs.catalog, '') AS branch_catalog
+            FROM public.task_cb_ratings tcb
+            JOIN public.cb_crawl_pairs cp
+              ON cp.id = tcb.cb_id
+            JOIN public.branches_sys bs
+              ON bs.id = cp.branch_id
+            WHERE tcb.task_id = %s
+              AND cp.collected = true
+            ORDER BY cp.updated_at DESC NULLS LAST, tcb.cb_id DESC
+            LIMIT 500
+            """,
+            [int(task_id)],
+        )
+        rows = cur.fetchall() or []
+
+        cur.execute(
+            """
+            SELECT tbr.branch_id::bigint, tbr.rate
+            FROM public.task_branch_ratings tbr
+            WHERE tbr.task_id = %s
+            """,
+            [int(task_id)],
+        )
+        branch_rate_rows = cur.fetchall() or []
+
+        cur.execute(
+            """
+            SELECT tcr.city_id::bigint, tcr.rate
+            FROM public.task_city_ratings tcr
+            WHERE tcr.task_id = %s
+            """,
+            [int(task_id)],
+        )
+        city_rate_rows = cur.fetchall() or []
+
+    branch_rate_map: dict[int, int | None] = {
+        int(row[0]): (int(row[1]) if row[1] is not None else None)
+        for row in branch_rate_rows
+        if row and row[0] is not None
+    }
+    city_rate_map: dict[int, int | None] = {
+        int(row[0]): (int(row[1]) if row[1] is not None else None)
+        for row in city_rate_rows
+        if row and row[0] is not None
+    }
+    category_title_cache: dict[int, str] = {}
+    city_title_cache: dict[int, str] = {}
+    city_id_by_plz: dict[int, int | None] = {}
+
+    pairs_rows: list[dict[str, Any]] = []
+    for row in rows:
+        cb_id = int(row[0])
+        pair_rate = row[1]
+        branch_id = int(row[2])
+        plz_id = int(row[3])
+        collected_num = int(row[4] or 0)
+        processed_at = row[5]
+        branch_catalog = str(row[6] or "").strip().lower()
+
+        if branch_id not in category_title_cache:
+            try:
+                category_title_cache[branch_id] = " ".join(str(get_category_title(branch_id, request)).split()).strip()
+            except Exception:
+                category_title_cache[branch_id] = str(branch_id)
+        category_title = category_title_cache[branch_id]
+
+        if plz_id not in city_title_cache:
+            try:
+                city_title_cache[plz_id] = " ".join(str(get_city_title(plz_id, request, land=True, plz=True)).split()).strip()
+            except Exception:
+                city_title_cache[plz_id] = str(plz_id)
+        city_title = city_title_cache[plz_id]
+
+        if plz_id not in city_id_by_plz:
+            with connection.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT cpm.city_id::bigint
+                    FROM public.plz_sys ps
+                    LEFT JOIN public.__city__plz_map cpm
+                      ON cpm.plz = ps.plz
+                    WHERE ps.id = %s
+                    LIMIT 1
+                    """,
+                    [plz_id],
+                )
+                city_id_row = cur.fetchone()
+            city_id_by_plz[plz_id] = int(city_id_row[0]) if city_id_row and city_id_row[0] is not None else None
+
+        category_rate_value = branch_rate_map.get(branch_id)
+        category_rate = str(category_rate_value) if category_rate_value is not None else "-"
+        city_rate_value = city_rate_map.get(int(city_id_by_plz[plz_id])) if city_id_by_plz[plz_id] is not None else None
+        city_rate = str(city_rate_value) if city_rate_value is not None else "-"
+
+        pairs_rows.append(
+            {
+                "cb_id": cb_id,
+                "catalog_display": "GS" if branch_catalog == "gs" else ("11880" if branch_catalog == "11880" else "-"),
+                "processed_at": processed_at,
+                "processed_at_display": (
+                    processed_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                    if processed_at is not None and hasattr(processed_at, "astimezone")
+                    else ""
+                ),
+                "processed_at_utc_iso": (
+                    processed_at.astimezone(timezone.utc).isoformat()
+                    if processed_at is not None and hasattr(processed_at, "astimezone")
+                    else ""
+                ),
+                "pair_rate_display": str(pair_rate) if pair_rate is not None else "-",
+                "category_with_rate": f"{category_title} ({category_rate})" if category_title else f"({category_rate})",
+                "city_with_rate": f"{city_title} ({city_rate})" if city_title else f"({city_rate})",
+                "collected_num": collected_num,
+                "collected_num_display": _format_contacts_total(collected_num),
+            }
+        )
+
+    return {
+        "contacts_pairs_show_catalog": show_catalog_column,
+        "contacts_pairs_rows": pairs_rows,
     }
 
 
@@ -339,6 +535,34 @@ def _build_contacts_pairs_partial_url(flow_type: str, item_id: str) -> str:
     if not item_id:
         return ""
     return reverse("audience:create_contacts_pairs_partial") + f"?flow_type={flow_type}&id={item_id}"
+
+
+def _contacts_section_route_name(flow_type: str, section: str) -> str:
+    suffix_by_section = {
+        CONTACTS_SECTION_COLLECT: "contacts",
+        CONTACTS_SECTION_ALL: "contacts_all",
+        CONTACTS_SECTION_BRANCH_CITY: "contacts_branch_city",
+        CONTACTS_SECTION_PAIRS: "contacts_pairs",
+    }
+    section_key = _normalize_contacts_section(section)
+    suffix = suffix_by_section.get(section_key, "contacts")
+    return f"audience:create_edit_{flow_type}_{suffix}"
+
+
+def _build_contacts_section_url(flow_type: str, item_id: str, section: str) -> str:
+    route_name = _contacts_section_route_name(flow_type, section)
+    if item_id:
+        return reverse(f"{route_name}_id", args=[item_id])
+    return reverse(route_name)
+
+
+def _build_contacts_section_urls(flow_type: str, item_id: str) -> dict[str, str]:
+    return {
+        CONTACTS_SECTION_COLLECT: _build_contacts_section_url(flow_type, item_id, CONTACTS_SECTION_COLLECT),
+        CONTACTS_SECTION_ALL: _build_contacts_section_url(flow_type, item_id, CONTACTS_SECTION_ALL),
+        CONTACTS_SECTION_BRANCH_CITY: _build_contacts_section_url(flow_type, item_id, CONTACTS_SECTION_BRANCH_CITY),
+        CONTACTS_SECTION_PAIRS: _build_contacts_section_url(flow_type, item_id, CONTACTS_SECTION_PAIRS),
+    }
 
 
 def _is_contacts_active(task) -> bool:
@@ -389,35 +613,55 @@ def _build_contacts_section_context(*, request, task, section: str, page: int = 
                 "contacts_city_rows": [],
             }
         return _fetch_contacts_branch_city_rows(request, int(task.id))
+    if section_key == CONTACTS_SECTION_PAIRS:
+        if not task:
+            return {
+                "contacts_pairs_show_catalog": _is_super_workspace_user(request),
+                "contacts_pairs_rows": [],
+            }
+        return _fetch_contacts_pairs_rows(request, int(task.id))
     return {}
 
 
-def _build_contacts_sections_context(*, request, task, flow_type: str, item_id: str) -> dict[str, Any]:
+def _build_active_contacts_context(
+    *,
+    request,
+    task,
+    flow_type: str,
+    item_id: str,
+    active_section: str,
+) -> dict[str, Any]:
+    section_key = _normalize_contacts_section(active_section)
     query = str(request.GET.get("q") or "").strip()
-    return {
-        "contacts_active_section": CONTACTS_SECTION_COLLECT,
-        "contacts_collect_partial_url": _build_contacts_collect_partial_url(flow_type, item_id),
-        "contacts_all_partial_url": _build_contacts_all_partial_url(flow_type, item_id),
-        "contacts_branch_city_partial_url": _build_contacts_branch_city_partial_url(flow_type, item_id),
-        "contacts_pairs_partial_url": _build_contacts_pairs_partial_url(flow_type, item_id),
+    page = _get_page_value(str(request.GET.get("page") or "1"))
+    section_urls = _build_contacts_section_urls(flow_type, item_id)
+
+    active_partial_url = ""
+    if section_key == CONTACTS_SECTION_COLLECT:
+        active_partial_url = _build_contacts_collect_partial_url(flow_type, item_id)
+    elif section_key == CONTACTS_SECTION_ALL:
+        active_partial_url = _build_contacts_all_partial_url(flow_type, item_id)
+    elif section_key == CONTACTS_SECTION_BRANCH_CITY:
+        active_partial_url = _build_contacts_branch_city_partial_url(flow_type, item_id)
+    elif section_key == CONTACTS_SECTION_PAIRS:
+        active_partial_url = _build_contacts_pairs_partial_url(flow_type, item_id)
+
+    context = {
+        "contacts_active_section": section_key,
+        "contacts_section_urls": section_urls,
         "contacts_collect_running": _is_contacts_active(task),
-        "contacts_all_running": False,
-        "contacts_branch_city_running": False,
-        "contacts_pairs_running": False,
-        **_build_contacts_section_context(request=request, task=task, section=CONTACTS_SECTION_COLLECT),
-        **_build_contacts_section_context(
-            request=request,
-            task=task,
-            section=CONTACTS_SECTION_ALL,
-            page=1,
-            query=query,
-        ),
-        **_build_contacts_section_context(
-            request=request,
-            task=task,
-            section=CONTACTS_SECTION_BRANCH_CITY,
-        ),
+        "contacts_active_partial_url": active_partial_url,
     }
+    context.update(
+        _build_contacts_section_context(
+            request=request,
+            task=task,
+            section=section_key,
+            page=page,
+            query=query,
+        )
+    )
+    return context
 
 
 def _resolve_contacts_partial_task(request):
@@ -432,17 +676,21 @@ def _resolve_contacts_partial_task(request):
 
 
 def _render_contacts_partial(request, *, section: str, template_name: str, page: int = 1, query: str = ""):
-    _, _, task, status_code = _resolve_contacts_partial_task(request)
+    flow_type, item_id, task, status_code = _resolve_contacts_partial_task(request)
+    context = _build_contacts_section_context(
+        request=request,
+        task=task,
+        section=section,
+        page=page,
+        query=query,
+    )
+    if flow_type in {"buy", "sell"}:
+        context["contacts_section_urls"] = _build_contacts_section_urls(flow_type, item_id)
+        context["type"] = flow_type
     return render(
         request,
         template_name,
-        _build_contacts_section_context(
-            request=request,
-            task=task,
-            section=section,
-            page=page,
-            query=query,
-        ),
+        context,
         status=status_code,
     )
 
@@ -511,9 +759,11 @@ def handle_contacts_step_view(
     task,
     saved_values: Mapping[str, Any],
     flow_status: Mapping[str, Any],
+    contacts_section: str,
 ):
     flow_conf = get_flow_config(flow_type)
     step_definitions = build_step_definitions(flow_type)
+    active_section = _normalize_contacts_section(contacts_section)
     return render(
         request,
         flow_conf["template_name"],
@@ -528,11 +778,12 @@ def handle_contacts_step_view(
             step_template="panels/aap_audience/create/step_contacts.html",
             extra_context={
                 "contacts_step": _build_contacts_step_context(task),
-                **_build_contacts_sections_context(
+                **_build_active_contacts_context(
                     request=request,
                     task=task,
                     flow_type=flow_type,
                     item_id=item_id,
+                    active_section=active_section,
                 ),
             },
         ),

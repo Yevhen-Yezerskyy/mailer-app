@@ -1,7 +1,7 @@
 {% load i18n %}
 <!-- FILE: web/templates/panels/aap_audience/create/_contacts_all_inner.html -->
-<!-- DATE: 2026-04-02 -->
-<!-- PURPOSE: All contacts inner section content with pagination. -->
+<!-- DATE: 2026-04-03 -->
+<!-- PURPOSE: All contacts section with server-side pagination and search via dedicated URLs. -->
 
 <table class="YY-MAIN_TABLE !mt-0 !mb-3">
   <tr>
@@ -12,10 +12,8 @@
             <span>{% trans "Страница:" %}</span>
             {% if contacts_all_page_items %}
               {% if contacts_all_has_prev %}
-                <a href="#"
-                   class="YY-LINK inline-flex items-center"
-                   data-contacts-all-page="{{ contacts_all_prev_page }}"
-                   data-contacts-all-q="{{ contacts_all_query|escape }}">
+                <a href="{{ contacts_section_urls.all }}?page={{ contacts_all_prev_page }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
+                   class="YY-LINK inline-flex items-center">
                   <svg xmlns="http://www.w3.org/2000/svg"
                        fill="none"
                        viewBox="0 0 24 24"
@@ -31,19 +29,15 @@
                 {% if item.kind == "gap" %}
                   <span>...</span>
                 {% elif item.is_current %}
-                  <strong class="font-semibold text-[#016b09]">{{ item.number }}</strong>
+                  <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
                 {% else %}
-                  <a href="#"
-                     class="YY-LINK"
-                     data-contacts-all-page="{{ item.number }}"
-                     data-contacts-all-q="{{ contacts_all_query|escape }}">{{ item.number }}</a>
+                  <a href="{{ contacts_section_urls.all }}?page={{ item.number }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
+                     class="YY-LINK">{{ item.number }}</a>
                 {% endif %}
               {% endfor %}
               {% if contacts_all_has_next %}
-                <a href="#"
-                   class="YY-LINK inline-flex items-center"
-                   data-contacts-all-page="{{ contacts_all_next_page }}"
-                   data-contacts-all-q="{{ contacts_all_query|escape }}">
+                <a href="{{ contacts_section_urls.all }}?page={{ contacts_all_next_page }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
+                   class="YY-LINK inline-flex items-center">
                   <svg xmlns="http://www.w3.org/2000/svg"
                        fill="none"
                        viewBox="0 0 24 24"
@@ -56,28 +50,24 @@
                 </a>
               {% endif %}
             {% else %}
-              <strong class="font-semibold text-[#016b09]">{{ contacts_all_page }}</strong>
+              <strong class="font-semibold text-base text-[#016b09]">{{ contacts_all_page }}</strong>
             {% endif %}
           </div>
-          <div class="flex items-center gap-2 ml-auto" data-contacts-all-search-wrap="1">
+          <form method="get" action="{{ contacts_section_urls.all }}" class="flex items-center gap-2 ml-auto">
             <input type="text"
+                   name="q"
                    class="YY-INPUT !mb-0 !w-[340px]"
                    placeholder="{% trans 'Поиск по компании или email' %}"
-                   value="{{ contacts_all_query }}"
-                   data-contacts-all-search-input="1">
-            <button type="button"
-                    class="YY-BUTTON_MAIN !mb-0 !w-fit"
-                    data-contacts-all-search-button="1">
+                   value="{{ contacts_all_query }}">
+            <button type="submit" class="YY-BUTTON_MAIN !mb-0 !w-fit">
               {% trans "Искать" %}
             </button>
             {% if contacts_all_query %}
-              <button type="button"
-                      class="YY-BUTTON_MAIN !mb-0 !w-fit"
-                      data-contacts-all-search-clear="1">
+              <a href="{{ contacts_section_urls.all }}" class="YY-BUTTON_MAIN !mb-0 !w-fit">
                 {% trans "Очистить" %}
-              </button>
+              </a>
             {% endif %}
-          </div>
+          </form>
         </div>
       </div>
     </td>
@@ -149,10 +139,8 @@
             <span>{% trans "Страница:" %}</span>
             {% if contacts_all_page_items %}
               {% if contacts_all_has_prev %}
-                <a href="#"
-                   class="YY-LINK inline-flex items-center"
-                   data-contacts-all-page="{{ contacts_all_prev_page }}"
-                   data-contacts-all-q="{{ contacts_all_query|escape }}">
+                <a href="{{ contacts_section_urls.all }}?page={{ contacts_all_prev_page }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
+                   class="YY-LINK inline-flex items-center">
                   <svg xmlns="http://www.w3.org/2000/svg"
                        fill="none"
                        viewBox="0 0 24 24"
@@ -168,19 +156,15 @@
                 {% if item.kind == "gap" %}
                   <span>...</span>
                 {% elif item.is_current %}
-                  <strong class="font-semibold text-[#016b09]">{{ item.number }}</strong>
+                  <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
                 {% else %}
-                  <a href="#"
-                     class="YY-LINK"
-                     data-contacts-all-page="{{ item.number }}"
-                     data-contacts-all-q="{{ contacts_all_query|escape }}">{{ item.number }}</a>
+                  <a href="{{ contacts_section_urls.all }}?page={{ item.number }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
+                     class="YY-LINK">{{ item.number }}</a>
                 {% endif %}
               {% endfor %}
               {% if contacts_all_has_next %}
-                <a href="#"
-                   class="YY-LINK inline-flex items-center"
-                   data-contacts-all-page="{{ contacts_all_next_page }}"
-                   data-contacts-all-q="{{ contacts_all_query|escape }}">
+                <a href="{{ contacts_section_urls.all }}?page={{ contacts_all_next_page }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
+                   class="YY-LINK inline-flex items-center">
                   <svg xmlns="http://www.w3.org/2000/svg"
                        fill="none"
                        viewBox="0 0 24 24"
@@ -193,28 +177,24 @@
                 </a>
               {% endif %}
             {% else %}
-              <strong class="font-semibold text-[#016b09]">{{ contacts_all_page }}</strong>
+              <strong class="font-semibold text-base text-[#016b09]">{{ contacts_all_page }}</strong>
             {% endif %}
           </div>
-          <div class="flex items-center gap-2 ml-auto" data-contacts-all-search-wrap="1">
+          <form method="get" action="{{ contacts_section_urls.all }}" class="flex items-center gap-2 ml-auto">
             <input type="text"
+                   name="q"
                    class="YY-INPUT !mb-0 !w-[340px]"
                    placeholder="{% trans 'Поиск по компании или email' %}"
-                   value="{{ contacts_all_query }}"
-                   data-contacts-all-search-input="1">
-            <button type="button"
-                    class="YY-BUTTON_MAIN !mb-0 !w-fit"
-                    data-contacts-all-search-button="1">
+                   value="{{ contacts_all_query }}">
+            <button type="submit" class="YY-BUTTON_MAIN !mb-0 !w-fit">
               {% trans "Искать" %}
             </button>
             {% if contacts_all_query %}
-              <button type="button"
-                      class="YY-BUTTON_MAIN !mb-0 !w-fit"
-                      data-contacts-all-search-clear="1">
+              <a href="{{ contacts_section_urls.all }}" class="YY-BUTTON_MAIN !mb-0 !w-fit">
                 {% trans "Очистить" %}
-              </button>
+              </a>
             {% endif %}
-          </div>
+          </form>
         </div>
       </div>
     </td>

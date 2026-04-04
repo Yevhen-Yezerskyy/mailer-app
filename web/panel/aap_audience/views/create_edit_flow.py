@@ -6,7 +6,10 @@ from __future__ import annotations
 
 from django.shortcuts import redirect
 
-from .create_edit_flow_branches_cities import handle_branches_cities_step_view
+from .create_edit_flow_branches_cities import (
+    handle_branches_step_view,
+    handle_cities_step_view,
+)
 from .create_edit_flow_contacts import handle_contacts_step_view
 from .create_edit_flow_mailing_list import handle_mailing_list_step_view
 from .create_edit_flow_status import build_flow_step_states
@@ -22,7 +25,14 @@ from .create_edit_flow_shared import (
 from .create_edit_flow_text import handle_text_step_view
 
 
-def create_edit_flow_view(request, *, flow_type: str, step_key: str, item_id: str = ""):
+def create_edit_flow_view(
+    request,
+    *,
+    flow_type: str,
+    step_key: str,
+    item_id: str = "",
+    contacts_section: str = "collect",
+):
     step_definitions = build_step_definitions(flow_type)
     requested_step = (step_key or "product").strip().lower()
 
@@ -50,8 +60,18 @@ def create_edit_flow_view(request, *, flow_type: str, step_key: str, item_id: st
             saved_values=saved_values,
             flow_status=flow_status,
         )
-    if current_step_key == "branches_cities":
-        return handle_branches_cities_step_view(
+    if current_step_key == "branches":
+        return handle_branches_step_view(
+            request,
+            flow_type=flow_type,
+            current_step_key=current_step_key,
+            item_id=item_id,
+            task=task,
+            saved_values=saved_values,
+            flow_status=flow_status,
+        )
+    if current_step_key == "cities":
+        return handle_cities_step_view(
             request,
             flow_type=flow_type,
             current_step_key=current_step_key,
@@ -69,6 +89,7 @@ def create_edit_flow_view(request, *, flow_type: str, step_key: str, item_id: st
             task=task,
             saved_values=saved_values,
             flow_status=flow_status,
+            contacts_section=contacts_section,
         )
     return handle_mailing_list_step_view(
         request,

@@ -172,6 +172,23 @@ def get_category_title(category_id: Any, request: HttpRequest, single: bool = Fa
     return _build_title(payload)
 
 
+def _normalize_city_name(value: str) -> str:
+    city_name = str(value or "").strip()
+    city_parts = [part.strip() for part in city_name.split(",")]
+    city_suffix = ", ".join([part for part in city_parts[1:] if part])
+    if city_suffix in {"Stadt", "St", "GKSt", "M"}:
+        city_name = city_parts[0] if city_parts else city_name
+    return city_name
+
+
+def _build_city_title(*, city_name: str, state_name: str, land: bool) -> str:
+    if land and city_name and state_name:
+        return f"{city_name}, {state_name}"
+    if land and state_name:
+        return state_name
+    return city_name or state_name
+
+
 def get_city_title(plz_id: Any, request: HttpRequest, land: bool = False, plz: bool = False) -> str:
     plz_id = int(plz_id)
     updated = False
@@ -234,20 +251,10 @@ def get_city_title(plz_id: Any, request: HttpRequest, land: bool = False, plz: b
             update=True,
         )
 
-    city_name = str(payload.get("city") or "").strip()
-    city_parts = [part.strip() for part in city_name.split(",")]
-    city_suffix = ", ".join([part for part in city_parts[1:] if part])
-    if city_suffix in {"Stadt", "St", "GKSt", "M"}:
-        city_name = city_parts[0] if city_parts else city_name
+    city_name = _normalize_city_name(payload.get("city") or "")
     state_name = str(payload.get("state") or "").strip()
     plz_value = str(payload.get("plz") or "").strip()
-
-    if land and city_name and state_name:
-        title = f"{city_name}, {state_name}"
-    elif land and state_name:
-        title = state_name
-    else:
-        title = city_name or state_name
+    title = _build_city_title(city_name=city_name, state_name=state_name, land=land)
 
     if plz and plz_value and title:
         return f"{plz_value} {title}"
@@ -257,4 +264,65 @@ def get_city_title(plz_id: Any, request: HttpRequest, land: bool = False, plz: b
     return title
 
 
-__all__ = ["get_category_title", "get_city_title"]
+def get_city_title_by_city_id(city_id: Any, request: HttpRequest, land: bool = False) -> str:
+    city_id = int(city_id)
+    updated = False
+
+    def _load_vocabulary(_query: Any) -> dict[int, dict[str, str]]:
+        vocabulary = getattr(request, "_format_contact_city_titles_by_id_cache", None)
+        if vocabulary is not None:
+            return vocabulary
+        return {}
+
+    vocabulary = getattr(request, "_format_contact_city_titles_by_id_cache", None)
+    if vocabulary is None:
+        vocabulary = memo(
+            ("format_contact:city_titles_by_id:v1",),
+            _load_vocabulary,
+            ttl=7 * 24 * 60 * 60,
+            version="format_contact:city_titles_by_id:v1",
+        )
+        request._format_contact_city_titles_by_id_cache = vocabulary
+
+    payload = vocabulary.get(city_id)
+    if payload is None:
+        with connection.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    COALESCE(cs.name, '') AS city_name,
+                    COALESCE(cs.state_name, '') AS state_name
+                FROM public.cities_sys cs
+                WHERE cs.id = %s
+                LIMIT 1
+                """,
+                [city_id],
+            )
+            row = cur.fetchone()
+
+        if not row:
+            raise Exception(f"CITY_NOT_FOUND: {city_id}")
+
+        payload = {
+            "city": " ".join(str(row[0] or "").split()).strip(),
+            "state": " ".join(str(row[1] or "").split()).strip(),
+        }
+        vocabulary[city_id] = payload
+        request._format_contact_city_titles_by_id_cache = vocabulary
+        updated = True
+
+    if updated:
+        memo(
+            ("format_contact:city_titles_by_id:v1",),
+            _load_vocabulary,
+            ttl=7 * 24 * 60 * 60,
+            version="format_contact:city_titles_by_id:v1",
+            update=True,
+        )
+
+    city_name = _normalize_city_name(payload.get("city") or "")
+    state_name = str(payload.get("state") or "").strip()
+    return _build_city_title(city_name=city_name, state_name=state_name, land=land)
+
+
+__all__ = ["get_category_title", "get_city_title", "get_city_title_by_city_id"]

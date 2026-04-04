@@ -10,8 +10,11 @@ WORKSPACE_ACCESS_TYPES = {
     "stat_only": "Stats only",
     "closed": "Closed",
     "super": "Super",
+    "custom": "Custom",
 }
 WORKSPACE_ACCESS_TYPE_DEFAULT = "test"
+WORKSPACE_BILLING_DAYS = (1, 5, 10, 15, 20, 25)
+WORKSPACE_BILLING_DAY_DEFAULT = 1
 
 CLIENT_USER_ROLES = {
     "main": "Main",
@@ -67,6 +70,11 @@ class Workspace(models.Model):
         default=WORKSPACE_ACCESS_TYPE_DEFAULT,
         db_index=True,
     )
+    billing_day = models.PositiveSmallIntegerField(
+        choices=[(day, day) for day in WORKSPACE_BILLING_DAYS],
+        default=WORKSPACE_BILLING_DAY_DEFAULT,
+    )
+    registration_date = models.DateTimeField(default=timezone.now)
     archived = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -77,6 +85,23 @@ class Workspace(models.Model):
     def __str__(self) -> str:
         company = (self.company_name or "").strip()
         return company or str(self.id)
+
+
+class WorkspaceLimits(models.Model):
+    workspace_id = models.UUIDField(null=True, blank=True, db_index=True)
+    type = models.CharField(
+        max_length=32,
+        choices=[(k, k) for k in WORKSPACE_ACCESS_TYPES.keys()],
+        null=True,
+        blank=True,
+        db_index=True,
+    )
+    sending_workspace_limit = models.IntegerField(null=True, blank=True)
+    sending_task_limit = models.IntegerField(null=True, blank=True)
+    active_tasks_limit = models.IntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = "accounts_workspace_limits"
 
 
 class ClientUser(AbstractBaseUser):
@@ -97,8 +122,6 @@ class ClientUser(AbstractBaseUser):
         "mailer_web.Workspace",
         on_delete=models.PROTECT,
         related_name="users",
-        null=True,
-        blank=True,
     )
     date_joined = models.DateTimeField(default=timezone.now)
 

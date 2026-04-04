@@ -1,0 +1,232 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/create/step_branches.html -->
+<!-- DATE: 2026-04-03 -->
+<!-- PURPOSE: Categories step body for the create/edit flow with fully isolated empty/work layouts. -->
+
+{% if branches_cities_step.branches_mode == "empty" %}
+<table class="YY-MAIN_TABLE !mt-3 !mb-10">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD" style="width:50%;">
+      <div class="YY-CARD_WHITE">
+        <form method="post" data-dirty-form="branches" data-submit-role="branches" class="h-full flex flex-col">
+          {% csrf_token %}
+          <input type="hidden" name="branches_conversation_id" value="{{ branches_cities_step.branch_conversation_id }}">
+          <input type="hidden" name="branches_response_id" value="{{ branches_cities_step.branch_response_id }}">
+          <input type="hidden" name="branches_records_json" value="{{ branches_cities_step.branch_records_json }}">
+          {% if type == "buy" %}
+            <div class="YY-STATUS_YELLOW !mb-3">{% trans "Бизнес-категории и рубрики" %}</div>
+          {% else %}
+            <div class="YY-STATUS_GREEN !mb-3">{% trans "Бизнес-категории и рубрики" %}</div>
+          {% endif %}
+          <div class="YY-TEXT !mb-8">
+            {% trans "Необходимо подобрать рубрики и бизнес-категории для поиска контактов в бизнес-справочниках. Подбор выполняется с помощью ассистента ИИ." %}<br><br>
+            {% trans "Ассистент ИИ выполняет первичный отбор категорий и рубрик. Далее вы можете с его помощью расширить список — как по функциональности, так и по видам деятельности, а также указать, какие именно категории необходимо добавить. Лишние категории можно удалить." %}<br><br>
+            {% trans "Жёлтые строки — предложения ассистента. Чтобы сохранить их, необходимо явно добавить их в список." %}<br>
+            {% trans "Зелёные строки — категории, уже сохранённые для последующего сбора контактов." %}<br><br>
+            {% trans "Для добавленных категорий (зелёные строки) указан сравнительный рейтинг (от 1 до 20, где 1 — наилучший). Рейтинг определяет порядок сбора контактов. Он кликабелен и может быть изменён — при изменении рейтинга автоматически меняется порядок сбора контактов." %}
+          </div>
+          <button type="submit" name="action" value="branches_pick" class="YY-BUTTON_MAIN_FULL mt-auto">
+            {% trans "Подобрать бизнес-категории и рубрики" %}
+          </button>
+        </form>
+      </div>
+    </td>
+    <td class="YY-MAIN_TOP_RIGHT_TD" style="width:50%;">
+      <div class="YY-CARD_WHITE">
+        {% if type == "buy" %}
+          <div class="YY-STATUS_YELLOW !mb-3">{% trans "Расширение списка бизнес-категорий и рубрик" %}</div>
+        {% else %}
+          <div class="YY-STATUS_GREEN !mb-3">{% trans "Расширение списка бизнес-категорий и рубрик" %}</div>
+        {% endif %}
+        <div class="YY-TEXT !mb-0">
+          {% trans "Ассистент ИИ подбирает категории на основе лингвистического и семантического анализа с использованием нейросетевых алгоритмов. Поэтому результат может не в полной мере учитывать бизнес-логику конкретной задачи." %}<br><br>
+          {% trans "Лишние категории, добавленные ассистентом, необходимо удалить — это повысит эффективность адресной рассылки. Удаление категорий с помощью ИИ-ассистента не предусмотрено." %}<br><br>
+          {% trans "Если вы считаете, что список нужно расширить, используйте стандартные элементы интерфейса: добавляйте смежные категории или категории, представляющие посредников." %}<br><br>
+          {% trans "Вы также можете задать инструкцию для расширения списка категорий — указать конкретные категории или дать смысловое указание (например: «добавь все категории, связанные с туризмом»)." %}
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>
+{% elif branches_cities_step.branches_mode == "work" %}
+<table class="YY-MAIN_TABLE !mt-3" data-branches-work-root="1">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD" style="width:60%;">
+      <div class="YY-CARD_WHITE flex flex-col" data-branches-work-left-card="1">
+        <form method="post" data-dirty-form="branches" data-submit-role="branches" class="h-full min-h-0 flex flex-col">
+          {% csrf_token %}
+          <input type="hidden" name="branches_conversation_id" value="{{ branches_cities_step.branch_conversation_id }}">
+          <input type="hidden" name="branches_response_id" value="{{ branches_cities_step.branch_response_id }}">
+          <input type="hidden" name="branches_records_json" value="{{ branches_cities_step.branch_records_json }}">
+          {% if type == "buy" %}
+            <div class="YY-STATUS_YELLOW !mb-3">{% trans "Бизнес-категории и рубрики" %}</div>
+          {% else %}
+            <div class="YY-STATUS_GREEN !mb-3">{% trans "Бизнес-категории и рубрики" %}</div>
+          {% endif %}
+          {% if branches_cities_step.branch_show_hash_alert %}
+            <div class="YY-STATUS_RED !mb-3">{% trans "Задача была изменена." %}</div>
+            <div class="grid grid-cols-3 gap-4 !mb-6">
+              <button type="submit" name="action" value="branches_recalc_ratings" class="YY-BUTTON_MAIN_FULL">
+                {% trans "Пересчитать рейтинги" %}
+              </button>
+              <button type="submit" name="action" value="branches_refill" class="YY-BUTTON_MAIN_FULL">
+                {% trans "Очистить / наполнить" %}
+              </button>
+              <button type="submit" name="action" value="branches_ignore_hash" class="YY-BUTTON_MAIN_FULL">
+                {% trans "Игнорировать" %}
+              </button>
+            </div>
+          {% endif %}
+          <div class="mb-3 flex-1 min-h-0 overflow-y-auto overflow-x-hidden" data-branches-scroll-box="1" data-has-green-branches="{% if branches_cities_step.branch_rating_rows %}1{% else %}0{% endif %}" data-has-yellow-branches="{% if branches_cities_step.branch_expand_rows %}1{% else %}0{% endif %}">
+            {% if branches_cities_step.branch_rating_rows %}
+              <div class="flex flex-col gap-[2px]">
+                {% for item in branches_cities_step.branch_rating_rows %}
+                  <div class="grid w-full items-start gap-x-2 px-1 bg-[#f0fff0]" data-branch-row="1" data-branch-last-green="{% if forloop.last %}1{% else %}0{% endif %}" data-branch-ids="{{ item.ids_csv }}" data-branch-yellow="0" style="grid-template-columns:3ch minmax(0,1fr) max-content;">
+                    <div class="YY-TEXT !mb-0 !py-1 whitespace-nowrap text-center">
+                      <a
+                        href="#"
+                        class="underline"
+                        data-yy-modal="url={{ branches_cities_step.branch_rate_modal_base_url|escape }}&ids={{ item.ids_csv|escape }}">
+                        {{ item.rate_display }}
+                      </a>
+                    </div>
+                    <div class="YY-TEXT !mb-0 !py-1 min-w-0 whitespace-normal break-words">{{ item.branch_name }}</div>
+                    <div class="YY-STATUS_RED !py-1 !pr-1 !min-h-0 !w-auto bg-transparent border-transparent text-right self-start leading-none">
+                      <button type="button" class="!p-0 !m-0 bg-transparent border-0" data-branch-delete-toggle="1" data-branch-ids="{{ item.ids_csv }}" aria-label="{% trans 'Удалить' %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="inline-block h-[1.38em] w-[1.38em] align-top" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% if branches_cities_step.branch_expand_rows %}
+              <div class="flex flex-col gap-[2px] {% if branches_cities_step.branch_rating_rows %}mt-6{% endif %}">
+                {% for item in branches_cities_step.branch_expand_rows %}
+                  <div class="grid w-full items-start gap-x-2 px-1 bg-[#ffffe3]" data-branch-row="1" data-branch-first-yellow="{% if forloop.first %}1{% else %}0{% endif %}" data-branch-ids="{{ item.ids_csv }}" data-branch-yellow="1" style="grid-template-columns:3ch minmax(0,1fr) max-content;">
+                    <div class="YY-TEXT !mb-0 !py-1 whitespace-nowrap text-center">{{ item.rate_display }}</div>
+                    <div class="YY-TEXT !mb-0 !py-1 min-w-0 whitespace-normal break-words">{{ item.branch_name }}</div>
+                    <div class="YY-STATUS_RED !py-1 !pr-1 !min-h-0 !w-auto bg-transparent border-transparent text-right self-start leading-none">
+                      <button type="button" class="!p-0 !m-0 bg-transparent border-0" data-branch-delete-toggle="1" data-branch-ids="{{ item.ids_csv }}" aria-label="{% trans 'Удалить' %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="inline-block h-[1.38em] w-[1.38em] align-top" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+          <div class="grid grid-cols-2 gap-4 !mb-6 hidden" data-branches-delete-actions="1">
+            <button type="button" class="YY-BUTTON_MAIN_FULL" data-branches-delete-cancel="1">
+              {% trans "Отменить" %}
+            </button>
+            <button type="submit" name="action" value="branches_delete_selected" class="YY-BUTTON_RED_FULL" data-branches-delete-submit="1">
+              {% trans "Удалить" %}
+            </button>
+          </div>
+          <div class="grid grid-cols-2 gap-4 mt-auto">
+            <button
+              type="submit"
+              name="action"
+              value="branches_clear_expand"
+              class="{% if branches_cities_step.branch_show_expand_save_actions %}YY-BUTTON_MAIN_FULL{% else %}YY-BUTTON_GRAY_FULL{% endif %}"
+              {% if not branches_cities_step.branch_show_expand_save_actions %}disabled{% endif %}>
+              {% trans "Очистить" %}
+            </button>
+            <button
+              type="submit"
+              name="action"
+              value="branches_save"
+              class="{% if branches_cities_step.branch_show_expand_save_actions %}YY-BUTTON_MAIN_FULL{% else %}YY-BUTTON_GRAY_FULL{% endif %}"
+              {% if not branches_cities_step.branch_show_expand_save_actions %}disabled{% endif %}>
+              {% trans "Добавить" %}
+            </button>
+          </div>
+          <input type="hidden" name="branches_delete_ids" value="" data-branches-delete-ids="1">
+        </form>
+      </div>
+    </td>
+    <td class="YY-MAIN_TOP_RIGHT_TD" style="width:40%;">
+      <div class="YY-CARD_WHITE !h-auto flex flex-col" data-branches-work-right-card="1">
+        <form method="post" data-dirty-form="branches" data-submit-role="branches" class="h-full min-h-0 flex flex-col gap-4">
+          {% csrf_token %}
+          <input type="hidden" name="branches_conversation_id" value="{{ branches_cities_step.branch_conversation_id }}">
+          <input type="hidden" name="branches_response_id" value="{{ branches_cities_step.branch_response_id }}">
+          <input type="hidden" name="branches_records_json" value="{{ branches_cities_step.branch_records_json }}">
+          {% if type == "buy" %}
+            <div class="YY-STATUS_YELLOW">{% trans "Расширение списка бизнес-категорий и рубрик" %}</div>
+          {% else %}
+            <div class="YY-STATUS_GREEN">{% trans "Расширение списка бизнес-категорий и рубрик" %}</div>
+          {% endif %}
+          {% if branches_cities_step.branch_show_expand_controls %}
+            <div class="YY-CARD_WHITE !h-auto">
+              <div class="YY-TEXT !mb-2">
+                {% trans "Вы можете расширить список за счёт смежных бизнес-категорий и рубрик." %}
+              </div>
+              <div class="grid gap-2 !mb-0" style="grid-template-columns: 3fr 2fr;">
+                <div class="YY-STATUS_BLUE !mb-0 !py-2 !px-3">
+                  {% trans "Смежные категории и рубрики:" %}
+                </div>
+                <button type="submit" name="action" value="branches_expand_adjacent" class="YY-BUTTON_MAIN_FULL">
+                  <span class="flex items-center justify-center gap-1 w-full">
+                    <span>{% trans "Расширить список" %}</span>
+                    <svg class="size-4 shrink-0" aria-hidden="true">
+                      <use href="#icon-arrow-circle"></use>
+                    </svg>
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div class="YY-CARD_WHITE !h-auto">
+              <div class="YY-TEXT !mb-2">
+                {% trans "Вы можете расширить список за счёт бизнес-категорий и рубрик посредников и торговых компаний." %}
+              </div>
+              <div class="grid gap-2 !mb-0" style="grid-template-columns: 3fr 2fr;">
+                <div class="YY-STATUS_BLUE !mb-0 !py-2 !px-3">
+                  {% trans "Посредники и торговые компании:" %}
+                </div>
+                <button type="submit" name="action" value="branches_expand_middlemen" class="YY-BUTTON_MAIN_FULL">
+                  <span class="flex items-center justify-center gap-1 w-full">
+                    <span>{% trans "Расширить список" %}</span>
+                    <svg class="size-4 shrink-0" aria-hidden="true">
+                      <use href="#icon-arrow-circle"></use>
+                    </svg>
+                  </span>
+                </button>
+              </div>
+            </div>
+            <div class="YY-CARD_WHITE !h-auto">
+              <div class="YY-TEXT !mb-2">
+                {% trans "Вы можете задать инструкцию для расширения списка." %}
+              </div>
+              <textarea
+                name="branches_expand_custom"
+                rows="4"
+                class="YY-INPUT !mb-2 !h-auto resize-y"
+                placeholder="{% trans 'Как расширить список?' %}"></textarea>
+              <button type="submit" name="action" value="branches_expand_custom" class="YY-BUTTON_MAIN_FULL">
+                <span class="flex items-center justify-center gap-1 w-full">
+                  <span>{% trans "Расширить список" %}</span>
+                  <svg class="size-4 shrink-0" aria-hidden="true">
+                    <use href="#icon-arrow-circle"></use>
+                  </svg>
+                </span>
+              </button>
+            </div>
+          {% else %}
+            <div class="YY-CARD_WHITE !h-auto">
+              <div class="YY-TEXT !mb-0">
+                {% trans "Кнопки расширения появятся после первичного подбора категорий." %}
+              </div>
+            </div>
+          {% endif %}
+        </form>
+      </div>
+    </td>
+  </tr>
+</table>
+{% endif %}

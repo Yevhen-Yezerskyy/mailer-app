@@ -1,7 +1,7 @@
 {% load i18n %}
 <!-- FILE: web/templates/panels/aap_audience/create/step_contacts.html -->
-<!-- DATE: 2026-04-01 -->
-<!-- PURPOSE: Contacts collection step status card and active polling panel. -->
+<!-- DATE: 2026-04-03 -->
+<!-- PURPOSE: Contacts step with server-routed sub-sections (collect/all/branch-city/pairs). -->
 
 <table class="YY-MAIN_TABLE !mt-3">
   <tr>
@@ -35,64 +35,49 @@
           <div class="flex items-center justify-end gap-4 flex-1">
             <div class="min-w-[170px]">
               {% if type == "buy" %}
-                <button
-                  type="button"
-                  class="YY-BUTTON_YELLOW_FULL"
-                  data-contacts-section-button="collect"
-                  data-contacts-section-active-class="YY-BUTTON_YELLOW_FULL"
-                  data-contacts-section-inactive-class="YY-BUTTON_MAIN_FULL">
+                <a
+                  href="{{ contacts_section_urls.collect }}"
+                  class="{% if contacts_active_section == 'collect' %}YY-BUTTON_YELLOW_FULL{% else %}YY-BUTTON_MAIN_FULL{% endif %}">
                   <span class="flex items-center justify-center w-full">
                     <span>{% trans "Сбор контактов" %}-50</span>
                   </span>
-                </button>
+                </a>
               {% else %}
-                <button
-                  type="button"
-                  class="YY-BUTTON_GREEN_FULL"
-                  data-contacts-section-button="collect"
-                  data-contacts-section-active-class="YY-BUTTON_GREEN_FULL"
-                  data-contacts-section-inactive-class="YY-BUTTON_MAIN_FULL">
+                <a
+                  href="{{ contacts_section_urls.collect }}"
+                  class="{% if contacts_active_section == 'collect' %}YY-BUTTON_GREEN_FULL{% else %}YY-BUTTON_MAIN_FULL{% endif %}">
                   <span class="flex items-center justify-center w-full">
                     <span>{% trans "Сбор контактов" %} - 50</span>
                   </span>
-                </button>
+                </a>
               {% endif %}
             </div>
             <div class="min-w-[170px]">
-              <button
-                type="button"
-                class="YY-BUTTON_MAIN_FULL"
-                data-contacts-section-button="all"
-                data-contacts-section-active-class="{% if type == 'buy' %}YY-BUTTON_YELLOW_FULL{% else %}YY-BUTTON_GREEN_FULL{% endif %}"
-                data-contacts-section-inactive-class="YY-BUTTON_MAIN_FULL">
+              <a
+                href="{{ contacts_section_urls.all }}"
+                class="{% if contacts_active_section == 'all' %}{% if type == 'buy' %}YY-BUTTON_YELLOW_FULL{% else %}YY-BUTTON_GREEN_FULL{% endif %}{% else %}YY-BUTTON_MAIN_FULL{% endif %}">
                 <span class="flex items-center justify-center w-full">
                   <span>{% trans "Все контакты" %}</span>
                 </span>
-              </button>
+              </a>
             </div>
             <div class="min-w-[170px]">
-              <button
-                type="button"
-                class="YY-BUTTON_MAIN_FULL"
-                data-contacts-section-button="branch_city"
-                data-contacts-section-active-class="{% if type == 'buy' %}YY-BUTTON_YELLOW_FULL{% else %}YY-BUTTON_GREEN_FULL{% endif %}"
-                data-contacts-section-inactive-class="YY-BUTTON_MAIN_FULL">
+              <a
+                href="{{ contacts_section_urls.branch_city }}"
+                class="{% if contacts_active_section == 'branch_city' %}{% if type == 'buy' %}YY-BUTTON_YELLOW_FULL{% else %}YY-BUTTON_GREEN_FULL{% endif %}{% else %}YY-BUTTON_MAIN_FULL{% endif %}">
                 <span class="flex items-center justify-center w-full">
                   <span>{% trans "Категории / города" %}</span>
                 </span>
-              </button>
+              </a>
             </div>
             <div class="min-w-[190px]">
-              <button
-                type="button"
-                class="YY-BUTTON_MAIN_FULL"
-                data-contacts-section-button="pairs"
-                data-contacts-section-active-class="{% if type == 'buy' %}YY-BUTTON_YELLOW_FULL{% else %}YY-BUTTON_GREEN_FULL{% endif %}"
-                data-contacts-section-inactive-class="YY-BUTTON_MAIN_FULL">
+              <a
+                href="{{ contacts_section_urls.pairs }}"
+                class="{% if contacts_active_section == 'pairs' %}{% if type == 'buy' %}YY-BUTTON_YELLOW_FULL{% else %}YY-BUTTON_GREEN_FULL{% endif %}{% else %}YY-BUTTON_MAIN_FULL{% endif %}">
                 <span class="flex items-center justify-center w-full">
                   <span>{% trans "Пары категории / города" %}</span>
                 </span>
-              </button>
+              </a>
             </div>
           </div>
         </div>
@@ -103,41 +88,19 @@
 
 <div class="!mt-3 !mb-10" data-contacts-sections-root="1" data-contacts-active-section="{{ contacts_active_section }}">
   <div
-    data-contacts-section-wrapper="collect"
-    data-contacts-section-running="{% if contacts_collect_running %}1{% else %}0{% endif %}"
-    data-contacts-section-url="{{ contacts_collect_partial_url|escape }}">
-    <div data-contacts-section-inner="collect">
-      {% include "panels/aap_audience/create/_contacts_collect_inner.html" %}
-    </div>
-  </div>
-
-  <div
-    hidden
-    data-contacts-section-wrapper="all"
-    data-contacts-section-running="{% if contacts_all_running %}1{% else %}0{% endif %}"
-    data-contacts-section-url="{{ contacts_all_partial_url|escape }}">
-    <div data-contacts-section-inner="all">
-      {% include "panels/aap_audience/create/_contacts_all_inner.html" %}
-    </div>
-  </div>
-
-  <div
-    hidden
-    data-contacts-section-wrapper="branch_city"
-    data-contacts-section-running="{% if contacts_branch_city_running %}1{% else %}0{% endif %}"
-    data-contacts-section-url="{{ contacts_branch_city_partial_url|escape }}">
-    <div data-contacts-section-inner="branch_city">
-      {% include "panels/aap_audience/create/_contacts_branch_city_inner.html" %}
-    </div>
-  </div>
-
-  <div
-    hidden
-    data-contacts-section-wrapper="pairs"
-    data-contacts-section-running="{% if contacts_pairs_running %}1{% else %}0{% endif %}"
-    data-contacts-section-url="{{ contacts_pairs_partial_url|escape }}">
-    <div data-contacts-section-inner="pairs">
-      {% include "panels/aap_audience/create/_contacts_pairs_inner.html" %}
+    data-contacts-section-wrapper="{{ contacts_active_section }}"
+    data-contacts-section-running="{% if contacts_active_section == 'collect' and contacts_collect_running %}1{% else %}0{% endif %}"
+    data-contacts-section-url="{{ contacts_active_partial_url|escape }}">
+    <div data-contacts-section-inner="{{ contacts_active_section }}">
+      {% if contacts_active_section == "collect" %}
+        {% include "panels/aap_audience/create/_contacts_collect_inner.html" %}
+      {% elif contacts_active_section == "all" %}
+        {% include "panels/aap_audience/create/_contacts_all_inner.html" %}
+      {% elif contacts_active_section == "branch_city" %}
+        {% include "panels/aap_audience/create/_contacts_branch_city_inner.html" %}
+      {% else %}
+        {% include "panels/aap_audience/create/_contacts_pairs_inner.html" %}
+      {% endif %}
     </div>
   </div>
 </div>

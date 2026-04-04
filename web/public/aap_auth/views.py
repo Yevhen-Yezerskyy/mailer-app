@@ -8,6 +8,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.db import transaction
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from mailer_web.access import decode_id, encode_id
@@ -33,6 +34,17 @@ _LOGIN_ERROR_MESSAGES = {
     "login_retired": _("Логин больше не обслуживается"),
     "invalid_credentials": _("Неверный логин или пароль"),
 }
+
+
+def _next_workspace_billing_day() -> int:
+    today = timezone.localdate()
+    billing_days = tuple(int(day) for day, _ in Workspace._meta.get_field("billing_day").choices)
+
+    for day in billing_days:
+        if day > today.day:
+            return day
+
+    return billing_days[0]
 
 
 def _redirect_login_error(code: str, user: ClientUser | None):
@@ -180,10 +192,13 @@ def register_view(request):
         form = RegistrationForm(request.POST)
         if form.is_valid():
             with transaction.atomic():
+                registration_date = timezone.now()
                 workspace = Workspace.objects.create(
                     company_name=form.cleaned_data["company_name"].strip(),
                     company_address=form.cleaned_data["company_address"].strip(),
                     access_type="test",
+                    registration_date=registration_date,
+                    billing_day=_next_workspace_billing_day(),
                 )
                 user = ClientUser.objects.create_user(
                     email=form.cleaned_data["email"],

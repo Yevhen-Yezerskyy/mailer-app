@@ -1,26 +1,25 @@
 {% load i18n %}
 <!-- FILE: web/templates/panels/aap_audience/create/_contacts_branch_city_inner.html -->
-<!-- DATE: 2026-04-02 -->
-<!-- PURPOSE: Contacts branch/city section with rating and collected contacts counters. -->
+<!-- DATE: 2026-04-03 -->
+<!-- PURPOSE: Contacts branch/city section with category/city formatting and responsive row layout. -->
 
-<table class="YY-MAIN_TABLE !mt-0 !mb-10">
+<table class="YY-MAIN_TABLE !mt-3" data-contacts-branch-city-root="1">
   <tr>
     <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
-      <div class="YY-CARD_WHITE !h-auto">
-        <div class="YY-STATUS_BLUE !mb-3">{% trans "Бизнес-категории и рубрики" %}</div>
-        <div class="h-[725px] overflow-y-auto pr-1">
-          <div class="grid items-start bg-[#ecf4ff] !mb-2" style="grid-template-columns:3ch minmax(0,1fr) minmax(0,16ch);">
-            <div class="YY-TEXT !mb-0 !py-1 !px-1 text-center font-semibold">{% trans "R" %}</div>
-            <div class="YY-TEXT !mb-0 !py-1 !px-2 break-words font-semibold">{% trans "Категория" %}</div>
-            <div class="YY-TEXT !mb-0 !py-1 !px-2 text-right whitespace-nowrap font-semibold">{% trans "Собрано контактов" %}</div>
-          </div>
+      <div class="YY-CARD_WHITE flex flex-col" data-contacts-branch-city-left-card="1">
+        {% if type == "buy" %}
+          <div class="YY-STATUS_YELLOW !mb-3">{% trans "Бизнес-категории и рубрики (собрано контактов)" %}</div>
+        {% else %}
+          <div class="YY-STATUS_GREEN !mb-3">{% trans "Бизнес-категории и рубрики (собрано контактов)" %}</div>
+        {% endif %}
+        <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
           {% if contacts_branch_rows %}
             <div class="flex flex-col gap-[2px]">
               {% for row in contacts_branch_rows %}
-                <div class="grid items-start bg-[#f0fff0]" style="grid-template-columns:3ch minmax(0,1fr) minmax(0,16ch);">
-                  <div class="YY-TEXT !mb-0 !py-1 !px-1 text-center">{{ row.rate_display }}</div>
-                  <div class="YY-TEXT !mb-0 !py-1 !px-2 break-words">{{ row.branch_name }}</div>
-                  <div class="YY-TEXT !mb-0 !py-1 !px-2 text-right whitespace-nowrap">{{ row.contacts_count_display }}</div>
+                <div class="grid w-full items-start gap-x-2 px-1 {% if row.contacts_count > 0 %}bg-[#f0fff0]{% else %}bg-[#ffffe3]{% endif %}" style="grid-template-columns:3ch minmax(0,1fr) max-content;">
+                  <div class="YY-TEXT !mb-0 !py-1 whitespace-nowrap text-center">{{ row.rate_display }}</div>
+                  <div class="YY-TEXT !mb-0 !py-1 min-w-0 whitespace-normal break-words">{{ row.branch_title }}</div>
+                  <div class="YY-TEXT !mb-0 !py-1 whitespace-nowrap text-right">{{ row.contacts_count_display }}</div>
                 </div>
               {% endfor %}
             </div>
@@ -31,23 +30,20 @@
       </div>
     </td>
     <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
-      <div class="YY-CARD_WHITE !h-auto">
-        <div class="YY-STATUS_BLUE !mb-3">{% trans "Города и населенные пункты" %}</div>
-        <div class="h-[725px] overflow-y-auto pr-1">
-          <div class="grid items-start bg-[#ecf4ff] !mb-2" style="grid-template-columns:3ch minmax(0,1fr) minmax(0,1fr) minmax(0,16ch);">
-            <div class="YY-TEXT !mb-0 !py-1 !px-1 text-center font-semibold">{% trans "R" %}</div>
-            <div class="YY-TEXT !mb-0 !py-1 !px-2 break-words font-semibold">{% trans "Город" %}</div>
-            <div class="YY-TEXT !mb-0 !py-1 !px-2 break-words font-semibold">{% trans "Земля" %}</div>
-            <div class="YY-TEXT !mb-0 !py-1 !px-2 text-right whitespace-nowrap font-semibold">{% trans "Собрано контактов" %}</div>
-          </div>
+      <div class="YY-CARD_WHITE flex flex-col" data-contacts-branch-city-right-card="1">
+        {% if type == "buy" %}
+          <div class="YY-STATUS_YELLOW !mb-3">{% trans "Города и населенные пункты (собрано контактов)" %}</div>
+        {% else %}
+          <div class="YY-STATUS_GREEN !mb-3">{% trans "Города и населенные пункты (собрано контактов)" %}</div>
+        {% endif %}
+        <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
           {% if contacts_city_rows %}
             <div class="flex flex-col gap-[2px]">
               {% for row in contacts_city_rows %}
-                <div class="grid items-start bg-[#f0fff0]" style="grid-template-columns:3ch minmax(0,1fr) minmax(0,1fr) minmax(0,16ch);">
-                  <div class="YY-TEXT !mb-0 !py-1 !px-1 text-center">{{ row.rate_display }}</div>
-                  <div class="YY-TEXT !mb-0 !py-1 !px-2 break-words">{{ row.city_name }}</div>
-                  <div class="YY-TEXT !mb-0 !py-1 !px-2 break-words">{{ row.state_name }}</div>
-                  <div class="YY-TEXT !mb-0 !py-1 !px-2 text-right whitespace-nowrap">{{ row.contacts_count_display }}</div>
+                <div class="grid w-full items-start gap-x-2 px-1 {% if row.contacts_count > 0 %}bg-[#f0fff0]{% else %}bg-[#ffffe3]{% endif %}" style="grid-template-columns:3ch minmax(0,1fr) max-content;">
+                  <div class="YY-TEXT !mb-0 !py-1 whitespace-nowrap text-center">{{ row.rate_display }}</div>
+                  <div class="YY-TEXT !mb-0 !py-1 min-w-0 whitespace-normal break-words">{{ row.city_title }}</div>
+                  <div class="YY-TEXT !mb-0 !py-1 whitespace-nowrap text-right">{{ row.contacts_count_display }}</div>
                 </div>
               {% endfor %}
             </div>

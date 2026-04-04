@@ -3,7 +3,7 @@
 
 from django.db import models
 
-from .models_accounts import ClientUser, Workspace, UserActionToken
+from .models_accounts import ClientUser, Workspace, WorkspaceLimits, UserActionToken
 
 
 class MailTemplate(models.Model):

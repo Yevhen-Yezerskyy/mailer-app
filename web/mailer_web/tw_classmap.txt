@@ -26,17 +26,17 @@ YY-STATUS_RED: min-h-[30px] px-3 py-1 text-sm leading-none flex items-center rou
 YY-MAIN_BOTTOM_DIV: border rounded-md bg-[#ffffff] border border-[#71d0f4] overflow-hidden
 
 #BUTTONS
-YY-BUTTON_MAIN: min-h-[30px] px-3 py-1 text-xs leading-[1.2] inline-flex items-center justify-center rounded-md bg-[#effbff] text-[#006991] font-semibold hover:bg-[#f8fdff] border border-[#71d0f4] uppercase whitespace-nowrap
-YY-BUTTON_GREEN: min-h-[30px] px-3 py-1 text-xs leading-[1.2] inline-flex items-center justify-center rounded-md bg-[#d6fdda] text-[#016b09] font-semibold hover:bg-[#f2fff3] border border-[#9ad3a0] uppercase whitespace-nowrap
-YY-BUTTON_YELLOW: min-h-[30px] px-3 py-1 text-xs leading-[1.2] inline-flex items-center justify-center rounded-md bg-[#FFF7E0] text-[#B45309] font-semibold hover:bg-[#fffaf0] border border-[#e9c48b] uppercase whitespace-nowrap
-YY-BUTTON_GRAY: min-h-[30px] px-3 py-1 text-xs leading-[1.2] inline-flex items-center justify-center rounded-md bg-[#f4f4f4] text-[#636363] font-semibold hover:bg-[#f4f4f4] border border-[#c4c4c4] uppercase whitespace-nowrap pointer-events-none cursor-default
-YY-BUTTON_RED: min-h-[30px] px-3 py-1 text-xs leading-[1.2] inline-flex items-center justify-center rounded-md bg-[#fff8f8] text-[#8e0000] font-semibold hover:bg-[#fff2f2] border border-[#f3a7a7] uppercase whitespace-nowrap
+YY-BUTTON_MAIN: min-h-[30px] px-3 py-1 text-xs leading-[1.2] inline-flex items-center justify-center rounded-md bg-[#effbff] text-[#006991] font-semibold hover:bg-[#f8fdff] border border-[#71d0f4] uppercase whitespace-nowrap !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline
+YY-BUTTON_GREEN: min-h-[30px] px-3 py-1 text-xs leading-[1.2] inline-flex items-center justify-center rounded-md bg-[#d6fdda] text-[#016b09] font-semibold hover:bg-[#f2fff3] border border-[#9ad3a0] uppercase whitespace-nowrap !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline
+YY-BUTTON_YELLOW: min-h-[30px] px-3 py-1 text-xs leading-[1.2] inline-flex items-center justify-center rounded-md bg-[#FFF7E0] text-[#B45309] font-semibold hover:bg-[#fffaf0] border border-[#e9c48b] uppercase whitespace-nowrap !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline
+YY-BUTTON_GRAY: min-h-[30px] px-3 py-1 text-xs leading-[1.2] inline-flex items-center justify-center rounded-md bg-[#f4f4f4] text-[#636363] font-semibold hover:bg-[#f4f4f4] border border-[#c4c4c4] uppercase whitespace-nowrap pointer-events-none cursor-default !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline
+YY-BUTTON_RED: min-h-[30px] px-3 py-1 text-xs leading-[1.2] inline-flex items-center justify-center rounded-md bg-[#fff8f8] text-[#8e0000] font-semibold hover:bg-[#fff2f2] border border-[#f3a7a7] uppercase whitespace-nowrap !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline
 
-YY-BUTTON_MAIN_FULL: min-h-[30px] px-3 py-1 text-xs leading-[1.2] flex items-center justify-center rounded-md bg-[#effbff] text-[#006991] font-semibold hover:bg-[#f8fdff] border border-[#71d0f4] uppercase whitespace-nowrap w-[100%]
-YY-BUTTON_GREEN_FULL: min-h-[30px] px-3 py-1 text-xs leading-[1.2] flex items-center justify-center rounded-md bg-[#d6fdda] text-[#016b09] font-semibold hover:bg-[#f2fff3] border border-[#9ad3a0] uppercase whitespace-nowrap w-[100%]
-YY-BUTTON_YELLOW_FULL: min-h-[30px] px-3 py-1 text-xs leading-[1.2] flex items-center justify-center rounded-md bg-[#FFF7E0] text-[#B45309] font-semibold hover:bg-[#fffaf0] border border-[#e9c48b] uppercase whitespace-nowrap w-[100%]
-YY-BUTTON_GRAY_FULL: min-h-[30px] px-3 py-1 text-xs leading-[1.2] flex items-center justify-center rounded-md bg-[#f4f4f4] text-[#636363] font-semibold hover:bg-[#f4f4f4] border border-[#c4c4c4] uppercase whitespace-nowrap pointer-events-none cursor-default w-[100%]
-YY-BUTTON_RED_FULL: min-h-[30px] px-3 py-1 text-xs leading-[1.2] flex items-center justify-center rounded-md bg-[#fff8f8] text-[#8e0000] font-semibold hover:bg-[#fff2f2] border border-[#f3a7a7] uppercase whitespace-nowrap w-[100%]
+YY-BUTTON_MAIN_FULL: min-h-[30px] px-3 py-1 text-xs leading-[1.2] flex items-center justify-center rounded-md bg-[#effbff] text-[#006991] font-semibold hover:bg-[#f8fdff] border border-[#71d0f4] uppercase whitespace-nowrap w-[100%] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline
+YY-BUTTON_GREEN_FULL: min-h-[30px] px-3 py-1 text-xs leading-[1.2] flex items-center justify-center rounded-md bg-[#d6fdda] text-[#016b09] font-semibold hover:bg-[#f2fff3] border border-[#9ad3a0] uppercase whitespace-nowrap w-[100%] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline
+YY-BUTTON_YELLOW_FULL: min-h-[30px] px-3 py-1 text-xs leading-[1.2] flex items-center justify-center rounded-md bg-[#FFF7E0] text-[#B45309] font-semibold hover:bg-[#fffaf0] border border-[#e9c48b] uppercase whitespace-nowrap w-[100%] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline
+YY-BUTTON_GRAY_FULL: min-h-[30px] px-3 py-1 text-xs leading-[1.2] flex items-center justify-center rounded-md bg-[#f4f4f4] text-[#636363] font-semibold hover:bg-[#f4f4f4] border border-[#c4c4c4] uppercase whitespace-nowrap pointer-events-none cursor-default w-[100%] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline
+YY-BUTTON_RED_FULL: min-h-[30px] px-3 py-1 text-xs leading-[1.2] flex items-center justify-center rounded-md bg-[#fff8f8] text-[#8e0000] font-semibold hover:bg-[#fff2f2] border border-[#f3a7a7] uppercase whitespace-nowrap w-[100%] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline
 
 #TEXTS
 YY-TEXT: block mb-3 text-sm
@@ -57,9 +57,9 @@ YY-MAIN_BOTTOM_TD: h-[1px] pt-0 pb-10 px-8 align-top
 
 # MENU
 YY-MENU-CARD-BLUE: rounded-md bg-[#effbff] border border-[#71d0f4]
-YY-MENU-SUMMARY: flex items-center gap-2 pl-2 py-3 text-sm font-bold text-[#006991] hover:bg-[#f8fdff] hover:text-[#007c09] rounded-md cursor-pointer leading-none
-YY-MENU-DETAIL: flex rounded-md text-sm font-semibold text-[#006991] py-2 pl-9 hover:bg-[#f8fdff] hover:text-[#007c09]
-YY-MENU-DETAIL-ACTIVE: bg-[#f8fdff] text-[#007c09]
+YY-MENU-SUMMARY: flex items-center gap-2 pl-2 py-3 text-sm font-bold text-[#006991] hover:bg-[#f8fdff] hover:text-[#007c09] rounded-md cursor-pointer leading-none !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline
+YY-MENU-DETAIL: flex rounded-md text-sm font-semibold text-[#006991] py-2 pl-9 hover:bg-[#f8fdff] hover:text-[#007c09] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline
+YY-MENU-DETAIL-ACTIVE: bg-[#f8fdff] text-[#007c09] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline
 
 #LINKS
 YY-LINK: flex text-[#006991] hover:text-[#016b09] underline

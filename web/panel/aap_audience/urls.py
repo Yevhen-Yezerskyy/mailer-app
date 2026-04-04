@@ -28,8 +28,12 @@ from .views.create_edit_buy import (
     create_edit_buy_product_view,
     create_edit_buy_company_view,
     create_edit_buy_geo_view,
-    create_edit_buy_branches_cities_view,
+    create_edit_buy_branches_view,
+    create_edit_buy_cities_view,
     create_edit_buy_contacts_view,
+    create_edit_buy_contacts_all_view,
+    create_edit_buy_contacts_branch_city_view,
+    create_edit_buy_contacts_pairs_view,
     create_edit_buy_mailing_list_view,
 )
 from .views.create_edit_sell import (
@@ -37,8 +41,12 @@ from .views.create_edit_sell import (
     create_edit_sell_product_view,
     create_edit_sell_company_view,
     create_edit_sell_geo_view,
-    create_edit_sell_branches_cities_view,
+    create_edit_sell_branches_view,
+    create_edit_sell_cities_view,
     create_edit_sell_contacts_view,
+    create_edit_sell_contacts_all_view,
+    create_edit_sell_contacts_branch_city_view,
+    create_edit_sell_contacts_pairs_view,
     create_edit_sell_mailing_list_view,
 )
 
@@ -73,12 +81,20 @@ urlpatterns = [
     path("create/edit-buy/product/", create_edit_buy_product_view, name="create_edit_buy_product"),
     path("create/edit-buy/company/", create_edit_buy_company_view, name="create_edit_buy_company"),
     path("create/edit-buy/geo/", create_edit_buy_geo_view, name="create_edit_buy_geo"),
-    path(
-        "create/edit-buy/branches-cities/",
-        create_edit_buy_branches_cities_view,
-        name="create_edit_buy_branches_cities",
-    ),
+    path("create/edit-buy/branches/", create_edit_buy_branches_view, name="create_edit_buy_branches"),
+    path("create/edit-buy/cities/", create_edit_buy_cities_view, name="create_edit_buy_cities"),
     path("create/edit-buy/contacts/", create_edit_buy_contacts_view, name="create_edit_buy_contacts"),
+    path("create/edit-buy/contacts/all/", create_edit_buy_contacts_all_view, name="create_edit_buy_contacts_all"),
+    path(
+        "create/edit-buy/contacts/branch-city/",
+        create_edit_buy_contacts_branch_city_view,
+        name="create_edit_buy_contacts_branch_city",
+    ),
+    path(
+        "create/edit-buy/contacts/pairs/",
+        create_edit_buy_contacts_pairs_view,
+        name="create_edit_buy_contacts_pairs",
+    ),
     path(
         "create/edit-buy/mailing-list/",
         create_edit_buy_mailing_list_view,
@@ -89,14 +105,34 @@ urlpatterns = [
     path("create/edit-buy/<str:item_id>/company/", create_edit_buy_company_view, name="create_edit_buy_company_id"),
     path("create/edit-buy/<str:item_id>/geo/", create_edit_buy_geo_view, name="create_edit_buy_geo_id"),
     path(
-        "create/edit-buy/<str:item_id>/branches-cities/",
-        create_edit_buy_branches_cities_view,
-        name="create_edit_buy_branches_cities_id",
+        "create/edit-buy/<str:item_id>/branches/",
+        create_edit_buy_branches_view,
+        name="create_edit_buy_branches_id",
+    ),
+    path(
+        "create/edit-buy/<str:item_id>/cities/",
+        create_edit_buy_cities_view,
+        name="create_edit_buy_cities_id",
     ),
     path(
         "create/edit-buy/<str:item_id>/contacts/",
         create_edit_buy_contacts_view,
         name="create_edit_buy_contacts_id",
+    ),
+    path(
+        "create/edit-buy/<str:item_id>/contacts/all/",
+        create_edit_buy_contacts_all_view,
+        name="create_edit_buy_contacts_all_id",
+    ),
+    path(
+        "create/edit-buy/<str:item_id>/contacts/branch-city/",
+        create_edit_buy_contacts_branch_city_view,
+        name="create_edit_buy_contacts_branch_city_id",
+    ),
+    path(
+        "create/edit-buy/<str:item_id>/contacts/pairs/",
+        create_edit_buy_contacts_pairs_view,
+        name="create_edit_buy_contacts_pairs_id",
     ),
     path(
         "create/edit-buy/<str:item_id>/mailing-list/",
@@ -107,12 +143,20 @@ urlpatterns = [
     path("create/edit-sell/product/", create_edit_sell_product_view, name="create_edit_sell_product"),
     path("create/edit-sell/company/", create_edit_sell_company_view, name="create_edit_sell_company"),
     path("create/edit-sell/geo/", create_edit_sell_geo_view, name="create_edit_sell_geo"),
-    path(
-        "create/edit-sell/branches-cities/",
-        create_edit_sell_branches_cities_view,
-        name="create_edit_sell_branches_cities",
-    ),
+    path("create/edit-sell/branches/", create_edit_sell_branches_view, name="create_edit_sell_branches"),
+    path("create/edit-sell/cities/", create_edit_sell_cities_view, name="create_edit_sell_cities"),
     path("create/edit-sell/contacts/", create_edit_sell_contacts_view, name="create_edit_sell_contacts"),
+    path("create/edit-sell/contacts/all/", create_edit_sell_contacts_all_view, name="create_edit_sell_contacts_all"),
+    path(
+        "create/edit-sell/contacts/branch-city/",
+        create_edit_sell_contacts_branch_city_view,
+        name="create_edit_sell_contacts_branch_city",
+    ),
+    path(
+        "create/edit-sell/contacts/pairs/",
+        create_edit_sell_contacts_pairs_view,
+        name="create_edit_sell_contacts_pairs",
+    ),
     path(
         "create/edit-sell/mailing-list/",
         create_edit_sell_mailing_list_view,
@@ -123,14 +167,34 @@ urlpatterns = [
     path("create/edit-sell/<str:item_id>/company/", create_edit_sell_company_view, name="create_edit_sell_company_id"),
     path("create/edit-sell/<str:item_id>/geo/", create_edit_sell_geo_view, name="create_edit_sell_geo_id"),
     path(
-        "create/edit-sell/<str:item_id>/branches-cities/",
-        create_edit_sell_branches_cities_view,
-        name="create_edit_sell_branches_cities_id",
+        "create/edit-sell/<str:item_id>/branches/",
+        create_edit_sell_branches_view,
+        name="create_edit_sell_branches_id",
+    ),
+    path(
+        "create/edit-sell/<str:item_id>/cities/",
+        create_edit_sell_cities_view,
+        name="create_edit_sell_cities_id",
     ),
     path(
         "create/edit-sell/<str:item_id>/contacts/",
         create_edit_sell_contacts_view,
         name="create_edit_sell_contacts_id",
+    ),
+    path(
+        "create/edit-sell/<str:item_id>/contacts/all/",
+        create_edit_sell_contacts_all_view,
+        name="create_edit_sell_contacts_all_id",
+    ),
+    path(
+        "create/edit-sell/<str:item_id>/contacts/branch-city/",
+        create_edit_sell_contacts_branch_city_view,
+        name="create_edit_sell_contacts_branch_city_id",
+    ),
+    path(
+        "create/edit-sell/<str:item_id>/contacts/pairs/",
+        create_edit_sell_contacts_pairs_view,
+        name="create_edit_sell_contacts_pairs_id",
     ),
     path(
         "create/edit-sell/<str:item_id>/mailing-list/",

@@ -2,6 +2,7 @@
 # DATE: 2026-01-01
 
 from django.conf import settings
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
 
@@ -29,9 +30,15 @@ class AudienceTask(models.Model):
     collected = models.BooleanField(default=False)
     ready = models.BooleanField(default=False)
     archived = models.BooleanField(default=False)  # NEW
+    active = models.BooleanField(default=False)
+    user_active = models.BooleanField(default=True)
 
     run_processing = models.BooleanField(default=False)
     subscribers_limit = models.IntegerField(default=0)
+    rate_limit = models.IntegerField(
+        default=50,
+        validators=[MinValueValidator(20), MaxValueValidator(60)],
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

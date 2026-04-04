@@ -17,6 +17,8 @@ from .views import (
     companies_view,
     dashboard_view,
     index_view,
+    limits_access_types_view,
+    limits_special_view,
     login_view,
     user_add_view,
     user_edit_view,
@@ -69,6 +71,8 @@ urlpatterns = [
     path("users/add/", _flag_view(user_add_view), name="user_add"),
     path("users/<int:pk>/modal/", _flag_view(user_modal_view), name="user_modal"),
     path("users/<int:pk>/", _flag_view(user_edit_view), name="user_edit"),
+    path("limits/access-types/", _flag_view(limits_access_types_view), name="limits_access_types"),
+    path("limits/special/", _flag_view(limits_special_view), name="limits_special"),
     # campaign_templates JS compatibility aliases (admin domain)
     path("panel/campaigns/templates/", _flag_view(system_mail_template_view)),
     path("panel/campaigns/templates/_render-user-html/", _flag_view(system_templates__render_user_html_view)),

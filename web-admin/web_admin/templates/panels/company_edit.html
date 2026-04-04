@@ -20,6 +20,28 @@
           {{ form.access_type }}
           {% if form.access_type.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.access_type.errors }}</div>{% endif %}
 
+          <div id="yy-custom-limits-block" {% if not show_custom_limits %}style="display:none"{% endif %}>
+            <label class="YY-LABEL" for="{{ form.sending_workspace_limit.id_for_label }}">{{ form.sending_workspace_limit.label }}</label>
+            {{ form.sending_workspace_limit }}
+            {% if form.sending_workspace_limit.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.sending_workspace_limit.errors }}</div>{% endif %}
+
+            <label class="YY-LABEL" for="{{ form.sending_task_limit.id_for_label }}">{{ form.sending_task_limit.label }}</label>
+            {{ form.sending_task_limit }}
+            {% if form.sending_task_limit.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.sending_task_limit.errors }}</div>{% endif %}
+
+            <label class="YY-LABEL" for="{{ form.active_tasks_limit.id_for_label }}">{{ form.active_tasks_limit.label }}</label>
+            {{ form.active_tasks_limit }}
+            {% if form.active_tasks_limit.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.active_tasks_limit.errors }}</div>{% endif %}
+          </div>
+
+          <label class="YY-LABEL" for="{{ form.billing_day.id_for_label }}">{{ form.billing_day.label }}</label>
+          {{ form.billing_day }}
+          {% if form.billing_day.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.billing_day.errors }}</div>{% endif %}
+
+          <label class="YY-LABEL" for="{{ form.registration_date.id_for_label }}">{{ form.registration_date.label }}</label>
+          {{ form.registration_date }}
+          {% if form.registration_date.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.registration_date.errors }}</div>{% endif %}
+
           <label class="YY-LABEL" for="{{ form.company_name.id_for_label }}">{{ form.company_name.label }}</label>
           {{ form.company_name }}
           {% if form.company_name.errors %}<div class="YY-CARD_IN_FORM_ERROR">{{ form.company_name.errors }}</div>{% endif %}
@@ -45,4 +67,23 @@
     </td>
   </tr>
 </table>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const accessType = document.getElementById('{{ form.access_type.id_for_label }}');
+    const limitsBlock = document.getElementById('yy-custom-limits-block');
+    if (!accessType || !limitsBlock) {
+      return;
+    }
+
+    const syncCustomLimitsVisibility = function () {
+      limitsBlock.style.display = accessType.value === 'custom' ? '' : 'none';
+    };
+
+    accessType.addEventListener('change', syncCustomLimitsVisibility);
+    syncCustomLimitsVisibility();
+  });
+</script>
 {% endblock %}
