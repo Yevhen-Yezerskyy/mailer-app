@@ -460,7 +460,7 @@ class BrowserSessionRouter:
                         "host": "direct",
                         "local_port": 0,
                         "proxy_server": "",
-                        "launch_id": f"direct:{ROUTER_BOOT_ID}",
+                        "launch_id": "direct",
                     }
                 )
                 continue
@@ -798,9 +798,6 @@ class BrowserSessionRouter:
         if not isinstance(state, dict):
             return None
         if not state:
-            return None
-        if str(state.get("router_boot_id") or "").strip() != ROUTER_BOOT_ID:
-            self._clear_cache_obj(session_key)
             return None
         current_launch_id = str(slot_launch_id or "").strip()
         if current_launch_id and str(state.get("slot_launch_id") or "").strip() != current_launch_id:
