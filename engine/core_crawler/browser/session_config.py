@@ -60,8 +60,8 @@ BROKER_QUEUE_MAX = 256
 CRAWLER_ACTIVE_TUNNEL_CAP = 2
 CRAWLER_SLOT_HOLD_MIN_SEC = 10 * 60
 CRAWLER_SLOT_HOLD_MAX_SEC = 15 * 60
-ONE_ONE_EIGHTY_WINDOW_MIN_SEC = 10 * 60
-ONE_ONE_EIGHTY_WINDOW_MAX_SEC = 15 * 60
+ONE_ONE_EIGHTY_WINDOW_MIN_SEC = 8 * 60
+ONE_ONE_EIGHTY_WINDOW_MAX_SEC = 14 * 60
 ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC = 70 * 60
 ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC = 100 * 60
 ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT = 300
@@ -228,6 +228,11 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
             "aws_3_76_209_105",
             "aws_63_183_216_59",
             "aws_3_79_104_36",
+            "aws_18_195_173_161",
+            "aws_18_197_184_219",
+            "aws_3_76_221_65",
+            "aws_3_70_227_250",
+            "aws_3_68_92_39",
             "direct",
         ),
         slot_quarantine_sec=26 * 60 * 60,
@@ -238,7 +243,7 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
         runtime_recycle_min_sec=300,
         runtime_recycle_max_sec=600,
         pause_min_sec=1.5,
-        pause_max_sec=3.0,
+        pause_max_sec=3.5,
         browser_timeout_ms=90_000,
     ),
     "gs": SiteSessionConfig(
@@ -267,6 +272,11 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
             "aws_3_76_209_105",
             "aws_63_183_216_59",
             "aws_3_79_104_36",
+            "aws_18_195_173_161",
+            "aws_18_197_184_219",
+            "aws_3_76_221_65",
+            "aws_3_70_227_250",
+            "aws_3_68_92_39",
             "direct",
         ),
         slot_quarantine_sec=1 * 60 * 60,

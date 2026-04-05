@@ -7,9 +7,6 @@ from __future__ import annotations
 import concurrent.futures
 import re
 import json
-import random
-import threading
-import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
@@ -27,14 +24,6 @@ TREFFER_RE = re.compile(r"\b(\d+)\s*Treffer\b", re.IGNORECASE)
 SPELL_SUGGEST_RE = re.compile(r"rechtschreibvorschl(?:a|ä)ge", re.IGNORECASE)
 LOG_FILE = "spider_gs"
 LOG_FOLDER = "crawler"
-
-# One process handles one tunnel, so a file-local gate is enough to serialize request starts.
-_REQUEST_GATE_COND = threading.Condition()
-_REQUEST_GATE_NEXT_START_TS = 0.0
-_REQUEST_GATE_WAITERS = 0
-_REQUEST_GATE_MAX_WAITERS = 10
-_REQUEST_GATE_ERROR = "INTERNAL THROTTLE QUEUE OVERFLOW"
-
 
 class GelbeSeitenCBSpider:
     name = "core_gs_cb"
@@ -62,31 +51,7 @@ class GelbeSeitenCBSpider:
         self.failed_urls: List[Dict[str, str]] = []
 
     @staticmethod
-    def _wait_for_request_slot() -> None:
-        global _REQUEST_GATE_NEXT_START_TS, _REQUEST_GATE_WAITERS
-
-        cfg = SITE_CONFIGS["gs"]
-        with _REQUEST_GATE_COND:
-            while True:
-                now = time.monotonic()
-                wait_for = float(_REQUEST_GATE_NEXT_START_TS) - float(now)
-                if wait_for <= 0:
-                    pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
-                    _REQUEST_GATE_NEXT_START_TS = float(now) + max(0.0, float(pause_sec))
-                    return
-
-                _REQUEST_GATE_WAITERS += 1
-                if _REQUEST_GATE_WAITERS > int(_REQUEST_GATE_MAX_WAITERS):
-                    _REQUEST_GATE_WAITERS -= 1
-                    raise RuntimeError(_REQUEST_GATE_ERROR)
-                try:
-                    _REQUEST_GATE_COND.wait(timeout=wait_for)
-                finally:
-                    _REQUEST_GATE_WAITERS -= 1
-
-    @staticmethod
     def _fetch_html_gated(**kwargs):
-        GelbeSeitenCBSpider._wait_for_request_slot()
         return fetch_html(**kwargs)
 
     def _run_detail_fetches(self) -> None:

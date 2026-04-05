@@ -383,6 +383,22 @@ class BrowserSessionRouter:
         return f"core_crawler:browser_session_gate:{site_name}:{tunnel_name}:{int(slot_idx)}"
 
     @staticmethod
+    def _dispatch_gate_key(site: str, slot_name: str, slot_idx: int) -> str:
+        site_name = str(site or "").strip()
+        tunnel_name = str(slot_name or "").strip()
+        if not site_name or not tunnel_name:
+            raise ValueError("dispatch gate key requires site and slot_name")
+        return f"core_crawler:browser_dispatch_gate:{site_name}:{tunnel_name}:{int(slot_idx)}"
+
+    @staticmethod
+    def _dispatch_state_key(site: str, slot_name: str, slot_idx: int) -> str:
+        site_name = str(site or "").strip()
+        tunnel_name = str(slot_name or "").strip()
+        if not site_name or not tunnel_name:
+            raise ValueError("dispatch state key requires site and slot_name")
+        return f"core_crawler:browser_dispatch_state:{site_name}:{tunnel_name}:{int(slot_idx)}"
+
+    @staticmethod
     def _session_warm_key(site: str, slot_name: str, slot_idx: int) -> str:
         site_name = str(site or "").strip()
         tunnel_name = str(slot_name or "").strip()
@@ -804,6 +820,38 @@ class BrowserSessionRouter:
             return None
         self._cache_set_obj(session_key, state, ttl_sec=SESSION_STATE_TTL_SEC)
         return state
+
+    def _wait_for_dispatch_slot(self, cfg: SiteSessionConfig, session: BrowserSession) -> None:
+        slot_name = str(session.tunnel.get("name") or "").strip()
+        slot_idx = int(session.slot_idx)
+        gate_key = self._dispatch_gate_key(cfg.site, slot_name, slot_idx)
+        state_key = self._dispatch_state_key(cfg.site, slot_name, slot_idx)
+        owner = f"dispatch:{cfg.site}:{slot_name}:{slot_idx}:{uuid4().hex}"
+        gate_wait_sec = max(float(SESSION_GATE_WAIT_SEC), float(cfg.pause_max_sec) + 1.0)
+        gate_token = self._lock_until(gate_key, SESSION_GATE_TTL_SEC, owner, gate_wait_sec)
+        if not gate_token:
+            raise RuntimeError(f"DISPATCH GATE BUSY {cfg.site} {slot_name}:{slot_idx}")
+        try:
+            raw_state = self._cache_get_obj(state_key)
+            next_start_ts = 0.0
+            if isinstance(raw_state, dict):
+                try:
+                    next_start_ts = float(raw_state.get("next_start_ts") or 0.0)
+                except Exception:
+                    next_start_ts = 0.0
+            wait_for = float(next_start_ts) - float(time.time())
+            if wait_for > 0:
+                time.sleep(wait_for)
+            pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
+            reserved_until = float(time.time()) + max(0.0, float(pause_sec))
+            self._cache_set_obj(
+                state_key,
+                {"next_start_ts": reserved_until},
+                ttl_sec=max(60, int(max(float(cfg.pause_max_sec) * 10.0, 60.0))),
+            )
+            session.next_dispatch_ts = reserved_until
+        finally:
+            self._release_lock(gate_key, gate_token)
 
     def _new_session_state(
         self,
@@ -1774,6 +1822,7 @@ class BrowserSessionRouter:
             cookies_before = page.context.cookies([url])
         except Exception:
             cookies_before = []
+        self._wait_for_dispatch_slot(cfg, session)
         nav_started = time.time()
         self._log_fetch_start(
             log_file=HTTP_CHROMIUM_LOG_FILE,
@@ -1855,12 +1904,13 @@ class BrowserSessionRouter:
     ) -> FetchResult:
         session.current_url = url
         method_s = str(method or "GET").upper()
-        started = time.time()
         had_cookies = False
         payload: dict[str, Any] | None = None
         with session.http_mu:
             cookies_before = cookie_snapshot(session.http_session)
             had_cookies = bool(cookies_before)
+        self._wait_for_dispatch_slot(cfg, session)
+        started = time.time()
         self._log_fetch_start(
             log_file=HTTP_LIGHT_LOG_FILE,
             site=cfg.site,
@@ -1958,6 +2008,7 @@ class BrowserSessionRouter:
                 cookies_before = bool(page.context.cookies([url]))
             except Exception:
                 cookies_before = False
+            self._wait_for_dispatch_slot(cfg, session)
             click_started = time.time()
             self._log_fetch_start(
                 log_file=HTTP_CHROMIUM_LOG_FILE,
@@ -2153,9 +2204,6 @@ class BrowserSessionRouter:
             if self._should_quarantine_response(cfg, warm.status, warm.title, warm.html):
                 self._mute_slot(cfg, slot["name"], f"home:{warm.status}")
                 raise RuntimeError(f"WARM BLOCKED {warm.status}")
-            pause_sec = random.uniform(float(cfg.pause_min_sec), float(cfg.pause_max_sec))
-            if pause_sec > 0:
-                time.sleep(float(pause_sec))
 
         result, current_log_file = self._run_mode_fetch(
             session,
