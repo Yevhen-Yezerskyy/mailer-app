@@ -421,11 +421,37 @@ def _is_11880_main_request(kind: str) -> bool:
     return kind_name not in {"home", "referer"}
 
 
-def _activate_fixed_slots(site: str, available: list[str], target_count: int) -> list[str]:
+def _activate_fixed_slots(
+    site: str,
+    available: list[str],
+    target_count: int,
+    *,
+    preferred_names: set[str] | None = None,
+) -> list[str]:
     if target_count <= 0 or not available:
         return []
     if len(available) <= target_count:
         return list(available)
+    preferred = {str(name) for name in (preferred_names or set()) if str(name or "").strip()}
+
+    def _select_slots(available_names: list[str], rr_pos: int) -> list[str]:
+        if not preferred:
+            start_idx = rr_pos % len(available_names)
+            rotated = list(available_names[start_idx:] + available_names[:start_idx])
+            return rotated[:target_count]
+        priority_names = [name for name in available_names if name in preferred]
+        regular_names = [name for name in available_names if name not in preferred]
+        selected: list[str] = []
+        if priority_names:
+            start_idx = rr_pos % len(priority_names)
+            rotated = list(priority_names[start_idx:] + priority_names[:start_idx])
+            selected.extend(rotated[:target_count])
+        if len(selected) < target_count and regular_names:
+            start_idx = rr_pos % len(regular_names)
+            rotated = list(regular_names[start_idx:] + regular_names[:start_idx])
+            selected.extend(rotated[: target_count - len(selected)])
+        return selected[:target_count]
+
     now = time.time()
     state = _cache_get_obj(_schedule_key(site)) or {}
     active_names = [str(name) for name in list(state.get("names") or []) if str(name or "").strip()]
@@ -433,12 +459,15 @@ def _activate_fixed_slots(site: str, available: list[str], target_count: int) ->
     if until > now:
         current = [name for name in active_names if name in available]
         if len(current) >= target_count:
-            return current[:target_count]
+            if not preferred:
+                return current[:target_count]
+            desired_priority = min(target_count, len([name for name in available if name in preferred]))
+            current_priority = len([name for name in current[:target_count] if name in preferred])
+            if current_priority >= desired_priority:
+                return current[:target_count]
     rr_state = _cache_get_obj(_rr_key(site)) or {"pos": 0}
     rr_pos = int(rr_state.get("pos") or 0)
-    start_idx = rr_pos % len(available)
-    rotated = list(available[start_idx:] + available[:start_idx])
-    selected = rotated[:target_count]
+    selected = _select_slots(available, rr_pos)
     _cache_set_obj(_rr_key(site), {"pos": rr_pos + max(1, target_count)})
     until = now + random.uniform(CRAWLER_SLOT_HOLD_MIN_SEC, CRAWLER_SLOT_HOLD_MAX_SEC)
     _cache_set_obj(_schedule_key(site), {"names": list(selected), "until": until})
@@ -486,7 +515,8 @@ def _compute_site_route_plan() -> dict[str, list[str]]:
     live_gs = [name for name in slots_gs if _slot_is_live(name, statuses)]
     available_gs = [name for name in live_gs if name not in quarantine_gs and name not in used_11880]
     gs_target = _gs_target_active_count(len(available_gs))
-    active_gs = _activate_fixed_slots("gs", available_gs, gs_target)
+    gs_preferred = {name for name in available_gs if name in quarantine_11880}
+    active_gs = _activate_fixed_slots("gs", available_gs, gs_target, preferred_names=gs_preferred)
 
     return {
         "11880": list(active_11880),
