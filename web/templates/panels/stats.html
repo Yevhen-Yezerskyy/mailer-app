@@ -32,11 +32,7 @@
                   <td class="YY-TB_TD">{{ it.campaign_title }}</td>
                   <td class="YY-TB_TD">{{ it.company_name }}</td>
                   <td class="YY-TB_TD">
-                    <a href="#"
-                      class="YY-BUTTON_TAB_MAIN w-full inline-block text-center"
-                      data-yy-modal="url=/panel/lists/contacts/modal/?id={{ it.ui_id }}">
-                      {% trans "Показать компанию" %}
-                    </a>
+                    {{ it.company_name }}
                   </td>
                 </tr>
               {% endfor %}

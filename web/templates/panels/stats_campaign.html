@@ -81,13 +81,7 @@
                           {{ it.first_time|date:"d.m.Y H:i:s" }}
                         </td>
                         <td class="YY-TB_TD">
-                          {% if it.ui_id %}
-                            <a href="#" class="underline" data-yy-modal="url=/panel/lists/contacts/modal/?id={{ it.ui_id }}">
-                              {{ it.company_name }}
-                            </a>
-                          {% else %}
-                            {{ it.company_name }}
-                          {% endif %}
+                          {{ it.company_name }}
                           {% if it.address %}
                             <div class="YY-TEXT !mb-0">{{ it.address }}</div>
                           {% endif %}

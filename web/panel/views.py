@@ -516,7 +516,7 @@ def dashboard(request):
             workspace_id=ws_id,
             archived=False,
         )
-        .only("id", "title", "run_processing")
+        .only("id", "title", "active")
         .order_by("-created_at")
     )[:3]
     task_ids = [int(t.id) for t in recent_tasks]
@@ -582,8 +582,8 @@ def dashboard(request):
         card_audiences.append(
             {
                 "title": (t.title or "").strip() or f"#{tid}",
-                "status": "Сбор контактов включен" if bool(t.run_processing) else "Сбор контактов отключен",
-                "status_on": bool(t.run_processing),
+                "status": "Сбор контактов включен" if bool(t.active) else "Сбор контактов отключен",
+                "status_on": bool(t.active),
                 "total": int(s["total"]),
                 "rated": int(s["rated"]),
                 "b1": int(s["b1"]),

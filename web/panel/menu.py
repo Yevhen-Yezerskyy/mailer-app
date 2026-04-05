@@ -33,47 +33,10 @@ PANEL_MENU = [
         "open_prefixes": ["/panel/audience/"],
         "items": [
             {
-                "title": _("Создание аудиторий"),
-                "page_title": _("Аудитории : создание"),
-                "url_name": "audience:index",
-                "active_prefixes": ["/panel/audience/how/"],
-            },
-            {
-                "title": _("Города и категории"),
-                "page_title": _("Города и бизнес-категории"),
-                "url_name": "audience:clar",
-                "active_prefixes": ["/panel/audience/clar/"],
-            },
-            {
-                "title": _("Сбор контактов / Рейтинг"),
-                "page_title": _("Аудитории : Сбор контактов"),
-                "url_name": "audience:status",
-                "active_prefixes": ["/panel/audience/status/"],
-            },
-            {
                 "title": _("Списки рассылок"),
                 "page_title": _("Списки рассылок"),
                 "url_name": "audience:create_list",
                 "active_prefixes": ["/panel/audience/create/"],
-            },
-        ],
-    },
-    {
-        # CONTACTS / LISTS
-        "title": _("Списки рассылок"),
-        "open_prefixes": ["/panel/lists/"],
-        "items": [
-            {
-                "title": _("Управление списками"),
-                "page_title": _("Контакты : Списки рассылок"),
-                "url_name": "lists:lists",
-                "active_prefixes": ["/panel/lists/lists/"],
-            },
-            {
-                "title": _("Все контакты списков"),
-                "page_title": _("Контакты : Все контакты"),
-                "url_name": "lists:contacts",
-                "active_prefixes": ["/panel/lists/contacts/"],
             },
         ],
     },

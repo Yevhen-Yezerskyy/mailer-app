@@ -389,7 +389,7 @@ def _handle_branches_cities_step_view(
         product_de = product_de or (task.source_product or "").strip()
         company_de = (translate_text(task.source_company or "", "de") or "").strip()
         company_de = company_de or (task.source_company or "").strip()
-    geo_text = ((task.source_geo or "").strip() or (task.task_geo or "").strip()) if task else ""
+    geo_text = (task.source_geo or "").strip() if task else ""
 
     branch_form = str(request.GET.get("branch_form") or "").strip()
     city_form = str(request.GET.get("city_form") or "").strip()

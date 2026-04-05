@@ -61,7 +61,6 @@ urlpatterns = [
     path("contact/modal/", _flag_view(contact_modal_view), name="contact_modal"),
 
     path("audience/", include_flagged("panel.aap_audience.urls")),
-    path("lists/", include_flagged("panel.aap_lists.urls")),
     path("settings/", include_flagged("panel.aap_settings.urls")),
     path("campaigns/", include_flagged("panel.aap_campaigns.urls")),
 ]

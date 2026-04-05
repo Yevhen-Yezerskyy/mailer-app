@@ -622,9 +622,7 @@ def _pick_sending_task(cur) -> Optional[int]:
         """
         SELECT id
         FROM public.aap_audience_audiencetask
-        WHERE ready = true
-          AND archived = false
-          AND collected = false
+        WHERE active = true
         ORDER BY random()
         LIMIT 1
         """
@@ -715,7 +713,7 @@ def run_sending_list_batch() -> Dict[str, int]:
         task_id = _pick_sending_task(cur)
         if not task_id:
             counts["duration_ms"] = int((time.time() - started_at) * 1000)
-            _log_json("sending_lists", {"reason": "no_ready_task", **counts})
+            _log_json("sending_lists", {"reason": "no_active_task", **counts})
             return counts
 
         counts["task_id"] = int(task_id)

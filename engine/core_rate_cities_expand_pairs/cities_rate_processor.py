@@ -1,9 +1,9 @@
-# FILE: engine/core_tasks/cities_rate_processor.py
-# DATE: 2026-03-26
+# FILE: engine/core_rate_cities_expand_pairs/cities_rate_processor.py
+# DATE: 2026-04-05
 # PURPOSE: Dedicated worker for city rating tasks only.
 
 from engine.common.worker import Worker
-from engine.core_tasks import rate_cities
+from engine.core_rate_cities_expand_pairs import rate_cities
 
 RATE_TIMEOUT_SEC = 900
 

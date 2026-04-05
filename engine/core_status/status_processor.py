@@ -1,6 +1,6 @@
 # FILE: engine/core_status/status_processor.py
 # DATE: 2026-04-05
-# PURPOSE: Dedicated worker for status-based audience task active recalculation.
+# PURPOSE: Dedicated worker for status-based audience task ready recalculation.
 
 from engine.common.worker import Worker
 from engine.core_status import status
@@ -26,9 +26,9 @@ def main() -> None:
     )
 
     w.register(
-        name="status_run_once",
-        fn=status.run_once,
-        every_sec=5,
+        name="active_run_once",
+        fn=status.run_active_once,
+        every_sec=2,
         timeout_sec=TASK_TIMEOUT_SEC,
         singleton=True,
         heavy=False,

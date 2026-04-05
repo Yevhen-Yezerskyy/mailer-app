@@ -1,4 +1,4 @@
-# FILE: engine/core_tasks/rate_cities.py
+# FILE: engine/core_rate_cities_expand_pairs/rate_cities.py
 # DATE: 2026-03-25
 # PURPOSE: Standalone city-rating task for the new flow. Picks one task with unrated cities,
 # rates up to 50 cities via GPT, stores rates/hash in DB, and returns the batch result.

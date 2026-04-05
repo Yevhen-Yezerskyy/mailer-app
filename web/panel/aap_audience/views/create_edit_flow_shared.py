@@ -494,10 +494,7 @@ def create_task(request, *, flow_type: str, title: str, **extra_fields):
     task = AudienceTask.objects.create(
         workspace_id=request.workspace_id,
         user=request.user,
-        task="",
         title=title,
-        task_branches="",
-        task_geo="",
         type=flow_type,
         **extra_fields,
     )
@@ -513,10 +510,7 @@ def task_saved_values(task) -> dict[str, Any]:
         "source_product": (task.source_product or "") if task else "",
         "source_company": (task.source_company or "") if task else "",
         "source_geo": (task.source_geo or "") if task else "",
-        "task_branches": (task.task_branches or "") if task else "",
-        "task_geo": (task.task_geo or "") if task else "",
         "ready": bool(task.ready) if task else False,
-        "run_processing": bool(task.run_processing) if task else False,
     }
 
 

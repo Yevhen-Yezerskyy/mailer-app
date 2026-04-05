@@ -566,11 +566,11 @@ def _build_contacts_section_urls(flow_type: str, item_id: str) -> dict[str, str]
 
 
 def _is_contacts_active(task) -> bool:
-    return bool(task and task.ready and not task.collected and not task.archived)
+    return bool(task and task.ready and not task.archived)
 
 
 def _is_contacts_completed(task) -> bool:
-    return bool(task and task.collected)
+    return False
 
 
 def _build_contacts_step_context(task) -> dict[str, Any]:

@@ -4,12 +4,6 @@
 from django.urls import path
 from django.shortcuts import redirect
 
-from .views.how import how_view
-from .views.clar import clar_view
-from .views.modal_clar import modal_clar_view
-from .views.status import status_view
-from .views.status_task import status_task_view
-from .views.modal_status_task import modal_status_task_view  # NEW
 from .views.modal_create_task import modal_create_task_view
 from .views.modal_edit_branch_rate import modal_edit_branch_rate_view
 from .views.modal_edit_city_rate import modal_edit_city_rate_view
@@ -53,15 +47,8 @@ from .views.create_edit_sell import (
 app_name = "audience"
 
 urlpatterns = [
-    path("", lambda r: redirect("audience:how"), name="index"),
+    path("", lambda r: redirect("audience:create_list"), name="index"),
 
-    path("how/", how_view, name="how"),
-    path("clar/", clar_view, name="clar"),
-    path("clar/modal/", modal_clar_view, name="clar_modal"),
-
-    path("status/", status_view, name="status"),
-    path("status/task/", status_task_view, name="status_task"),
-    path("status/task/modal/", modal_status_task_view, name="status_task_modal"),  # NEW
     path("create/modal/", modal_create_task_view, name="create_modal"),
     path("create/branch-rate/modal/", modal_edit_branch_rate_view, name="create_branch_rate_modal"),
     path("create/city-rate/modal/", modal_edit_city_rate_view, name="create_city_rate_modal"),

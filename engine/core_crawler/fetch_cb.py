@@ -15,7 +15,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Optional, Sequence
+from typing import Any, Optional
 
 from engine.common.cache.client import CLIENT, _redis_call
 from engine.common.db import fetch_one, get_connection
@@ -115,79 +115,32 @@ def _make_item(
     )
 
 
-def _normalize_catalogs(catalogs: Sequence[str] | str | None = None) -> tuple[str, ...]:
-    if catalogs is None:
-        return ()
-    if isinstance(catalogs, str):
-        raw_values = [catalogs]
-    else:
-        raw_values = list(catalogs or [])
-    seen: set[str] = set()
-    out: list[str] = []
-    for raw_value in raw_values:
-        value = str(raw_value or "").strip()
-        if not value or value in seen:
-            continue
-        seen.add(value)
-        out.append(value)
-    return tuple(out)
-
-
-def _catalog_clause(catalogs: Sequence[str] | str | None = None) -> tuple[str, tuple[Any, ...]]:
-    normalized = _normalize_catalogs(catalogs)
-    if not normalized:
-        return "", ()
-    if len(normalized) == 1:
-        return " AND bs.catalog = %s ", (normalized[0],)
-    placeholders = ", ".join(["%s"] * len(normalized))
-    return f" AND bs.catalog IN ({placeholders}) ", tuple(normalized)
-
-
-def _pick_active_task_id(catalogs: Sequence[str] | str | None = None) -> Optional[int]:
-    catalog_sql, catalog_params = _catalog_clause(catalogs)
+def _pick_active_task_id() -> Optional[int]:
     row = fetch_one(
-        f"""
-        SELECT t.id
+        """
+        SELECT id
+        FROM public.aap_audience_audiencetask t
+        WHERE t.active = true
+        ORDER BY random()
+        LIMIT 1
+        """,
+    )
+    return int(row[0]) if row else None
+
+
+def pending_items_exist() -> bool:
+    row = fetch_one(
+        """
+        SELECT 1
         FROM public.aap_audience_audiencetask t
         JOIN public.task_cb_ratings tcr
           ON tcr.task_id = t.id
         JOIN public.cb_crawl_pairs cp
           ON cp.id = tcr.cb_id
-        JOIN public.branches_sys bs
-          ON bs.id = cp.branch_id
-        WHERE t.ready = true
-          AND t.archived = false
-          AND t.collected = false
+        WHERE t.active = true
           AND cp.collected = false
-          {catalog_sql}
-        ORDER BY random()
         LIMIT 1
         """,
-        catalog_params,
-    )
-    return int(row[0]) if row else None
-
-
-def pending_items_exist(catalogs: Sequence[str] | str | None = None) -> bool:
-    catalog_sql, catalog_params = _catalog_clause(catalogs)
-    row = fetch_one(
-        f"""
-        SELECT 1
-        FROM public.task_cb_ratings tcr
-        JOIN public.cb_crawl_pairs cp
-          ON cp.id = tcr.cb_id
-        JOIN public.aap_audience_audiencetask t
-          ON t.id = tcr.task_id
-        JOIN public.branches_sys bs
-          ON bs.id = cp.branch_id
-        WHERE t.ready = true
-          AND t.archived = false
-          AND t.collected = false
-          AND cp.collected = false
-          {catalog_sql}
-        LIMIT 1
-        """,
-        catalog_params,
     )
     return bool(row)
 
@@ -562,15 +515,14 @@ def _stop_item_timeout_watchdog(watchdog: ItemTimeoutWatchdog | None) -> None:
         pass
 
 
-def _claim_next_item(catalogs: Sequence[str] | str | None = None) -> Optional[QueueItem]:
+def _claim_next_item() -> Optional[QueueItem]:
     with get_connection() as conn, conn.cursor() as cur:
-        catalog_sql, catalog_params = _catalog_clause(catalogs)
-        task_id = _pick_active_task_id(catalogs)
+        task_id = _pick_active_task_id()
         if not task_id:
             return None
 
         cur.execute(
-            f"""
+            """
             SELECT
               tcr.task_id,
               tcr.cb_id,
@@ -578,15 +530,12 @@ def _claim_next_item(catalogs: Sequence[str] | str | None = None) -> Optional[Qu
             FROM public.task_cb_ratings tcr
             JOIN public.cb_crawl_pairs cp
               ON cp.id = tcr.cb_id
-            JOIN public.branches_sys bs
-              ON bs.id = cp.branch_id
             WHERE tcr.task_id = %s
               AND cp.collected = false
-              {catalog_sql}
             ORDER BY tcr.rate ASC NULLS LAST, tcr.id ASC
-            LIMIT 50
+            LIMIT 5
             """,
-            (task_id, *catalog_params),
+            (task_id,),
         )
         candidates = cur.fetchall() or []
 
@@ -750,8 +699,7 @@ def _decode_run_one_b64(raw_b64: str) -> dict:
 
 
 def dispatch_run_once(catalog: str = "") -> None:
-    catalog_name = str(catalog or "").strip()
-    item = _claim_next_item(catalog_name)
+    item = _claim_next_item()
     if item is None:
         return
     queue_capacity = max(0, int(len(current_site_route_plan().get(item.catalog) or [])))

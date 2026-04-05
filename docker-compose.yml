@@ -263,64 +263,6 @@ services:
   #       "engine.core_prepare.prepare_cb_processor"
   #     ]
 
-  # mailer-engine-val-prod:
-  #   image: mailer-python:latest
-  #   container_name: mailer-engine-val-prod
-  #   working_dir: /app
-  #   restart: unless-stopped
-  #   depends_on:
-  #     mailer-set-env:
-  #       condition: service_started
-  #     mailer-db:
-  #       condition: service_started
-  #     mailer-redis:
-  #       condition: service_started
-  #   environment:
-  #     PYTHONPATH: /app
-  #   volumes:
-  #     - ./logs:/host-logs
-  #     - serenity-logs:/serenity-logs
-  #     - mailer-app-prod:/app
-  #     - serenity-redis-run:/app/run/redis
-  #     - serenity-secrets:/run/serenity-secrets:ro
-  #   cpus: "0.15"
-  #   command:
-  #     [
-  #       "/app/config/sh/with-secrets.sh",
-  #       "python",
-  #       "-m",
-  #       "engine.core_validate.val_processor"
-  #     ]
-
-  # mailer-engine-exp-prod:
-  #   image: mailer-python:latest
-  #   container_name: mailer-engine-exp-prod
-  #   working_dir: /app
-  #   restart: unless-stopped
-  #   depends_on:
-  #     mailer-set-env:
-  #       condition: service_started
-  #     mailer-db:
-  #       condition: service_started
-  #     mailer-redis:
-  #       condition: service_started
-  #   environment:
-  #     PYTHONPATH: /app
-  #   volumes:
-  #     - ./logs:/host-logs
-  #     - serenity-logs:/serenity-logs
-  #     - mailer-app-prod:/app
-  #     - serenity-redis-run:/app/run/redis
-  #     - serenity-secrets:/run/serenity-secrets:ro
-  #   cpus: "0.15"
-  #   command:
-  #     [
-  #       "/app/config/sh/with-secrets.sh",
-  #       "python",
-  #       "-m",
-  #       "engine.core_validate.val_expand_processor"
-  #     ]
-
   # mailer-engine-rate-prod:
   #   image: mailer-python:latest
   #   container_name: mailer-engine-rate-prod
@@ -376,7 +318,7 @@ services:
         "/app/config/sh/with-secrets.sh",
         "python",
         "-m",
-        "engine.core_tasks.cities_rate_processor"
+        "engine.core_rate_cities_expand_pairs.cities_rate_processor"
       ]
 
   mailer-engine-expand-cb-ready-prod:
@@ -405,7 +347,7 @@ services:
         "/app/config/sh/with-secrets.sh",
         "python",
         "-m",
-        "engine.core_tasks.expand_cb_ready_task_processor"
+        "engine.core_rate_cities_expand_pairs.expand_pairs_processor"
       ]
 
   mailer-engine-crawler-prod:
@@ -466,9 +408,9 @@ services:
         "engine.core_expander.expander_processor"
       ]
 
-  mailer-engine-billing-prod:
+  mailer-engine-status-prod:
     image: mailer-python:latest
-    container_name: mailer-engine-billing-prod
+    container_name: mailer-engine-status-prod
     init: true
     working_dir: /app
     restart: unless-stopped
@@ -492,7 +434,7 @@ services:
         "/app/config/sh/with-secrets.sh",
         "python",
         "-m",
-        "engine.core_billing.billing_processor"
+        "engine.core_status.status_processor"
       ]
 
   # mailer-engine-stat-prod:

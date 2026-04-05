@@ -10,7 +10,6 @@ import time
 from html import unescape
 from typing import Any, Dict, List
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 from psycopg.types.json import Json
@@ -20,18 +19,20 @@ from engine.common.gpt import GPTClient
 from engine.common.prompts.process import get_prompt, translate_text
 from engine.common.utils import h64_text, parse_json_object, parse_json_response
 
-
-IMPRESSUM_PATHS = [
-    "/impressum/",
-    "/impressum.html",
-    "/impressum.htm",
-    "/impressum.php",
-    "/impressum.asp",
-    "/impressum.aspx",
-    "/impressum.jsp",
-]
+WEBSITE_HTTP_TIMEOUT_SEC = 4
+WEBSITE_CONTACT_BUDGET_SEC = 12
 MAX_PAGE_TEXT_LEN = 8000
 MAX_WEBSITE_INPUT_LEN = 12000
+MAX_MEANINGFUL_BLOCKS = 30
+NOISY_LINE_MARKERS = (
+    "cookie",
+    "datenschutz",
+    "agb",
+    "impressum",
+    "login",
+    "newsletter",
+    "kontakt",
+)
 
 
 def _uniq_text_list(values: Any) -> List[str]:
@@ -50,23 +51,6 @@ def _uniq_text_list(values: Any) -> List[str]:
     return out
 
 
-def _build_root_url(url: str) -> str:
-    parsed = urlsplit(str(url or "").strip())
-    scheme = parsed.scheme or "https"
-    netloc = parsed.netloc
-    path = parsed.path
-
-    if not netloc and path:
-        parsed2 = urlsplit("https://" + path)
-        scheme = parsed2.scheme or "https"
-        netloc = parsed2.netloc
-
-    if not netloc:
-        return ""
-
-    return urlunsplit((scheme, netloc, "", "", ""))
-
-
 def _fetch_text_from_url(url: str) -> str:
     url_value = str(url or "").strip()
     if not url_value:
@@ -83,7 +67,7 @@ def _fetch_text_from_url(url: str) -> str:
                 )
             },
         )
-        with urlopen(request, timeout=15) as resp:
+        with urlopen(request, timeout=WEBSITE_HTTP_TIMEOUT_SEC) as resp:
             body = resp.read()
     except (HTTPError, URLError, TimeoutError, ValueError):
         return ""
@@ -95,15 +79,44 @@ def _fetch_text_from_url(url: str) -> str:
     except Exception:
         return ""
 
+    body_match = re.search(r"(?is)<body[^>]*>(.*?)</body>", html)
+    if not body_match:
+        return ""
+    html = body_match.group(1)
+
+    html = re.sub(r"(?is)<(header|footer|nav|aside|form|noscript|svg)[^>]*>.*?</\\1>", " ", html)
     html = re.sub(r"(?is)<script[^>]*>.*?</script>", " ", html)
     html = re.sub(r"(?is)<style[^>]*>.*?</style>", " ", html)
     html = re.sub(r"(?is)<!--.*?-->", " ", html)
+    html = re.sub(r"(?is)</?(main|article|section|p|li|h1|h2|h3|h4)[^>]*>", "\n", html)
     html = re.sub(r"(?is)<[^>]+>", " ", html)
     html = unescape(html)
     html = re.sub(r"\r", "\n", html)
     html = re.sub(r"[ \t]+", " ", html)
     html = re.sub(r"\n\s*\n+", "\n\n", html)
-    text = html.strip()
+    raw_lines = [line.strip() for line in html.splitlines()]
+    lines: List[str] = []
+    seen_lines: set[str] = set()
+
+    for raw_line in raw_lines:
+        line = re.sub(r"\s+", " ", raw_line).strip()
+        if not line:
+            continue
+        line_l = line.lower()
+        if any(marker in line_l for marker in NOISY_LINE_MARKERS) and len(line) <= 160:
+            continue
+        if sum(1 for ch in line if ch in "|>•") >= 3:
+            continue
+        if len(line.split()) <= 2 and len(line) <= 24:
+            continue
+        if line in seen_lines:
+            continue
+        seen_lines.add(line)
+        lines.append(line)
+        if len(lines) >= MAX_MEANINGFUL_BLOCKS:
+            break
+
+    text = "\n\n".join(lines).strip()
     if not text:
         return ""
 
@@ -134,18 +147,9 @@ def _build_contact_text(company_data: Dict[str, Any]) -> str:
     keywords = _uniq_text_list(norm.get("keywords_11880"))
     statuses = _uniq_text_list(norm.get("statuses_11880"))
     phones = _uniq_text_list(norm.get("phones"))
-    websites = _uniq_text_list(norm.get("websites"))
     socials = _uniq_text_list(norm.get("socials"))
     description_web = str(norm.get("description_web") or "").strip()
     description = str(norm.get("description") or "").strip()
-
-    source_links: List[str] = []
-    for card_item in cards.values():
-        if not isinstance(card_item, dict):
-            continue
-        url_value = str(card_item.get("url") or "").strip()
-        if url_value and url_value not in source_links:
-            source_links.append(url_value)
 
     parts: List[str] = []
 
@@ -165,12 +169,8 @@ def _build_contact_text(company_data: Dict[str, Any]) -> str:
         parts.append("Suchanfragen fuer Kataloge:\n" + "\n".join(keywords))
     if statuses:
         parts.append("Statusangaben:\n" + "\n".join(statuses))
-    if websites:
-        parts.append("Webseiten:\n" + "\n".join(websites))
     if socials:
         parts.append("Soziale Netzwerke:\n" + "\n".join(socials))
-    if source_links:
-        parts.append("Quellenlinks:\n" + "\n".join(source_links))
     if company_names:
         parts.append("Weitere Unternehmensnamen:\n" + "\n".join(company_names))
     if addresses:
@@ -348,22 +348,19 @@ def run_once() -> Dict[str, Any]:
 
                 if not website_processed:
                     norm = parse_json_object(company_data.get("norm"), field_name="company_data.norm")
+                    description = str(norm.get("description") or "").strip()
                     website_urls = _uniq_text_list(norm.get("websites"))
                     website_text_parts: List[str] = []
+                    if len(description) < 100:
+                        website_started_at = time.monotonic()
 
-                    for website_url in website_urls:
-                        main_page_text = _fetch_text_from_url(website_url)
-                        if main_page_text:
-                            website_text_parts.append(main_page_text)
+                        for website_url in website_urls[:1]:
+                            if (time.monotonic() - website_started_at) >= WEBSITE_CONTACT_BUDGET_SEC:
+                                break
 
-                        root_url = _build_root_url(website_url)
-                        if root_url:
-                            for path in IMPRESSUM_PATHS:
-                                page_url = root_url + path
-                                page_text = _fetch_text_from_url(page_url)
-                                if page_text:
-                                    website_text_parts.append(page_text)
-                                    break
+                            main_page_text = _fetch_text_from_url(website_url)
+                            if main_page_text:
+                                website_text_parts.append(main_page_text)
 
                     description_web = ""
                     website_input = "\n\n".join(part for part in website_text_parts if part.strip()).strip()
@@ -399,6 +396,7 @@ def run_once() -> Dict[str, Any]:
                         """,
                         (Json(company_data), int(contact_id)),
                     )
+                    conn.commit()
                     website_processed = True
                     result["website_processed_cnt"] = int(result["website_processed_cnt"]) + 1
 
@@ -427,7 +425,7 @@ def run_once() -> Dict[str, Any]:
                 instructions=instructions,
                 input=payload,
                 use_cache=False,
-                web_search=True,
+                web_search=False,
             )
         except Exception:
             result["status"] = "gpt_error"
