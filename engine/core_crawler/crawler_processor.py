@@ -1,6 +1,6 @@
 # FILE: engine/core_crawler/crawler_processor.py
 # DATE: 2026-03-29
-# PURPOSE: Production core_crawler processor with browser broker plus one-shot pair workers.
+# PURPOSE: Production core_crawler processor with two long-lived site executors and one-shot global pair dispatchers.
 
 from __future__ import annotations
 
@@ -25,6 +25,7 @@ _TZ_BERLIN = ZoneInfo("Europe/Berlin")
 
 @dataclass
 class WorkerProcess:
+    label: str
     process: subprocess.Popen[Any]
     started_at: float
 
@@ -66,6 +67,13 @@ def _clear_stale_route_worker_locks() -> int:
     return int(CLIENT.delete_many(keys) or 0)
 
 
+def _clear_dispatch_queues() -> int:
+    keys = _scan_redis_keys("core_crawler:dispatch_queue:*")
+    if not keys:
+        return 0
+    return int(CLIENT.delete_many(keys) or 0)
+
+
 def _target_parallelism() -> tuple[int, dict[str, int]]:
     route_plan = current_site_route_plan()
     per_site = {
@@ -82,19 +90,41 @@ def _collect_finished_workers(active: list[WorkerProcess]) -> list[WorkerProcess
         if worker.process.poll() is None:
             still_running.append(worker)
             continue
-        _log(f"[crawler_processor] worker_done pid={worker.process.pid} rc={worker.process.returncode}")
+        _log(
+            f"[crawler_processor] worker_done label={worker.label} "
+            f"pid={worker.process.pid} rc={worker.process.returncode}"
+        )
     return still_running
 
 
-def _launch_worker() -> WorkerProcess:
+def _launch_executor(catalog: str) -> WorkerProcess:
     proc = subprocess.Popen(
-        [sys.executable, "-m", "engine.core_crawler.fetch_cb", "--worker-loop"],
+        [
+            sys.executable,
+            "-m",
+            "engine.core_crawler.fetch_cb",
+            "--site-executor",
+            "--catalog",
+            str(catalog or "").strip(),
+        ],
         stdin=subprocess.DEVNULL,
         start_new_session=True,
         close_fds=True,
     )
-    _log(f"[crawler_processor] worker_start pid={proc.pid}")
-    return WorkerProcess(process=proc, started_at=time.time())
+    label = f"executor:{str(catalog or '').strip()}"
+    _log(f"[crawler_processor] worker_start label={label} pid={proc.pid}")
+    return WorkerProcess(label=label, process=proc, started_at=time.time())
+
+
+def _launch_dispatcher() -> WorkerProcess:
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "engine.core_crawler.fetch_cb", "--dispatch-once"],
+        stdin=subprocess.DEVNULL,
+        start_new_session=True,
+        close_fds=True,
+    )
+    label = "dispatch"
+    return WorkerProcess(label=label, process=proc, started_at=time.time())
 
 
 def _stop_workers(active: list[WorkerProcess]) -> None:
@@ -137,6 +167,15 @@ def _trim_workers(active: list[WorkerProcess], target: int) -> list[WorkerProces
     return survivors + [worker for worker in doomed if worker.process.poll() is None]
 
 
+def _ensure_executor(active: list[WorkerProcess], catalog: str) -> list[WorkerProcess]:
+    label = f"executor:{str(catalog or '').strip()}"
+    for worker in active:
+        if worker.label == label and worker.process.poll() is None:
+            return active
+    active.append(_launch_executor(catalog))
+    return active
+
+
 def main() -> None:
     stop_requested = {"value": False}
 
@@ -148,25 +187,33 @@ def main() -> None:
     signal.signal(signal.SIGINT, _handle_signal)
 
     active_workers: list[WorkerProcess] = []
+    active_dispatchers: list[WorkerProcess] = []
     last_total_target = -1
     try:
         cleared = _clear_stale_route_worker_locks()
         if cleared > 0:
             _log(f"[crawler_processor] cleared_stale_route_locks count={cleared}")
+        cleared_queues = _clear_dispatch_queues()
+        if cleared_queues > 0:
+            _log(f"[crawler_processor] cleared_dispatch_queues count={cleared_queues}")
         ensure_tunnel_watchdog()
         while not stop_requested["value"]:
             total_target, per_site = _target_parallelism()
             active_workers = _collect_finished_workers(active_workers)
+            active_dispatchers = _collect_finished_workers(active_dispatchers)
+            active_workers = _ensure_executor(active_workers, "11880")
+            active_workers = _ensure_executor(active_workers, "gs")
             if total_target != last_total_target:
                 details = " ".join(f"{site}={count}" for site, count in sorted(per_site.items()))
                 _log(f"[crawler_processor] target_parallel total={total_target} {details}".rstrip())
                 last_total_target = total_target
-            active_workers = _trim_workers(active_workers, total_target)
-            if len(active_workers) < total_target and pending_items_exist():
-                active_workers.append(_launch_worker())
+            active_dispatchers = _trim_workers(active_dispatchers, max(0, int(total_target)))
+            while len(active_dispatchers) < max(0, int(total_target)) and pending_items_exist():
+                active_dispatchers.append(_launch_dispatcher())
             time.sleep(TICK_SEC)
     finally:
         _stop_workers(active_workers)
+        _stop_workers(active_dispatchers)
         stop_tunnel_watchdog()
 
 

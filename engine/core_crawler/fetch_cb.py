@@ -1,6 +1,6 @@
 # FILE: engine/core_crawler/fetch_cb.py
 # DATE: 2026-03-29
-# PURPOSE: Simplified CB crawler queue on top of task_cb_ratings/cb_crawl_pairs without Scrapy runtime per pair.
+# PURPOSE: Global pair selector plus site-bound executors for CB crawling on top of task_cb_ratings/cb_crawl_pairs.
 
 from __future__ import annotations
 
@@ -10,6 +10,8 @@ import json
 import os
 import random
 import signal
+import subprocess
+import sys
 import threading
 import time
 from dataclasses import dataclass
@@ -29,11 +31,13 @@ from engine.core_crawler.spiders.spider_gs_cb import GelbeSeitenCBSpider
 from engine.core_crawler.spiders.spider_11880_cb import OneOneEightZeroCBSpider
 from engine.core_crawler.tunnels_11880 import load_tunnel_statuses
 
-LOCK_TTL_SEC = 1200.0
 RETRY_LOCK_TTL_SEC = 3 * 60 * 60.0
 ROUTE_LOCK_TTL_SEC = 20.0
 ROUTE_LOCK_RENEW_SEC = 10.0
 ITEM_TIMEOUT_SEC = 180.0
+ITEM_LOCK_TTL_SEC = 3 * 60.0
+ITEM_LOCK_RENEW_SEC = 15.0
+DISPATCH_TICK_SEC = 0.25
 
 
 @dataclass(frozen=True)
@@ -70,6 +74,19 @@ class RouteLeaseHeartbeat:
 class ItemTimeoutWatchdog:
     stop_event: Any
     thread: Any
+
+
+@dataclass(frozen=True)
+class ItemLockHeartbeat:
+    stop_event: Any
+    thread: Any
+
+
+@dataclass
+class ChildWorkerProcess:
+    slot_name: str
+    process: subprocess.Popen[Any]
+    started_at: float
 
 
 def _make_item(
@@ -197,14 +214,10 @@ def _scan_redis_keys(pattern: str) -> list[str]:
     return found
 
 
-def _active_route_lock_count() -> int:
-    return len(_scan_redis_keys("lock:core_crawler:route_worker:*"))
-
-
 def _try_lock_cb(cb_id: int) -> Optional[tuple[str, str]]:
     lock_key = f"core_crawler:cb:{int(cb_id)}"
     owner = f"{os.getpid()}:{int(cb_id)}"
-    resp = CLIENT.lock_try(lock_key, ttl_sec=LOCK_TTL_SEC, owner=owner)
+    resp = CLIENT.lock_try(lock_key, ttl_sec=ITEM_LOCK_TTL_SEC, owner=owner)
     if resp and resp.get("acquired") is True and isinstance(resp.get("token"), str):
         return lock_key, str(resp["token"])
     return None
@@ -216,6 +229,105 @@ def _route_lock_key(site: str, slot_name: str) -> str:
     if not site_name or not tunnel_name:
         raise ValueError("route lock key requires site and slot_name")
     return f"core_crawler:route_worker:{site_name}:{tunnel_name}"
+
+
+def _dispatch_queue_key(site: str) -> str:
+    site_name = str(site or "").strip()
+    if not site_name:
+        raise ValueError("dispatch queue key requires site")
+    return f"core_crawler:dispatch_queue:{site_name}"
+
+
+def _encode_queue_item(item: QueueItem) -> bytes:
+    payload = {
+        "task_id": int(item.task_id),
+        "cb_id": int(item.cb_id),
+        "rate": int(item.rate) if item.rate is not None else None,
+        "plz": str(item.plz or "").strip(),
+        "branch_id": int(item.branch_id),
+        "branch_name": str(item.branch_name or "").strip(),
+        "branch_slug": str(item.branch_slug or "").strip(),
+        "catalog": str(item.catalog or "").strip(),
+        "lock_key": str(item.lock_key or "").strip(),
+        "lock_token": str(item.lock_token or "").strip(),
+    }
+    return json.dumps(payload, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+
+
+def _decode_queue_item(raw_payload: bytes | bytearray | str) -> QueueItem | None:
+    try:
+        if isinstance(raw_payload, (bytes, bytearray)):
+            text = bytes(raw_payload).decode("utf-8")
+        else:
+            text = str(raw_payload)
+        data = json.loads(text)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    try:
+        return _make_item(
+            task_id=int(data["task_id"]),
+            cb_id=int(data["cb_id"]),
+            rate=int(data["rate"]) if data.get("rate") is not None else None,
+            plz=str(data.get("plz") or "").strip(),
+            branch_id=int(data["branch_id"]),
+            branch_name=str(data.get("branch_name") or "").strip(),
+            branch_slug=str(data.get("branch_slug") or "").strip(),
+            catalog=str(data.get("catalog") or "").strip(),
+            lock_key=str(data.get("lock_key") or "").strip(),
+            lock_token=str(data.get("lock_token") or "").strip(),
+        )
+    except Exception:
+        return None
+
+
+def _queue_length(site: str) -> int:
+    reply = _redis_call("LLEN", _dispatch_queue_key(site))
+    return int(reply) if isinstance(reply, int) else 0
+
+
+def _queue_push_item(item: QueueItem, max_depth: int) -> bool:
+    if int(max_depth) <= 0:
+        return False
+    if _queue_length(item.catalog) >= int(max_depth):
+        return False
+    reply = _redis_call("RPUSH", _dispatch_queue_key(item.catalog), _encode_queue_item(item))
+    return isinstance(reply, int) and int(reply) > 0
+
+
+def _queue_pop_item(site: str) -> QueueItem | None:
+    reply = _redis_call("LPOP", _dispatch_queue_key(site))
+    if not isinstance(reply, (bytes, bytearray, str)):
+        return None
+    return _decode_queue_item(reply)
+
+
+def _claim_specific_route(site: str, slot_name: str) -> RouteLease | None:
+    site_name = str(site or "").strip()
+    tunnel_name = str(slot_name or "").strip()
+    if not site_name or not tunnel_name:
+        return None
+    active_names = [str(name or "").strip() for name in list((current_site_route_plan().get(site_name) or [])) if str(name or "").strip()]
+    if tunnel_name not in active_names:
+        return None
+    statuses = load_tunnel_statuses([tunnel_name] if tunnel_name != "direct" else [])
+    launch_id = "direct" if tunnel_name == "direct" else str((statuses.get(tunnel_name) or {}).get("launch_id") or "").strip()
+    if tunnel_name != "direct" and not launch_id:
+        return None
+    owner = f"{os.getpid()}:{site_name}:{tunnel_name}"
+    lock_key = _route_lock_key(site_name, tunnel_name)
+    info = CLIENT.lock_try(lock_key, ttl_sec=ROUTE_LOCK_TTL_SEC, owner=owner)
+    if not info or not bool(info.get("acquired")) or not str(info.get("token") or "").strip():
+        return None
+    return RouteLease(
+        site=site_name,
+        slot_name=tunnel_name,
+        slot_idx=0,
+        lock_key=lock_key,
+        lock_token=str(info["token"]),
+        launch_id=launch_id,
+    )
 
 
 def _claim_route(site: str) -> RouteLease | None:
@@ -315,6 +427,46 @@ def _start_route_heartbeat(route: RouteLease | None) -> RouteLeaseHeartbeat | No
 
 
 def _stop_route_heartbeat(heartbeat: RouteLeaseHeartbeat | None) -> None:
+    if heartbeat is None:
+        return
+    try:
+        heartbeat.stop_event.set()
+    except Exception:
+        pass
+    try:
+        heartbeat.thread.join(timeout=1.0)
+    except Exception:
+        pass
+
+
+def _start_item_lock_heartbeat(item: QueueItem) -> ItemLockHeartbeat | None:
+    if not item.lock_key or not item.lock_token:
+        return None
+    stop_event = threading.Event()
+
+    def _heartbeat() -> None:
+        while not stop_event.wait(ITEM_LOCK_RENEW_SEC):
+            try:
+                renewed = CLIENT.lock_renew(
+                    item.lock_key,
+                    ttl_sec=ITEM_LOCK_TTL_SEC,
+                    token=item.lock_token,
+                )
+            except Exception:
+                renewed = False
+            if not renewed:
+                return
+
+    thread = threading.Thread(
+        target=_heartbeat,
+        name=f"item_lock:{item.catalog}:{item.cb_id}",
+        daemon=True,
+    )
+    thread.start()
+    return ItemLockHeartbeat(stop_event=stop_event, thread=thread)
+
+
+def _stop_item_lock_heartbeat(heartbeat: ItemLockHeartbeat | None) -> None:
     if heartbeat is None:
         return
     try:
@@ -597,24 +749,127 @@ def _decode_run_one_b64(raw_b64: str) -> dict:
     return json.loads(base64.b64decode(str(raw_b64).encode("ascii")).decode("utf-8"))
 
 
-def worker_run_once(catalog: str = "") -> None:
+def dispatch_run_once(catalog: str = "") -> None:
     catalog_name = str(catalog or "").strip()
     item = _claim_next_item(catalog_name)
-    if not item:
-        if catalog_name:
-            print(f"[core_crawler] queue empty catalog={catalog_name}; nothing to do")
-        else:
-            print("[core_crawler] queue empty; nothing to do")
+    if item is None:
         return
+    queue_capacity = max(0, int(len(current_site_route_plan().get(item.catalog) or [])))
+    if queue_capacity <= 0:
+        _release_item_lock(item)
+        return
+    if not _queue_push_item(item, max_depth=queue_capacity):
+        _release_item_lock(item)
+        return
+    print(
+        f"[core_crawler] dispatch cb_id={item.cb_id} catalog={item.catalog} "
+        f"rate={item.rate if item.rate is not None else '-'}"
+    )
+
+
+def _launch_slot_worker(catalog: str, slot_name: str) -> ChildWorkerProcess:
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "engine.core_crawler.fetch_cb",
+            "--slot-worker",
+            "--catalog",
+            str(catalog or "").strip(),
+            "--slot-name",
+            str(slot_name or "").strip(),
+        ],
+        stdin=subprocess.DEVNULL,
+        start_new_session=True,
+        close_fds=True,
+    )
+    print(f"[core_crawler] slot_worker_start catalog={catalog} slot={slot_name} pid={process.pid}")
+    return ChildWorkerProcess(slot_name=str(slot_name), process=process, started_at=time.time())
+
+
+def _collect_finished_slot_workers(active: dict[str, ChildWorkerProcess], catalog: str) -> dict[str, ChildWorkerProcess]:
+    out: dict[str, ChildWorkerProcess] = {}
+    for slot_name, child in active.items():
+        if child.process.poll() is None:
+            out[slot_name] = child
+            continue
+        print(
+            f"[core_crawler] slot_worker_done catalog={catalog} "
+            f"slot={slot_name} pid={child.process.pid} rc={child.process.returncode}"
+        )
+    return out
+
+
+def _stop_slot_workers(active: dict[str, ChildWorkerProcess]) -> None:
+    live = [child for child in active.values() if child.process.poll() is None]
+    if not live:
+        return
+    for child in live:
+        try:
+            child.process.terminate()
+        except Exception:
+            continue
+    deadline = time.time() + 5.0
+    while time.time() < deadline:
+        if all(child.process.poll() is not None for child in live):
+            return
+        time.sleep(0.1)
+    for child in live:
+        if child.process.poll() is not None:
+            continue
+        try:
+            child.process.kill()
+        except Exception:
+            continue
+
+
+def site_executor_main(catalog: str) -> None:
+    catalog_name = str(catalog or "").strip()
+    if not catalog_name:
+        raise RuntimeError("site executor requires catalog")
+    stop_requested = {"value": False}
+    active: dict[str, ChildWorkerProcess] = {}
+
+    def _handle_signal(_signum, _frame) -> None:
+        stop_requested["value"] = True
+
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
 
     try:
-        _run_item(item)
+        while not stop_requested["value"]:
+            active = _collect_finished_slot_workers(active, catalog_name)
+            desired_slots = [
+                str(name or "").strip()
+                for name in list((current_site_route_plan().get(catalog_name) or []))
+                if str(name or "").strip()
+            ]
+            desired_set = set(desired_slots)
+
+            for slot_name in list(active.keys()):
+                if slot_name in desired_set:
+                    continue
+                child = active.pop(slot_name)
+                try:
+                    child.process.terminate()
+                except Exception:
+                    pass
+
+            for slot_name in desired_slots:
+                if slot_name in active:
+                    continue
+                active[slot_name] = _launch_slot_worker(catalog_name, slot_name)
+
+            time.sleep(1.0)
     finally:
-        _finalize_item_lock(item)
+        _stop_slot_workers(active)
 
 
-def worker_main_loop(catalog: str = "") -> None:
+def slot_worker_main(catalog: str, slot_name: str) -> None:
     catalog_name = str(catalog or "").strip()
+    fixed_slot_name = str(slot_name or "").strip()
+    if not catalog_name or not fixed_slot_name:
+        raise RuntimeError("slot worker requires catalog and slot name")
     stop_requested = {"value": False}
     route: RouteLease | None = None
     heartbeat: RouteLeaseHeartbeat | None = None
@@ -632,31 +887,33 @@ def worker_main_loop(catalog: str = "") -> None:
                 route = None
                 heartbeat = None
                 clear_fetch_route_context()
-                time.sleep(0.25)
-                continue
-
-            if route is None and _active_route_lock_count() >= int(CRAWLER_ACTIVE_TUNNEL_CAP):
-                time.sleep(0.25)
-                continue
-
-            item = _claim_next_item(route.site if route is not None else catalog_name)
-            if item is None:
-                time.sleep(0.25)
+                time.sleep(DISPATCH_TICK_SEC)
                 continue
 
             if route is None:
-                route = _claim_route(item.catalog)
+                route = _claim_specific_route(catalog_name, fixed_slot_name)
                 if route is None:
-                    _release_item_lock(item)
-                    time.sleep(0.25)
+                    time.sleep(DISPATCH_TICK_SEC)
                     continue
                 heartbeat = _start_route_heartbeat(route)
 
+            item = _queue_pop_item(catalog_name)
+            if item is None:
+                time.sleep(DISPATCH_TICK_SEC)
+                continue
+
+            if str(item.catalog or "").strip() != catalog_name:
+                _release_item_lock(item)
+                time.sleep(DISPATCH_TICK_SEC)
+                continue
+
+            item_heartbeat = _start_item_lock_heartbeat(item)
             watchdog = _start_item_timeout_watchdog(item, route, heartbeat)
             try:
                 _run_item(item, route)
             finally:
                 _stop_item_timeout_watchdog(watchdog)
+                _stop_item_lock_heartbeat(item_heartbeat)
                 _finalize_item_lock(item)
                 if route is not None and not _route_still_valid(route):
                     _reset_and_release_route(route, heartbeat)
@@ -664,11 +921,7 @@ def worker_main_loop(catalog: str = "") -> None:
                     heartbeat = None
     finally:
         if route is not None or heartbeat is not None:
-            if _route_still_valid(route):
-                _stop_route_heartbeat(heartbeat)
-                _release_route(route)
-            else:
-                _reset_and_release_route(route, heartbeat)
+            _reset_and_release_route(route, heartbeat)
         clear_fetch_route_context()
         close_all_fetch_routers()
 
@@ -677,7 +930,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-one-b64", default="")
     parser.add_argument("--catalog", default="")
-    parser.add_argument("--worker-loop", action="store_true")
+    parser.add_argument("--dispatch-once", action="store_true")
+    parser.add_argument("--site-executor", action="store_true")
+    parser.add_argument("--slot-worker", action="store_true")
+    parser.add_argument("--slot-name", default="")
     args = parser.parse_args()
 
     if args.run_one_b64:
@@ -693,11 +949,19 @@ def main() -> None:
         )
         return
 
-    if bool(args.worker_loop):
-        worker_main_loop(str(args.catalog or "").strip())
+    if bool(args.dispatch_once):
+        dispatch_run_once(str(args.catalog or "").strip())
         return
 
-    worker_run_once(str(args.catalog or "").strip())
+    if bool(args.site_executor):
+        site_executor_main(str(args.catalog or "").strip())
+        return
+
+    if bool(args.slot_worker):
+        slot_worker_main(str(args.catalog or "").strip(), str(args.slot_name or "").strip())
+        return
+
+    dispatch_run_once(str(args.catalog or "").strip())
 
 
 if __name__ == "__main__":
