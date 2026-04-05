@@ -88,6 +88,10 @@ def clear_fetch_route_context() -> None:
         _ROUTE_CONTEXT = None
 
 
+def reset_fetch_route_session(site: str, slot_name: str, slot_idx: int = 0) -> None:
+    _get_router().reset_slot_session(str(site or "").strip(), str(slot_name or "").strip(), int(slot_idx))
+
+
 def get_fetch_route_context() -> FetchRouteContext | None:
     with _ROUTE_CONTEXT_MU:
         return _ROUTE_CONTEXT

@@ -328,20 +328,6 @@ def _active_window_names(site: str, available: list[str]) -> list[str]:
     ]
 
 
-def _fallback_11880_windows(site: str, available: list[str]) -> list[str]:
-    active_names = _active_window_names(site, available)
-    if active_names:
-        return list(active_names)
-    target_count = _11880_target_active_count(len(available))
-    if target_count <= 0:
-        return []
-    rr_state = _cache_get_obj(_rr_key(site)) or {"pos": 0}
-    rr_pos = int(rr_state.get("pos") or 0)
-    start_idx = rr_pos % len(available)
-    rotated = list(available[start_idx:] + available[:start_idx])
-    return rotated[:target_count]
-
-
 def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
     if len(available) <= 1:
         return list(available)
@@ -349,7 +335,7 @@ def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
     owner = f"{site}:window:{uuid4().hex}"
     lock_token = _lock_until(lock_key, ROUTE_STATE_LOCK_TTL_SEC, owner, ROUTE_STATE_WAIT_SEC)
     if not lock_token:
-        return _fallback_11880_windows(site, available)
+        return _active_window_names(site, available)
     try:
         now = time.time()
         state = _load_window_state(site, available)
@@ -508,8 +494,6 @@ def _compute_site_route_plan() -> dict[str, list[str]]:
     live_11880 = [name for name in slots_11880 if _slot_is_live(name, statuses)]
     available_11880 = [name for name in live_11880 if name not in quarantine_11880]
     active_11880 = _activate_11880_windows("11880", available_11880) if available_11880 else []
-    if not active_11880 and available_11880 and _11880_target_active_count(len(available_11880)) > 0:
-        active_11880 = _fallback_11880_windows("11880", available_11880)
     used_11880 = set(active_11880)
 
     live_gs = [name for name in slots_gs if _slot_is_live(name, statuses)]

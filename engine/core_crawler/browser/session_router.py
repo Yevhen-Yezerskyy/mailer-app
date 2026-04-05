@@ -40,10 +40,9 @@ from engine.core_crawler.browser.session_config import (
 from engine.core_crawler.tunnels_11880 import list_tunnels, load_tunnel_statuses
 
 ROUTER_BOOT_ID = uuid4().hex
-SESSION_STATE_TTL_SEC = 3 * 60
+SESSION_STATE_TTL_SEC = 7 * 24 * 60 * 60
 SESSION_STATE_CLEAR_TTL_SEC = 1
 QUARANTINE_BACKOFF_TTL_SEC = 7 * 24 * 60 * 60
-SESSION_STATE_IDLE_MAX_SEC = 3 * 60
 WAIT_TIMEOUT_SEC = 60.0
 RUNTIME_IDLE_REAP_SEC = 90.0
 SESSION_GATE_TTL_SEC = 5.0
@@ -803,18 +802,6 @@ class BrowserSessionRouter:
         if current_launch_id and str(state.get("slot_launch_id") or "").strip() != current_launch_id:
             self._clear_cache_obj(session_key)
             return None
-        last_used_at = float(state.get("last_used_at") or 0.0)
-        created_at = float(state.get("created_at") or 0.0)
-        requests_total = int(state.get("requests_total") or 0)
-        if requests_total >= cfg.max_requests_per_session:
-            self._clear_cache_obj(session_key)
-            return None
-        if created_at and (time.time() - created_at) >= cfg.max_session_age_sec:
-            self._clear_cache_obj(session_key)
-            return None
-        if last_used_at and (time.time() - last_used_at) >= SESSION_STATE_IDLE_MAX_SEC:
-            self._clear_cache_obj(session_key)
-            return None
         self._cache_set_obj(session_key, state, ttl_sec=SESSION_STATE_TTL_SEC)
         return state
 
@@ -847,7 +834,6 @@ class BrowserSessionRouter:
             "current_url": "",
             "next_dispatch_ts": 0.0,
             "storage_state": {},
-            "router_boot_id": ROUTER_BOOT_ID,
             "slot_launch_id": str(slot_launch_id or ""),
         }
 
@@ -886,11 +872,16 @@ class BrowserSessionRouter:
         merged["warmed"] = bool(bool(merged.get("warmed") is True) or session.warmed)
         merged["current_url"] = str(session.current_url or merged.get("current_url") or "")
         merged["next_dispatch_ts"] = 0.0
-        merged["router_boot_id"] = ROUTER_BOOT_ID
         merged["slot_launch_id"] = self._slot_launch_id(session.tunnel)
         exported_state = export_storage_state(session.http_session, session.storage_state)
         merged["storage_state"] = exported_state if exported_state else dict(merged.get("storage_state") or {})
         return merged
+
+    def reset_slot_session(self, site: str, slot_name: str, slot_idx: int = 0) -> None:
+        cfg = SITE_CONFIGS.get(str(site or "").strip())
+        if cfg is None:
+            return
+        self._drop_egress_session_state(cfg, str(slot_name or "").strip(), clear_state=True)
 
     def _checkout_session_lease(
         self,
@@ -992,10 +983,6 @@ class BrowserSessionRouter:
     @staticmethod
     def _runtime_expired(cfg: SiteSessionConfig, runtime: BrowserSession) -> bool:
         now = time.time()
-        if runtime.requests_total >= cfg.max_requests_per_session:
-            return True
-        if (now - float(runtime.created_at or 0.0)) >= float(cfg.max_session_age_sec):
-            return True
         recycle_after_ts = float(runtime.recycle_after_ts or 0.0)
         return bool(recycle_after_ts and now >= recycle_after_ts)
 
@@ -1372,10 +1359,7 @@ class BrowserSessionRouter:
                 if merged_state is not None:
                     session.created_at = float(merged_state.get("created_at") or session.created_at)
                     session.warmed = bool(merged_state.get("warmed") is True)
-                    runtime_is_expired = (
-                        int(merged_state.get("requests_total") or 0) >= cfg.max_requests_per_session
-                        or (session.last_used_at - float(merged_state.get("created_at") or session.created_at or 0.0)) >= float(cfg.max_session_age_sec)
-                    )
+                    runtime_is_expired = False
                 if session.active_pages <= 0 and (drop_runtime or clear_state or self._slot_is_quarantined(cfg, slot_name) or runtime_is_expired or self._runtime_expired(cfg, session)):
                     self._runtimes.pop(runtime_key, None)
                     should_close = True

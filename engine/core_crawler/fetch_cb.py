@@ -22,10 +22,12 @@ from engine.core_crawler.browser.session_config import CRAWLER_ACTIVE_TUNNEL_CAP
 from engine.core_crawler.browser.fetcher import (
     clear_fetch_route_context,
     close_all_fetch_routers,
+    reset_fetch_route_session,
     set_fetch_route_context,
 )
 from engine.core_crawler.spiders.spider_gs_cb import GelbeSeitenCBSpider
 from engine.core_crawler.spiders.spider_11880_cb import OneOneEightZeroCBSpider
+from engine.core_crawler.tunnels_11880 import load_tunnel_statuses
 
 LOCK_TTL_SEC = 1200.0
 RETRY_LOCK_TTL_SEC = 3 * 60 * 60.0
@@ -55,6 +57,7 @@ class RouteLease:
     slot_idx: int
     lock_key: str
     lock_token: str
+    launch_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -220,9 +223,13 @@ def _claim_route(site: str) -> RouteLease | None:
     available = [str(name or "").strip() for name in list((current_site_route_plan().get(site_name) or [])) if str(name or "").strip()]
     if not available:
         return None
+    statuses = load_tunnel_statuses([name for name in available if name != "direct"])
     shuffled = list(available)
     random.shuffle(shuffled)
     for slot_name in shuffled:
+        launch_id = "direct" if slot_name == "direct" else str((statuses.get(slot_name) or {}).get("launch_id") or "").strip()
+        if slot_name != "direct" and not launch_id:
+            continue
         owner = f"{os.getpid()}:{site_name}:{slot_name}"
         lock_key = _route_lock_key(site_name, slot_name)
         info = CLIENT.lock_try(lock_key, ttl_sec=ROUTE_LOCK_TTL_SEC, owner=owner)
@@ -234,6 +241,7 @@ def _claim_route(site: str) -> RouteLease | None:
             slot_idx=0,
             lock_key=lock_key,
             lock_token=str(info["token"]),
+            launch_id=launch_id,
         )
     return None
 
@@ -243,6 +251,38 @@ def _release_route(route: RouteLease | None) -> None:
         return
     try:
         CLIENT.lock_release(route.lock_key, token=route.lock_token)
+    except Exception:
+        pass
+
+
+def _route_still_valid(route: RouteLease | None) -> bool:
+    if route is None:
+        return False
+    plan = current_site_route_plan()
+    active_names = [str(name or "").strip() for name in list((plan.get(route.site) or [])) if str(name or "").strip()]
+    if str(route.slot_name or "").strip() not in active_names:
+        return False
+    if str(route.slot_name or "").strip() == "direct":
+        return True
+    statuses = load_tunnel_statuses([route.slot_name])
+    current_launch_id = str((statuses.get(route.slot_name) or {}).get("launch_id") or "").strip()
+    if not current_launch_id:
+        return False
+    return str(route.launch_id or "").strip() == current_launch_id
+
+
+def _reset_and_release_route(route: RouteLease | None, heartbeat: RouteLeaseHeartbeat | None) -> None:
+    try:
+        _stop_route_heartbeat(heartbeat)
+    except Exception:
+        pass
+    try:
+        if route is not None:
+            reset_fetch_route_session(route.site, route.slot_name, route.slot_idx)
+    except Exception:
+        pass
+    try:
+        _release_route(route)
     except Exception:
         pass
 
@@ -576,6 +616,8 @@ def worker_run_once(catalog: str = "") -> None:
 def worker_main_loop(catalog: str = "") -> None:
     catalog_name = str(catalog or "").strip()
     stop_requested = {"value": False}
+    route: RouteLease | None = None
+    heartbeat: RouteLeaseHeartbeat | None = None
 
     def _handle_signal(_signum, _frame) -> None:
         stop_requested["value"] = True
@@ -585,28 +627,48 @@ def worker_main_loop(catalog: str = "") -> None:
 
     try:
         while not stop_requested["value"]:
-            if _active_route_lock_count() >= int(CRAWLER_ACTIVE_TUNNEL_CAP):
+            if route is not None and not _route_still_valid(route):
+                _reset_and_release_route(route, heartbeat)
+                route = None
+                heartbeat = None
+                clear_fetch_route_context()
                 time.sleep(0.25)
                 continue
-            item = _claim_next_item(catalog_name)
+
+            if route is None and _active_route_lock_count() >= int(CRAWLER_ACTIVE_TUNNEL_CAP):
+                time.sleep(0.25)
+                continue
+
+            item = _claim_next_item(route.site if route is not None else catalog_name)
             if item is None:
                 time.sleep(0.25)
                 continue
-            route = _claim_route(item.catalog)
+
             if route is None:
-                _release_item_lock(item)
-                time.sleep(0.25)
-                continue
-            heartbeat = _start_route_heartbeat(route)
+                route = _claim_route(item.catalog)
+                if route is None:
+                    _release_item_lock(item)
+                    time.sleep(0.25)
+                    continue
+                heartbeat = _start_route_heartbeat(route)
+
             watchdog = _start_item_timeout_watchdog(item, route, heartbeat)
             try:
                 _run_item(item, route)
             finally:
                 _stop_item_timeout_watchdog(watchdog)
                 _finalize_item_lock(item)
+                if route is not None and not _route_still_valid(route):
+                    _reset_and_release_route(route, heartbeat)
+                    route = None
+                    heartbeat = None
+    finally:
+        if route is not None or heartbeat is not None:
+            if _route_still_valid(route):
                 _stop_route_heartbeat(heartbeat)
                 _release_route(route)
-    finally:
+            else:
+                _reset_and_release_route(route, heartbeat)
         clear_fetch_route_context()
         close_all_fetch_routers()
 
