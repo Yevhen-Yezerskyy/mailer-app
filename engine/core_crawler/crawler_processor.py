@@ -207,8 +207,9 @@ def main() -> None:
                 details = " ".join(f"{site}={count}" for site, count in sorted(per_site.items()))
                 _log(f"[crawler_processor] target_parallel total={total_target} {details}".rstrip())
                 last_total_target = total_target
-            active_dispatchers = _trim_workers(active_dispatchers, max(0, int(total_target)))
-            while len(active_dispatchers) < max(0, int(total_target)) and pending_items_exist():
+            desired_dispatchers = 1 if int(total_target) > 0 else 0
+            active_dispatchers = _trim_workers(active_dispatchers, desired_dispatchers)
+            if len(active_dispatchers) < desired_dispatchers and pending_items_exist():
                 active_dispatchers.append(_launch_dispatcher())
             time.sleep(TICK_SEC)
     finally:
