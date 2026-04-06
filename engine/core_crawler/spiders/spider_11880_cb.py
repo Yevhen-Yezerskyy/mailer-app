@@ -274,6 +274,10 @@ class OneOneEightZeroCBSpider:
         )
 
     @staticmethod
+    def _is_failed_to_parse_reason(reason: str) -> bool:
+        return str(reason or "").strip().startswith("FAILED TO PARSE")
+
+    @staticmethod
     def _reason_marks_collected(reason: str) -> bool:
         reason_s = str(reason or "").strip()
         if not reason_s:
@@ -347,6 +351,43 @@ class OneOneEightZeroCBSpider:
             conn.commit()
             return 1
 
+    def _handle_parse_error_result(self) -> int:
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT error FROM public.cb_crawl_pairs WHERE id = %s FOR UPDATE",
+                (self.cb_id,),
+            )
+            row = cur.fetchone()
+            current_error = str((row or [None])[0] or "").strip()
+
+            if current_error == "FAILED TO PARSE 1":
+                cur.execute(
+                    """
+                    UPDATE public.cb_crawl_pairs
+                    SET error = 'FAILED TO PARSE 2',
+                        updated_at = NOW()
+                    WHERE id = %s
+                    """,
+                    (self.cb_id,),
+                )
+                conn.commit()
+                return 2
+
+            if current_error == "FAILED TO PARSE 2":
+                return 3
+
+            cur.execute(
+                """
+                UPDATE public.cb_crawl_pairs
+                SET error = 'FAILED TO PARSE 1',
+                    updated_at = NOW()
+                WHERE id = %s
+                """,
+                (self.cb_id,),
+            )
+            conn.commit()
+            return 1
+
     def _index_log_line(self, reason: str) -> str:
         if str(reason or "") == "ALREADY COLLECTED":
             return f"cb_id={self.cb_id} index skip already_collected"
@@ -394,6 +435,26 @@ class OneOneEightZeroCBSpider:
             else:
                 self._db_action = "leave_pending_http"
                 print(f"CORE_11880_CB cb_id={self.cb_id} result=pending_http reason={r} http_attempt={http_attempt}")
+            return
+
+        if self._is_failed_to_parse_reason(r):
+            parse_attempt = int(self._handle_parse_error_result())
+            if parse_attempt >= 3:
+                self._db_flush_items_and_mark()
+                self._mark_pair_result("FAILED TO PARSE")
+                self._db_action = "commit_parse"
+                print(
+                    f"CORE_11880_CB cb_id={self.cb_id} result=commit_parse reason={r} "
+                    f"parse_attempt={parse_attempt} stored={self._db_rows} indexed={len(self.index_cards)} "
+                    f"selected={len(self.selected_urls)} parsed={self._detail_parsed}"
+                )
+            else:
+                self._db_action = "leave_pending_parse"
+                print(
+                    f"CORE_11880_CB cb_id={self.cb_id} result=pending_parse reason={r} "
+                    f"parse_attempt={parse_attempt} indexed={len(self.index_cards)} "
+                    f"selected={len(self.selected_urls)} parsed={self._detail_parsed}"
+                )
             return
 
         if not self._reason_marks_collected(r):

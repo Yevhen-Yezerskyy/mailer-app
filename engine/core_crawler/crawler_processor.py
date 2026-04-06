@@ -16,7 +16,6 @@ from zoneinfo import ZoneInfo
 from engine.common.cache.client import CLIENT, _redis_call
 from engine.core_crawler.browser.broker_server import current_site_route_plan
 from engine.core_crawler.browser.session_config import CRAWLER_ACTIVE_TUNNEL_CAP
-from engine.core_crawler.fetch_cb import pending_items_exist
 from engine.core_crawler.tunnels_11880 import ensure_tunnel_watchdog, stop_tunnel_watchdog
 
 TICK_SEC = 0.7
@@ -118,12 +117,13 @@ def _launch_executor(catalog: str) -> WorkerProcess:
 
 def _launch_dispatcher() -> WorkerProcess:
     proc = subprocess.Popen(
-        [sys.executable, "-m", "engine.core_crawler.fetch_cb", "--dispatch-once"],
+        [sys.executable, "-m", "engine.core_crawler.fetch_cb", "--dispatcher"],
         stdin=subprocess.DEVNULL,
         start_new_session=True,
         close_fds=True,
     )
     label = "dispatch"
+    _log(f"[crawler_processor] worker_start label={label} pid={proc.pid}")
     return WorkerProcess(label=label, process=proc, started_at=time.time())
 
 
@@ -209,7 +209,7 @@ def main() -> None:
                 last_total_target = total_target
             desired_dispatchers = 1 if int(total_target) > 0 else 0
             active_dispatchers = _trim_workers(active_dispatchers, desired_dispatchers)
-            if len(active_dispatchers) < desired_dispatchers and pending_items_exist():
+            if len(active_dispatchers) < desired_dispatchers:
                 active_dispatchers.append(_launch_dispatcher())
             time.sleep(TICK_SEC)
     finally:

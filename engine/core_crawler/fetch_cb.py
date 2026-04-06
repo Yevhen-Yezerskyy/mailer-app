@@ -20,7 +20,6 @@ from typing import Any, Optional
 from engine.common.cache.client import CLIENT, _redis_call
 from engine.common.db import fetch_one, get_connection
 from engine.core_crawler.browser.broker_server import current_site_route_plan
-from engine.core_crawler.browser.session_config import CRAWLER_ACTIVE_TUNNEL_CAP
 from engine.core_crawler.browser.fetcher import (
     clear_fetch_route_context,
     close_all_fetch_routers,
@@ -38,6 +37,10 @@ ITEM_TIMEOUT_SEC = 180.0
 ITEM_LOCK_TTL_SEC = 3 * 60.0
 ITEM_LOCK_RENEW_SEC = 15.0
 DISPATCH_TICK_SEC = 0.25
+DISPATCHER_LOOP_SEC = 0.7
+DISPATCH_POOL_LIMIT = 10
+DISPATCH_HEAD_LIMIT = 5
+ACTIVE_TASK_REFRESH_SEC = 10.0
 
 
 @dataclass(frozen=True)
@@ -89,6 +92,13 @@ class ChildWorkerProcess:
     started_at: float
 
 
+@dataclass
+class DispatcherState:
+    active_tasks: list[int]
+    pool_by_task: dict[int, list[QueueItem]]
+    last_active_refresh_at: float
+
+
 def _make_item(
     task_id: int,
     cb_id: int,
@@ -126,6 +136,19 @@ def _pick_active_task_id() -> Optional[int]:
         """,
     )
     return int(row[0]) if row else None
+
+
+def _list_active_task_ids() -> list[int]:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id
+            FROM public.aap_audience_audiencetask t
+            WHERE t.active = true
+            ORDER BY t.id ASC
+            """
+        )
+        return [int(row[0]) for row in (cur.fetchall() or [])]
 
 
 def pending_items_exist() -> bool:
@@ -515,72 +538,127 @@ def _stop_item_timeout_watchdog(watchdog: ItemTimeoutWatchdog | None) -> None:
         pass
 
 
-def _claim_next_item() -> Optional[QueueItem]:
+def _fetch_task_pool(task_id: int, limit: int) -> list[QueueItem]:
     with get_connection() as conn, conn.cursor() as cur:
-        task_id = _pick_active_task_id()
-        if not task_id:
-            return None
-
         cur.execute(
             """
             SELECT
               tcr.task_id,
               tcr.cb_id,
-              tcr.rate
+              tcr.rate,
+              ps.plz,
+              cp.branch_id,
+              bs.branch_name,
+              bs.branch_slug,
+              bs.catalog
             FROM public.task_cb_ratings tcr
             JOIN public.cb_crawl_pairs cp
               ON cp.id = tcr.cb_id
+            JOIN public.plz_sys ps
+              ON ps.id = cp.plz_id
+            JOIN public.branches_sys bs
+              ON bs.id = cp.branch_id
             WHERE tcr.task_id = %s
               AND cp.collected = false
             ORDER BY tcr.rate ASC NULLS LAST, tcr.id ASC
-            LIMIT 5
+            LIMIT %s
             """,
-            (task_id,),
+            (int(task_id), max(1, int(limit))),
         )
-        candidates = cur.fetchall() or []
-
-        for queue_row in candidates:
-            cb_id = int(queue_row[1])
-            lock_data = _try_lock_cb(cb_id)
-            if not lock_data:
-                continue
-
-            cur.execute(
-                """
-                SELECT
-                  ps.plz,
-                  cp.branch_id,
-                  bs.branch_name,
-                  bs.branch_slug,
-                  bs.catalog
-                FROM public.cb_crawl_pairs cp
-                JOIN public.plz_sys ps
-                  ON ps.id = cp.plz_id
-                JOIN public.branches_sys bs
-                  ON bs.id = cp.branch_id
-                WHERE cp.id = %s
-                """,
-                (cb_id,),
+        rows = cur.fetchall() or []
+    out: list[QueueItem] = []
+    for row in rows:
+        out.append(
+            _make_item(
+                task_id=int(row[0]),
+                cb_id=int(row[1]),
+                rate=int(row[2]) if row[2] is not None else None,
+                plz=str(row[3] or "").strip(),
+                branch_id=int(row[4]),
+                branch_name=str(row[5] or "").strip(),
+                branch_slug=str(row[6] or "").strip(),
+                catalog=str(row[7] or "").strip(),
             )
-            meta_row = cur.fetchone()
-            if not meta_row:
-                CLIENT.lock_release(lock_data[0], token=lock_data[1])
-                continue
+        )
+    return out
 
-            return _make_item(
-                task_id=int(queue_row[0]),
-                cb_id=cb_id,
-                rate=int(queue_row[2]) if queue_row[2] is not None else None,
-                plz=str(meta_row[0] or "").strip(),
-                branch_id=int(meta_row[1]),
-                branch_name=str(meta_row[2] or "").strip(),
-                branch_slug=str(meta_row[3] or "").strip(),
-                catalog=str(meta_row[4] or "").strip(),
-                lock_key=lock_data[0],
-                lock_token=lock_data[1],
-            )
 
+def _lock_candidate_item(candidate: QueueItem) -> QueueItem | None:
+    lock_data = _try_lock_cb(candidate.cb_id)
+    if not lock_data:
         return None
+    return _make_item(
+        task_id=int(candidate.task_id),
+        cb_id=int(candidate.cb_id),
+        rate=int(candidate.rate) if candidate.rate is not None else None,
+        plz=str(candidate.plz or "").strip(),
+        branch_id=int(candidate.branch_id),
+        branch_name=str(candidate.branch_name or "").strip(),
+        branch_slug=str(candidate.branch_slug or "").strip(),
+        catalog=str(candidate.catalog or "").strip(),
+        lock_key=lock_data[0],
+        lock_token=lock_data[1],
+    )
+
+
+def _claim_next_item() -> Optional[QueueItem]:
+    task_id = _pick_active_task_id()
+    if not task_id:
+        return None
+    for candidate in _fetch_task_pool(task_id, limit=DISPATCH_HEAD_LIMIT):
+        locked_item = _lock_candidate_item(candidate)
+        if locked_item is not None:
+            return locked_item
+    return None
+
+
+def _refresh_dispatcher_active_tasks(state: DispatcherState, force: bool = False) -> None:
+    now = time.time()
+    if not force and (now - float(state.last_active_refresh_at)) < ACTIVE_TASK_REFRESH_SEC:
+        return
+    active_tasks = _list_active_task_ids()
+    active_set = set(active_tasks)
+    state.active_tasks = list(active_tasks)
+    state.pool_by_task = {
+        int(task_id): list(state.pool_by_task.get(int(task_id), []) or [])
+        for task_id in active_tasks
+        if int(task_id) in active_set
+    }
+    state.last_active_refresh_at = now
+
+
+def _reload_dispatcher_task_pool(state: DispatcherState, task_id: int) -> list[QueueItem]:
+    task_key = int(task_id)
+    pool = _fetch_task_pool(task_key, limit=DISPATCH_POOL_LIMIT)
+    state.pool_by_task[task_key] = list(pool)
+    return pool
+
+
+def _drop_dispatcher_pool_item(state: DispatcherState, task_id: int, cb_id: int) -> None:
+    task_key = int(task_id)
+    pool = list(state.pool_by_task.get(task_key) or [])
+    if not pool:
+        return
+    state.pool_by_task[task_key] = [item for item in pool if int(item.cb_id) != int(cb_id)]
+
+
+def _claim_pooled_item(state: DispatcherState) -> tuple[int, QueueItem] | None:
+    _refresh_dispatcher_active_tasks(state)
+    if not state.active_tasks:
+        return None
+
+    task_id = int(random.choice(state.active_tasks))
+    pool = list(state.pool_by_task.get(task_id) or [])
+    if len(pool) < DISPATCH_HEAD_LIMIT:
+        pool = _reload_dispatcher_task_pool(state, task_id)
+    if not pool:
+        return None
+
+    for candidate in pool[:DISPATCH_HEAD_LIMIT]:
+        locked_item = _lock_candidate_item(candidate)
+        if locked_item is not None:
+            return task_id, locked_item
+    return None
 
 
 def _pair_is_collected(cb_id: int) -> bool:
@@ -713,6 +791,44 @@ def dispatch_run_once(catalog: str = "") -> None:
         f"[core_crawler] dispatch cb_id={item.cb_id} catalog={item.catalog} "
         f"rate={item.rate if item.rate is not None else '-'}"
     )
+
+
+def dispatcher_main() -> None:
+    stop_requested = {"value": False}
+    state = DispatcherState(active_tasks=[], pool_by_task={}, last_active_refresh_at=0.0)
+
+    def _handle_signal(_signum, _frame) -> None:
+        stop_requested["value"] = True
+
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
+
+    while not stop_requested["value"]:
+        try:
+            attempt = _claim_pooled_item(state)
+            if attempt is None:
+                time.sleep(DISPATCHER_LOOP_SEC)
+                continue
+
+            task_id, item = attempt
+            queue_capacity = max(0, int(len(current_site_route_plan().get(item.catalog) or [])))
+            if queue_capacity <= 0:
+                _release_item_lock(item)
+                time.sleep(DISPATCHER_LOOP_SEC)
+                continue
+            if not _queue_push_item(item, max_depth=queue_capacity):
+                _release_item_lock(item)
+                time.sleep(DISPATCHER_LOOP_SEC)
+                continue
+
+            _drop_dispatcher_pool_item(state, task_id, item.cb_id)
+            print(
+                f"[core_crawler] dispatch cb_id={item.cb_id} catalog={item.catalog} "
+                f"rate={item.rate if item.rate is not None else '-'}"
+            )
+        except Exception as exc:
+            print(f"[core_crawler] dispatcher_error {type(exc).__name__}: {exc}")
+        time.sleep(DISPATCHER_LOOP_SEC)
 
 
 def _launch_slot_worker(catalog: str, slot_name: str) -> ChildWorkerProcess:
@@ -878,6 +994,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-one-b64", default="")
     parser.add_argument("--catalog", default="")
+    parser.add_argument("--dispatcher", action="store_true")
     parser.add_argument("--dispatch-once", action="store_true")
     parser.add_argument("--site-executor", action="store_true")
     parser.add_argument("--slot-worker", action="store_true")
@@ -899,6 +1016,10 @@ def main() -> None:
 
     if bool(args.dispatch_once):
         dispatch_run_once(str(args.catalog or "").strip())
+        return
+
+    if bool(args.dispatcher):
+        dispatcher_main()
         return
 
     if bool(args.site_executor):
