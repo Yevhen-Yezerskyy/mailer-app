@@ -345,16 +345,16 @@ def _log_watchdog_snapshot(status_map: dict[str, dict[str, Any]], configured_nam
         "event": "watch_snapshot",
         "alive": alive_count,
         "down": down_count,
-        "quarantine": {
-            "11880": quarantine_11880,
-            "gs": quarantine_gs,
-        },
         "cooldown": {
             "11880": _load_cooldown_snapshot("11880"),
         },
         "active": {
             "11880": _snapshot_active(list(route_plan.get("11880") or [])),
             "gs": _snapshot_active(list(route_plan.get("gs") or [])),
+        },
+        "quarantine": {
+            "11880": quarantine_11880,
+            "gs": quarantine_gs,
         },
     }
     _log_tunnel(json.dumps(payload, ensure_ascii=False, indent=2))
