@@ -51,6 +51,8 @@ ROUTE_STATE_LOCK_TTL_SEC = 3.0
 ROUTE_STATE_WAIT_SEC = 2.0
 ROUTE_PLAN_CACHE_SEC = 60.0
 BROKER_WORKERS = 10
+ONE_ONE_EIGHTY_FIRST_ACTIVATION_SPAN_SEC = 20 * 60 * 60
+ONE_ONE_EIGHTY_LONG_COOLDOWN_SEC = 26 * 60 * 60
 
 
 def _broker_worker_parallelism() -> int:
@@ -302,6 +304,7 @@ def _load_window_state(site: str, active_names: list[str]) -> dict[str, dict[str
             active_until = float(row.get("active_until") or 0.0)
             cool_until = float(row.get("cool_until") or 0.0)
             main_requests = max(0, int(row.get("main_requests") or 0))
+            first_activated_at = float(row.get("first_activated_at") or 0.0)
         except Exception:
             continue
         if active_until <= now or main_requests >= ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT:
@@ -313,6 +316,7 @@ def _load_window_state(site: str, active_names: list[str]) -> dict[str, dict[str
             "active_until": active_until,
             "cool_until": cool_until,
             "main_requests": main_requests,
+            "first_activated_at": first_activated_at,
         }
     return out
 
@@ -329,8 +333,8 @@ def _active_window_names(site: str, available: list[str]) -> list[str]:
 
 
 def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
-    if len(available) <= 1:
-        return list(available)
+    if not available:
+        return []
     lock_key = _window_lock_key(site)
     owner = f"{site}:window:{uuid4().hex}"
     lock_token = _lock_until(lock_key, ROUTE_STATE_LOCK_TTL_SEC, owner, ROUTE_STATE_WAIT_SEC)
@@ -359,8 +363,23 @@ def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
                 rr_pos = int(rr_state.get("pos") or 0)
                 start_idx = rr_pos % len(eligible_names)
                 rotated_names = eligible_names[start_idx:] + eligible_names[:start_idx]
-                needed = target_count - len(active_names)
-                for name in rotated_names[:needed]:
+                advanced = 0
+                for name in rotated_names:
+                    if len(active_names) >= target_count:
+                        break
+                    advanced += 1
+                    row = dict(state.get(name) or {})
+                    first_activated_at = float(row.get("first_activated_at") or 0.0)
+                    if first_activated_at > 0.0 and (now - first_activated_at) > ONE_ONE_EIGHTY_FIRST_ACTIVATION_SPAN_SEC:
+                        state[name] = {
+                            "active_until": 0.0,
+                            "cool_until": now + ONE_ONE_EIGHTY_LONG_COOLDOWN_SEC,
+                            "main_requests": 0,
+                            "first_activated_at": 0.0,
+                        }
+                        continue
+                    if first_activated_at <= 0.0:
+                        first_activated_at = now
                     state[name] = {
                         "active_until": now + random.uniform(ONE_ONE_EIGHTY_WINDOW_MIN_SEC, ONE_ONE_EIGHTY_WINDOW_MAX_SEC),
                         "cool_until": now + random.uniform(
@@ -368,9 +387,10 @@ def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
                             ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC,
                         ),
                         "main_requests": 0,
+                        "first_activated_at": first_activated_at,
                     }
                     active_names.append(name)
-                _cache_set_obj(_rr_key(site), {"pos": rr_pos + max(1, needed)})
+                _cache_set_obj(_rr_key(site), {"pos": rr_pos + max(1, advanced)})
         _cache_set_obj(_window_key(site), state)
         return [name for name in available if name in active_names]
     finally:

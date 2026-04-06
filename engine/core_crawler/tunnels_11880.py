@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+from datetime import datetime
 import fcntl
 import json
 import os
@@ -20,6 +21,7 @@ import time
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from engine.common.cache.client import CLIENT
 from engine.common.logs import log
@@ -238,6 +240,13 @@ def _site_quarantine_key(site: str) -> str:
     return f"core_crawler:slot_quarantine:{site_name}"
 
 
+def _window_key(site: str) -> str:
+    site_name = str(site or "").strip()
+    if not site_name:
+        raise ValueError("window key requires site")
+    return f"core_crawler:slot_window:{site_name}"
+
+
 def _format_hhmm(seconds_left: float) -> str:
     total_sec = max(0, int(seconds_left))
     hours = total_sec // 3600
@@ -260,6 +269,40 @@ def _load_quarantine_snapshot(site: str) -> dict[str, str]:
             continue
         out[str(slot_name or "").strip()] = _format_hhmm(until_ts - now)
     return out
+
+
+def _load_cooldown_snapshot(site: str) -> dict[str, dict[str, str]]:
+    raw = _cache_get_obj(_window_key(site)) or {}
+    if not isinstance(raw, dict):
+        return {}
+    now = time.time()
+    berlin_tz = ZoneInfo("Europe/Berlin")
+    rows: list[tuple[float, str, dict[str, str]]] = []
+    for slot_name, row in raw.items():
+        if not isinstance(row, dict):
+            continue
+        try:
+            active_until = float(row.get("active_until") or 0.0)
+            cool_until = float(row.get("cool_until") or 0.0)
+        except Exception:
+            continue
+        if active_until > now or cool_until <= now:
+            continue
+        name = str(slot_name or "").strip()
+        if not name:
+            continue
+        rows.append(
+            (
+                cool_until,
+                name,
+                {
+                    "until": datetime.fromtimestamp(cool_until, tz=berlin_tz).isoformat(timespec="seconds"),
+                    "remaining": _format_hhmm(cool_until - now),
+                },
+            )
+        )
+    rows.sort(key=lambda item: (item[0], item[1]))
+    return {name: payload for _, name, payload in rows}
 
 
 def _snapshot_tunnels(status_map: dict[str, dict[str, Any]], configured_names: list[str]) -> dict[str, dict[str, Any]]:
@@ -302,10 +345,12 @@ def _log_watchdog_snapshot(status_map: dict[str, dict[str, Any]], configured_nam
         "event": "watch_snapshot",
         "alive": alive_count,
         "down": down_count,
-        "tunnels": _snapshot_tunnels(status_map, configured_names),
         "quarantine": {
             "11880": quarantine_11880,
             "gs": quarantine_gs,
+        },
+        "cooldown": {
+            "11880": _load_cooldown_snapshot("11880"),
         },
         "active": {
             "11880": _snapshot_active(list(route_plan.get("11880") or [])),
