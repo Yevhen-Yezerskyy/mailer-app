@@ -211,7 +211,7 @@
     </td>
 
     <td class="YY-MAIN_TOP_RIGHT_TD" style="width:40%;">
-      <div class="YY-CARD_WHITE {% if branches_cities_step.city_rating_rows or branches_cities_step.city_expand_rows %}!h-auto{% endif %}">
+      <div class="YY-CARD_WHITE {% if branches_cities_step.city_rating_rows or branches_cities_step.city_expand_rows %}!h-auto{% endif %} flex flex-col">
         {% if type == "buy" %}
           <div class="YY-STATUS_YELLOW !mb-3">{% trans "Ретингование городов и населенных пунктов" %}</div>
         {% else %}
@@ -222,7 +222,113 @@
           {% trans "На основании рейтинга определяется порядок сбора контактов. Рейтинг кликабелен и может быть изменён — таким образом вы меняете порядок сбора контактов." %}<br><br>
           {% trans "Вы также можете удалить города, которые считаете ненужными. Это повысит вероятность сбора контактов из приоритетных городов." %}
         </div>
+        <div class="mt-auto pt-10">
+          {% for step in flow_step_states %}
+            {% if step.key == "contacts" %}
+              {% if task and task.ready %}
+                <button
+                  type="button"
+                  class="YY-BUTTON_MAIN_FULL"
+                  data-cities-ready-target="contacts"
+                  data-dirty-nav="{{ step.url }}">
+                  <span class="flex items-center justify-center gap-1 w-full">
+                    <span>{% trans "Наполнение - сбор контактов" %}</span>
+                    <svg class="size-4 shrink-0" aria-hidden="true">
+                      <use href="#icon-arrow-circle"></use>
+                    </svg>
+                  </span>
+                </button>
+              {% else %}
+                <button
+                  type="button"
+                  class="YY-BUTTON_GRAY_FULL"
+                  data-cities-ready-target="contacts"
+                  data-dirty-nav="{{ step.url }}"
+                  disabled>
+                  <span class="flex items-center justify-center gap-1 w-full">
+                    <span>{% trans "Наполнение - сбор контактов" %}</span>
+                    <svg class="size-4 shrink-0" aria-hidden="true">
+                      <use href="#icon-arrow-circle"></use>
+                    </svg>
+                  </span>
+                </button>
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+        </div>
       </div>
     </td>
   </tr>
 </table>
+
+{% if task and task_id_token %}
+<script>
+  (function () {
+    const readyUrl = "{% url 'audience:create_contacts_ready' %}?flow_type={{ type|urlencode }}&id={{ task_id_token|urlencode }}";
+    let timerId = 0;
+    let inFlight = false;
+
+    function mappedButtonClass(key) {
+      const classMap = window.yyClassMap || (document.documentElement && document.documentElement.yyClassMap) || {};
+      const mapped = String(classMap[key] || "").trim();
+      return mapped ? (key + " " + mapped) : key;
+    }
+
+    function activateButton(button) {
+      if (!button) return;
+      button.disabled = false;
+      button.setAttribute("class", mappedButtonClass("YY-BUTTON_MAIN_FULL"));
+    }
+
+    function activateReadyButtons() {
+      activateButton(document.querySelector("[data-flow-step-key='contacts']"));
+      activateButton(document.querySelector("[data-flow-step-key='mailing_list']"));
+      activateButton(document.querySelector("[data-cities-ready-target='contacts']"));
+    }
+
+    function stopPolling() {
+      if (!timerId) return;
+      window.clearInterval(timerId);
+      timerId = 0;
+    }
+
+    function pollReady() {
+      if (inFlight) return;
+      inFlight = true;
+
+      window
+        .fetch(readyUrl, {
+          credentials: "same-origin",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        })
+        .then(function (response) {
+          return response
+            .json()
+            .catch(function () {
+              return { ok: false };
+            })
+            .then(function (payload) {
+              return { response: response, payload: payload };
+            });
+        })
+        .then(function (result) {
+          const payload = result.payload || {};
+          if (!result.response.ok || !payload.ok) return;
+          if (payload.ready === true) {
+            activateReadyButtons();
+            stopPolling();
+          }
+        })
+        .catch(function () {})
+        .finally(function () {
+          inFlight = false;
+        });
+    }
+
+    pollReady();
+    timerId = window.setInterval(pollReady, 3000);
+  })();
+</script>
+{% endif %}

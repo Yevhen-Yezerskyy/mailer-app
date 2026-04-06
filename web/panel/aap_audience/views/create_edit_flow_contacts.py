@@ -195,7 +195,7 @@ def _fetch_contacts_all_rows(request, task_id: int, page: int, query: str) -> di
                     OR COALESCE(ac.email, '') ILIKE %s
               )
             ORDER BY
-                sl.rate_cb DESC NULLS LAST,
+                sl.rate_cb ASC NULLS LAST,
                 sl.created_at DESC NULLS LAST,
                 sl.aggr_contact_cb_id DESC
             LIMIT %s
@@ -710,6 +710,24 @@ def contacts_total_view(request):
             "ok": True,
             "is_active": _is_contacts_active(task),
             "contacts_total": _fetch_contacts_total(int(task.id)),
+        }
+    )
+
+
+def contacts_ready_view(request):
+    flow_type = str(request.GET.get("flow_type") or "").strip().lower()
+    item_id = str(request.GET.get("id") or "").strip()
+    if flow_type not in {"buy", "sell"}:
+        return JsonResponse({"ok": False, "error": "invalid_flow_type"}, status=400)
+
+    task = resolve_task(request, flow_type, item_id)
+    if not task:
+        return JsonResponse({"ok": False, "error": "task_not_found"}, status=404)
+
+    return JsonResponse(
+        {
+            "ok": True,
+            "ready": bool(task.ready),
         }
     )
 

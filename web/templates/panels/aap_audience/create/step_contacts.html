@@ -39,7 +39,7 @@
                   href="{{ contacts_section_urls.collect }}"
                   class="{% if contacts_active_section == 'collect' %}YY-BUTTON_YELLOW_FULL{% else %}YY-BUTTON_MAIN_FULL{% endif %}">
                   <span class="flex items-center justify-center w-full">
-                    <span>{% trans "Сбор контактов" %}-50</span>
+                    <span>{% trans "Последние 50 контактов" %}</span>
                   </span>
                 </a>
               {% else %}
@@ -47,7 +47,7 @@
                   href="{{ contacts_section_urls.collect }}"
                   class="{% if contacts_active_section == 'collect' %}YY-BUTTON_GREEN_FULL{% else %}YY-BUTTON_MAIN_FULL{% endif %}">
                   <span class="flex items-center justify-center w-full">
-                    <span>{% trans "Сбор контактов" %} - 50</span>
+                    <span>{% trans "Последние 50 контактов" %}</span>
                   </span>
                 </a>
               {% endif %}

@@ -37,6 +37,30 @@ def _selectable_step_keys(step_order: Sequence[str], step_definitions: Mapping[s
     ]
 
 
+def _is_step_available(
+    *,
+    step_key: str,
+    step_definitions: Mapping[str, Mapping[str, object]],
+    completed_keys: set[str],
+) -> bool:
+    step_def = step_definitions.get(step_key, {})
+    depends_on = tuple(step_def.get("depends_on") or ())
+    deps_ready = bool(step_def.get("always_available")) or all(dep in completed_keys for dep in depends_on)
+    if not deps_ready:
+        return False
+    if bool(step_def.get("available_when_complete")):
+        return step_key in completed_keys
+    return True
+
+
+def _is_step_locked_for_navigation(step_key: str, saved_values: Mapping[str, object]) -> bool:
+    if not bool(saved_values.get("ready")):
+        return False
+    if not bool(saved_values.get("user_active")):
+        return False
+    return step_key in {"product", "company", "geo"}
+
+
 def _first_unmet_dependency(
     step_key: str,
     step_definitions: Mapping[str, Mapping[str, object]],
@@ -65,10 +89,7 @@ def resolve_current_step_key(
     }
     selectable_keys = []
     for key in _selectable_step_keys(step_order, step_definitions):
-        step_def = step_definitions.get(key, {})
-        depends_on = tuple(step_def.get("depends_on") or ())
-        is_available = bool(step_def.get("always_available")) or all(dep in completed_keys for dep in depends_on)
-        if is_available:
+        if _is_step_available(step_key=key, step_definitions=step_definitions, completed_keys=completed_keys):
             selectable_keys.append(key)
 
     if not selectable_keys:
@@ -108,9 +129,14 @@ def build_flow_step_states(
         step_def = step_definitions.get(key, {})
         if not bool(step_def.get("visible")):
             continue
-        depends_on = tuple(step_def.get("depends_on") or ())
         is_implemented = bool(step_def.get("implemented", True))
-        is_available = bool(step_def.get("always_available")) or all(dep in completed_keys for dep in depends_on)
+        is_available = _is_step_available(
+            step_key=key,
+            step_definitions=step_definitions,
+            completed_keys=completed_keys,
+        )
+        is_locked = _is_step_locked_for_navigation(key, saved_values)
+        is_clickable = bool(is_available and is_implemented and not is_locked)
         step_states.append(
             {
                 "key": key,
@@ -119,8 +145,9 @@ def build_flow_step_states(
                 "is_current": key == current_step_key,
                 "is_complete": key in completed_keys,
                 "is_available": is_available,
-                "is_clickable": bool(is_available and is_implemented),
+                "is_clickable": is_clickable,
                 "is_implemented": is_implemented,
+                "is_locked": is_locked,
             }
         )
 

@@ -37,6 +37,14 @@ def create_edit_flow_view(
     requested_step = (step_key or "product").strip().lower()
 
     task = resolve_task(request, flow_type, item_id)
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "toggle_user_active":
+            if task and bool(task.ready):
+                task.user_active = not bool(task.user_active)
+                task.save(update_fields=["user_active", "updated_at"])
+            return redirect(request.get_full_path())
+
     task = maybe_update_title_on_geo_enter(request, requested_step=requested_step, task=task)
     saved_values = task_saved_values(task)
     flow_status = build_flow_step_states(

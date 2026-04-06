@@ -15,6 +15,7 @@ from .views.create_edit_flow_contacts import (
     contacts_branch_city_partial_view,
     contacts_collect_partial_view,
     contacts_pairs_partial_view,
+    contacts_ready_view,
     contacts_total_view,
 )
 from .views.create_edit_buy import (
@@ -55,6 +56,7 @@ urlpatterns = [
     path("create/title/modal/", modal_edit_title_view, name="create_title_modal"),
     path("create/company/insert/modal/", modal_insert_company_view, name="create_company_insert_modal"),
     path("create/contacts-total/", contacts_total_view, name="create_contacts_total"),
+    path("create/contacts-ready/", contacts_ready_view, name="create_contacts_ready"),
     path("create/contacts-collect/", contacts_collect_partial_view, name="create_contacts_collect_partial"),
     path("create/contacts-all/", contacts_all_partial_view, name="create_contacts_all_partial"),
     path(

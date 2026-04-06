@@ -33,11 +33,34 @@
                 {% endif %}
               </div>
               <div>
+                {% if task and task.ready %}
+                  <form method="post" data-submit-role="nav">
+                    {% csrf_token %}
+                    <button
+                      type="submit"
+                      name="action"
+                      value="toggle_user_active"
+                      class="YY-BUTTON_MAIN">
+                      <span class="flex items-center justify-center gap-1 w-full">
+                        {% if task.user_active %}
+                          <span>{% trans "Обработка включена. Отключить" %}</span>
+                        {% else %}
+                          <span>{% trans "Обработка отключена. Включить" %}</span>
+                        {% endif %}
+                        <svg class="size-4 shrink-0" aria-hidden="true">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </span>
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+              <div>
                 <button
                   type="button"
                   class="YY-BUTTON_MAIN"
                   data-dirty-nav="{{ flow_close_url }}">
-                  {% trans "Закрыть / перейти к спискам рассылки" %}
+                  {% trans "Закрыть / к спискам" %}
                 </button>
               </div>
             </div>
@@ -48,7 +71,12 @@
                 <div class="min-w-0 flex-1">
                   {% if step.is_current %}
                     {% if type == "buy" %}
-                      <button type="button" class="YY-BUTTON_YELLOW_FULL" disabled>
+                      <button
+                        type="button"
+                        class="YY-BUTTON_YELLOW_FULL"
+                        data-flow-step-key="{{ step.key }}"
+                        data-flow-step-url="{{ step.url }}"
+                        disabled>
                         <span class="flex items-center justify-center gap-1 w-full">
                           <span>{{ step.label }}</span>
                           <svg class="size-4 shrink-0" aria-hidden="true">
@@ -57,7 +85,12 @@
                         </span>
                       </button>
                     {% else %}
-                      <button type="button" class="YY-BUTTON_GREEN_FULL" disabled>
+                      <button
+                        type="button"
+                        class="YY-BUTTON_GREEN_FULL"
+                        data-flow-step-key="{{ step.key }}"
+                        data-flow-step-url="{{ step.url }}"
+                        disabled>
                         <span class="flex items-center justify-center gap-1 w-full">
                           <span>{{ step.label }}</span>
                           <svg class="size-4 shrink-0" aria-hidden="true">
@@ -67,7 +100,13 @@
                       </button>
                     {% endif %}
                   {% elif step.is_clickable %}
-                    <button type="button" class="YY-BUTTON_MAIN_FULL" data-dirty-nav="{{ step.url }}" data-dirty-nav-skip-required="1">
+                    <button
+                      type="button"
+                      class="YY-BUTTON_MAIN_FULL"
+                      data-flow-step-key="{{ step.key }}"
+                      data-flow-step-url="{{ step.url }}"
+                      data-dirty-nav="{{ step.url }}"
+                      data-dirty-nav-skip-required="1">
                       <span class="flex items-center justify-center gap-1 w-full">
                         <span>{{ step.label }}</span>
                         <svg class="size-4 shrink-0" aria-hidden="true">
@@ -76,7 +115,14 @@
                       </span>
                     </button>
                   {% else %}
-                    <button type="button" class="YY-BUTTON_GRAY_FULL" disabled>
+                    <button
+                      type="button"
+                      class="YY-BUTTON_GRAY_FULL"
+                      data-flow-step-key="{{ step.key }}"
+                      data-flow-step-url="{{ step.url }}"
+                      data-dirty-nav="{{ step.url }}"
+                      data-dirty-nav-skip-required="1"
+                      disabled>
                       <span class="flex items-center justify-center gap-1 w-full">
                         <span>{{ step.label }}</span>
                         <svg class="size-4 shrink-0" aria-hidden="true">

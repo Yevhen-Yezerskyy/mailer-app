@@ -19,7 +19,7 @@
                 <div
                   class="grid w-full items-start gap-x-2 px-1 {% if row.collected_num > 0 %}bg-[#f0fff0]{% else %}bg-[#ffffe3]{% endif %}"
                   data-contacts-pair-row-key="{{ row.cb_id }}"
-                  style="{% if contacts_pairs_show_catalog %}grid-template-columns:7ch max-content 4ch minmax(0,1.45fr) minmax(0,1fr) max-content;{% else %}grid-template-columns:max-content 4ch minmax(0,1.45fr) minmax(0,1fr) max-content;{% endif %}">
+                  style="{% if contacts_pairs_show_catalog %}grid-template-columns:7ch max-content calc(4ch + 15px) minmax(0,1fr) minmax(0,1fr) max-content;{% else %}grid-template-columns:max-content calc(4ch + 15px) minmax(0,1fr) minmax(0,1fr) max-content;{% endif %}">
                   {% if contacts_pairs_show_catalog %}
                     <div class="YY-TEXT !mb-0 !py-1 whitespace-nowrap text-center">{{ row.catalog_display }}</div>
                   {% endif %}

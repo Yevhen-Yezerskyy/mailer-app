@@ -18,6 +18,7 @@ from engine.common.utils import (
     email_is_bad_syntax,
     load_email_domains_allowlist,
 )
+from engine.core_status.is_active import is_more_needed
 
 RAW_BATCH_SIZE = 100
 SENDING_LIST_LIMIT = 50000
@@ -720,6 +721,9 @@ def run_sending_list_batch() -> Dict[str, int]:
         counts["upserted_rows"] = _upsert_sending_list(cur, int(task_id))
         counts["deleted_rows"] = _delete_sending_list_tail(cur, int(task_id))
         conn.commit()
+
+    if int(counts["upserted_rows"]) > 0 or int(counts["deleted_rows"]) > 0:
+        is_more_needed(int(task_id), update=True)
 
     counts["duration_ms"] = int((time.time() - started_at) * 1000)
     _log_json("sending_lists", counts)

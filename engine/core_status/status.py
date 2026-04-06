@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from engine.common.db import get_connection
+from engine.core_status.is_active import is_more_needed
 
 
 def is_active(task: dict[str, object]) -> bool:
@@ -13,6 +14,8 @@ def is_active(task: dict[str, object]) -> bool:
     if bool(task.get("archived")):
         return False
     if not bool(task.get("user_active")):
+        return False
+    if not bool(is_more_needed(int(task["id"]))):
         return False
     return True
 

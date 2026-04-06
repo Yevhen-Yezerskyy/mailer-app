@@ -129,14 +129,16 @@ BASE_STEP_DEFINITIONS = {
         "completion_field": "ready",
         "visible": True,
         "implemented": True,
-        "depends_on": (),
+        "depends_on": ("product", "company", "geo"),
+        "available_when_complete": True,
     },
     "mailing_list": {
         "completion_type": "truthy",
         "completion_field": "ready",
         "visible": True,
         "implemented": True,
-        "depends_on": (),
+        "depends_on": ("product", "company", "geo"),
+        "available_when_complete": True,
     },
 }
 
@@ -511,6 +513,7 @@ def task_saved_values(task) -> dict[str, Any]:
         "source_company": (task.source_company or "") if task else "",
         "source_geo": (task.source_geo or "") if task else "",
         "ready": bool(task.ready) if task else False,
+        "user_active": bool(task.user_active) if task else False,
     }
 
 
@@ -546,6 +549,9 @@ def build_current_step_context(
     current_step = step_definitions[current_step_key]
     next_step_key = get_next_step_key(flow_step_states, current_step_key)
     next_step = step_definitions.get(next_step_key, current_step)
+    if current_step_key == "geo":
+        next_step_key = "branches"
+        next_step = step_definitions.get("branches", current_step)
 
     field_name = str(current_step["field_name"])
     command_field = str(current_step["command_field"])

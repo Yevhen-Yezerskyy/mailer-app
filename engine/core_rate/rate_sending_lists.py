@@ -18,6 +18,7 @@ from engine.common.db import get_connection
 from engine.common.gpt import GPTClient
 from engine.common.prompts.process import get_prompt, translate_text
 from engine.common.utils import h64_text, parse_json_object, parse_json_response
+from engine.core_status.is_active import is_more_needed
 
 WEBSITE_HTTP_TIMEOUT_SEC = 4
 WEBSITE_CONTACT_BUDGET_SEC = 12
@@ -303,7 +304,6 @@ def run_once() -> Dict[str, Any]:
                     JOIN public.aggr_contacts_cb ac
                       ON ac.id = sl.aggr_contact_cb_id
                     WHERE sl.task_id = %s
-                      AND COALESCE(sl.removed, false) = false
                       AND (
                           sl.rate IS NULL
                           OR sl.rating_hash IS DISTINCT FROM %s
@@ -324,7 +324,6 @@ def run_once() -> Dict[str, Any]:
                     JOIN public.aggr_contacts_cb ac
                       ON ac.id = sl.aggr_contact_cb_id
                     WHERE sl.task_id = %s
-                      AND COALESCE(sl.removed, false) = false
                       AND sl.rate IS NULL
                     ORDER BY sl.rate_cb ASC NULLS LAST
                     LIMIT %s
@@ -489,6 +488,7 @@ def run_once() -> Dict[str, Any]:
             )
             conn.commit()
 
+        is_more_needed(int(task_id), update=True)
         result["written_cnt"] = len(write_rows)
         result["status"] = "ok"
         return result

@@ -224,6 +224,37 @@
               </div>
             </div>
           {% endif %}
+          <div class="mt-10">
+            {% for step in flow_step_states %}
+              {% if step.key == "cities" %}
+                {% if branches_cities_step.branch_rating_rows %}
+                  <button
+                    type="button"
+                    class="YY-BUTTON_MAIN_FULL"
+                    data-dirty-nav="{{ step.url }}">
+                    <span class="flex items-center justify-center gap-1 w-full">
+                      <span>{% trans "Города и населенные пункты" %}</span>
+                      <svg class="size-4 shrink-0" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </span>
+                  </button>
+                {% else %}
+                  <button
+                    type="button"
+                    class="YY-BUTTON_GRAY_FULL"
+                    disabled>
+                    <span class="flex items-center justify-center gap-1 w-full">
+                      <span>{% trans "Города и населенные пункты" %}</span>
+                      <svg class="size-4 shrink-0" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </span>
+                  </button>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          </div>
         </form>
       </div>
     </td>
