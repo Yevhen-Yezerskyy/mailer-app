@@ -1,0 +1,385 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/create/step_mailing_list.html -->
+<!-- DATE: 2026-04-06 -->
+<!-- PURPOSE: Mailing list step with rating status, in/out/all filters, and paged contacts table. -->
+
+<table class="YY-MAIN_TABLE !mt-3">
+  <tr>
+    <td class="YY-MAIN_TOP_TD">
+      <div
+        class="YY-CARD_WHITE"
+        data-mailing-status-panel="1"
+        data-mailing-status-url="{{ mailing_step.status_url|escape }}">
+        <div class="grid grid-cols-[auto_1fr_auto] items-center gap-4">
+          <div class="min-w-0 shrink-0">
+            <div class="{{ flow_mode_class }} !mb-0 flex items-center gap-2">
+              {% if mailing_step.pause_info_modal_url %}
+                <button
+                  type="button"
+                  class="inline-flex {% if not mailing_step.is_paused %}hidden{% endif %}"
+                  data-mailing-paused-info="1"
+                  aria-label="Инфо"
+                  title="Инфо"
+                  data-yy-modal="url={{ mailing_step.pause_info_modal_url|escape }}">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4 shrink-0 block" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                  </svg>
+                </button>
+              {% endif %}
+              <span data-mailing-status-prefix="1">
+                {% if mailing_step.is_running %}
+                  {% trans "Рейтингование - запущено" %}
+                {% elif mailing_step.is_paused %}
+                  {% trans "Рейтингование - приостановлено" %}
+                {% elif mailing_step.total_count > 0 %}
+                  {% trans "Рейтингование - завершено" %}
+                {% else %}
+                  {% trans "Рейтингование - нет данных" %}
+                {% endif %}
+              </span>
+              <span
+                data-mailing-spinner="1"
+                class="inline-block h-3.5 w-3.5 shrink-0 rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin {% if not mailing_step.is_running %}hidden{% endif %}"
+                aria-hidden="true"></span>
+              <span data-mailing-status-counts="1">
+                {{ mailing_step.rated_count_display }}
+              </span>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 justify-self-center">
+            {% if type == "buy" %}
+              <div class="YY-STATUS_YELLOW !mb-0 whitespace-nowrap">
+                {% trans "Максимальный рейтинг:" %}&nbsp;<span data-mailing-rate-limit="1">{{ mailing_step.rate_limit_display }}</span>
+              </div>
+            {% else %}
+              <div class="YY-STATUS_GREEN !mb-0 whitespace-nowrap">
+                {% trans "Максимальный рейтинг:" %}&nbsp;<span data-mailing-rate-limit="1">{{ mailing_step.rate_limit_display }}</span>
+              </div>
+            {% endif %}
+            <button
+              type="button"
+              class="YY-BUTTON_MAIN !w-fit !mb-0"
+              aria-label="{% trans 'Изменить' %}"
+              title="{% trans 'Изменить' %}"
+              data-yy-modal="url={{ mailing_step.rate_limit_modal_url }}">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4 shrink-0 block" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-end gap-4">
+            <a
+              href="{{ mailing_step.section_urls.in }}"
+              class="{% if mailing_step.active_section == 'in' %}{% if type == 'buy' %}YY-BUTTON_YELLOW_FULL{% else %}YY-BUTTON_GREEN_FULL{% endif %}{% else %}YY-BUTTON_MAIN_FULL{% endif %} !w-fit">
+              <span class="flex items-center justify-center w-full">
+                <span>
+                  {% blocktrans with limit=mailing_step.rate_limit_display %}В списке (Con-R<{{ limit }}){% endblocktrans %}
+                </span>
+              </span>
+            </a>
+            <a
+              href="{{ mailing_step.section_urls.out }}"
+              class="{% if mailing_step.active_section == 'out' %}{% if type == 'buy' %}YY-BUTTON_YELLOW_FULL{% else %}YY-BUTTON_GREEN_FULL{% endif %}{% else %}YY-BUTTON_MAIN_FULL{% endif %} !w-fit">
+              <span class="flex items-center justify-center w-full">
+                <span>
+                  {% blocktrans with limit=mailing_step.rate_limit_display %}Вне списка (Con-R>{{ limit }}){% endblocktrans %}
+                </span>
+              </span>
+            </a>
+            <a
+              href="{{ mailing_step.section_urls.rated }}"
+              class="{% if mailing_step.active_section == 'rated' %}{% if type == 'buy' %}YY-BUTTON_YELLOW_FULL{% else %}YY-BUTTON_GREEN_FULL{% endif %}{% else %}YY-BUTTON_MAIN_FULL{% endif %} !w-fit">
+              <span class="flex items-center justify-center w-full">
+                <span>{% trans "Весь рейтинг" %}</span>
+              </span>
+            </a>
+            <a
+              href="{{ mailing_step.section_urls.all }}"
+              class="{% if mailing_step.active_section == 'all' %}{% if type == 'buy' %}YY-BUTTON_YELLOW_FULL{% else %}YY-BUTTON_GREEN_FULL{% endif %}{% else %}YY-BUTTON_MAIN_FULL{% endif %} !w-fit">
+              <span class="flex items-center justify-center w-full">
+                <span>{% trans "Без рейтинга" %}</span>
+              </span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE !mt-3 !mb-3">
+  <tr>
+    <td class="YY-MAIN_TOP_TD">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-MAIN_TEXT flex items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <span>{% trans "Найдено:" %}&nbsp;{{ mailing_step.mailing_total_display }},</span>
+            <span>{% trans "Страница:" %}</span>
+            {% if mailing_step.mailing_page_items %}
+              {% if mailing_step.mailing_has_prev %}
+                <a href="{{ mailing_step.base_url }}?mailing_section={{ mailing_step.active_section }}&page={{ mailing_step.mailing_prev_page }}{% if mailing_step.mailing_query %}&q={{ mailing_step.mailing_query|urlencode }}{% endif %}"
+                   class="YY-LINK inline-flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[21px] shrink-0 relative top-[0px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+              {% for item in mailing_step.mailing_page_items %}
+                {% if item.kind == "gap" %}
+                  <span>...</span>
+                {% elif item.is_current %}
+                  <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
+                {% else %}
+                  <a href="{{ mailing_step.base_url }}?mailing_section={{ mailing_step.active_section }}&page={{ item.number }}{% if mailing_step.mailing_query %}&q={{ mailing_step.mailing_query|urlencode }}{% endif %}"
+                     class="YY-LINK">{{ item.number }}</a>
+                {% endif %}
+              {% endfor %}
+              {% if mailing_step.mailing_has_next %}
+                <a href="{{ mailing_step.base_url }}?mailing_section={{ mailing_step.active_section }}&page={{ mailing_step.mailing_next_page }}{% if mailing_step.mailing_query %}&q={{ mailing_step.mailing_query|urlencode }}{% endif %}"
+                   class="YY-LINK inline-flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[21px] shrink-0 rotate-180 relative top-[2px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+            {% else %}
+              <strong class="font-semibold text-base text-[#016b09]">{{ mailing_step.mailing_page }}</strong>
+            {% endif %}
+          </div>
+          <form method="get" action="{{ mailing_step.base_url }}" class="flex items-center gap-2 ml-auto">
+            <input type="hidden" name="mailing_section" value="{{ mailing_step.active_section }}">
+            <input type="text"
+                   name="q"
+                   class="YY-INPUT !mb-0 !w-[340px]"
+                   placeholder="{% trans 'Поиск по компании или email' %}"
+                   value="{{ mailing_step.mailing_query }}">
+            <button type="submit" class="YY-BUTTON_MAIN !mb-0 !w-fit">
+              {% trans "Искать" %}
+            </button>
+            {% if mailing_step.mailing_query %}
+              <a href="{{ mailing_step.base_url }}?mailing_section={{ mailing_step.active_section }}" class="YY-BUTTON_MAIN !mb-0 !w-fit">
+                {% trans "Очистить" %}
+              </a>
+            {% endif %}
+          </form>
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE !mt-0">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD !pb-0">
+      <div class="YY-MAIN_BOTTOM_DIV overflow-x-auto">
+        <table class="w-full text-left">
+          <thead>
+            <tr class="YY-TH_TR">
+              <th class="YY-TH_TH w-[40%]">{% trans "Контакт" %}</th>
+              <th class="YY-TH_TH w-[40%]">{% trans "Категория - Город" %}</th>
+              <th class="YY-TH_TH text-center whitespace-nowrap">{% trans "Pair-R" %}</th>
+              <th class="YY-TH_TH text-center whitespace-nowrap">{% trans "Con-R" %}</th>
+              <th class="YY-TH_TH">&nbsp;</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in mailing_step.mailing_rows %}
+              <tr class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">
+                  <a href="#"
+                     data-yy-modal="url={{ row.contact_modal_url|escape }}">
+                    <strong>{{ row.company_name|default:"-" }}</strong>
+                  </a><br>
+                  {{ row.address }}
+                </td>
+                <td class="YY-TB_TD">
+                  {{ row.branch_name|default:"-" }}<br>
+                  {{ row.city_title }}
+                </td>
+                <td class="YY-TB_TD text-center">{{ row.pair_rate|default_if_none:"-" }}</td>
+                <td class="YY-TB_TD text-center">{{ row.contact_rate_display }}</td>
+                <td class="YY-TB_TD">
+                  <a href="#"
+                     class="YY-LINK flex items-center gap-1 whitespace-nowrap"
+                     data-yy-modal="url={{ row.contact_modal_url|escape }}">
+                    <span>{% trans "Подробнее" %}</span>
+                    <svg class="size-4 shrink-0" aria-hidden="true">
+                      <use href="#icon-arrow-circle"></use>
+                    </svg>
+                  </a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD" colspan="5">{% trans "Здесь пока нет данных" %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE !mt-3 !mb-10">
+  <tr>
+    <td class="YY-MAIN_TOP_TD">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-MAIN_TEXT flex items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <span>{% trans "Найдено:" %}&nbsp;{{ mailing_step.mailing_total_display }},</span>
+            <span>{% trans "Страница:" %}</span>
+            {% if mailing_step.mailing_page_items %}
+              {% if mailing_step.mailing_has_prev %}
+                <a href="{{ mailing_step.base_url }}?mailing_section={{ mailing_step.active_section }}&page={{ mailing_step.mailing_prev_page }}{% if mailing_step.mailing_query %}&q={{ mailing_step.mailing_query|urlencode }}{% endif %}"
+                   class="YY-LINK inline-flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[21px] shrink-0 relative top-[0px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+              {% for item in mailing_step.mailing_page_items %}
+                {% if item.kind == "gap" %}
+                  <span>...</span>
+                {% elif item.is_current %}
+                  <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
+                {% else %}
+                  <a href="{{ mailing_step.base_url }}?mailing_section={{ mailing_step.active_section }}&page={{ item.number }}{% if mailing_step.mailing_query %}&q={{ mailing_step.mailing_query|urlencode }}{% endif %}"
+                     class="YY-LINK">{{ item.number }}</a>
+                {% endif %}
+              {% endfor %}
+              {% if mailing_step.mailing_has_next %}
+                <a href="{{ mailing_step.base_url }}?mailing_section={{ mailing_step.active_section }}&page={{ mailing_step.mailing_next_page }}{% if mailing_step.mailing_query %}&q={{ mailing_step.mailing_query|urlencode }}{% endif %}"
+                   class="YY-LINK inline-flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[21px] shrink-0 rotate-180 relative top-[2px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+            {% else %}
+              <strong class="font-semibold text-base text-[#016b09]">{{ mailing_step.mailing_page }}</strong>
+            {% endif %}
+          </div>
+          <form method="get" action="{{ mailing_step.base_url }}" class="flex items-center gap-2 ml-auto">
+            <input type="hidden" name="mailing_section" value="{{ mailing_step.active_section }}">
+            <input type="text"
+                   name="q"
+                   class="YY-INPUT !mb-0 !w-[340px]"
+                   placeholder="{% trans 'Поиск по компании или email' %}"
+                   value="{{ mailing_step.mailing_query }}">
+            <button type="submit" class="YY-BUTTON_MAIN !mb-0 !w-fit">
+              {% trans "Искать" %}
+            </button>
+            {% if mailing_step.mailing_query %}
+              <a href="{{ mailing_step.base_url }}?mailing_section={{ mailing_step.active_section }}" class="YY-BUTTON_MAIN !mb-0 !w-fit">
+                {% trans "Очистить" %}
+              </a>
+            {% endif %}
+          </form>
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+{% if task and task_id_token and mailing_step.status_url %}
+<script>
+  (function () {
+    const statusUrl = "{{ mailing_step.status_url|escapejs }}";
+    if (!statusUrl) return;
+
+    const prefixNode = document.querySelector("[data-mailing-status-prefix='1']");
+    const spinnerNode = document.querySelector("[data-mailing-spinner='1']");
+    const countsNode = document.querySelector("[data-mailing-status-counts='1']");
+    const rateLimitNode = document.querySelector("[data-mailing-rate-limit='1']");
+    const pausedInfoNode = document.querySelector("[data-mailing-paused-info='1']");
+
+    const textRunning = "{% trans 'Рейтингование - запущено' %}";
+    const textPaused = "{% trans 'Рейтингование - приостановлено' %}";
+    const textDone = "{% trans 'Рейтингование - завершено' %}";
+    const textEmpty = "{% trans 'Рейтингование - нет данных' %}";
+
+    let inFlight = false;
+
+    function applyStatus(payload) {
+      const totalCount = Number(payload.total_count || 0);
+      const isRunning = payload.is_running === true;
+      const isPaused = payload.is_paused === true;
+      if (prefixNode) {
+        if (isRunning) {
+          prefixNode.textContent = textRunning;
+        } else if (isPaused) {
+          prefixNode.textContent = textPaused;
+        } else {
+          prefixNode.textContent = totalCount > 0 ? textDone : textEmpty;
+        }
+      }
+      if (spinnerNode) {
+        spinnerNode.classList.toggle("hidden", !isRunning);
+      }
+      if (pausedInfoNode) {
+        pausedInfoNode.classList.toggle("hidden", !isPaused);
+      }
+      if (countsNode) {
+        countsNode.textContent = String(payload.rated_count_display || "0");
+      }
+      if (rateLimitNode) {
+        rateLimitNode.textContent = String(payload.rate_limit_display || "");
+      }
+    }
+
+    function pollStatus() {
+      if (inFlight) return;
+      inFlight = true;
+      window.fetch(statusUrl, {
+        credentials: "same-origin",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      }).then(function (response) {
+        return response.json().catch(function () {
+          return { ok: false };
+        }).then(function (payload) {
+          return { response: response, payload: payload };
+        });
+      }).then(function (result) {
+        const payload = result.payload || {};
+        if (!result.response.ok || !payload.ok) return;
+        applyStatus(payload);
+      }).catch(function () {
+      }).finally(function () {
+        inFlight = false;
+      });
+    }
+
+    pollStatus();
+    window.setInterval(pollStatus, 3000);
+  })();
+</script>
+{% endif %}

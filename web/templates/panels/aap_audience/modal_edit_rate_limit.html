@@ -1,0 +1,51 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/modal_edit_rate_limit.html -->
+<!-- DATE: 2026-04-06 -->
+<!-- PURPOSE: Modal form for editing mailing-list rate limit. -->
+
+<div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:560px;">
+  <button type="button" class="YY-BUTTON_MAIN !w-fit" data-yy-modal-close style="position:absolute;top:10px;right:10px;">✕</button>
+
+  <div class="overflow-auto mt-10 mb-1 max-h-[calc(85vh-5rem)]">
+    {% if status == "ok" %}
+      <form method="post" action="{% url 'audience:create_rate_limit_modal' %}" data-edit-branch-rate-form="1">
+        {% csrf_token %}
+        <input type="hidden" name="id" value="{{ task_id_token }}">
+
+        {% if type == "buy" %}
+          <div class="YY-STATUS_YELLOW !mb-2">{% trans "Лимит для списка рассылки" %}</div>
+        {% else %}
+          <div class="YY-STATUS_GREEN !mb-2">{% trans "Лимит для списка рассылки" %}</div>
+        {% endif %}
+
+        <div class="grid items-start gap-4 mt-6" style="grid-template-columns: 40% 9ch 1fr 1fr;">
+          {% if type == "buy" %}
+            <div class="YY-STATUS_YELLOW !mb-0 self-center">{% trans "Rate-Limit:" %}</div>
+          {% else %}
+            <div class="YY-STATUS_GREEN !mb-0 self-center">{% trans "Rate-Limit:" %}</div>
+          {% endif %}
+
+          <input
+            id="yy-edit-rate-limit-input"
+            type="number"
+            name="rate_limit"
+            min="20"
+            max="60"
+            class="YY-INPUT !mb-0 w-[9ch] min-w-[9ch]"
+            value="{{ current_rate_limit }}"
+            autocomplete="off">
+
+          <button type="submit" class="YY-BUTTON_MAIN_FULL">{% trans "Сохранить" %}</button>
+          <button type="button" class="YY-BUTTON_MAIN_FULL" data-yy-modal-close>{% trans "Отмена" %}</button>
+        </div>
+
+        <div class="hidden mt-4" data-edit-branch-rate-error-wrap="1">
+          <div class="YY-STATUS_RED w-full" data-edit-branch-rate-error="1"></div>
+        </div>
+
+      </form>
+    {% else %}
+      <div class="YY-STATUS_GRAY w-full">{% trans "Здесь пока нет данных" %}</div>
+    {% endif %}
+  </div>
+</div>

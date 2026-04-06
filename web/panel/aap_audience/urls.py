@@ -8,6 +8,8 @@ from .views.modal_create_task import modal_create_task_view
 from .views.modal_edit_branch_rate import modal_edit_branch_rate_view
 from .views.modal_edit_city_rate import modal_edit_city_rate_view
 from .views.modal_edit_title import modal_edit_title_view
+from .views.modal_edit_rate_limit import modal_edit_rate_limit_view
+from .views.modal_pause_info import modal_pause_info_view
 from .views.modal_insert_company import modal_insert_company_view
 from .views.create_list import create_list_view
 from .views.create_edit_flow_contacts import (
@@ -18,6 +20,7 @@ from .views.create_edit_flow_contacts import (
     contacts_ready_view,
     contacts_total_view,
 )
+from .views.create_edit_flow_mailing_list import mailing_status_view
 from .views.create_edit_buy import (
     create_edit_buy_view,
     create_edit_buy_product_view,
@@ -54,9 +57,12 @@ urlpatterns = [
     path("create/branch-rate/modal/", modal_edit_branch_rate_view, name="create_branch_rate_modal"),
     path("create/city-rate/modal/", modal_edit_city_rate_view, name="create_city_rate_modal"),
     path("create/title/modal/", modal_edit_title_view, name="create_title_modal"),
+    path("create/rate-limit/modal/", modal_edit_rate_limit_view, name="create_rate_limit_modal"),
+    path("create/pause-info/modal/", modal_pause_info_view, name="create_pause_info_modal"),
     path("create/company/insert/modal/", modal_insert_company_view, name="create_company_insert_modal"),
     path("create/contacts-total/", contacts_total_view, name="create_contacts_total"),
     path("create/contacts-ready/", contacts_ready_view, name="create_contacts_ready"),
+    path("create/mailing-status/", mailing_status_view, name="create_mailing_status"),
     path("create/contacts-collect/", contacts_collect_partial_view, name="create_contacts_collect_partial"),
     path("create/contacts-all/", contacts_all_partial_view, name="create_contacts_all_partial"),
     path(

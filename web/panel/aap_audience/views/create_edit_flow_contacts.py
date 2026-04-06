@@ -210,6 +210,7 @@ def _fetch_contacts_all_rows(request, task_id: int, page: int, query: str) -> di
         "contacts_all_page": current_page,
         "contacts_all_pages": total_pages,
         "contacts_all_total": total,
+        "contacts_all_total_display": _format_contacts_total(total),
         "contacts_all_has_prev": current_page > 1,
         "contacts_all_prev_page": current_page - 1,
         "contacts_all_has_next": current_page < total_pages,
@@ -566,7 +567,7 @@ def _build_contacts_section_urls(flow_type: str, item_id: str) -> dict[str, str]
 
 
 def _is_contacts_active(task) -> bool:
-    return bool(task and task.ready and not task.archived)
+    return bool(task and task.active and not task.archived)
 
 
 def _is_contacts_completed(task) -> bool:
@@ -598,6 +599,7 @@ def _build_contacts_section_context(*, request, task, section: str, page: int = 
                 "contacts_all_page": 1,
                 "contacts_all_pages": 1,
                 "contacts_all_total": 0,
+                "contacts_all_total_display": _format_contacts_total(0),
                 "contacts_all_has_prev": False,
                 "contacts_all_prev_page": 1,
                 "contacts_all_has_next": False,
@@ -782,6 +784,11 @@ def handle_contacts_step_view(
     flow_conf = get_flow_config(flow_type)
     step_definitions = build_step_definitions(flow_type)
     active_section = _normalize_contacts_section(contacts_section)
+    pause_info_modal_url = (
+        reverse("audience:create_pause_info_modal") + f"?id={item_id}"
+        if item_id
+        else ""
+    )
     return render(
         request,
         flow_conf["template_name"],
@@ -796,6 +803,7 @@ def handle_contacts_step_view(
             step_template="panels/aap_audience/create/step_contacts.html",
             extra_context={
                 "contacts_step": _build_contacts_step_context(task),
+                "pause_info_modal_url": pause_info_modal_url,
                 **_build_active_contacts_context(
                     request=request,
                     task=task,

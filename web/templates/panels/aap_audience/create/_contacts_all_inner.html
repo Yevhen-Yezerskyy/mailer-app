@@ -9,6 +9,7 @@
       <div class="YY-CARD_WHITE">
         <div class="YY-MAIN_TEXT flex items-center justify-between gap-4">
           <div class="flex items-center gap-3">
+            <span>{% trans "Найдено:" %}&nbsp;{{ contacts_all_total_display }},</span>
             <span>{% trans "Страница:" %}</span>
             {% if contacts_all_page_items %}
               {% if contacts_all_has_prev %}
@@ -136,6 +137,7 @@
       <div class="YY-CARD_WHITE">
         <div class="YY-MAIN_TEXT flex items-center justify-between gap-4">
           <div class="flex items-center gap-3">
+            <span>{% trans "Найдено:" %}&nbsp;{{ contacts_all_total_display }},</span>
             <span>{% trans "Страница:" %}</span>
             {% if contacts_all_page_items %}
               {% if contacts_all_has_prev %}

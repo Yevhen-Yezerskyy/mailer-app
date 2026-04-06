@@ -898,7 +898,7 @@ def switch_user_modal_view(request):
                 "company_name": (ws.company_name if ws else "") or "",
                 "email": user.email or "",
                 "full_name": full_name or "-",
-                "role": user.role or "",
+                "access": (ws.access_type if ws else "") or "",
             }
         )
 
@@ -1227,5 +1227,6 @@ def contact_modal_view(request):
             "title_statuses_11880": _text_or_dash(norm.get("statuses_11880")),
             "title_keywords_11880": _text_or_dash(norm.get("keywords_11880")),
             "title_description": _text_or_dash(norm.get("description")),
+            "title_description_web": _text_or_dash(norm.get("description_web")),
         },
     )

@@ -75,13 +75,20 @@
       </table>
     </div>
 
-    {% if title_description and title_description != "-" %}
+    {% if title_description and title_description != "-" or title_description_web and title_description_web != "-" %}
       <div class="YY-MAIN_BOTTOM_DIV mb-4">
         <table class="w-full text-left">
           <tbody>
-            <tr class="YY-TB_TR">
-              <td class="YY-TB_TD">{{ title_description|linebreaksbr }}</td>
-            </tr>
+            {% if title_description and title_description != "-" %}
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD">{{ title_description|linebreaksbr }}</td>
+              </tr>
+            {% endif %}
+            {% if title_description_web and title_description_web != "-" %}
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD">{{ title_description_web|linebreaksbr }}</td>
+              </tr>
+            {% endif %}
           </tbody>
         </table>
       </div>

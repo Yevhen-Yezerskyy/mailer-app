@@ -625,6 +625,12 @@
     return document.querySelector("[data-contacts-sections-root='1']");
   }
 
+  function contactsFlowActive() {
+    const rootNode = contactsSectionsRoot();
+    if (!rootNode) return false;
+    return String(rootNode.getAttribute("data-contacts-flow-active") || "").trim() === "1";
+  }
+
   function contactsSectionButtons() {
     return Array.from(document.querySelectorAll("[data-contacts-section-button]"));
   }
@@ -696,6 +702,7 @@
   }
 
   function contactsShouldPoll() {
+    if (!contactsFlowActive()) return false;
     const panel = contactsTotalPanel();
     if (!panel) return false;
     if (!String(panel.getAttribute("data-contacts-total-url") || "").trim()) return false;
@@ -708,8 +715,12 @@
   }
 
   function refreshContactsTick() {
+    if (!contactsFlowActive()) return;
     refreshContactsTotalPanel();
     const activeSection = contactsActiveSectionKey();
+    if (activeSection === "all") {
+      return;
+    }
     if (activeSection && activeSection !== "collect") {
       refreshContactsSectionPanel();
       return;
@@ -723,6 +734,7 @@
 
   function startContactsPolling() {
     stopContactsPolling();
+    if (!contactsFlowActive()) return;
     if (!contactsShouldPoll()) return;
     contactsPollTimer = window.setInterval(refreshContactsTick, 10000);
   }
@@ -759,6 +771,7 @@
   }
 
   function refreshContactsTotalPanel() {
+    if (!contactsFlowActive()) return;
     const panel = contactsTotalPanel();
     const valueNode = panel ? panel.querySelector("[data-contacts-total-value='1']") : null;
     if (!panel || !valueNode || contactsTotalPollInFlight) return;
@@ -786,6 +799,10 @@
       }
       valueNode.textContent = formatContactsTotal(payload.contacts_total || 0);
       if (payload.is_active === false) {
+        const rootNode = contactsSectionsRoot();
+        if (rootNode) {
+          rootNode.setAttribute("data-contacts-flow-active", "0");
+        }
         const collectWrapper = contactsSectionWrapper("collect");
         if (collectWrapper) {
           collectWrapper.setAttribute("data-contacts-section-running", "0");
@@ -799,6 +816,7 @@
   }
 
   function refreshContactsSectionPanel(urlOverride) {
+    if (!contactsFlowActive()) return;
     const wrapper = contactsSectionWrapper();
     if (!wrapper || contactsSectionPollInFlight) return;
 

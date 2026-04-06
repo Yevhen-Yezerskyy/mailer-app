@@ -1,0 +1,27 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/modal_pause_info.html -->
+<!-- DATE: 2026-04-06 -->
+<!-- PURPOSE: Workspace-specific explanation modal for paused contacts/rating status. -->
+
+<div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:760px;">
+  <button type="button" class="YY-BUTTON_MAIN !w-fit" data-yy-modal-close style="position:absolute;top:10px;right:10px;">✕</button>
+
+  <div class="overflow-auto mt-10 mb-1 max-h-[calc(85vh-5rem)]">
+    {% if status == "ok" %}
+      {% if type == "buy" %}
+        <div class="YY-STATUS_YELLOW !mb-3">{{ title }}</div>
+      {% else %}
+        <div class="YY-STATUS_GREEN !mb-3">{{ title }}</div>
+      {% endif %}
+
+      <div class="YY-CARD_WHITE border border-[#71d0f4]">
+        {% for line in lines %}
+          <div class="YY-TEXT !mb-2">{{ line }}</div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="YY-STATUS_GRAY w-full">{% trans "Здесь пока нет данных" %}</div>
+    {% endif %}
+  </div>
+</div>
+

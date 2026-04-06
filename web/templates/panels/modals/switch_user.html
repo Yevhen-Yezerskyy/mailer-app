@@ -17,7 +17,7 @@
             <th class="YY-TH_TH">{% trans "Компания" %}</th>
             <th class="YY-TH_TH">Email</th>
             <th class="YY-TH_TH">{% trans "Имя Фамилия" %}</th>
-            <th class="YY-TH_TH">{% trans "Роль" %}</th>
+            <th class="YY-TH_TH">{% trans "Доступ" %}</th>
             <th class="YY-TH_TH">&nbsp;</th>
           </tr>
         </thead>
@@ -27,7 +27,7 @@
               <td class="YY-TB_TD">{{ it.company_name }}</td>
               <td class="YY-TB_TD">{{ it.email }}</td>
               <td class="YY-TB_TD">{{ it.full_name }}</td>
-              <td class="YY-TB_TD">{{ it.role }}</td>
+              <td class="YY-TB_TD">{{ it.access }}</td>
               <td class="YY-TB_TD">
                 <form method="post" action="{% url 'switch_user_login' %}" style="margin:0;">
                   {% csrf_token %}
