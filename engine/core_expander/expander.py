@@ -5,11 +5,14 @@
 from __future__ import annotations
 
 import json
+import os
+import random
 import time
 from typing import Any, Dict, List, Optional
 
 from psycopg.types.json import Json
 
+from engine.common.cache.client import CLIENT
 from engine.common.db import get_connection
 from engine.common.logs import log
 from engine.common.utils import (
@@ -30,6 +33,10 @@ STATUS_UPDATED = "UPDATED"
 
 _ALLOWLIST = load_email_domains_allowlist()
 _MX_CACHE: Dict[str, bool] = {}
+_SENDING_HASH_TTL_MIN_SEC = 24 * 60 * 60
+_SENDING_HASH_TTL_MAX_SEC = 2 * 24 * 60 * 60
+_RATE_NULL_ORD = 9223372036854775807
+_SENDING_TASK_LOCK_TTL_SEC = 300
 
 
 def _log_line(branch: str, message: str) -> None:
@@ -618,10 +625,13 @@ def run_batch() -> Dict[str, int]:
     return counts
 
 
-def _pick_sending_task(cur) -> Optional[int]:
+def _pick_sending_task(cur) -> Optional[Dict[str, Any]]:
     cur.execute(
         """
-        SELECT id
+        SELECT
+          id,
+          COALESCE(rating_city_hash::text, '') AS rating_city_hash,
+          COALESCE(rating_branch_hash::text, '') AS rating_branch_hash
         FROM public.aap_audience_audiencetask
         WHERE active = true
         ORDER BY random()
@@ -629,35 +639,129 @@ def _pick_sending_task(cur) -> Optional[int]:
         """
     )
     row = cur.fetchone()
-    return int(row[0]) if row else None
+    if not row:
+        return None
+    return {
+        "id": int(row[0]),
+        "rating_city_hash": str(row[1] or ""),
+        "rating_branch_hash": str(row[2] or ""),
+    }
 
 
-def _sending_candidates_cte() -> str:
+def _sending_hash_cache_key(task_id: int) -> str:
+    return f"core_expander:sending_hash:{int(task_id)}"
+
+
+def _sending_task_lock_key(task_id: int) -> str:
+    return f"core_expander:sending_list:task:{int(task_id)}"
+
+
+def _try_lock_sending_task(task_id: int, owner: str) -> Optional[str]:
+    resp = CLIENT.lock_try(
+        _sending_task_lock_key(int(task_id)),
+        ttl_sec=_SENDING_TASK_LOCK_TTL_SEC,
+        owner=str(owner),
+    )
+    if not resp or resp.get("acquired") is not True or not isinstance(resp.get("token"), str):
+        return None
+    return str(resp["token"])
+
+
+def _release_sending_task_lock(task_id: int, token: Optional[str]) -> None:
+    if not token:
+        return
+    try:
+        CLIENT.lock_release(_sending_task_lock_key(int(task_id)), token=str(token))
+    except Exception:
+        pass
+
+
+def _get_cached_sending_hash(task_id: int) -> str:
+    raw = CLIENT.get(_sending_hash_cache_key(int(task_id)), ttl_sec=1)
+    if raw is None:
+        return ""
+    try:
+        return bytes(raw).decode("utf-8", errors="replace").strip()
+    except Exception:
+        return ""
+
+
+def _set_cached_sending_hash(task_id: int, task_hash: str) -> None:
+    ttl_sec = random.randint(_SENDING_HASH_TTL_MIN_SEC, _SENDING_HASH_TTL_MAX_SEC)
+    CLIENT.set(
+        _sending_hash_cache_key(int(task_id)),
+        str(task_hash).encode("utf-8"),
+        ttl_sec=ttl_sec,
+    )
+
+
+def _current_prefix_candidate_top_sql() -> str:
     return """
-        WITH candidate_best AS (
+        WITH first_hole AS (
+            SELECT
+                COALESCE(tcr.rate::bigint, %s::bigint) AS hole_rate_ord,
+                tcr.id AS hole_id
+            FROM public.task_cb_ratings tcr
+            JOIN public.cb_crawl_pairs cp
+              ON cp.id = tcr.cb_id
+            WHERE tcr.task_id = %s
+              AND cp.collected = false
+            ORDER BY tcr.rate ASC NULLS LAST, tcr.id ASC
+            LIMIT 1
+        ),
+        candidate_best AS (
             SELECT DISTINCT ON (cc.aggr_contact_id)
                 tcr.task_id,
                 cc.aggr_contact_id AS aggr_contact_cb_id,
                 tcr.cb_id,
-                tcr.rate AS rate_cb
+                tcr.rate AS rate_cb,
+                tcr.id AS task_cb_rating_id
             FROM public.task_cb_ratings tcr
+            JOIN public.cb_crawl_pairs cp
+              ON cp.id = tcr.cb_id
             JOIN public.cb_contacts cc
               ON cc.cb_id = tcr.cb_id
+            LEFT JOIN first_hole fh
+              ON true
             WHERE tcr.task_id = %s
-            ORDER BY cc.aggr_contact_id, tcr.rate ASC NULLS LAST, tcr.cb_id ASC
+              AND cp.collected = true
+              AND (
+                  fh.hole_id IS NULL
+                  OR COALESCE(tcr.rate::bigint, %s::bigint) < fh.hole_rate_ord
+                  OR (
+                      COALESCE(tcr.rate::bigint, %s::bigint) = fh.hole_rate_ord
+                      AND tcr.id < fh.hole_id
+                  )
+              )
+            ORDER BY cc.aggr_contact_id, tcr.rate ASC NULLS LAST, tcr.id ASC
         ),
         candidate_top AS (
-            SELECT task_id, cb_id, aggr_contact_cb_id, rate_cb
+            SELECT
+                task_id,
+                cb_id,
+                aggr_contact_cb_id,
+                rate_cb
             FROM candidate_best
-            ORDER BY rate_cb ASC NULLS LAST, aggr_contact_cb_id ASC
+            ORDER BY rate_cb ASC NULLS LAST, task_cb_rating_id ASC, aggr_contact_cb_id ASC
             LIMIT %s
         )
     """
 
 
-def _upsert_sending_list(cur, task_id: int) -> int:
+def _current_prefix_candidate_top_params(task_id: int) -> tuple[int, int, int, int, int, int]:
+    return (
+        int(_RATE_NULL_ORD),
+        int(task_id),
+        int(task_id),
+        int(_RATE_NULL_ORD),
+        int(_RATE_NULL_ORD),
+        int(SENDING_LIST_LIMIT),
+    )
+
+
+def _rebuild_upsert_sending_list(cur, task_id: int) -> int:
     cur.execute(
-        _sending_candidates_cte()
+        _current_prefix_candidate_top_sql()
         + """
         INSERT INTO public.sending_lists (
             task_id,
@@ -678,14 +782,14 @@ def _upsert_sending_list(cur, task_id: int) -> int:
         WHERE public.sending_lists.cb_id IS DISTINCT FROM EXCLUDED.cb_id
            OR public.sending_lists.rate_cb IS DISTINCT FROM EXCLUDED.rate_cb
         """,
-        (int(task_id), int(SENDING_LIST_LIMIT)),
+        _current_prefix_candidate_top_params(int(task_id)),
     )
     return int(cur.rowcount or 0)
 
 
-def _delete_sending_list_tail(cur, task_id: int) -> int:
+def _delete_rebuild_sending_list_missing(cur, task_id: int) -> int:
     cur.execute(
-        _sending_candidates_cte()
+        _current_prefix_candidate_top_sql()
         + """
         DELETE FROM public.sending_lists sl
         WHERE sl.task_id = %s
@@ -696,9 +800,52 @@ def _delete_sending_list_tail(cur, task_id: int) -> int:
                 AND ct.aggr_contact_cb_id = sl.aggr_contact_cb_id
           )
         """,
-        (int(task_id), int(SENDING_LIST_LIMIT), int(task_id)),
+        (
+            *_current_prefix_candidate_top_params(int(task_id)),
+            int(task_id),
+        ),
     )
     return int(cur.rowcount or 0)
+
+
+def _insert_incremental_sending_list(cur, task_id: int) -> int:
+    cur.execute(
+        _current_prefix_candidate_top_sql()
+        + """
+        INSERT INTO public.sending_lists (
+            task_id,
+            cb_id,
+            aggr_contact_cb_id,
+            rate_cb
+        )
+        SELECT
+            task_id,
+            cb_id,
+            aggr_contact_cb_id,
+            rate_cb
+        FROM candidate_top
+        ON CONFLICT (task_id, aggr_contact_cb_id) DO NOTHING
+        """,
+        _current_prefix_candidate_top_params(int(task_id)),
+    )
+    return int(cur.rowcount or 0)
+
+
+def _run_rebuild_sending_list(cur, task_id: int) -> Dict[str, int]:
+    upserted_rows = _rebuild_upsert_sending_list(cur, int(task_id))
+    deleted_rows = _delete_rebuild_sending_list_missing(cur, int(task_id))
+    return {
+        "deleted_rows": int(deleted_rows),
+        "upserted_rows": int(upserted_rows),
+    }
+
+
+def _run_incremental_sending_list(cur, task_id: int) -> Dict[str, int]:
+    upserted_rows = _insert_incremental_sending_list(cur, int(task_id))
+    return {
+        "deleted_rows": 0,
+        "upserted_rows": int(upserted_rows),
+    }
 
 
 def run_sending_list_batch() -> Dict[str, int]:
@@ -707,20 +854,45 @@ def run_sending_list_batch() -> Dict[str, int]:
         "task_id": 0,
         "upserted_rows": 0,
         "deleted_rows": 0,
+        "rebuilt": 0,
         "duration_ms": 0,
     }
 
     with get_connection() as conn, conn.cursor() as cur:
-        task_id = _pick_sending_task(cur)
-        if not task_id:
+        task = _pick_sending_task(cur)
+        if not task:
             counts["duration_ms"] = int((time.time() - started_at) * 1000)
             _log_json("sending_lists", {"reason": "no_active_task", **counts})
             return counts
 
+        task_id = int(task["id"])
         counts["task_id"] = int(task_id)
-        counts["upserted_rows"] = _upsert_sending_list(cur, int(task_id))
-        counts["deleted_rows"] = _delete_sending_list_tail(cur, int(task_id))
-        conn.commit()
+        lock_owner = f"{os.getpid()}:{int(time.time())}"
+        lock_token = _try_lock_sending_task(int(task_id), lock_owner)
+        if not lock_token:
+            counts["duration_ms"] = int((time.time() - started_at) * 1000)
+            _log_json("sending_lists", {"reason": "task_locked", **counts})
+            return counts
+
+        try:
+            task_hash = f"{str(task['rating_city_hash'])}:{str(task['rating_branch_hash'])}"
+            cached_hash = _get_cached_sending_hash(int(task_id))
+            must_rebuild = (not cached_hash) or (cached_hash != task_hash)
+
+            if must_rebuild:
+                counts["rebuilt"] = 1
+                result = _run_rebuild_sending_list(cur, int(task_id))
+            else:
+                result = _run_incremental_sending_list(cur, int(task_id))
+
+            counts["deleted_rows"] = int(result["deleted_rows"])
+            counts["upserted_rows"] = int(result["upserted_rows"])
+            conn.commit()
+        finally:
+            _release_sending_task_lock(int(task_id), lock_token)
+
+    if int(counts["rebuilt"]) == 1:
+        _set_cached_sending_hash(int(task_id), task_hash)
 
     if int(counts["upserted_rows"]) > 0 or int(counts["deleted_rows"]) > 0:
         is_more_needed(int(task_id), update=True)

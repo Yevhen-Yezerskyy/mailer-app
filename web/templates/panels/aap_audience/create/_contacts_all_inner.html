@@ -3,56 +3,57 @@
 <!-- DATE: 2026-04-03 -->
 <!-- PURPOSE: All contacts section with server-side pagination and search via dedicated URLs. -->
 
-<table class="YY-MAIN_TABLE !mt-0 !mb-3">
+{% if contacts_all_show_paging %}
+<table class="YY-MAIN_TABLE !mt-0">
   <tr>
     <td class="YY-MAIN_TOP_TD">
       <div class="YY-CARD_WHITE">
         <div class="YY-MAIN_TEXT flex items-center justify-between gap-4">
           <div class="flex items-center gap-3">
             <span>{% trans "Найдено:" %}&nbsp;{{ contacts_all_total_display }},</span>
-            <span>{% trans "Страница:" %}</span>
-            {% if contacts_all_page_items %}
-              {% if contacts_all_has_prev %}
-                <a href="{{ contacts_section_urls.all }}?page={{ contacts_all_prev_page }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
-                   class="YY-LINK inline-flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg"
-                       fill="none"
-                       viewBox="0 0 24 24"
-                       stroke-width="1.5"
-                       stroke="currentColor"
-                       class="size-[21px] shrink-0 relative top-[0px]"
-                       aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
-                  </svg>
-                </a>
-              {% endif %}
-              {% for item in contacts_all_page_items %}
-                {% if item.kind == "gap" %}
-                  <span>...</span>
-                {% elif item.is_current %}
-                  <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
-                {% else %}
-                  <a href="{{ contacts_section_urls.all }}?page={{ item.number }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
-                     class="YY-LINK">{{ item.number }}</a>
+              <span>{% trans "Страница:" %}</span>
+              {% if contacts_all_page_items %}
+                {% if contacts_all_has_prev %}
+                  <a href="{{ contacts_section_urls.all }}?page={{ contacts_all_prev_page }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
+                     class="YY-LINK inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke-width="1.5"
+                         stroke="currentColor"
+                         class="size-[21px] shrink-0 relative top-[0px]"
+                         aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                    </svg>
+                  </a>
                 {% endif %}
-              {% endfor %}
-              {% if contacts_all_has_next %}
-                <a href="{{ contacts_section_urls.all }}?page={{ contacts_all_next_page }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
-                   class="YY-LINK inline-flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg"
-                       fill="none"
-                       viewBox="0 0 24 24"
-                       stroke-width="1.5"
-                       stroke="currentColor"
-                       class="size-[21px] shrink-0 rotate-180 relative top-[2px]"
-                       aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
-                  </svg>
-                </a>
+                {% for item in contacts_all_page_items %}
+                  {% if item.kind == "gap" %}
+                    <span>...</span>
+                  {% elif item.is_current %}
+                    <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
+                  {% else %}
+                    <a href="{{ contacts_section_urls.all }}?page={{ item.number }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
+                       class="YY-LINK">{{ item.number }}</a>
+                  {% endif %}
+                {% endfor %}
+                {% if contacts_all_has_next %}
+                  <a href="{{ contacts_section_urls.all }}?page={{ contacts_all_next_page }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
+                     class="YY-LINK inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke-width="1.5"
+                         stroke="currentColor"
+                         class="size-[21px] shrink-0 rotate-180 relative top-[2px]"
+                         aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                    </svg>
+                  </a>
+                {% endif %}
+              {% else %}
+                <strong class="font-semibold text-base text-[#016b09]">{{ contacts_all_page }}</strong>
               {% endif %}
-            {% else %}
-              <strong class="font-semibold text-base text-[#016b09]">{{ contacts_all_page }}</strong>
-            {% endif %}
           </div>
           <form method="get" action="{{ contacts_section_urls.all }}" class="flex items-center gap-2 ml-auto">
             <input type="text"
@@ -74,8 +75,9 @@
     </td>
   </tr>
 </table>
+{% endif %}
 
-<table class="YY-MAIN_TABLE !mt-0">
+<table class="YY-MAIN_TABLE !mt-3">
   <tr>
     <td class="YY-MAIN_BOTTOM_TD !pb-0">
       <div class="YY-MAIN_BOTTOM_DIV overflow-x-auto">
@@ -131,74 +133,76 @@
   </tr>
 </table>
 
-<table class="YY-MAIN_TABLE !mt-3">
-  <tr>
-    <td class="YY-MAIN_TOP_TD">
-      <div class="YY-CARD_WHITE">
-        <div class="YY-MAIN_TEXT flex items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <span>{% trans "Найдено:" %}&nbsp;{{ contacts_all_total_display }},</span>
-            <span>{% trans "Страница:" %}</span>
-            {% if contacts_all_page_items %}
-              {% if contacts_all_has_prev %}
-                <a href="{{ contacts_section_urls.all }}?page={{ contacts_all_prev_page }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
-                   class="YY-LINK inline-flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg"
-                       fill="none"
-                       viewBox="0 0 24 24"
-                       stroke-width="1.5"
-                       stroke="currentColor"
-                       class="size-[21px] shrink-0 relative top-[0px]"
-                       aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
-                  </svg>
-                </a>
-              {% endif %}
-              {% for item in contacts_all_page_items %}
-                {% if item.kind == "gap" %}
-                  <span>...</span>
-                {% elif item.is_current %}
-                  <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
-                {% else %}
-                  <a href="{{ contacts_section_urls.all }}?page={{ item.number }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
-                     class="YY-LINK">{{ item.number }}</a>
+{% if contacts_all_show_paging %}
+  <table class="YY-MAIN_TABLE !mt-3">
+    <tr>
+      <td class="YY-MAIN_TOP_TD">
+        <div class="YY-CARD_WHITE">
+          <div class="YY-MAIN_TEXT flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <span>{% trans "Найдено:" %}&nbsp;{{ contacts_all_total_display }},</span>
+              <span>{% trans "Страница:" %}</span>
+              {% if contacts_all_page_items %}
+                {% if contacts_all_has_prev %}
+                  <a href="{{ contacts_section_urls.all }}?page={{ contacts_all_prev_page }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
+                     class="YY-LINK inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke-width="1.5"
+                         stroke="currentColor"
+                         class="size-[21px] shrink-0 relative top-[0px]"
+                         aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                    </svg>
+                  </a>
                 {% endif %}
-              {% endfor %}
-              {% if contacts_all_has_next %}
-                <a href="{{ contacts_section_urls.all }}?page={{ contacts_all_next_page }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
-                   class="YY-LINK inline-flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg"
-                       fill="none"
-                       viewBox="0 0 24 24"
-                       stroke-width="1.5"
-                       stroke="currentColor"
-                       class="size-[21px] shrink-0 rotate-180 relative top-[2px]"
-                       aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
-                  </svg>
+                {% for item in contacts_all_page_items %}
+                  {% if item.kind == "gap" %}
+                    <span>...</span>
+                  {% elif item.is_current %}
+                    <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
+                  {% else %}
+                    <a href="{{ contacts_section_urls.all }}?page={{ item.number }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
+                       class="YY-LINK">{{ item.number }}</a>
+                  {% endif %}
+                {% endfor %}
+                {% if contacts_all_has_next %}
+                  <a href="{{ contacts_section_urls.all }}?page={{ contacts_all_next_page }}{% if contacts_all_query %}&q={{ contacts_all_query|urlencode }}{% endif %}"
+                     class="YY-LINK inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke-width="1.5"
+                         stroke="currentColor"
+                         class="size-[21px] shrink-0 rotate-180 relative top-[2px]"
+                         aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                    </svg>
+                  </a>
+                {% endif %}
+              {% else %}
+                <strong class="font-semibold text-base text-[#016b09]">{{ contacts_all_page }}</strong>
+              {% endif %}
+            </div>
+            <form method="get" action="{{ contacts_section_urls.all }}" class="flex items-center gap-2 ml-auto">
+              <input type="text"
+                     name="q"
+                     class="YY-INPUT !mb-0 !w-[340px]"
+                     placeholder="{% trans 'Поиск по компании или email' %}"
+                     value="{{ contacts_all_query }}">
+              <button type="submit" class="YY-BUTTON_MAIN !mb-0 !w-fit">
+                {% trans "Искать" %}
+              </button>
+              {% if contacts_all_query %}
+                <a href="{{ contacts_section_urls.all }}" class="YY-BUTTON_MAIN !mb-0 !w-fit">
+                  {% trans "Очистить" %}
                 </a>
               {% endif %}
-            {% else %}
-              <strong class="font-semibold text-base text-[#016b09]">{{ contacts_all_page }}</strong>
-            {% endif %}
+            </form>
           </div>
-          <form method="get" action="{{ contacts_section_urls.all }}" class="flex items-center gap-2 ml-auto">
-            <input type="text"
-                   name="q"
-                   class="YY-INPUT !mb-0 !w-[340px]"
-                   placeholder="{% trans 'Поиск по компании или email' %}"
-                   value="{{ contacts_all_query }}">
-            <button type="submit" class="YY-BUTTON_MAIN !mb-0 !w-fit">
-              {% trans "Искать" %}
-            </button>
-            {% if contacts_all_query %}
-              <a href="{{ contacts_section_urls.all }}" class="YY-BUTTON_MAIN !mb-0 !w-fit">
-                {% trans "Очистить" %}
-              </a>
-            {% endif %}
-          </form>
         </div>
-      </div>
-    </td>
-  </tr>
-</table>
+      </td>
+    </tr>
+  </table>
+{% endif %}

@@ -1,9 +1,12 @@
-# FILE: engine/common/prompts/process.py  (обновлено — 2025-12-26)
+# FILE: engine/common/prompts/process.py  (обновлено — 2026-04-06)
 # Смысл: переводы промптов/текста через GPT + получение/кеширование переводов gb_branches (DE — отдаём оригинал сразу; остальные языки: memo→DB→GPT→DB).
 
+import hashlib
+import json
+import pickle
 from pathlib import Path
 
-from engine.common.cache.client import memo
+from engine.common.cache.client import CLIENT, DEFAULT_TTL_SEC, memo
 from engine.common.db import execute, fetch_one
 from engine.common.gpt import GPTClient
 
@@ -11,6 +14,14 @@ from engine.common.gpt import GPTClient
 BASE_DIR = Path(__file__).resolve().parent
 
 PROMPTS_TRANSLATE_KEY = "prompt_translate"
+TRANSLATION_VERIFY_SYSTEM = (
+    "You compare two texts. "
+    "Answer yes if the result is a faithful translation of the original, "
+    "or if both texts have the same meaning in the same language. "
+    "Answer no otherwise. "
+    "Return only yes or no."
+)
+TRANSLATION_CACHE_VERSION = "translation.checked.v1"
 
 LANG_MAP = {
     "en": "English",
@@ -44,6 +55,90 @@ def _get_translate_instructions(lang: str) -> str:
     return tpl.replace("{LANG}", _lang_name(lang))
 
 
+def _translation_cache_key(*, model: str, instructions: str, input_text: str) -> str:
+    query = (TRANSLATION_CACHE_VERSION, model, instructions, input_text)
+    raw = pickle.dumps(query, protocol=pickle.HIGHEST_PROTOCOL)
+    return "prompt_translate:" + hashlib.sha1(raw).hexdigest()
+
+
+def _translation_cache_get(key: str) -> str | None:
+    payload = CLIENT.get(key, ttl_sec=DEFAULT_TTL_SEC)
+    if payload is None:
+        return None
+    try:
+        value = pickle.loads(payload)
+    except Exception:
+        return None
+    return value if isinstance(value, str) else None
+
+
+def _translation_cache_set(key: str, value: str) -> None:
+    try:
+        payload = pickle.dumps(str(value), protocol=pickle.HIGHEST_PROTOCOL)
+    except Exception:
+        return
+    CLIENT.set(key, payload, ttl_sec=DEFAULT_TTL_SEC)
+
+
+def _is_translation_valid(original_text: str, result_text: str) -> bool:
+    original = str(original_text or "").strip()
+    result = str(result_text or "").strip()
+    if not original or not result:
+        return False
+    if original == result:
+        return True
+
+    payload = json.dumps(
+        {
+            "original_text": original_text,
+            "result_text": result_text,
+        },
+        ensure_ascii=False,
+    )
+    try:
+        resp = GPTClient().ask(
+            model="gpt-5.4-nano",
+            service_tier="flex",
+            user_id="SYSTEM",
+            instructions=TRANSLATION_VERIFY_SYSTEM,
+            input=payload,
+            use_cache=False,
+            web_search=False,
+        )
+    except Exception:
+        return False
+
+    answer = str(resp.content or "").strip().lower()
+    return answer == "yes"
+
+
+def _translate_checked(*, model: str, instructions: str, input_text: str, fallback_text: str) -> str:
+    cache_key = _translation_cache_key(model=model, instructions=instructions, input_text=input_text)
+    cached = _translation_cache_get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        resp = GPTClient().ask(
+            model=model,
+            service_tier="flex",
+            user_id="SYSTEM",
+            instructions=instructions,
+            input=input_text,
+            use_cache=False,
+            web_search=False,
+        )
+    except Exception:
+        return fallback_text
+
+    translated = str(resp.content or "").strip()
+    if not _is_translation_valid(input_text, translated):
+        return fallback_text
+
+    _translation_cache_set(cache_key, translated)
+    return translated
+
+
 def get_prompt(key: str, lang: str = "en") -> str:
     """
     Берёт файл <key>.txt и переводит его на нужный язык через GPT.
@@ -61,16 +156,12 @@ def get_prompt(key: str, lang: str = "en") -> str:
         if not instructions:
             return ""
 
-        resp = GPTClient().ask(
+        return _translate_checked(
             model="gpt-5.4",
-            service_tier="flex",
-            user_id="SYSTEM",
             instructions=instructions,
-            input=text,
-            use_cache=True,
-            web_search=False,
+            input_text=text,
+            fallback_text=text,
         )
-        return (resp.content or "").strip()
     except Exception:
         return ""
 
@@ -87,15 +178,12 @@ def translate_text(text: str, lang: str = "en") -> str:
         if not instructions:
             return ""
 
-        resp = GPTClient().ask(
-            model="gpt-5.4-mini",
-            service_tier="flex",
-            user_id="SYSTEM",
+        return _translate_checked(
+            model="gpt-5.4",
             instructions=instructions,
-            input=text,
-            use_cache=True,
+            input_text=text,
+            fallback_text=text,
         )
-        return (resp.content or "").strip()
     except Exception:
         return ""
 

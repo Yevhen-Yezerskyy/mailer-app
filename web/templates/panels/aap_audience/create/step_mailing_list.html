@@ -109,7 +109,8 @@
   </tr>
 </table>
 
-<table class="YY-MAIN_TABLE !mt-3 !mb-3">
+{% if mailing_step.mailing_show_paging %}
+<table class="YY-MAIN_TABLE !mt-3">
   <tr>
     <td class="YY-MAIN_TOP_TD">
       <div class="YY-CARD_WHITE">
@@ -181,8 +182,9 @@
     </td>
   </tr>
 </table>
+{% endif %}
 
-<table class="YY-MAIN_TABLE !mt-0">
+<table class="YY-MAIN_TABLE !mt-3">
   <tr>
     <td class="YY-MAIN_BOTTOM_TD !pb-0">
       <div class="YY-MAIN_BOTTOM_DIV overflow-x-auto">
@@ -235,6 +237,7 @@
   </tr>
 </table>
 
+{% if mailing_step.mailing_show_paging %}
 <table class="YY-MAIN_TABLE !mt-3 !mb-10">
   <tr>
     <td class="YY-MAIN_TOP_TD">
@@ -307,12 +310,20 @@
     </td>
   </tr>
 </table>
+{% endif %}
 
 {% if task and task_id_token and mailing_step.status_url %}
 <script>
   (function () {
     const statusUrl = "{{ mailing_step.status_url|escapejs }}";
     if (!statusUrl) return;
+    const activeSection = "{{ mailing_step.active_section|escapejs }}";
+    const allowAutoRefresh =
+      activeSection === "in" ||
+      activeSection === "out" ||
+      activeSection === "rated";
+    if (!allowAutoRefresh) return;
+    const pollIntervalMs = 10000;
 
     const prefixNode = document.querySelector("[data-mailing-status-prefix='1']");
     const spinnerNode = document.querySelector("[data-mailing-spinner='1']");
@@ -326,11 +337,28 @@
     const textEmpty = "{% trans 'Рейтингование - нет данных' %}";
 
     let inFlight = false;
+    let runningNow = {% if mailing_step.is_running %}true{% else %}false{% endif %};
+    let pollTimerId = null;
+
+    function stopPolling() {
+      if (pollTimerId === null) return;
+      window.clearInterval(pollTimerId);
+      pollTimerId = null;
+    }
+
+    function startPolling() {
+      stopPolling();
+      if (!runningNow) return;
+      pollTimerId = window.setInterval(function () {
+        pollStatusTick(true);
+      }, pollIntervalMs);
+    }
 
     function applyStatus(payload) {
       const totalCount = Number(payload.total_count || 0);
       const isRunning = payload.is_running === true;
       const isPaused = payload.is_paused === true;
+      runningNow = isRunning;
       if (prefixNode) {
         if (isRunning) {
           prefixNode.textContent = textRunning;
@@ -354,7 +382,7 @@
       }
     }
 
-    function pollStatus() {
+    function pollStatusTick(reloadOnRunning) {
       if (inFlight) return;
       inFlight = true;
       window.fetch(statusUrl, {
@@ -372,14 +400,21 @@
         const payload = result.payload || {};
         if (!result.response.ok || !payload.ok) return;
         applyStatus(payload);
+        if (!runningNow) {
+          stopPolling();
+          return;
+        }
+        if (reloadOnRunning === true) {
+          window.location.reload();
+        }
       }).catch(function () {
       }).finally(function () {
         inFlight = false;
       });
     }
 
-    pollStatus();
-    window.setInterval(pollStatus, 3000);
+    pollStatusTick(false);
+    startPolling();
   })();
 </script>
 {% endif %}
