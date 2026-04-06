@@ -793,6 +793,7 @@ def _delete_rebuild_sending_list_missing(cur, task_id: int) -> int:
         + """
         DELETE FROM public.sending_lists sl
         WHERE sl.task_id = %s
+          AND sl.rate IS NULL
           AND NOT EXISTS (
               SELECT 1
               FROM candidate_top ct

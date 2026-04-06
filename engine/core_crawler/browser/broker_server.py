@@ -296,7 +296,13 @@ def _load_window_state(site: str, active_names: list[str]) -> dict[str, dict[str
     if not isinstance(raw, dict):
         return {}
     now = time.time()
-    known_names = {str(name) for name in active_names}
+    cfg = SITE_CONFIGS.get(site)
+    configured_names = [
+        str(name or "").strip()
+        for name in list(getattr(cfg, "egress_slots", ()) or [])
+        if str(name or "").strip()
+    ]
+    known_names = set(configured_names or [str(name) for name in active_names if str(name or "").strip()])
     out: dict[str, dict[str, float | int]] = {}
     for slot_name, row in raw.items():
         name = str(slot_name or "").strip()
@@ -307,6 +313,7 @@ def _load_window_state(site: str, active_names: list[str]) -> dict[str, dict[str
             cool_until = float(row.get("cool_until") or 0.0)
             main_requests = max(0, int(row.get("main_requests") or 0))
             first_activated_at = float(row.get("first_activated_at") or 0.0)
+            first_activation_span_sec = float(row.get("first_activation_span_sec") or 0.0)
         except Exception:
             continue
         if active_until <= now or main_requests >= ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT:
@@ -319,6 +326,7 @@ def _load_window_state(site: str, active_names: list[str]) -> dict[str, dict[str
             "cool_until": cool_until,
             "main_requests": main_requests,
             "first_activated_at": first_activated_at,
+            "first_activation_span_sec": first_activation_span_sec,
         }
     return out
 

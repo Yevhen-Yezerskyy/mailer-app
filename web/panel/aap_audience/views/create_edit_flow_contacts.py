@@ -39,6 +39,7 @@ CONTACTS_SECTION_KEYS = {
     CONTACTS_SECTION_PAIRS,
 }
 CONTACTS_ALL_PAGE_SIZE = 50
+RATE_NULL_ORD = 1_000_000_000
 
 
 def _is_super_workspace_user(request) -> bool:
@@ -371,6 +372,18 @@ def _fetch_contacts_pairs_rows(request, task_id: int) -> dict[str, Any]:
     with connection.cursor() as cur:
         cur.execute(
             """
+            WITH first_hole AS MATERIALIZED (
+                SELECT
+                    COALESCE(tcb.rate::bigint, %s::bigint) AS hole_rate_ord,
+                    tcb.id AS hole_id
+                FROM public.task_cb_ratings tcb
+                JOIN public.cb_crawl_pairs cp
+                  ON cp.id = tcb.cb_id
+                WHERE tcb.task_id = %s
+                  AND COALESCE(cp.collected, false) = false
+                ORDER BY tcb.rate ASC NULLS LAST, tcb.id ASC
+                LIMIT 1
+            )
             SELECT
                 tcb.cb_id::bigint AS cb_id,
                 tcb.rate AS pair_rate,
@@ -384,12 +397,28 @@ def _fetch_contacts_pairs_rows(request, task_id: int) -> dict[str, Any]:
               ON cp.id = tcb.cb_id
             JOIN public.branches_sys bs
               ON bs.id = cp.branch_id
+            LEFT JOIN first_hole fh
+              ON true
             WHERE tcb.task_id = %s
-              AND cp.collected = true
-            ORDER BY cp.updated_at DESC NULLS LAST, tcb.cb_id DESC
+              AND COALESCE(cp.collected, false) = true
+              AND (
+                    fh.hole_id IS NULL
+                    OR COALESCE(tcb.rate::bigint, %s::bigint) < fh.hole_rate_ord
+                    OR (
+                        COALESCE(tcb.rate::bigint, %s::bigint) = fh.hole_rate_ord
+                        AND tcb.id < fh.hole_id
+                    )
+              )
+            ORDER BY tcb.rate DESC NULLS LAST, tcb.id DESC
             LIMIT 500
             """,
-            [int(task_id)],
+            [
+                int(RATE_NULL_ORD),
+                int(task_id),
+                int(task_id),
+                int(RATE_NULL_ORD),
+                int(RATE_NULL_ORD),
+            ],
         )
         rows = cur.fetchall() or []
 
