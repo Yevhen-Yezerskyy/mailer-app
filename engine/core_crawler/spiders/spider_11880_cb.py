@@ -102,7 +102,7 @@ class OneOneEightZeroCBSpider:
                     task_id=self.task_id,
                     cb_id=self.cb_id,
                     referer=self._detail_referers.get(detail_url, self._start_url),
-                    mode="index_browser",
+                    mode="http_only",
                 )
                 reason = ""
                 card = None
@@ -192,7 +192,7 @@ class OneOneEightZeroCBSpider:
                 task_id=self.task_id,
                 cb_id=self.cb_id,
                 referer=current_referer,
-                mode="index_browser",
+                mode="http_only",
             )
             self._last_tunnel = dict(search_result.tunnel)
             if search_result.status != 200:

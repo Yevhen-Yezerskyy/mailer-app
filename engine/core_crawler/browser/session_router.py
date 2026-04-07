@@ -1368,6 +1368,7 @@ class BrowserSessionRouter:
         *,
         clear_state: bool = False,
         drop_runtime: bool = False,
+        drop_browser_runtime: bool = False,
     ) -> None:
         runtime_key = self._runtime_key(cfg.site, session.tunnel["name"], session.slot_idx)
         browser_key = self._browser_key(cfg.site, session.tunnel["name"])
@@ -1424,6 +1425,17 @@ class BrowserSessionRouter:
                             or browser_expired
                         ):
                             close_browser = self._browsers.pop(browser_key, None)
+                if (
+                    close_browser is None
+                    and drop_browser_runtime
+                    and session.active_pages <= 0
+                    and not any(
+                        self._browser_key(row.site, row.tunnel["name"]) == browser_key
+                        and int(row.active_pages) > 0
+                        for row in self._runtimes.values()
+                    )
+                ):
+                    close_browser = self._browsers.pop(browser_key, None)
                 self._runtime_cv.notify_all()
 
             if clear_state:
@@ -1661,10 +1673,7 @@ class BrowserSessionRouter:
             requested = "index_browser"
         if cfg.site != "11880":
             return requested
-        browser_mode = "index_browser"
-        if random.random() < 0.99:
-            return "http_only"
-        return browser_mode
+        return "http_only"
 
     def _should_try_click(self, session: BrowserSession, url: str, referer: str) -> bool:
         if not referer:
@@ -2287,12 +2296,14 @@ class BrowserSessionRouter:
             )
             clear_state = False
             drop_runtime = False
+            drop_browser_runtime = False
             try:
                 current_log_file = (
                     HTTP_CHROMIUM_LOG_FILE
                     if needs_warm or effective_mode in {"index_browser", "browser_click"}
                     else HTTP_LIGHT_LOG_FILE
                 )
+                drop_browser_runtime = bool(cfg.site == "11880" and effective_mode == "http_only")
                 result, current_log_file = self._execute_fetch_for_session(
                     session,
                     cfg,
@@ -2352,7 +2363,14 @@ class BrowserSessionRouter:
                     error=self._format_error_message(exc),
                 )
             finally:
-                self._release_runtime(cfg, session, lease, clear_state=clear_state, drop_runtime=drop_runtime)
+                self._release_runtime(
+                    cfg,
+                    session,
+                    lease,
+                    clear_state=clear_state,
+                    drop_runtime=drop_runtime,
+                    drop_browser_runtime=drop_browser_runtime,
+                )
 
         raise RuntimeError(str(last_error or f"FETCH FAILED {site} {url}"))
 
