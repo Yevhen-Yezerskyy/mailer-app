@@ -239,7 +239,7 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
             "aws_63_177_247_105",
             "direct",
         ),
-        slot_quarantine_sec=32 * 60 * 60,
+        slot_quarantine_sec=50 * 60 * 60,
         sessions_per_egress=1,
         concurrent_pages_per_session=2,
         max_requests_per_session=500,
