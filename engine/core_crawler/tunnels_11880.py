@@ -339,8 +339,17 @@ def _log_watchdog_snapshot(status_map: dict[str, dict[str, Any]], configured_nam
         route_plan = {}
     quarantine_11880 = _load_quarantine_snapshot("11880")
     quarantine_gs = _load_quarantine_snapshot("gs")
-    alive_count = sum(1 for name in configured_names if bool((status_map.get(name) or {}).get("alive")))
-    down_count = max(0, len(configured_names) - alive_count)
+    alive_count = sum(
+        1
+        for name in list(route_plan.get("11880") or [])
+        if str(name or "").strip() != "direct" and bool((status_map.get(str(name or "").strip()) or {}).get("alive"))
+    )
+    down_count = max(
+        0,
+        len([name for name in configured_names if str(name or "").strip()]) - sum(
+            1 for name in configured_names if bool((status_map.get(name) or {}).get("alive"))
+        ),
+    )
     payload = {
         "event": "watch_snapshot",
         "alive": alive_count,
