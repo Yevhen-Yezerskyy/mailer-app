@@ -337,6 +337,20 @@ def _active_window_names(site: str, available: list[str]) -> list[str]:
     ]
 
 
+def _cooldown_window_names(site: str, available: list[str]) -> set[str]:
+    now = time.time()
+    state = _load_window_state(site, available)
+    out: set[str] = set()
+    for name in available:
+        row = state.get(name) or {}
+        if float(row.get("active_until") or 0.0) > now:
+            continue
+        if float(row.get("cool_until") or 0.0) <= now:
+            continue
+        out.add(name)
+    return out
+
+
 def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
     if not available:
         return []
@@ -421,14 +435,39 @@ def _activate_fixed_slots(
     target_count: int,
     *,
     preferred_names: set[str] | None = None,
+    priority_groups: list[set[str]] | None = None,
 ) -> list[str]:
     if target_count <= 0 or not available:
         return []
     if len(available) <= target_count:
         return list(available)
     preferred = {str(name) for name in (preferred_names or set()) if str(name or "").strip()}
+    groups = [
+        {str(name) for name in (group or set()) if str(name or "").strip()}
+        for group in list(priority_groups or [])
+        if group
+    ]
 
     def _select_slots(available_names: list[str], rr_pos: int) -> list[str]:
+        if groups:
+            selected: list[str] = []
+            claimed: set[str] = set()
+            for group in groups:
+                group_names = [name for name in available_names if name in group and name not in claimed]
+                if not group_names:
+                    continue
+                start_idx = rr_pos % len(group_names)
+                rotated = list(group_names[start_idx:] + group_names[:start_idx])
+                selected.extend(rotated[: target_count - len(selected)])
+                claimed.update(selected)
+                if len(selected) >= target_count:
+                    return selected[:target_count]
+            regular_names = [name for name in available_names if name not in claimed]
+            if regular_names and len(selected) < target_count:
+                start_idx = rr_pos % len(regular_names)
+                rotated = list(regular_names[start_idx:] + regular_names[:start_idx])
+                selected.extend(rotated[: target_count - len(selected)])
+            return selected[:target_count]
         if not preferred:
             start_idx = rr_pos % len(available_names)
             rotated = list(available_names[start_idx:] + available_names[:start_idx])
@@ -453,12 +492,22 @@ def _activate_fixed_slots(
     if until > now:
         current = [name for name in active_names if name in available]
         if len(current) >= target_count:
-            if not preferred:
+            if groups:
+                remaining = target_count
+                for group in groups:
+                    desired = min(remaining, len([name for name in available if name in group]))
+                    if desired > len([name for name in current[:target_count] if name in group]):
+                        break
+                    remaining -= desired
+                else:
+                    return current[:target_count]
+            elif not preferred:
                 return current[:target_count]
-            desired_priority = min(target_count, len([name for name in available if name in preferred]))
-            current_priority = len([name for name in current[:target_count] if name in preferred])
-            if current_priority >= desired_priority:
-                return current[:target_count]
+            else:
+                desired_priority = min(target_count, len([name for name in available if name in preferred]))
+                current_priority = len([name for name in current[:target_count] if name in preferred])
+                if current_priority >= desired_priority:
+                    return current[:target_count]
     rr_state = _cache_get_obj(_rr_key(site)) or {"pos": 0}
     rr_pos = int(rr_state.get("pos") or 0)
     selected = _select_slots(available, rr_pos)
@@ -507,8 +556,18 @@ def _compute_site_route_plan() -> dict[str, list[str]]:
     live_gs = [name for name in slots_gs if _slot_is_live(name, statuses)]
     available_gs = [name for name in live_gs if name not in quarantine_gs and name not in used_11880]
     gs_target = _gs_target_active_count(len(available_gs))
-    gs_preferred = {name for name in available_gs if name in quarantine_11880}
-    active_gs = _activate_fixed_slots("gs", available_gs, gs_target, preferred_names=gs_preferred)
+    cooldown_11880 = {
+        name
+        for name in _cooldown_window_names("11880", slots_11880)
+        if name in available_gs and name != "direct"
+    }
+    gs_quarantine_11880 = {name for name in available_gs if name in quarantine_11880 and name != "direct"}
+    active_gs = _activate_fixed_slots(
+        "gs",
+        available_gs,
+        gs_target,
+        priority_groups=[gs_quarantine_11880, cooldown_11880],
+    )
 
     return {
         "11880": list(active_11880),
