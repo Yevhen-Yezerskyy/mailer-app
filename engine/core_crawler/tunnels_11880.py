@@ -360,7 +360,7 @@ def _log_watchdog_snapshot(status_map: dict[str, dict[str, Any]], configured_nam
     _log_tunnel(json.dumps(payload, ensure_ascii=False, indent=2))
     cooldown_count = len(payload["cooldown"].get("11880") or {})
     quarantine_count = len(quarantine_11880)
-    total_count = len([name for name in configured_names if str(name or "").strip() and str(name or "").strip() != "direct"])
+    total_count = len([name for name in configured_names if str(name or "").strip()]) + 1
     _log_tunnel(
         f"Alive: {alive_count}, Cooldown: {cooldown_count}, "
         f"Quarantine: {quarantine_count}, Total: {total_count}"
