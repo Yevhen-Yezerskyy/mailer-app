@@ -37,7 +37,7 @@ from engine.core_crawler.browser.session_config import (
     BrowserProfile,
     SiteSessionConfig,
 )
-from engine.core_crawler.tunnels_11880 import list_tunnels, load_tunnel_statuses, log_quarantine_summary
+from engine.core_crawler.tunnels_11880 import list_tunnels, load_tunnel_statuses
 
 ROUTER_BOOT_ID = uuid4().hex
 SESSION_STATE_TTL_SEC = 15 * 60
@@ -638,7 +638,6 @@ class BrowserSessionRouter:
                 f"level={int(level) + 1} duration_sec={int(duration_sec)} until_ts={int(until)}"
             ),
         )
-        log_quarantine_summary(cfg.site)
 
     @staticmethod
     def _profile_script(profile: BrowserProfile) -> str:
