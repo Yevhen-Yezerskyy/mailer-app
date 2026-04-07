@@ -1447,12 +1447,12 @@ class BrowserSessionRouter:
             self._release_lock(lease.warm_lock_key, lease.warm_lock_token)
             self._release_lock(gate_key, gate_token)
 
+        if close_browser is not None:
+            self._close_browser_runtime(close_browser)
         if not should_close:
             return
 
         self._close_session(session)
-        if close_browser is not None:
-            self._close_browser_runtime(close_browser)
 
     def _all_headers_or_empty(self, source: Any, source_name: str) -> dict[str, Any]:
         if source is None:
