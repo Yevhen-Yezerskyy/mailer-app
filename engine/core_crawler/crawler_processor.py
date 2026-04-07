@@ -18,7 +18,7 @@ from engine.core_crawler.browser.broker_server import current_site_route_plan
 from engine.core_crawler.browser.session_config import CRAWLER_ACTIVE_TUNNEL_CAP
 from engine.core_crawler.tunnels_11880 import ensure_tunnel_watchdog, stop_tunnel_watchdog
 
-TICK_SEC = 0.7
+TICK_SEC = 5.0
 _TZ_BERLIN = ZoneInfo("Europe/Berlin")
 
 

@@ -43,7 +43,7 @@ ROUTER_BOOT_ID = uuid4().hex
 SESSION_STATE_TTL_SEC = 15 * 60
 SESSION_STATE_CLEAR_TTL_SEC = 1
 QUARANTINE_BACKOFF_TTL_SEC = 7 * 24 * 60 * 60
-WAIT_TIMEOUT_SEC = 60.0
+WAIT_TIMEOUT_SEC = 30.0
 RUNTIME_IDLE_REAP_SEC = 90.0
 SESSION_GATE_TTL_SEC = 5.0
 SESSION_GATE_WAIT_SEC = 5.0
@@ -2302,12 +2302,12 @@ class BrowserSessionRouter:
                 )
             except RuntimeError as exc:
                 last_error = exc
-                time.sleep(0.2)
+                time.sleep(0.5)
                 continue
             if not candidates:
                 tried.clear()
                 with self._runtime_cv:
-                    self._runtime_cv.wait(timeout=0.2)
+                    self._runtime_cv.wait(timeout=0.5)
                 continue
 
             slot, slot_idx = candidates[0]
@@ -2317,7 +2317,7 @@ class BrowserSessionRouter:
                 if len(tried) >= len(candidates):
                     tried.clear()
                     with self._runtime_cv:
-                        self._runtime_cv.wait(timeout=0.1)
+                        self._runtime_cv.wait(timeout=0.5)
                 continue
 
             session, lease = checked

@@ -30,13 +30,13 @@ from engine.core_crawler.spiders.spider_gs_cb import GelbeSeitenCBSpider
 from engine.core_crawler.spiders.spider_11880_cb import OneOneEightZeroCBSpider
 from engine.core_crawler.tunnels_11880 import load_tunnel_statuses
 
-RETRY_LOCK_TTL_SEC = 3 * 60 * 60.0
+RETRY_LOCK_TTL_SEC = 10 * 60.0
 ROUTE_LOCK_TTL_SEC = 20.0
 ROUTE_LOCK_RENEW_SEC = 10.0
 ITEM_TIMEOUT_SEC = 180.0
 ITEM_LOCK_TTL_SEC = 3 * 60.0
 ITEM_LOCK_RENEW_SEC = 15.0
-DISPATCH_TICK_SEC = 0.25
+DISPATCH_TICK_SEC = 0.75
 DISPATCHER_LOOP_SEC = 1.5
 DISPATCH_POOL_LIMIT = 10
 DISPATCH_HEAD_LIMIT = 5

@@ -31,7 +31,6 @@ from engine.core_crawler.browser.session_config import (
     ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO,
     ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC,
     ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC,
-    ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT,
     ONE_ONE_EIGHTY_WINDOW_MAX_SEC,
     ONE_ONE_EIGHTY_WINDOW_MIN_SEC,
     SITE_CONFIGS,
@@ -51,10 +50,10 @@ ROUTE_STATE_LOCK_TTL_SEC = 3.0
 ROUTE_STATE_WAIT_SEC = 2.0
 ROUTE_PLAN_CACHE_SEC = 60.0
 BROKER_WORKERS = 10
-ONE_ONE_EIGHTY_FIRST_ACTIVATION_SPAN_MIN_SEC = 9 * 60 * 60
-ONE_ONE_EIGHTY_FIRST_ACTIVATION_SPAN_MAX_SEC = 12 * 60 * 60
-ONE_ONE_EIGHTY_LONG_COOLDOWN_MIN_SEC = 6 * 60 * 60
-ONE_ONE_EIGHTY_LONG_COOLDOWN_MAX_SEC = 10 * 60 * 60
+ONE_ONE_EIGHTY_FIRST_ACTIVATION_SPAN_MIN_SEC = 7 * 60 * 60
+ONE_ONE_EIGHTY_FIRST_ACTIVATION_SPAN_MAX_SEC = 14 * 60 * 60
+ONE_ONE_EIGHTY_LONG_COOLDOWN_MIN_SEC = 4 * 60 * 60
+ONE_ONE_EIGHTY_LONG_COOLDOWN_MAX_SEC = 16 * 60 * 60
 
 
 def _broker_worker_parallelism() -> int:
@@ -303,7 +302,7 @@ def _load_window_state(site: str, active_names: list[str]) -> dict[str, dict[str
         if str(name or "").strip()
     ]
     known_names = set(configured_names or [str(name) for name in active_names if str(name or "").strip()])
-    out: dict[str, dict[str, float | int]] = {}
+    out: dict[str, dict[str, float]] = {}
     for slot_name, row in raw.items():
         name = str(slot_name or "").strip()
         if name not in known_names or not isinstance(row, dict):
@@ -311,20 +310,17 @@ def _load_window_state(site: str, active_names: list[str]) -> dict[str, dict[str
         try:
             active_until = float(row.get("active_until") or 0.0)
             cool_until = float(row.get("cool_until") or 0.0)
-            main_requests = max(0, int(row.get("main_requests") or 0))
             first_activated_at = float(row.get("first_activated_at") or 0.0)
             first_activation_span_sec = float(row.get("first_activation_span_sec") or 0.0)
         except Exception:
             continue
-        if active_until <= now or main_requests >= ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT:
+        if active_until <= now:
             active_until = 0.0
         if cool_until <= now and active_until <= 0.0:
             cool_until = 0.0
-            main_requests = 0
         out[name] = {
             "active_until": active_until,
             "cool_until": cool_until,
-            "main_requests": main_requests,
             "first_activated_at": first_activated_at,
             "first_activation_span_sec": first_activation_span_sec,
         }
@@ -338,7 +334,6 @@ def _active_window_names(site: str, available: list[str]) -> list[str]:
         name
         for name in available
         if float((state.get(name) or {}).get("active_until") or 0.0) > now
-        and int((state.get(name) or {}).get("main_requests") or 0) < ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT
     ]
 
 
@@ -393,7 +388,6 @@ def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
                                 ONE_ONE_EIGHTY_LONG_COOLDOWN_MIN_SEC,
                                 ONE_ONE_EIGHTY_LONG_COOLDOWN_MAX_SEC,
                             ),
-                            "main_requests": 0,
                             "first_activated_at": 0.0,
                             "first_activation_span_sec": 0.0,
                         }
@@ -410,7 +404,6 @@ def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
                             ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC,
                             ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC,
                         ),
-                        "main_requests": 0,
                         "first_activated_at": first_activated_at,
                         "first_activation_span_sec": first_activation_span_sec,
                     }
@@ -420,36 +413,6 @@ def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
         return [name for name in available if name in active_names]
     finally:
         _release_lock(lock_key, lock_token)
-
-
-def _record_11880_main_request(site: str, slot_name: str) -> None:
-    name = str(slot_name or "").strip()
-    if site != "11880" or not name:
-        return
-    lock_key = _window_lock_key(site)
-    owner = f"{site}:count:{name}:{uuid4().hex}"
-    lock_token = _lock_until(lock_key, ROUTE_STATE_LOCK_TTL_SEC, owner, ROUTE_STATE_WAIT_SEC)
-    if not lock_token:
-        return
-    try:
-        cfg = SITE_CONFIGS.get(site)
-        configured_names = list(getattr(cfg, "egress_slots", ()) or ()) or [name]
-        state = _load_window_state(site, configured_names)
-        row = dict(state.get(name) or {})
-        row["main_requests"] = max(0, int(row.get("main_requests") or 0)) + 1
-        if int(row["main_requests"]) >= ONE_ONE_EIGHTY_WINDOW_MAIN_REQUEST_LIMIT:
-            row["active_until"] = 0.0
-        state[name] = row
-        _cache_set_obj(_window_key(site), state)
-    finally:
-        _release_lock(lock_key, lock_token)
-
-
-def _is_11880_main_request(kind: str) -> bool:
-    kind_name = str(kind or "").strip().lower()
-    if not kind_name:
-        return False
-    return kind_name not in {"home", "referer"}
 
 
 def _activate_fixed_slots(
@@ -697,8 +660,6 @@ class _BrokerDispatcher:
                 self._inflight.discard(request_id)
                 self._accepted_count = max(0, int(self._accepted_count) - 1)
             return {"ok": False, "error": "BROKER_BUSY", "detail": "TRY_AGAIN"}
-        if site == "11880" and _is_11880_main_request(str(payload.get("kind") or "")):
-            _record_11880_main_request(site, preferred_slot_name)
         return {"ok": True, "accepted": True, "request_id": request_id}
 
     def poll_result(self, request_id: str) -> dict[str, Any]:
