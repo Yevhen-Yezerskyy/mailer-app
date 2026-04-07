@@ -339,20 +339,12 @@ def _log_watchdog_snapshot(status_map: dict[str, dict[str, Any]], configured_nam
         route_plan = {}
     quarantine_11880 = _load_quarantine_snapshot("11880")
     quarantine_gs = _load_quarantine_snapshot("gs")
-    alive_count = sum(
-        1
-        for name in list(route_plan.get("11880") or [])
-        if str(name or "").strip() != "direct" and bool((status_map.get(str(name or "").strip()) or {}).get("alive"))
-    )
-    down_count = max(
-        0,
-        len([name for name in configured_names if str(name or "").strip()]) - sum(
-            1 for name in configured_names if bool((status_map.get(name) or {}).get("alive"))
-        ),
-    )
+    configured_set = {str(name or "").strip() for name in configured_names if str(name or "").strip()}
+    live_tunnel_count = sum(1 for name in configured_set if bool((status_map.get(name) or {}).get("alive")))
+    down_count = max(0, len(configured_set) - live_tunnel_count)
     payload = {
         "event": "watch_snapshot",
-        "alive": alive_count,
+        "alive": live_tunnel_count,
         "down": down_count,
         "cooldown": {
             "11880": _load_cooldown_snapshot("11880"),
@@ -369,9 +361,12 @@ def _log_watchdog_snapshot(status_map: dict[str, dict[str, Any]], configured_nam
     _log_tunnel(json.dumps(payload, ensure_ascii=False, indent=2))
     cooldown_count = len(payload["cooldown"].get("11880") or {})
     quarantine_count = len(quarantine_11880)
-    total_count = len([name for name in configured_names if str(name or "").strip()]) + 1
+    total_count = len(configured_set) + 1
+    cooldown_names = {str(name or "").strip() for name in (payload["cooldown"].get("11880") or {}).keys() if str(name or "").strip()}
+    quarantine_names = {str(name or "").strip() for name in quarantine_11880.keys() if str(name or "").strip()}
+    available_count = len((set(configured_set) | {"direct"}) - cooldown_names - quarantine_names)
     _log_tunnel(
-        f"Alive: {alive_count}, Cooldown: {cooldown_count}, "
+        f"Alive: {available_count}, Cooldown: {cooldown_count}, "
         f"Quarantine: {quarantine_count}, Total: {total_count}"
     )
 
