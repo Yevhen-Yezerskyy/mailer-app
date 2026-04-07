@@ -25,6 +25,7 @@ WEBSITE_CONTACT_BUDGET_SEC = 12
 MAX_PAGE_TEXT_LEN = 8000
 MAX_WEBSITE_INPUT_LEN = 12000
 MAX_MEANINGFUL_BLOCKS = 30
+MIN_WORK_BATCH_SIZE = 15
 NOISY_LINE_MARKERS = (
     "cookie",
     "datenschutz",
@@ -335,6 +336,10 @@ def run_once() -> Dict[str, Any]:
             result["picked_cnt"] = len(rows)
             if not rows:
                 result["status"] = "no_batch"
+                conn.rollback()
+                return result
+            if len(rows) < MIN_WORK_BATCH_SIZE:
+                result["status"] = "small_batch"
                 conn.rollback()
                 return result
 
