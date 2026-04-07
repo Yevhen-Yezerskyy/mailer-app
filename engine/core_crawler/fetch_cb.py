@@ -37,7 +37,7 @@ ITEM_TIMEOUT_SEC = 180.0
 ITEM_LOCK_TTL_SEC = 3 * 60.0
 ITEM_LOCK_RENEW_SEC = 15.0
 DISPATCH_TICK_SEC = 0.25
-DISPATCHER_LOOP_SEC = 0.7
+DISPATCHER_LOOP_SEC = 1.5
 DISPATCH_POOL_LIMIT = 10
 DISPATCH_HEAD_LIMIT = 5
 ACTIVE_TASK_REFRESH_SEC = 10.0
@@ -741,6 +741,8 @@ def _run_item(item: QueueItem, route: RouteLease | None = None) -> dict[str, Any
         db_rows = int(getattr(spider, "_db_rows", 0) or 0)
         final_reason = str(getattr(spider, "_final_reason", "") or "")
         release_lock = final_reason.startswith("FAILED TO PARSE")
+        if final_reason.startswith("FETCH EXCEPTION"):
+            release_lock = True
         selected = int(len(getattr(spider, "selected_urls", []) or []))
         parsed = int(getattr(spider, "_detail_parsed", 0) or 0)
         print(
