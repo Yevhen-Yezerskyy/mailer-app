@@ -455,10 +455,16 @@ def _stop_item_lock_heartbeat(heartbeat: ItemLockHeartbeat | None) -> None:
         pass
 
 
-def _finalize_item_lock(item: QueueItem) -> None:
+def _finalize_item_lock(item: QueueItem, *, release_lock: bool = False) -> None:
     if not item.lock_key or not item.lock_token:
         return
     if _pair_is_collected(item.cb_id):
+        try:
+            CLIENT.lock_release(item.lock_key, token=item.lock_token)
+        except Exception:
+            pass
+        return
+    if bool(release_lock):
         try:
             CLIENT.lock_release(item.lock_key, token=item.lock_token)
         except Exception:
@@ -706,7 +712,8 @@ def _run_spider(item: QueueItem) -> Any | None:
     return None
 
 
-def _run_item(item: QueueItem, route: RouteLease | None = None) -> None:
+def _run_item(item: QueueItem, route: RouteLease | None = None) -> dict[str, Any]:
+    release_lock = False
     try:
         if route is not None:
             set_fetch_route_context(route.site, route.slot_name, route.slot_idx)
@@ -733,6 +740,7 @@ def _run_item(item: QueueItem, route: RouteLease | None = None) -> None:
         db_action = str(getattr(spider, "_db_action", "") or "")
         db_rows = int(getattr(spider, "_db_rows", 0) or 0)
         final_reason = str(getattr(spider, "_final_reason", "") or "")
+        release_lock = final_reason.startswith("FAILED TO PARSE")
         selected = int(len(getattr(spider, "selected_urls", []) or []))
         parsed = int(getattr(spider, "_detail_parsed", 0) or 0)
         print(
@@ -748,6 +756,7 @@ def _run_item(item: QueueItem, route: RouteLease | None = None) -> None:
             )
     finally:
         clear_fetch_route_context()
+    return {"release_lock": release_lock}
 
 
 def run_fixed_pair(
@@ -973,12 +982,16 @@ def slot_worker_main(catalog: str, slot_name: str) -> None:
 
             item_heartbeat = _start_item_lock_heartbeat(item)
             watchdog = _start_item_timeout_watchdog(item, route, heartbeat)
+            finalize_info: dict[str, Any] | None = None
             try:
-                _run_item(item, route)
+                finalize_info = _run_item(item, route)
             finally:
                 _stop_item_timeout_watchdog(watchdog)
                 _stop_item_lock_heartbeat(item_heartbeat)
-                _finalize_item_lock(item)
+                _finalize_item_lock(
+                    item,
+                    release_lock=bool((finalize_info or {}).get("release_lock")),
+                )
                 if route is not None and not _route_still_valid(route):
                     _reset_and_release_route(route, heartbeat)
                     route = None

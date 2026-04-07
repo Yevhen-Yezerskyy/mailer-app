@@ -259,7 +259,7 @@ class GelbeSeitenCBSpider:
             self._last_tunnel = dict(search_result.tunnel)
             page_slot_name = str(search_result.tunnel.get("name") or "")
             page_slot_idx = int(search_result.session_slot)
-            if search_result.status not in {200, 404}:
+            if search_result.status != 200:
                 self._final_reason = f"SEARCH HTTP {search_result.status}"
                 return
 
@@ -435,6 +435,19 @@ class GelbeSeitenCBSpider:
 
     def _handle_http_error_result(self, reason: str) -> int:
         with get_connection() as conn, conn.cursor() as cur:
+            if str(reason or "").strip() == "SEARCH HTTP 404":
+                cur.execute(
+                    """
+                    UPDATE public.cb_crawl_pairs
+                    SET collected = true,
+                        error = %s,
+                        updated_at = NOW()
+                    WHERE id = %s
+                    """,
+                    ("SEARCH HTTP 404", self.cb_id),
+                )
+                conn.commit()
+                return 3
             cur.execute(
                 "SELECT error FROM public.cb_crawl_pairs WHERE id = %s FOR UPDATE",
                 (self.cb_id,),
