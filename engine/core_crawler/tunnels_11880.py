@@ -330,6 +330,35 @@ def _snapshot_active(active_names: list[str]) -> dict[str, Any]:
     }
 
 
+def log_quarantine_summary(site: str) -> None:
+    site_name = str(site or "").strip()
+    if not site_name:
+        return
+    try:
+        from engine.core_crawler.browser.session_config import SITE_CONFIGS
+
+        cfg = SITE_CONFIGS.get(site_name)
+        configured_names = [
+            str(name or "").strip()
+            for name in list(getattr(cfg, "egress_slots", ()) or [])
+            if str(name or "").strip() and str(name or "").strip() != "direct"
+        ]
+        statuses = load_tunnel_statuses(configured_names)
+        alive_count = sum(1 for name in configured_names if bool((statuses.get(name) or {}).get("alive")))
+        cooldown_count = len(_load_cooldown_snapshot(site_name))
+        quarantine_count = len(_load_quarantine_snapshot(site_name))
+        total_count = len(configured_names)
+        _log_tunnel(
+            f"Alive: {alive_count}, Cooldown: {cooldown_count}, "
+            f"Quarantine: {quarantine_count}, Total: {total_count}"
+        )
+    except Exception as exc:
+        _log_tunnel(
+            f"Alive: ?, Cooldown: ?, Quarantine: ?, Total: ? "
+            f"(summary_error={type(exc).__name__})"
+        )
+
+
 def _log_watchdog_snapshot(status_map: dict[str, dict[str, Any]], configured_names: list[str]) -> None:
     try:
         from engine.core_crawler.browser.broker_server import current_site_route_plan
