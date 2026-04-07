@@ -697,7 +697,7 @@ def _set_cached_sending_hash(task_id: int, task_hash: str) -> None:
 
 def _current_prefix_candidate_top_sql() -> str:
     return """
-        WITH first_hole AS (
+        WITH first_hole AS MATERIALIZED (
             SELECT
                 COALESCE(tcr.rate::bigint, %s::bigint) AS hole_rate_ord,
                 tcr.id AS hole_id
