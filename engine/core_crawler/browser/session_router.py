@@ -129,6 +129,7 @@ class BrowserSessionRouter:
         self._runtime_cv = threading.Condition()
         self._runtimes: dict[str, BrowserSession] = {}
         self._browsers: dict[str, BrowserRuntime] = {}
+        self._browser_launches_inflight = 0
         if register_atexit:
             atexit.register(self.close_all)
 
@@ -174,6 +175,30 @@ class BrowserSessionRouter:
             if self._playwright is None:
                 self._playwright = sync_playwright().start()
             return self._playwright
+
+    def _begin_browser_launch(self) -> None:
+        with self._runtime_cv:
+            self._browser_launches_inflight += 1
+            self._runtime_cv.notify_all()
+
+    def _end_browser_launch(self) -> None:
+        with self._runtime_cv:
+            self._browser_launches_inflight = max(0, int(self._browser_launches_inflight) - 1)
+            self._runtime_cv.notify_all()
+
+    def _maybe_stop_playwright(self) -> None:
+        with self._pw_mu:
+            with self._runtime_cv:
+                if self._playwright is None:
+                    return
+                if self._browsers or int(self._browser_launches_inflight) > 0:
+                    return
+                playwright = self._playwright
+                self._playwright = None
+            try:
+                playwright.stop()
+            except Exception:
+                pass
 
     def _log_fetch_start(
         self,
@@ -1027,6 +1052,7 @@ class BrowserSessionRouter:
             self._close_session(runtime)
         if doomed_browser is not None:
             self._close_browser_runtime(doomed_browser)
+            self._maybe_stop_playwright()
 
     @staticmethod
     def _runtime_expired(cfg: SiteSessionConfig, runtime: BrowserSession) -> bool:
@@ -1070,6 +1096,8 @@ class BrowserSessionRouter:
             self._close_session(runtime)
         for browser_runtime in doomed_browsers:
             self._close_browser_runtime(browser_runtime)
+        if doomed_browsers:
+            self._maybe_stop_playwright()
 
     def _session_candidates(
         self,
@@ -1195,26 +1223,31 @@ class BrowserSessionRouter:
                 else:
                     existing.last_used_at = time.time()
                     return existing
-        if doomed is not None:
-            self._close_browser_runtime(doomed)
-        created = self._launch_browser_runtime(cfg, tunnel)
-        doomed = None
-        with self._runtime_cv:
-            existing = self._browsers.get(browser_key)
-            if existing is not None:
-                if not self._runtime_matches_slot(existing, tunnel):
-                    self._browsers.pop(browser_key, None)
-                    doomed = existing
-                    existing = None
-                else:
-                    existing.last_used_at = time.time()
-                    self._close_browser_runtime(created)
-                    return existing
+        self._begin_browser_launch()
+        try:
             if doomed is not None:
                 self._close_browser_runtime(doomed)
-            self._browsers[browser_key] = created
-            self._runtime_cv.notify_all()
-            return created
+            created = self._launch_browser_runtime(cfg, tunnel)
+            doomed = None
+            with self._runtime_cv:
+                existing = self._browsers.get(browser_key)
+                if existing is not None:
+                    if not self._runtime_matches_slot(existing, tunnel):
+                        self._browsers.pop(browser_key, None)
+                        doomed = existing
+                        existing = None
+                    else:
+                        existing.last_used_at = time.time()
+                        self._close_browser_runtime(created)
+                        return existing
+                if doomed is not None:
+                    self._close_browser_runtime(doomed)
+                self._browsers[browser_key] = created
+                self._runtime_cv.notify_all()
+                return created
+        finally:
+            self._end_browser_launch()
+            self._maybe_stop_playwright()
 
     def _checkout_runtime(
         self,
@@ -1449,6 +1482,7 @@ class BrowserSessionRouter:
 
         if close_browser is not None:
             self._close_browser_runtime(close_browser)
+            self._maybe_stop_playwright()
         if not should_close:
             return
 
