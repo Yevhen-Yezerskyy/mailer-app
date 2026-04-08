@@ -58,6 +58,12 @@ QUARANTINE_STEP_LADDER_SEC = (
     24 * 60 * 60,
     48 * 60 * 60,
 )
+ONE_ONE_EIGHTY_QUARANTINE_WINDOW_SEC = 48 * 60 * 60
+ONE_ONE_EIGHTY_QUARANTINE_LEVEL_RANGES_SEC = (
+    (5 * 60 * 60, 8 * 60 * 60),
+    (12 * 60 * 60, 15 * 60 * 60),
+    (72 * 60 * 60, 78 * 60 * 60),
+)
 
 
 @dataclass
@@ -362,6 +368,12 @@ class BrowserSessionRouter:
         return max(60, min(int(max_left), QUARANTINE_BACKOFF_TTL_SEC))
 
     @staticmethod
+    def _quarantine_grace_sec(cfg: SiteSessionConfig) -> int:
+        if cfg.site == "11880":
+            return int(ONE_ONE_EIGHTY_QUARANTINE_LEVEL_RANGES_SEC[-1][1])
+        return int(cfg.slot_quarantine_sec)
+
+    @staticmethod
     def _runtime_key(site: str, slot_name: str, slot_idx: int) -> str:
         site_name = str(site or "").strip()
         tunnel_name = str(slot_name or "").strip()
@@ -390,6 +402,13 @@ class BrowserSessionRouter:
         if not site_name:
             raise ValueError("quarantine backoff key requires site")
         return f"core_crawler:slot_quarantine_backoff:{site_name}"
+
+    @staticmethod
+    def _quarantine_history_key(site: str) -> str:
+        site_name = str(site or "").strip()
+        if not site_name:
+            raise ValueError("quarantine history key requires site")
+        return f"core_crawler:slot_quarantine_history:{site_name}"
 
     @staticmethod
     def _session_key(site: str, slot_name: str, slot_idx: int) -> str:
@@ -564,12 +583,64 @@ class BrowserSessionRouter:
         quarantined = self._load_quarantine(cfg)
         return slot_name in quarantined
 
+    def _load_quarantine_history(self, cfg: SiteSessionConfig) -> dict[str, list[float]]:
+        raw = self._cache_get_obj(self._quarantine_history_key(cfg.site)) or {}
+        if not isinstance(raw, dict):
+            return {}
+        now = time.time()
+        cutoff = now - float(ONE_ONE_EIGHTY_QUARANTINE_WINDOW_SEC)
+        out: dict[str, list[float]] = {}
+        for name, values in raw.items():
+            if not isinstance(values, (list, tuple)):
+                continue
+            kept: list[float] = []
+            for value in values:
+                try:
+                    ts = float(value or 0.0)
+                except Exception:
+                    continue
+                if ts >= cutoff:
+                    kept.append(ts)
+            if kept:
+                out[str(name)] = kept
+        if out != raw:
+            self._cache_set_obj(
+                self._quarantine_history_key(cfg.site),
+                out,
+                ttl_sec=self._quarantine_ttl_sec(
+                    {
+                        name: max(values)
+                        for name, values in out.items()
+                        if values
+                    }
+                ) + int(ONE_ONE_EIGHTY_QUARANTINE_WINDOW_SEC),
+            )
+        return out
+
+    def _next_11880_quarantine(self, cfg: SiteSessionConfig, slot_name: str) -> tuple[int, int]:
+        history = self._load_quarantine_history(cfg)
+        now = time.time()
+        current = list(history.get(str(slot_name)) or [])
+        current.append(now)
+        history[str(slot_name)] = current
+        event_count = len(current)
+        level = 0 if event_count <= 1 else 1 if event_count == 2 else 2
+        min_sec, max_sec = ONE_ONE_EIGHTY_QUARANTINE_LEVEL_RANGES_SEC[level]
+        duration_sec = int(random.uniform(float(min_sec), float(max_sec)))
+        self._cache_set_obj(
+            self._quarantine_history_key(cfg.site),
+            history,
+            ttl_sec=int(ONE_ONE_EIGHTY_QUARANTINE_WINDOW_SEC + max_sec),
+        )
+        return level, duration_sec
+
     def _load_quarantine_backoff(self, cfg: SiteSessionConfig) -> dict[str, dict[str, float | int]]:
         raw = self._cache_get_obj(self._quarantine_backoff_key(cfg.site)) or {}
         if not isinstance(raw, dict):
             return {}
         now = time.time()
-        grace_sec = max(60.0, float(cfg.slot_quarantine_sec))
+        quarantine_max_sec = self._quarantine_grace_sec(cfg)
+        grace_sec = max(60.0, float(quarantine_max_sec))
         out: dict[str, dict[str, float | int]] = {}
         for name, row in raw.items():
             if not isinstance(row, dict):
@@ -598,7 +669,8 @@ class BrowserSessionRouter:
         now = time.time()
         prev_until = float(current.get("until") or 0.0)
         prev_level = max(0, int(current.get("level") or 0))
-        grace_sec = max(60.0, float(cfg.slot_quarantine_sec))
+        quarantine_max_sec = self._quarantine_grace_sec(cfg)
+        grace_sec = max(60.0, float(quarantine_max_sec))
         if prev_until > 0.0 and now <= (prev_until + grace_sec):
             next_level = min(prev_level + 1, len(QUARANTINE_STEP_LADDER_SEC) - 1)
         else:
@@ -612,10 +684,10 @@ class BrowserSessionRouter:
         state = self._load_quarantine(cfg)
         backoff = self._load_quarantine_backoff(cfg)
         if cfg.site == "11880":
-            level = 0
-            duration_sec = int(cfg.slot_quarantine_sec)
+            level, duration_sec = self._next_11880_quarantine(cfg, slot_name)
         else:
             level, duration_sec = self._next_quarantine_level(cfg, slot_name)
+        quarantine_max_sec = self._quarantine_grace_sec(cfg)
         until = time.time() + float(duration_sec)
         state[slot_name] = until
         self._cache_set_obj(
@@ -627,7 +699,7 @@ class BrowserSessionRouter:
         self._cache_set_obj(
             self._quarantine_backoff_key(cfg.site),
             backoff,
-            ttl_sec=self._quarantine_backoff_ttl_sec(backoff, max(60.0, float(cfg.slot_quarantine_sec))),
+            ttl_sec=self._quarantine_backoff_ttl_sec(backoff, max(60.0, float(quarantine_max_sec))),
         )
         self._drop_egress_session_state(cfg, slot_name, clear_state=True)
         log(

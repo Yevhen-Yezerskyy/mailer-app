@@ -64,6 +64,8 @@ ONE_ONE_EIGHTY_WINDOW_MIN_SEC = 15 * 60
 ONE_ONE_EIGHTY_WINDOW_MAX_SEC = 25 * 60
 ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC = 86 * 60
 ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC = 100 * 60
+ONE_ONE_EIGHTY_QUARANTINE_MIN_SEC = 6 * 60 * 60
+ONE_ONE_EIGHTY_QUARANTINE_MAX_SEC = 60 * 60 * 60
 ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO = 0.50
 ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX = CRAWLER_ACTIVE_TUNNEL_CAP
 GS_ACTIVE_TUNNEL_MAX = CRAWLER_ACTIVE_TUNNEL_CAP
@@ -241,7 +243,7 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
             "aws_3_75_230_23",
             "direct",
         ),
-        slot_quarantine_sec=50 * 60 * 60,
+        slot_quarantine_sec=ONE_ONE_EIGHTY_QUARANTINE_MAX_SEC,
         sessions_per_egress=1,
         concurrent_pages_per_session=2,
         max_requests_per_session=500,
