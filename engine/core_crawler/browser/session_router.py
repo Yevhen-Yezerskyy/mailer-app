@@ -40,7 +40,7 @@ from engine.core_crawler.browser.session_config import (
 from engine.core_crawler.tunnels_11880 import list_tunnels, load_tunnel_statuses
 
 ROUTER_BOOT_ID = uuid4().hex
-SESSION_STATE_TTL_SEC = 15 * 60
+SESSION_STATE_TTL_SEC = 40 * 60
 SESSION_STATE_CLEAR_TTL_SEC = 1
 QUARANTINE_BACKOFF_TTL_SEC = 7 * 24 * 60 * 60
 WAIT_TIMEOUT_SEC = 30.0
@@ -911,6 +911,11 @@ class BrowserSessionRouter:
             return None
         if not state:
             return None
+        created_at = float(state.get("created_at") or 0.0)
+        max_session_age_sec = max(1.0, float(getattr(cfg, "max_session_age_sec", 40 * 60) or (40 * 60)))
+        if created_at > 0.0 and (time.time() - created_at) >= max_session_age_sec:
+            self._clear_cache_obj(session_key)
+            return None
         current_launch_id = str(slot_launch_id or "").strip()
         if current_launch_id and str(state.get("slot_launch_id") or "").strip() != current_launch_id:
             self._clear_cache_obj(session_key)
@@ -1161,7 +1166,8 @@ class BrowserSessionRouter:
             self._runtime_cv.notify_all()
 
         for cfg, runtime, clear_state in doomed:
-            self._clear_cache_obj(self._session_key(cfg.site, runtime.tunnel["name"], runtime.slot_idx))
+            if clear_state:
+                self._clear_cache_obj(self._session_key(cfg.site, runtime.tunnel["name"], runtime.slot_idx))
             self._close_session(runtime)
         for browser_runtime in doomed_browsers:
             self._close_browser_runtime(browser_runtime)
@@ -1543,7 +1549,6 @@ class BrowserSessionRouter:
                 if close_browser is not None and session.active_pages <= 0:
                     self._runtimes.pop(runtime_key, None)
                     should_close = True
-                    drop_session_state = True
                 self._runtime_cv.notify_all()
 
             if drop_session_state:
