@@ -305,6 +305,36 @@ def _load_cooldown_snapshot(site: str) -> dict[str, dict[str, str]]:
     return {name: payload for _, name, payload in rows}
 
 
+def _load_quarantine_history_snapshot(site: str) -> dict[str, dict[str, Any]]:
+    raw = _cache_get_obj(f"core_crawler:slot_quarantine_history:{str(site or '').strip()}") or {}
+    if not isinstance(raw, dict):
+        return {}
+    berlin_tz = ZoneInfo("Europe/Berlin")
+    out: dict[str, dict[str, Any]] = {}
+    for slot_name, values in raw.items():
+        name = str(slot_name or "").strip()
+        if not name or not isinstance(values, (list, tuple)):
+            continue
+        timestamps: list[float] = []
+        for value in values:
+            try:
+                timestamps.append(float(value or 0.0))
+            except Exception:
+                continue
+        timestamps = [ts for ts in timestamps if ts > 0.0]
+        if not timestamps:
+            continue
+        timestamps.sort()
+        out[name] = {
+            "count": len(timestamps),
+            "timestamps": [
+                datetime.fromtimestamp(ts, tz=berlin_tz).isoformat(timespec="seconds")
+                for ts in timestamps
+            ],
+        }
+    return dict(sorted(out.items(), key=lambda item: item[0]))
+
+
 def _snapshot_tunnels(status_map: dict[str, dict[str, Any]], configured_names: list[str]) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     for name in configured_names:
@@ -348,6 +378,9 @@ def _log_watchdog_snapshot(status_map: dict[str, dict[str, Any]], configured_nam
         "down": down_count,
         "cooldown": {
             "11880": _load_cooldown_snapshot("11880"),
+        },
+        "quarantine_history": {
+            "11880": _load_quarantine_history_snapshot("11880"),
         },
         "active": {
             "11880": _snapshot_active(list(route_plan.get("11880") or [])),
