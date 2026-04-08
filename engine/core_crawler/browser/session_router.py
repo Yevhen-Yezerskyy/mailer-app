@@ -182,6 +182,22 @@ class BrowserSessionRouter:
                 self._playwright = sync_playwright().start()
             return self._playwright
 
+    @staticmethod
+    def _compute_recycle_after_ts(min_sec: Any, max_sec: Any) -> float:
+        try:
+            min_value = float(min_sec or 0.0)
+        except Exception:
+            min_value = 0.0
+        try:
+            max_value = float(max_sec or 0.0)
+        except Exception:
+            max_value = 0.0
+        if min_value <= 0.0 or max_value <= 0.0:
+            return 0.0
+        if max_value < min_value:
+            min_value, max_value = max_value, min_value
+        return time.time() + random.uniform(min_value, max_value)
+
     def _begin_browser_launch(self) -> None:
         with self._runtime_cv:
             self._browser_launches_inflight += 1
@@ -1246,7 +1262,10 @@ class BrowserSessionRouter:
             warmed=bool((state or {}).get("warmed") is True),
             current_url=str((state or {}).get("current_url") or ""),
             active_pages=0,
-            recycle_after_ts=time.time() + random.uniform(float(cfg.runtime_recycle_min_sec), float(cfg.runtime_recycle_max_sec)),
+            recycle_after_ts=self._compute_recycle_after_ts(
+                cfg.runtime_recycle_min_sec,
+                cfg.runtime_recycle_max_sec,
+            ),
             next_dispatch_ts=float((state or {}).get("next_dispatch_ts") or 0.0),
         )
 
@@ -1282,7 +1301,10 @@ class BrowserSessionRouter:
             browser=browser,
             created_at=now,
             last_used_at=now,
-            recycle_after_ts=now + random.uniform(float(cfg.runtime_recycle_min_sec), float(cfg.runtime_recycle_max_sec)),
+            recycle_after_ts=self._compute_recycle_after_ts(
+                cfg.runtime_recycle_min_sec,
+                cfg.runtime_recycle_max_sec,
+            ),
         )
 
     def _checkout_browser_runtime(self, cfg: SiteSessionConfig, tunnel: dict[str, Any]) -> BrowserRuntime:
