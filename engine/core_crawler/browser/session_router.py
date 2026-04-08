@@ -1089,10 +1089,7 @@ class BrowserSessionRouter:
             self._runtime_cv.notify_all()
 
         for cfg, runtime, clear_state in doomed:
-            if clear_state:
-                self._clear_cache_obj(self._session_key(cfg.site, runtime.tunnel["name"], runtime.slot_idx))
-            else:
-                self._persist_session_state(cfg, runtime)
+            self._clear_cache_obj(self._session_key(cfg.site, runtime.tunnel["name"], runtime.slot_idx))
             self._close_session(runtime)
         for browser_runtime in doomed_browsers:
             self._close_browser_runtime(browser_runtime)
@@ -1406,6 +1403,7 @@ class BrowserSessionRouter:
         runtime_key = self._runtime_key(cfg.site, session.tunnel["name"], session.slot_idx)
         browser_key = self._browser_key(cfg.site, session.tunnel["name"])
         should_close = False
+        drop_session_state = bool(clear_state)
         close_browser: BrowserRuntime | None = None
         merged_state: dict[str, Any] | None = None
         slot_name = str(session.tunnel["name"])
@@ -1445,6 +1443,7 @@ class BrowserSessionRouter:
                 if session.active_pages <= 0 and (drop_runtime or clear_state or self._slot_is_quarantined(cfg, slot_name) or runtime_is_expired or self._runtime_expired(cfg, session)):
                     self._runtimes.pop(runtime_key, None)
                     should_close = True
+                    drop_session_state = True
                     if not any(self._browser_key(row.site, row.tunnel["name"]) == browser_key for row in self._runtimes.values()):
                         browser_runtime = self._browsers.get(browser_key)
                         if browser_runtime is not None:
@@ -1469,9 +1468,13 @@ class BrowserSessionRouter:
                     )
                 ):
                     close_browser = self._browsers.pop(browser_key, None)
+                if close_browser is not None and session.active_pages <= 0:
+                    self._runtimes.pop(runtime_key, None)
+                    should_close = True
+                    drop_session_state = True
                 self._runtime_cv.notify_all()
 
-            if clear_state:
+            if drop_session_state:
                 self._clear_cache_obj(self._session_key(cfg.site, slot_name, slot_idx))
             elif merged_state is not None:
                 self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), merged_state)
