@@ -50,10 +50,6 @@ ROUTE_STATE_LOCK_TTL_SEC = 3.0
 ROUTE_STATE_WAIT_SEC = 2.0
 ROUTE_PLAN_CACHE_SEC = 60.0
 BROKER_WORKERS = 10
-ONE_ONE_EIGHTY_FIRST_ACTIVATION_SPAN_MIN_SEC = 14 * 60 * 60
-ONE_ONE_EIGHTY_FIRST_ACTIVATION_SPAN_MAX_SEC = 16 * 60 * 60
-ONE_ONE_EIGHTY_LONG_COOLDOWN_MIN_SEC = 4 * 60 * 60
-ONE_ONE_EIGHTY_LONG_COOLDOWN_MAX_SEC = 16 * 60 * 60
 
 
 def _broker_worker_parallelism() -> int:
@@ -310,8 +306,6 @@ def _load_window_state(site: str, active_names: list[str]) -> dict[str, dict[str
         try:
             active_until = float(row.get("active_until") or 0.0)
             cool_until = float(row.get("cool_until") or 0.0)
-            first_activated_at = float(row.get("first_activated_at") or 0.0)
-            first_activation_span_sec = float(row.get("first_activation_span_sec") or 0.0)
         except Exception:
             continue
         if active_until <= now:
@@ -321,8 +315,6 @@ def _load_window_state(site: str, active_names: list[str]) -> dict[str, dict[str
         out[name] = {
             "active_until": active_until,
             "cool_until": cool_until,
-            "first_activated_at": first_activated_at,
-            "first_activation_span_sec": first_activation_span_sec,
         }
     return out
 
@@ -387,39 +379,12 @@ def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
                     if len(active_names) >= target_count:
                         break
                     advanced += 1
-                    row = dict(state.get(name) or {})
-                    first_activated_at = float(row.get("first_activated_at") or 0.0)
-                    first_activation_span_sec = float(row.get("first_activation_span_sec") or 0.0)
-                    if first_activation_span_sec <= 0.0:
-                        first_activation_span_sec = random.uniform(
-                            ONE_ONE_EIGHTY_FIRST_ACTIVATION_SPAN_MIN_SEC,
-                            ONE_ONE_EIGHTY_FIRST_ACTIVATION_SPAN_MAX_SEC,
-                        )
-                    if first_activated_at > 0.0 and (now - first_activated_at) > first_activation_span_sec:
-                        state[name] = {
-                            "active_until": 0.0,
-                            "cool_until": now + random.uniform(
-                                ONE_ONE_EIGHTY_LONG_COOLDOWN_MIN_SEC,
-                                ONE_ONE_EIGHTY_LONG_COOLDOWN_MAX_SEC,
-                            ),
-                            "first_activated_at": 0.0,
-                            "first_activation_span_sec": 0.0,
-                        }
-                        continue
-                    if first_activated_at <= 0.0:
-                        first_activated_at = now
-                        first_activation_span_sec = random.uniform(
-                            ONE_ONE_EIGHTY_FIRST_ACTIVATION_SPAN_MIN_SEC,
-                            ONE_ONE_EIGHTY_FIRST_ACTIVATION_SPAN_MAX_SEC,
-                        )
                     state[name] = {
                         "active_until": now + random.uniform(ONE_ONE_EIGHTY_WINDOW_MIN_SEC, ONE_ONE_EIGHTY_WINDOW_MAX_SEC),
                         "cool_until": now + random.uniform(
                             ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC,
                             ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC,
                         ),
-                        "first_activated_at": first_activated_at,
-                        "first_activation_span_sec": first_activation_span_sec,
                     }
                     active_names.append(name)
                 _cache_set_obj(_rr_key(site), {"pos": rr_pos + max(1, advanced)})
