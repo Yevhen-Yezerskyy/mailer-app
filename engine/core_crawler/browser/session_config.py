@@ -77,6 +77,8 @@ def _chrome_windows(
     name: str,
     major_version: str,
     full_version: str,
+    accept_language: str,
+    languages: tuple[str, ...],
     width: int,
     height: int,
     concurrency: int,
@@ -98,13 +100,13 @@ def _chrome_windows(
     return BrowserProfile(
         name=name,
         user_agent=ua,
-        accept_language="de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
+        accept_language=accept_language,
         locale="de-DE",
         timezone_id="Europe/Berlin",
         platform="Windows",
         navigator_platform="Win32",
         navigator_vendor="Google Inc.",
-        languages=("de-DE", "de", "en-US", "en"),
+        languages=languages,
         hardware_concurrency=concurrency,
         device_memory=memory,
         device_scale_factor=scale_factor,
@@ -161,6 +163,15 @@ WINDOWS_DESKTOP_SHAPES = (
     ("f", 1280, 720, 4, 4, 1.0, 0, 40, 14, 84, "4g", 7.8, 70),
 )
 
+WINDOWS_LANGUAGE_VARIANTS = (
+    ("de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7", ("de-DE", "de", "en-US", "en")),
+    ("de-DE,de;q=0.9,en-GB;q=0.8,en;q=0.7", ("de-DE", "de", "en-GB", "en")),
+    ("de-DE,de;q=0.9,en;q=0.8", ("de-DE", "de", "en")),
+    ("de-DE,de;q=0.9", ("de-DE", "de")),
+    ("de-DE,de;q=0.8,en-US;q=0.6,en;q=0.5", ("de-DE", "de", "en-US", "en")),
+    ("de-DE,de;q=0.9,en-US;q=0.7,en;q=0.6", ("de-DE", "de", "en-US", "en")),
+)
+
 
 BROWSER_PROFILES = (
     tuple(
@@ -168,6 +179,8 @@ BROWSER_PROFILES = (
             f"win_chrome_{major_version}_{suffix}",
             major_version,
             full_version,
+            accept_language,
+            languages,
             width,
             height,
             concurrency,
@@ -183,6 +196,8 @@ BROWSER_PROFILES = (
         )
         for major_version, full_version in CHROME_FULL_VERSIONS
         for (
+            (accept_language, languages),
+            (
             suffix,
             width,
             height,
@@ -196,7 +211,8 @@ BROWSER_PROFILES = (
             connection_effective_type,
             connection_downlink,
             connection_rtt,
-        ) in WINDOWS_DESKTOP_SHAPES
+            ),
+        ) in zip(WINDOWS_LANGUAGE_VARIANTS, WINDOWS_DESKTOP_SHAPES, strict=True)
     )
 )
 

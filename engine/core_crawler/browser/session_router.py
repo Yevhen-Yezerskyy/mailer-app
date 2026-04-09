@@ -1657,6 +1657,7 @@ class BrowserSessionRouter:
         if isinstance(session.storage_state, dict) and session.storage_state:
             context_kwargs["storage_state"] = session.storage_state
         context = browser_runtime.browser.new_context(**context_kwargs)
+        context.set_extra_http_headers({"Accept-Language": session.profile.accept_language})
         context.add_init_script(self._profile_script(session.profile))
         route_state = self._install_page_resource_filter(context, cfg)
         page = context.new_page()
@@ -1665,7 +1666,6 @@ class BrowserSessionRouter:
             "Network.setUserAgentOverride",
             {
                 "userAgent": session.profile.user_agent,
-                "acceptLanguage": session.profile.accept_language,
                 "platform": session.profile.platform,
                 "userAgentMetadata": session.profile.user_agent_metadata,
             },
