@@ -58,11 +58,13 @@ QUARANTINE_STEP_LADDER_SEC = (
     24 * 60 * 60,
     48 * 60 * 60,
 )
-ONE_ONE_EIGHTY_QUARANTINE_WINDOW_SEC = 48 * 60 * 60
+ONE_ONE_EIGHTY_QUARANTINE_WINDOW_SEC = 96 * 60 * 60
 ONE_ONE_EIGHTY_QUARANTINE_LEVEL_RANGES_SEC = (
     (5 * 60 * 60, 8 * 60 * 60),
     (12 * 60 * 60, 15 * 60 * 60),
-    (72 * 60 * 60, 78 * 60 * 60),
+    (16 * 60 * 60, 20 * 60 * 60),
+    (24 * 60 * 60, 28 * 60 * 60),
+    (72 * 60 * 60, 72 * 60 * 60),
 )
 
 
@@ -640,7 +642,7 @@ class BrowserSessionRouter:
         current.append(now)
         history[str(slot_name)] = current
         event_count = len(current)
-        level = 0 if event_count <= 1 else 1 if event_count == 2 else 2
+        level = min(max(0, event_count - 1), len(ONE_ONE_EIGHTY_QUARANTINE_LEVEL_RANGES_SEC) - 1)
         min_sec, max_sec = ONE_ONE_EIGHTY_QUARANTINE_LEVEL_RANGES_SEC[level]
         duration_sec = int(random.uniform(float(min_sec), float(max_sec)))
         self._cache_set_obj(
