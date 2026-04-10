@@ -57,7 +57,7 @@ class SiteSessionConfig:
 
 LOG_FOLDER = "crawler"
 BROKER_QUEUE_MAX = 256
-CRAWLER_ACTIVE_TUNNEL_CAP = 2
+CRAWLER_ACTIVE_TUNNEL_CAP = 1
 CRAWLER_SLOT_HOLD_MIN_SEC = 15 * 60
 CRAWLER_SLOT_HOLD_MAX_SEC = 25 * 60
 ONE_ONE_EIGHTY_WINDOW_MIN_SEC = 15 * 60
@@ -257,6 +257,7 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
             "aws_18_193_115_228",
             "aws_3_67_184_15",
             "aws_3_75_230_23",
+            "aws_18_199_122_185",
             "direct",
         ),
         slot_quarantine_sec=ONE_ONE_EIGHTY_QUARANTINE_MAX_SEC,
@@ -308,6 +309,7 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
             "aws_18_193_115_228",
             "aws_3_67_184_15",
             "aws_3_75_230_23",
+            "aws_18_199_122_185",
             "direct",
         ),
         slot_quarantine_sec=1 * 60 * 60,
