@@ -266,8 +266,6 @@ def _slot_is_live(slot_name: str, statuses: dict[str, dict[str, Any]]) -> bool:
     name = str(slot_name or "").strip()
     if not name:
         return False
-    if name == "direct":
-        return True
     return bool((statuses.get(name) or {}).get("alive"))
 
 
@@ -343,6 +341,20 @@ def _cooldown_window_names(site: str, available: list[str]) -> set[str]:
     return out
 
 
+def _cooldown_window_remaining(site: str, available: list[str]) -> dict[str, float]:
+    now = time.time()
+    state = _load_window_state(site, available)
+    out: dict[str, float] = {}
+    for name in available:
+        row = state.get(name) or {}
+        active_until = float(row.get("active_until") or 0.0)
+        cool_until = float(row.get("cool_until") or 0.0)
+        if active_until > now or cool_until <= now:
+            continue
+        out[name] = max(0.0, cool_until - now)
+    return out
+
+
 def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
     if not available:
         return []
@@ -401,6 +413,7 @@ def _activate_fixed_slots(
     *,
     preferred_names: set[str] | None = None,
     priority_groups: list[set[str]] | None = None,
+    priority_rank: dict[str, float] | None = None,
 ) -> list[str]:
     if target_count <= 0 or not available:
         return []
@@ -412,6 +425,11 @@ def _activate_fixed_slots(
         for group in list(priority_groups or [])
         if group
     ]
+    rank_map = {
+        str(name): float(value)
+        for name, value in dict(priority_rank or {}).items()
+        if str(name or "").strip()
+    }
 
     def _select_slots(available_names: list[str], rr_pos: int) -> list[str]:
         if groups:
@@ -421,9 +439,13 @@ def _activate_fixed_slots(
                 group_names = [name for name in available_names if name in group and name not in claimed]
                 if not group_names:
                     continue
-                start_idx = rr_pos % len(group_names)
-                rotated = list(group_names[start_idx:] + group_names[:start_idx])
-                selected.extend(rotated[: target_count - len(selected)])
+                ordered = list(
+                    sorted(
+                        group_names,
+                        key=lambda name: (-float(rank_map.get(name, 0.0)), available_names.index(name)),
+                    )
+                )
+                selected.extend(ordered[: target_count - len(selected)])
                 claimed.update(selected)
                 if len(selected) >= target_count:
                     return selected[:target_count]
@@ -503,7 +525,7 @@ def _compute_site_route_plan() -> dict[str, list[str]]:
     if not all_names:
         return {site: [] for site in ROUTE_SITES}
     statuses = load_tunnel_statuses(all_names)
-    missing_statuses = [name for name in all_names if name != "direct" and name not in statuses]
+    missing_statuses = [name for name in all_names if name not in statuses]
     if missing_statuses:
         statuses = refresh_tunnel_statuses(all_names)
     cfg_11880 = SITE_CONFIGS.get("11880")
@@ -524,14 +546,21 @@ def _compute_site_route_plan() -> dict[str, list[str]]:
     cooldown_11880 = {
         name
         for name in _cooldown_window_names("11880", slots_11880)
-        if name in available_gs and name != "direct"
+        if name in available_gs
     }
-    gs_quarantine_11880 = {name for name in available_gs if name in quarantine_11880 and name != "direct"}
+    now = time.time()
+    cooldown_11880_remaining = _cooldown_window_remaining("11880", slots_11880)
+    gs_priority_rank = {
+        **{name: max(0.0, float(until) - now) for name, until in quarantine_11880.items() if name in available_gs},
+        **{name: float(cooldown_11880_remaining.get(name, 0.0)) for name in cooldown_11880},
+    }
+    gs_quarantine_11880 = {name for name in available_gs if name in quarantine_11880}
     active_gs = _activate_fixed_slots(
         "gs",
         available_gs,
         gs_target,
         priority_groups=[gs_quarantine_11880, cooldown_11880],
+        priority_rank=gs_priority_rank,
     )
 
     return {
@@ -634,14 +663,11 @@ class _BrokerDispatcher:
         cfg = SITE_CONFIGS.get(site)
         if cfg is None or not allowed_slot_names:
             return "", 0
-        total_slots = max(1, len(allowed_slot_names) * int(cfg.sessions_per_egress))
         with self._rr_mu:
             pos = int(self._site_rr.get(site, 0))
             self._site_rr[site] = pos + 1
-        logical_idx = pos % total_slots
-        egress_idx = logical_idx // int(cfg.sessions_per_egress)
-        slot_idx = logical_idx % int(cfg.sessions_per_egress)
-        return str(allowed_slot_names[egress_idx]), int(slot_idx)
+        slot_name = str(allowed_slot_names[pos % len(allowed_slot_names)])
+        return slot_name, 0
 
     def submit(self, payload: dict[str, Any]) -> dict[str, Any]:
         request_id = uuid4().hex

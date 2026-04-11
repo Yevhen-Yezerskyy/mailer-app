@@ -1,6 +1,6 @@
 # FILE: engine/core_crawler/browser/session_router.py
 # DATE: 2026-03-27
-# PURPOSE: Shared browser fetch router with Redis-backed slot/session state and concurrent pages per logical session.
+# PURPOSE: Shared browser fetch router with in-process slot/session state and concurrent pages per logical session.
 
 from __future__ import annotations
 
@@ -22,6 +22,11 @@ from playwright.sync_api import sync_playwright
 
 from engine.common.cache.client import CLIENT
 from engine.common.logs import log
+from engine.core_crawler.browser.browser_signature import (
+    build_browser_context_kwargs,
+    build_browser_extra_http_headers,
+    build_browser_ua_override,
+)
 from engine.core_crawler.browser.http_fetch import (
     SkippedFetchError,
     build_http_session,
@@ -40,14 +45,11 @@ from engine.core_crawler.browser.session_config import (
 from engine.core_crawler.tunnels_11880 import list_tunnels, load_tunnel_statuses
 
 ROUTER_BOOT_ID = uuid4().hex
-SESSION_STATE_TTL_SEC = 40 * 60
-SESSION_STATE_CLEAR_TTL_SEC = 1
 QUARANTINE_BACKOFF_TTL_SEC = 7 * 24 * 60 * 60
 WAIT_TIMEOUT_SEC = 30.0
 RUNTIME_IDLE_REAP_SEC = 90.0
 SESSION_GATE_TTL_SEC = 5.0
 SESSION_GATE_WAIT_SEC = 5.0
-SESSION_LEASE_TTL_SEC = 5 * 60.0
 HTTP_CHROMIUM_LOG_FILE = "http_chromium.log"
 HTTP_LIGHT_LOG_FILE = "http_light.log"
 ROUTER_STATE_LOG_FILE = "router_state.log"
@@ -58,6 +60,7 @@ QUARANTINE_STEP_LADDER_SEC = (
     24 * 60 * 60,
     48 * 60 * 60,
 )
+SLOT_PROFILE_TTL_SEC = 7 * 24 * 60 * 60
 ONE_ONE_EIGHTY_QUARANTINE_WINDOW_SEC = 96 * 60 * 60
 ONE_ONE_EIGHTY_QUARANTINE_LEVEL_RANGES_SEC = (
     (5 * 60 * 60, 8 * 60 * 60),
@@ -99,7 +102,7 @@ class BrowserSession:
     warmed: bool = False
     current_url: str = ""
     active_pages: int = 0
-    recycle_after_ts: float = 0.0
+    warming: bool = False
     next_dispatch_ts: float = 0.0
     http_mu: Any = field(default_factory=threading.Lock)
 
@@ -112,7 +115,6 @@ class BrowserRuntime:
     browser: Any
     created_at: float
     last_used_at: float
-    recycle_after_ts: float = 0.0
 
 
 @dataclass
@@ -149,12 +151,6 @@ class BrowserSessionRouter:
             self._browsers = {}
             self._runtime_cv.notify_all()
         for runtime in runtimes:
-            try:
-                cfg = SITE_CONFIGS[runtime.site]
-                if not self._slot_is_quarantined(cfg, runtime.tunnel["name"]):
-                    self._persist_session_state(cfg, runtime)
-            except Exception:
-                pass
             self._close_session(runtime)
         for browser_runtime in browsers:
             self._close_browser_runtime(browser_runtime)
@@ -185,20 +181,8 @@ class BrowserSessionRouter:
             return self._playwright
 
     @staticmethod
-    def _compute_recycle_after_ts(min_sec: Any, max_sec: Any) -> float:
-        try:
-            min_value = float(min_sec or 0.0)
-        except Exception:
-            min_value = 0.0
-        try:
-            max_value = float(max_sec or 0.0)
-        except Exception:
-            max_value = 0.0
-        if min_value <= 0.0 or max_value <= 0.0:
-            return 0.0
-        if max_value < min_value:
-            min_value, max_value = max_value, min_value
-        return time.time() + random.uniform(min_value, max_value)
+    def _abort_session_process(reason: str) -> None:
+        raise SystemExit(str(reason or "SESSION RESTART REQUIRED"))
 
     def _begin_browser_launch(self) -> None:
         with self._runtime_cv:
@@ -337,7 +321,7 @@ class BrowserSessionRouter:
 
     @staticmethod
     def _cache_get_obj(key: str) -> Any:
-        payload = CLIENT.get(key, ttl_sec=SESSION_STATE_TTL_SEC)
+        payload = CLIENT.get(key, ttl_sec=40 * 60)
         if not payload:
             return None
         try:
@@ -346,7 +330,7 @@ class BrowserSessionRouter:
             raise RuntimeError(f"BAD CACHE PAYLOAD {key}: {type(exc).__name__}: {exc}") from exc
 
     @staticmethod
-    def _cache_set_obj(key: str, value: Any, ttl_sec: int = SESSION_STATE_TTL_SEC) -> None:
+    def _cache_set_obj(key: str, value: Any, ttl_sec: int = 40 * 60) -> None:
         try:
             payload = pickle.dumps(value, protocol=pickle.HIGHEST_PROTOCOL)
         except Exception as exc:
@@ -355,7 +339,7 @@ class BrowserSessionRouter:
 
     @classmethod
     def _clear_cache_obj(cls, key: str) -> None:
-        cls._cache_set_obj(key, {}, ttl_sec=SESSION_STATE_CLEAR_TTL_SEC)
+        cls._cache_set_obj(key, {}, ttl_sec=1)
 
     @staticmethod
     def _quarantine_ttl_sec(state: dict[str, float]) -> int:
@@ -429,22 +413,6 @@ class BrowserSessionRouter:
         return f"core_crawler:slot_quarantine_history:{site_name}"
 
     @staticmethod
-    def _session_key(site: str, slot_name: str, slot_idx: int) -> str:
-        site_name = str(site or "").strip()
-        tunnel_name = str(slot_name or "").strip()
-        if not site_name or not tunnel_name:
-            raise ValueError("session key requires site and slot_name")
-        return f"core_crawler:browser_session:{site_name}:{tunnel_name}:{int(slot_idx)}"
-
-    @staticmethod
-    def _session_gate_key(site: str, slot_name: str, slot_idx: int) -> str:
-        site_name = str(site or "").strip()
-        tunnel_name = str(slot_name or "").strip()
-        if not site_name or not tunnel_name:
-            raise ValueError("session gate key requires site and slot_name")
-        return f"core_crawler:browser_session_gate:{site_name}:{tunnel_name}:{int(slot_idx)}"
-
-    @staticmethod
     def _dispatch_gate_key(site: str, slot_name: str, slot_idx: int) -> str:
         site_name = str(site or "").strip()
         tunnel_name = str(slot_name or "").strip()
@@ -461,20 +429,12 @@ class BrowserSessionRouter:
         return f"core_crawler:browser_dispatch_state:{site_name}:{tunnel_name}:{int(slot_idx)}"
 
     @staticmethod
-    def _session_warm_key(site: str, slot_name: str, slot_idx: int) -> str:
+    def _slot_profile_key(site: str, slot_name: str) -> str:
         site_name = str(site or "").strip()
         tunnel_name = str(slot_name or "").strip()
         if not site_name or not tunnel_name:
-            raise ValueError("session warm key requires site and slot_name")
-        return f"core_crawler:browser_session_warm:{site_name}:{tunnel_name}:{int(slot_idx)}"
-
-    @staticmethod
-    def _session_page_key(site: str, slot_name: str, slot_idx: int, page_idx: int) -> str:
-        site_name = str(site or "").strip()
-        tunnel_name = str(slot_name or "").strip()
-        if not site_name or not tunnel_name:
-            raise ValueError("session page key requires site and slot_name")
-        return f"core_crawler:browser_session_page:{site_name}:{tunnel_name}:{int(slot_idx)}:{int(page_idx)}"
+            raise ValueError("slot profile key requires site and slot_name")
+        return f"core_crawler:browser_slot_profile:{site_name}:{tunnel_name}"
 
     @staticmethod
     def _slot_launch_id(slot: dict[str, Any] | None) -> str:
@@ -529,17 +489,6 @@ class BrowserSessionRouter:
         for name in slot_names:
             if name in quarantined:
                 slot_errors.append(f"{name}: quarantined")
-                continue
-            if name == "direct":
-                resolved.append(
-                    {
-                        "name": "direct",
-                        "host": "direct",
-                        "local_port": 0,
-                        "proxy_server": "",
-                        "launch_id": "direct",
-                    }
-                )
                 continue
             row = by_name.get(name)
             if not row:
@@ -719,7 +668,7 @@ class BrowserSessionRouter:
             backoff,
             ttl_sec=self._quarantine_backoff_ttl_sec(backoff, max(60.0, float(quarantine_max_sec))),
         )
-        self._drop_egress_session_state(cfg, slot_name, clear_state=True)
+        self._drop_egress_session_state(cfg, slot_name)
         log(
             ROUTER_STATE_LOG_FILE,
             folder=LOG_FOLDER,
@@ -908,38 +857,35 @@ class BrowserSessionRouter:
 }})();
 """
 
-    def _pick_profile(self, site: str) -> BrowserProfile:
+    def _pick_profile(self, site: str, slot_name: str = "") -> BrowserProfile:
         site_name = str(site or "").strip()
         if not site_name:
             raise RuntimeError("profile selection requires site")
         if not BROWSER_PROFILES:
             raise RuntimeError("NO BROWSER PROFILES CONFIGURED")
-        return random.choice(BROWSER_PROFILES)
-
-    def _load_session_state(
-        self,
-        cfg: SiteSessionConfig,
-        slot_name: str,
-        slot_idx: int,
-        slot_launch_id: str = "",
-    ) -> dict[str, Any] | None:
-        session_key = self._session_key(cfg.site, slot_name, slot_idx)
-        state = self._cache_get_obj(session_key)
-        if not isinstance(state, dict):
-            return None
-        if not state:
-            return None
-        created_at = float(state.get("created_at") or 0.0)
-        max_session_age_sec = max(1.0, float(getattr(cfg, "max_session_age_sec", 40 * 60) or (40 * 60)))
-        if created_at > 0.0 and (time.time() - created_at) >= max_session_age_sec:
-            self._clear_cache_obj(session_key)
-            return None
-        current_launch_id = str(slot_launch_id or "").strip()
-        if current_launch_id and str(state.get("slot_launch_id") or "").strip() != current_launch_id:
-            self._clear_cache_obj(session_key)
-            return None
-        self._cache_set_obj(session_key, state, ttl_sec=SESSION_STATE_TTL_SEC)
-        return state
+        pinned_slot_name = str(slot_name or "").strip()
+        if not pinned_slot_name:
+            return random.choice(BROWSER_PROFILES)
+        pinned_key = self._slot_profile_key(site_name, pinned_slot_name)
+        raw_state = self._cache_get_obj(pinned_key)
+        if isinstance(raw_state, dict):
+            pinned_name = str(raw_state.get("profile_name") or "").strip()
+            if pinned_name:
+                for candidate in BROWSER_PROFILES:
+                    if candidate.name == pinned_name:
+                        return candidate
+        profile = random.choice(BROWSER_PROFILES)
+        self._cache_set_obj(
+            pinned_key,
+            {
+                "site": site_name,
+                "slot_name": pinned_slot_name,
+                "profile_name": str(profile.name),
+                "assigned_at": float(time.time()),
+            },
+            ttl_sec=SLOT_PROFILE_TTL_SEC,
+        )
+        return profile
 
     def _wait_for_dispatch_slot(self, cfg: SiteSessionConfig, session: BrowserSession) -> None:
         slot_name = str(session.tunnel.get("name") or "").strip()
@@ -973,83 +919,8 @@ class BrowserSessionRouter:
         finally:
             self._release_lock(gate_key, gate_token)
 
-    def _new_session_state(
-        self,
-        cfg: SiteSessionConfig,
-        slot_idx: int,
-        slot_launch_id: str = "",
-        previous_state: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        now = time.time()
-        previous = dict(previous_state or {}) if isinstance(previous_state, dict) else {}
-        profile_name = str(previous.get("profile_name") or "").strip()
-        profile = None
-        if profile_name:
-            for candidate in BROWSER_PROFILES:
-                if candidate.name == profile_name:
-                    profile = candidate
-                    break
-        if profile is None:
-            profile = self._pick_profile(cfg.site)
-        return {
-            "session_id": uuid4().hex[:12],
-            "profile_name": profile.name,
-            "slot_idx": int(slot_idx),
-            "created_at": now,
-            "last_used_at": now,
-            "requests_total": 0,
-            "warmed": False,
-            "current_url": "",
-            "next_dispatch_ts": 0.0,
-            "storage_state": {},
-            "slot_launch_id": str(slot_launch_id or ""),
-        }
-
-    def _apply_state_to_runtime(self, session: BrowserSession, state: dict[str, Any]) -> None:
-        if not isinstance(state, dict):
-            return
-        storage_state = dict(state.get("storage_state") or {})
-        should_sync_http = storage_state != dict(session.storage_state or {})
-        session.created_at = float(state.get("created_at") or session.created_at or time.time())
-        session.last_used_at = float(state.get("last_used_at") or session.last_used_at or time.time())
-        session.requests_total = int(state.get("requests_total") or 0)
-        session.warmed = bool(state.get("warmed") is True)
-        session.current_url = str(state.get("current_url") or "")
-        session.next_dispatch_ts = float(state.get("next_dispatch_ts") or 0.0)
-        session.storage_state = storage_state
-        if should_sync_http:
-            self._sync_http_session(session)
-
-    def _merge_session_state(
-        self,
-        session: BrowserSession,
-        current_state: dict[str, Any] | None,
-        requests_delta: int,
-    ) -> dict[str, Any]:
-        merged = dict(current_state or {})
-        merged["session_id"] = str(session.session_id)
-        merged["profile_name"] = str(session.profile.name)
-        merged["slot_idx"] = int(session.slot_idx)
-        merged["created_at"] = float(merged.get("created_at") or session.created_at or time.time())
-        merged["last_used_at"] = max(
-            float(merged.get("last_used_at") or 0.0),
-            float(session.last_used_at or 0.0),
-            time.time(),
-        )
-        merged["requests_total"] = int(merged.get("requests_total") or 0) + max(0, int(requests_delta))
-        merged["warmed"] = bool(bool(merged.get("warmed") is True) or session.warmed)
-        merged["current_url"] = str(session.current_url or merged.get("current_url") or "")
-        merged["next_dispatch_ts"] = 0.0
-        merged["slot_launch_id"] = self._slot_launch_id(session.tunnel)
-        exported_state = export_storage_state(session.http_session, session.storage_state)
-        merged["storage_state"] = exported_state if exported_state else dict(merged.get("storage_state") or {})
-        return merged
-
     def reset_slot_session(self, site: str, slot_name: str, slot_idx: int = 0) -> None:
-        cfg = SITE_CONFIGS.get(str(site or "").strip())
-        if cfg is None:
-            return
-        self._drop_egress_session_state(cfg, str(slot_name or "").strip(), clear_state=True)
+        return
 
     def _checkout_session_lease(
         self,
@@ -1058,71 +929,11 @@ class BrowserSessionRouter:
         slot_idx: int,
     ) -> SessionLease | None:
         slot_name = str(slot["name"])
-        gate_key = self._session_gate_key(cfg.site, slot_name, slot_idx)
-        owner = f"{cfg.site}:{slot_name}:{int(slot_idx)}:{uuid4().hex}"
-        gate_token = self._try_lock(gate_key, SESSION_GATE_TTL_SEC, owner)
-        if not gate_token:
-            return None
-        try:
-            session_key = self._session_key(cfg.site, slot_name, slot_idx)
-            raw_state = self._cache_get_obj(session_key)
-            current_launch_id = self._slot_launch_id(slot)
-            state = self._load_session_state(cfg, slot_name, slot_idx, current_launch_id)
-            if state is None:
-                state = self._new_session_state(
-                    cfg,
-                    slot_idx,
-                    slot_launch_id=current_launch_id,
-                    previous_state=raw_state if isinstance(raw_state, dict) else None,
-                )
-            needs_warm = not bool(state.get("warmed") is True)
-            warm_lock_key = ""
-            warm_lock_token = ""
-            if needs_warm:
-                warm_lock_key = self._session_warm_key(cfg.site, slot_name, slot_idx)
-                warm_lock_token = self._try_lock(warm_lock_key, SESSION_LEASE_TTL_SEC, owner)
-                if not warm_lock_token:
-                    return None
-            page_lock_key = ""
-            page_lock_token = ""
-            for current_page_idx in range(int(cfg.concurrent_pages_per_session)):
-                candidate_key = self._session_page_key(cfg.site, slot_name, slot_idx, current_page_idx)
-                candidate_token = self._try_lock(candidate_key, SESSION_LEASE_TTL_SEC, owner)
-                if not candidate_token:
-                    continue
-                page_lock_key = candidate_key
-                page_lock_token = candidate_token
-                break
-            if not page_lock_token:
-                self._release_lock(warm_lock_key, warm_lock_token)
-                return None
-            state = dict(state)
-            state["slot_idx"] = int(slot_idx)
-            state["last_used_at"] = max(float(state.get("last_used_at") or 0.0), time.time())
-            state["next_dispatch_ts"] = 0.0
-            self._cache_set_obj(session_key, state)
-            return SessionLease(
-                session_key=session_key,
-                slot_name=slot_name,
-                slot_idx=int(slot_idx),
-                session_id=str(state.get("session_id") or ""),
-                state=state,
-                needs_warm=needs_warm,
-                base_requests_total=int(state.get("requests_total") or 0),
-                page_lock_key=page_lock_key,
-                page_lock_token=page_lock_token,
-                warm_lock_key=warm_lock_key,
-                warm_lock_token=warm_lock_token,
-            )
-        finally:
-            self._release_lock(gate_key, gate_token)
+        return None
 
-    def _drop_egress_session_state(self, cfg: SiteSessionConfig, slot_name: str, *, clear_state: bool = True) -> None:
+    def _drop_egress_session_state(self, cfg: SiteSessionConfig, slot_name: str) -> None:
         doomed: list[BrowserSession] = []
         doomed_browser: BrowserRuntime | None = None
-        for slot_idx in range(cfg.sessions_per_egress):
-            if clear_state:
-                self._clear_cache_obj(self._session_key(cfg.site, slot_name, slot_idx))
         with self._runtime_cv:
             for runtime_key, runtime in list(self._runtimes.items()):
                 if runtime.site != cfg.site or str(runtime.tunnel.get("name") or "") != str(slot_name):
@@ -1139,24 +950,13 @@ class BrowserSessionRouter:
                 doomed_browser = self._browsers.pop(browser_key, None)
             self._runtime_cv.notify_all()
         for runtime in doomed:
-            if not clear_state:
-                try:
-                    self._persist_session_state(cfg, runtime)
-                except Exception:
-                    pass
             self._close_session(runtime)
         if doomed_browser is not None:
             self._close_browser_runtime(doomed_browser)
             self._maybe_stop_playwright()
 
-    @staticmethod
-    def _runtime_expired(cfg: SiteSessionConfig, runtime: BrowserSession) -> bool:
-        now = time.time()
-        recycle_after_ts = float(runtime.recycle_after_ts or 0.0)
-        return bool(recycle_after_ts and now >= recycle_after_ts)
-
     def reap_idle_runtimes(self) -> None:
-        doomed: list[tuple[SiteSessionConfig, BrowserSession, bool]] = []
+        doomed: list[tuple[SiteSessionConfig, BrowserSession]] = []
         doomed_browsers: list[BrowserRuntime] = []
         now = time.time()
         with self._runtime_cv:
@@ -1165,27 +965,20 @@ class BrowserSessionRouter:
                     continue
                 cfg = SITE_CONFIGS[runtime.site]
                 drop_runtime = self._slot_is_quarantined(cfg, runtime.tunnel["name"])
-                clear_state = False
                 if not drop_runtime:
-                    clear_state = self._runtime_expired(cfg, runtime)
-                if not drop_runtime and not clear_state and (now - float(runtime.last_used_at or 0.0)) < RUNTIME_IDLE_REAP_SEC:
                     continue
                 self._runtimes.pop(runtime_key, None)
-                doomed.append((cfg, runtime, clear_state))
+                doomed.append((cfg, runtime))
             for browser_key, browser_runtime in list(self._browsers.items()):
                 if any(self._browser_key(row.site, row.tunnel["name"]) == browser_key for row in self._runtimes.values()):
                     continue
-                recycle_after_ts = float(browser_runtime.recycle_after_ts or 0.0)
-                browser_expired = bool(recycle_after_ts and now >= recycle_after_ts)
-                if (now - float(browser_runtime.last_used_at or 0.0)) < RUNTIME_IDLE_REAP_SEC and not browser_expired:
+                if (now - float(browser_runtime.last_used_at or 0.0)) < RUNTIME_IDLE_REAP_SEC:
                     continue
                 self._browsers.pop(browser_key, None)
                 doomed_browsers.append(browser_runtime)
             self._runtime_cv.notify_all()
 
-        for cfg, runtime, clear_state in doomed:
-            if clear_state:
-                self._clear_cache_obj(self._session_key(cfg.site, runtime.tunnel["name"], runtime.slot_idx))
+        for cfg, runtime in doomed:
             self._close_session(runtime)
         for browser_runtime in doomed_browsers:
             self._close_browser_runtime(browser_runtime)
@@ -1207,28 +1000,140 @@ class BrowserSessionRouter:
         weighted: list[tuple[int, int, int, float, dict[str, Any], int, dict[str, Any] | None]] = []
         with self._runtime_cv:
             for slot in active:
-                for slot_idx in range(cfg.sessions_per_egress):
-                    key = (slot["name"], slot_idx)
-                    if key in excluded:
-                        continue
-                    preferred_rank = 0 if (str(slot["name"]) == str(preferred_slot_name) and int(slot_idx) == int(preferred_slot_idx)) else 1
-                    runtime = self._runtimes.get(self._runtime_key(cfg.site, slot["name"], slot_idx))
-                    state = self._load_session_state(cfg, slot["name"], slot_idx, self._slot_launch_id(slot))
-                    if runtime is not None and not self._runtime_matches_slot(runtime, slot):
-                        runtime = None
-                    if runtime is not None and self._runtime_expired(cfg, runtime):
-                        runtime = None
-                    has_local_runtime = 0 if runtime is not None else 1
-                    local_uses = int((runtime.active_pages if runtime is not None else 0) or 0)
-                    last_used_at = float(
-                        (state or {}).get("last_used_at")
-                        or (runtime.last_used_at if runtime is not None else 0.0)
-                        or 0.0
-                    )
-                    weighted.append((preferred_rank, has_local_runtime, local_uses, last_used_at, slot, slot_idx))
+                slot_idx = 0
+                key = (slot["name"], slot_idx)
+                if key in excluded:
+                    continue
+                preferred_rank = 0 if (str(slot["name"]) == str(preferred_slot_name) and int(slot_idx) == int(preferred_slot_idx)) else 1
+                runtime = self._runtimes.get(self._runtime_key(cfg.site, slot["name"], slot_idx))
+                if runtime is not None and not self._runtime_matches_slot(runtime, slot):
+                    runtime = None
+                has_local_runtime = 0 if runtime is not None else 1
+                local_uses = int((runtime.active_pages if runtime is not None else 0) or 0)
+                last_used_at = float(runtime.last_used_at if runtime is not None else 0.0)
+                weighted.append((preferred_rank, has_local_runtime, local_uses, last_used_at, slot, slot_idx))
 
         weighted.sort(key=lambda item: (item[0], item[1], item[2], item[3]))
         return [(slot, slot_idx) for _, _, _, _, slot, slot_idx in weighted]
+
+    @staticmethod
+    def _fixed_slot_request(
+        preferred_slot_name: str = "",
+        preferred_slot_idx: int = -1,
+        allowed_slot_names: list[str] | None = None,
+    ) -> tuple[str, int] | None:
+        preferred_name = str(preferred_slot_name or "").strip()
+        preferred_idx = int(preferred_slot_idx)
+        allowed = [str(name or "").strip() for name in list(allowed_slot_names or []) if str(name or "").strip()]
+        if len(allowed) == 1:
+            return allowed[0], max(0, preferred_idx)
+        if preferred_name and not allowed:
+            return preferred_name, max(0, preferred_idx)
+        if preferred_name and preferred_name in set(allowed):
+            return preferred_name, max(0, preferred_idx)
+        return None
+
+    def _execute_checked_runtime(
+        self,
+        *,
+        site: str,
+        cfg: SiteSessionConfig,
+        slot: dict[str, Any],
+        session: BrowserSession,
+        lease: SessionLease,
+        needs_warm: bool,
+        url: str,
+        kind: str,
+        task_id: int,
+        cb_id: int,
+        referer: str = "",
+        requested_mode: str = "",
+        method: str = "GET",
+        form: dict[str, Any] | None = None,
+        extra_headers: dict[str, str] | None = None,
+    ) -> FetchResult:
+        current_log_file = HTTP_LIGHT_LOG_FILE
+        drop_runtime = False
+        drop_browser_runtime = False
+        try:
+            effective_mode = self._resolve_request_mode(
+                cfg,
+                kind,
+                requested_mode,
+                int(session.requests_total) + (1 if needs_warm else 0),
+            )
+            current_log_file = (
+                HTTP_CHROMIUM_LOG_FILE
+                if needs_warm or effective_mode in {"index_browser", "browser_click"}
+                else HTTP_LIGHT_LOG_FILE
+            )
+            drop_browser_runtime = bool(cfg.site == "11880" and effective_mode == "http_only")
+            result, current_log_file = self._execute_fetch_for_session(
+                session,
+                cfg,
+                slot,
+                needs_warm,
+                url,
+                kind,
+                task_id,
+                cb_id,
+                referer=referer,
+                mode=effective_mode,
+                method=method,
+                form=form,
+                extra_headers=extra_headers,
+            )
+            return result
+        except SkippedFetchError:
+            raise
+        except RuntimeError as exc:
+            drop_runtime = True
+            if not str(exc).startswith("BLOCKED ") and not str(exc).startswith("WARM BLOCKED "):
+                self._log_fetch_error(
+                    log_file=current_log_file,
+                    site=site,
+                    has_cookies=bool(session.http_session.cookies) if current_log_file == HTTP_LIGHT_LOG_FILE else bool(session.storage_state.get("cookies") if isinstance(session.storage_state, dict) else []),
+                    tunnel=slot,
+                    url=str(session.current_url or (cfg.home_url if needs_warm else url) or url),
+                    status=0,
+                    ms=0,
+                    error=self._format_error_message(exc),
+                )
+            raise
+        except PlaywrightTimeoutError as exc:
+            drop_runtime = True
+            self._log_fetch_error(
+                log_file=current_log_file,
+                site=site,
+                has_cookies=bool(session.http_session.cookies) if current_log_file == HTTP_LIGHT_LOG_FILE else bool(session.storage_state.get("cookies") if isinstance(session.storage_state, dict) else []),
+                tunnel=slot,
+                url=str(session.current_url or (cfg.home_url if needs_warm else url) or url),
+                status=0,
+                ms=0,
+                error=self._format_error_message(exc),
+            )
+            raise
+        except Exception as exc:
+            drop_runtime = True
+            self._log_fetch_error(
+                log_file=current_log_file,
+                site=site,
+                has_cookies=bool(session.http_session.cookies) if current_log_file == HTTP_LIGHT_LOG_FILE else bool(session.storage_state.get("cookies") if isinstance(session.storage_state, dict) else []),
+                tunnel=slot,
+                url=str(session.current_url or (cfg.home_url if needs_warm else url) or url),
+                status=0,
+                ms=0,
+                error=self._format_error_message(exc),
+            )
+            raise
+        finally:
+            self._release_runtime(
+                cfg,
+                session,
+                lease,
+                drop_runtime=drop_runtime,
+                drop_browser_runtime=drop_browser_runtime,
+            )
 
     def _create_session(
         self,
@@ -1244,7 +1149,7 @@ class BrowserSessionRouter:
                 profile = candidate
                 break
         if profile is None:
-            profile = self._pick_profile(cfg.site)
+            profile = self._pick_profile(cfg.site, str(tunnel.get("name") or ""))
         storage_state = dict((state or {}).get("storage_state") or {})
         http_session = build_http_session(profile, tunnel, storage_state)
 
@@ -1264,15 +1169,15 @@ class BrowserSessionRouter:
             warmed=bool((state or {}).get("warmed") is True),
             current_url=str((state or {}).get("current_url") or ""),
             active_pages=0,
-            recycle_after_ts=self._compute_recycle_after_ts(
-                cfg.runtime_recycle_min_sec,
-                cfg.runtime_recycle_max_sec,
-            ),
             next_dispatch_ts=float((state or {}).get("next_dispatch_ts") or 0.0),
         )
 
     def _launch_browser_runtime(self, cfg: SiteSessionConfig, tunnel: dict[str, Any]) -> BrowserRuntime:
         pw = self._ensure_playwright()
+        proxy_server = str(tunnel.get("proxy_server") or "").strip()
+        if not proxy_server:
+            tunnel_name = str(tunnel.get("name") or "").strip()
+            raise RuntimeError(f"MISSING SLOT PROXY {cfg.site}:{tunnel_name or 'unknown'}")
         launch_kwargs: dict[str, Any] = {
             "headless": True,
             "ignore_default_args": ["--enable-automation"],
@@ -1289,11 +1194,13 @@ class BrowserSessionRouter:
                 "--disable-features=AudioServiceOutOfProcess,BackForwardCache,MediaRouter,Translate",
                 "--no-default-browser-check",
                 "--no-first-run",
+                f"--proxy-server={proxy_server}",
+                "--proxy-bypass-list=<-loopback>",
+                "--host-resolver-rules=MAP * ~NOTFOUND , EXCLUDE localhost , EXCLUDE 127.0.0.1 , EXCLUDE ::1",
                 "--renderer-process-limit=2",
             ],
         }
-        if tunnel.get("proxy_server"):
-            launch_kwargs["proxy"] = {"server": tunnel["proxy_server"]}
+        launch_kwargs["proxy"] = {"server": proxy_server}
         browser = pw.chromium.launch(**launch_kwargs)
         now = time.time()
         return BrowserRuntime(
@@ -1303,10 +1210,6 @@ class BrowserSessionRouter:
             browser=browser,
             created_at=now,
             last_used_at=now,
-            recycle_after_ts=self._compute_recycle_after_ts(
-                cfg.runtime_recycle_min_sec,
-                cfg.runtime_recycle_max_sec,
-            ),
         )
 
     def _checkout_browser_runtime(self, cfg: SiteSessionConfig, tunnel: dict[str, Any]) -> BrowserRuntime:
@@ -1354,72 +1257,105 @@ class BrowserSessionRouter:
         slot: dict[str, Any],
         slot_idx: int,
     ) -> tuple[BrowserSession, SessionLease] | None:
-        lease = self._checkout_session_lease(cfg, slot, int(slot_idx))
-        if lease is None:
-            return None
         runtime_key = self._runtime_key(cfg.site, slot["name"], slot_idx)
         doomed: BrowserSession | None = None
         with self._runtime_cv:
             runtime = self._runtimes.get(runtime_key)
             if runtime is not None:
-                if (
-                    str(runtime.session_id) != str(lease.session_id)
-                    or not self._runtime_matches_slot(runtime, slot)
-                ):
+                if not self._runtime_matches_slot(runtime, slot):
                     if runtime.active_pages > 0:
-                        self._release_lock(lease.page_lock_key, lease.page_lock_token)
-                        self._release_lock(lease.warm_lock_key, lease.warm_lock_token)
                         return None
                     self._runtimes.pop(runtime_key, None)
                     doomed = runtime
                     runtime = None
                 if runtime is not None:
-                    self._apply_state_to_runtime(runtime, lease.state)
-                    runtime.next_dispatch_ts = float(lease.state.get("next_dispatch_ts") or 0.0)
+                    if int(runtime.active_pages) >= int(cfg.concurrent_pages_per_session):
+                        return None
+                    needs_warm = not bool(runtime.warmed)
+                    if needs_warm:
+                        if runtime.warming:
+                            return None
+                        runtime.warming = True
                     runtime.last_used_at = time.time()
                     runtime.active_pages += 1
                     self._runtime_cv.notify_all()
-                    return runtime, lease
+                    return runtime, SessionLease(
+                        session_key="",
+                        slot_name=str(slot["name"]),
+                        slot_idx=int(slot_idx),
+                        session_id=str(runtime.session_id),
+                        state={},
+                        needs_warm=needs_warm,
+                        base_requests_total=int(runtime.requests_total),
+                        page_lock_key="",
+                        page_lock_token="",
+                        warm_lock_key="",
+                        warm_lock_token="",
+                    )
 
         if doomed is not None:
             self._close_session(doomed)
 
         runtime = None
         try:
-            runtime = self._create_session(cfg, slot, slot_idx, lease.state)
-            runtime.next_dispatch_ts = float(lease.state.get("next_dispatch_ts") or 0.0)
+            runtime = self._create_session(cfg, slot, slot_idx, None)
+            runtime.warming = True
             runtime.active_pages = 1
             with self._runtime_cv:
                 existing = self._runtimes.get(runtime_key)
                 if existing is not None:
-                    if (
-                        str(existing.session_id) != str(lease.session_id)
-                        or not self._runtime_matches_slot(existing, slot)
-                    ):
+                    if not self._runtime_matches_slot(existing, slot):
                         if existing.active_pages > 0:
-                            self._release_lock(lease.page_lock_key, lease.page_lock_token)
-                            self._release_lock(lease.warm_lock_key, lease.warm_lock_token)
                             self._close_session(runtime)
                             return None
                         self._runtimes.pop(runtime_key, None)
                         doomed = existing
                         existing = None
                     if existing is not None:
-                        self._apply_state_to_runtime(existing, lease.state)
-                        existing.next_dispatch_ts = float(lease.state.get("next_dispatch_ts") or 0.0)
+                        if int(existing.active_pages) >= int(cfg.concurrent_pages_per_session):
+                            self._close_session(runtime)
+                            return None
+                        needs_warm = not bool(existing.warmed)
+                        if needs_warm:
+                            if existing.warming:
+                                self._close_session(runtime)
+                                return None
+                            existing.warming = True
                         existing.last_used_at = time.time()
                         existing.active_pages += 1
                         self._runtime_cv.notify_all()
                         self._close_session(runtime)
-                        return existing, lease
+                        return existing, SessionLease(
+                            session_key="",
+                            slot_name=str(slot["name"]),
+                            slot_idx=int(slot_idx),
+                            session_id=str(existing.session_id),
+                            state={},
+                            needs_warm=needs_warm,
+                            base_requests_total=int(existing.requests_total),
+                            page_lock_key="",
+                            page_lock_token="",
+                            warm_lock_key="",
+                            warm_lock_token="",
+                        )
                 self._runtimes[runtime_key] = runtime
                 self._runtime_cv.notify_all()
             if doomed is not None:
                 self._close_session(doomed)
-            return runtime, lease
+            return runtime, SessionLease(
+                session_key="",
+                slot_name=str(slot["name"]),
+                slot_idx=int(slot_idx),
+                session_id=str(runtime.session_id),
+                state={},
+                needs_warm=True,
+                base_requests_total=int(runtime.requests_total),
+                page_lock_key="",
+                page_lock_token="",
+                warm_lock_key="",
+                warm_lock_token="",
+            )
         except Exception:
-            self._release_lock(lease.page_lock_key, lease.page_lock_token)
-            self._release_lock(lease.warm_lock_key, lease.warm_lock_token)
             if runtime is not None:
                 self._close_session(runtime)
             raise
@@ -1443,30 +1379,7 @@ class BrowserSessionRouter:
             pass
 
     def _persist_session_state(self, cfg: SiteSessionConfig, session: BrowserSession) -> None:
-        slot_name = str(session.tunnel["name"])
-        slot_idx = int(session.slot_idx)
-        gate_key = self._session_gate_key(cfg.site, slot_name, slot_idx)
-        owner = f"persist:{cfg.site}:{slot_name}:{slot_idx}:{uuid4().hex}"
-        gate_token = self._lock_until(gate_key, SESSION_GATE_TTL_SEC, owner, SESSION_GATE_WAIT_SEC)
-        if not gate_token:
-            raise RuntimeError(f"SESSION GATE BUSY {cfg.site} {slot_name}:{slot_idx}")
-        try:
-            current_state = self._load_session_state(
-                cfg,
-                slot_name,
-                slot_idx,
-                self._slot_launch_id(session.tunnel),
-            ) or {}
-            requests_delta = max(
-                0,
-                int(session.requests_total) - int(current_state.get("requests_total") or 0),
-            )
-            merged = self._merge_session_state(session, current_state, requests_delta=requests_delta)
-            session.requests_total = int(merged.get("requests_total") or session.requests_total)
-            session.next_dispatch_ts = float(merged.get("next_dispatch_ts") or session.next_dispatch_ts)
-            self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), merged)
-        finally:
-            self._release_lock(gate_key, gate_token)
+        return
 
     def _sync_http_session(self, session: BrowserSession) -> None:
         storage_state = dict(session.storage_state or {})
@@ -1498,91 +1411,38 @@ class BrowserSessionRouter:
         session: BrowserSession,
         lease: SessionLease,
         *,
-        clear_state: bool = False,
         drop_runtime: bool = False,
         drop_browser_runtime: bool = False,
     ) -> None:
         runtime_key = self._runtime_key(cfg.site, session.tunnel["name"], session.slot_idx)
         browser_key = self._browser_key(cfg.site, session.tunnel["name"])
         should_close = False
-        drop_session_state = bool(clear_state)
         close_browser: BrowserRuntime | None = None
-        merged_state: dict[str, Any] | None = None
         slot_name = str(session.tunnel["name"])
-        slot_idx = int(session.slot_idx)
-        gate_key = self._session_gate_key(cfg.site, slot_name, slot_idx)
-        owner = f"release:{cfg.site}:{slot_name}:{slot_idx}:{uuid4().hex}"
-
-        gate_token = self._lock_until(gate_key, SESSION_GATE_TTL_SEC, owner, SESSION_GATE_WAIT_SEC)
-        if not gate_token:
-            raise RuntimeError(f"SESSION GATE BUSY {cfg.site} {slot_name}:{slot_idx}")
-
-        try:
-            current_state = self._load_session_state(
-                cfg,
-                slot_name,
-                slot_idx,
-                self._slot_launch_id(session.tunnel),
-            ) or {}
-            if str(current_state.get("session_id") or session.session_id) != str(session.session_id):
-                current_state = {}
-            requests_delta = max(0, int(session.requests_total) - int(lease.base_requests_total))
-            if not clear_state:
-                merged_state = self._merge_session_state(session, current_state, requests_delta)
-                session.requests_total = int(merged_state.get("requests_total") or session.requests_total)
-                session.next_dispatch_ts = float(merged_state.get("next_dispatch_ts") or session.next_dispatch_ts)
-            with self._runtime_cv:
-                session.active_pages = max(0, int(session.active_pages) - 1)
-                session.last_used_at = time.time()
+        with self._runtime_cv:
+            session.active_pages = max(0, int(session.active_pages) - 1)
+            if bool(lease.needs_warm):
+                session.warming = False
+            session.last_used_at = time.time()
+            browser_runtime = self._browsers.get(browser_key)
+            if browser_runtime is not None:
+                browser_runtime.last_used_at = session.last_used_at
+            if session.active_pages <= 0 and (
+                drop_runtime
+                or self._slot_is_quarantined(cfg, slot_name)
+            ):
+                self._runtimes.pop(runtime_key, None)
+                should_close = True
+            same_browser_in_use = any(
+                self._browser_key(row.site, row.tunnel["name"]) == browser_key
+                and int(row.active_pages) > 0
+                for row in self._runtimes.values()
+            )
+            if session.active_pages <= 0 and not same_browser_in_use:
                 browser_runtime = self._browsers.get(browser_key)
-                if browser_runtime is not None:
-                    browser_runtime.last_used_at = session.last_used_at
-                runtime_is_expired = False
-                if merged_state is not None:
-                    session.created_at = float(merged_state.get("created_at") or session.created_at)
-                    session.warmed = bool(merged_state.get("warmed") is True)
-                    runtime_is_expired = False
-                if session.active_pages <= 0 and (drop_runtime or clear_state or self._slot_is_quarantined(cfg, slot_name) or runtime_is_expired or self._runtime_expired(cfg, session)):
-                    self._runtimes.pop(runtime_key, None)
-                    should_close = True
-                    drop_session_state = True
-                    if not any(self._browser_key(row.site, row.tunnel["name"]) == browser_key for row in self._runtimes.values()):
-                        browser_runtime = self._browsers.get(browser_key)
-                        if browser_runtime is not None:
-                            recycle_after_ts = float(browser_runtime.recycle_after_ts or 0.0)
-                            browser_expired = bool(recycle_after_ts and time.time() >= recycle_after_ts)
-                        else:
-                            browser_expired = False
-                        if browser_runtime is not None and (
-                            clear_state
-                            or self._slot_is_quarantined(cfg, slot_name)
-                            or browser_expired
-                        ):
-                            close_browser = self._browsers.pop(browser_key, None)
-                if (
-                    close_browser is None
-                    and drop_browser_runtime
-                    and session.active_pages <= 0
-                    and not any(
-                        self._browser_key(row.site, row.tunnel["name"]) == browser_key
-                        and int(row.active_pages) > 0
-                        for row in self._runtimes.values()
-                    )
-                ):
+                if drop_browser_runtime or should_close:
                     close_browser = self._browsers.pop(browser_key, None)
-                if close_browser is not None and session.active_pages <= 0:
-                    self._runtimes.pop(runtime_key, None)
-                    should_close = True
-                self._runtime_cv.notify_all()
-
-            if drop_session_state:
-                self._clear_cache_obj(self._session_key(cfg.site, slot_name, slot_idx))
-            elif merged_state is not None:
-                self._cache_set_obj(self._session_key(cfg.site, slot_name, slot_idx), merged_state)
-        finally:
-            self._release_lock(lease.page_lock_key, lease.page_lock_token)
-            self._release_lock(lease.warm_lock_key, lease.warm_lock_token)
-            self._release_lock(gate_key, gate_token)
+            self._runtime_cv.notify_all()
 
         if close_browser is not None:
             self._close_browser_runtime(close_browser)
@@ -1607,71 +1467,19 @@ class BrowserSessionRouter:
         return set()
 
     def _install_page_resource_filter(self, context: Any, cfg: SiteSessionConfig) -> dict[str, str]:
-        blocked_types = self._blocked_resource_types(cfg)
         state = {"skipped_reason": ""}
-
-        def _handle_route(route: Any) -> None:
-            try:
-                request = route.request
-                resource_type = str(getattr(request, "resource_type", "") or "").strip().lower()
-                if resource_type == "document":
-                    response = route.fetch(max_redirects=1, timeout=float(cfg.browser_timeout_ms))
-                    route.fulfill(response=response)
-                    return
-                if resource_type in blocked_types:
-                    route.abort()
-                    return
-                route.continue_()
-                return
-            except Exception as exc:
-                msg = str(exc or "").strip()
-                if "redirect" in msg.lower():
-                    state["skipped_reason"] = "SKIPPED REDIRECT LIMIT"
-                    try:
-                        route.abort(error_code="blockedbyclient")
-                    except Exception:
-                        pass
-                    return
-                try:
-                    route.continue_()
-                except Exception:
-                    pass
-                return
-
-        context.route("**/*", _handle_route)
         return state
 
     def _new_page(self, session: BrowserSession, cfg: SiteSessionConfig) -> tuple[Any, Any, dict[str, str]]:
         browser_runtime = self._checkout_browser_runtime(cfg, session.tunnel)
-        context_kwargs: dict[str, Any] = {
-            "user_agent": session.profile.user_agent,
-            "locale": session.profile.locale,
-            "timezone_id": session.profile.timezone_id,
-            "viewport": {"width": session.profile.viewport_width, "height": session.profile.viewport_height},
-            "screen": {"width": session.profile.screen_width, "height": session.profile.screen_height},
-            "color_scheme": "light",
-            "device_scale_factor": session.profile.device_scale_factor,
-            "has_touch": bool(session.profile.max_touch_points > 0),
-            "ignore_https_errors": True,
-            "reduced_motion": "reduce",
-            "service_workers": "block",
-        }
-        if isinstance(session.storage_state, dict) and session.storage_state:
-            context_kwargs["storage_state"] = session.storage_state
+        context_kwargs = build_browser_context_kwargs(session.profile, session.storage_state)
         context = browser_runtime.browser.new_context(**context_kwargs)
-        context.set_extra_http_headers({"Accept-Language": session.profile.accept_language})
+        context.set_extra_http_headers(build_browser_extra_http_headers(session.profile))
         context.add_init_script(self._profile_script(session.profile))
         route_state = self._install_page_resource_filter(context, cfg)
         page = context.new_page()
         cdp = context.new_cdp_session(page)
-        cdp.send(
-            "Network.setUserAgentOverride",
-            {
-                "userAgent": session.profile.user_agent,
-                "platform": session.profile.platform,
-                "userAgentMetadata": session.profile.user_agent_metadata,
-            },
-        )
+        cdp.send("Network.setUserAgentOverride", build_browser_ua_override(session.profile))
         return context, page, route_state
 
     @staticmethod
@@ -2243,44 +2051,14 @@ class BrowserSessionRouter:
         extra_headers: dict[str, str] | None = None,
     ) -> tuple[FetchResult, str]:
         if mode == "index_browser":
-            result = self._fetch_index_browser_once(
-                session,
-                cfg,
-                url,
-                kind,
-                task_id,
-                cb_id,
-                referer or session.current_url,
-            )
-            self._persist_session_state(cfg, session)
-            return result, HTTP_CHROMIUM_LOG_FILE
+            self._abort_session_process("SESSION RESTART REQUIRED: browser fetch after warmup is forbidden")
 
         if mode == "browser_click":
-            result = self._fetch_index_browser_once(
-                session,
-                cfg,
-                url,
-                kind,
-                task_id,
-                cb_id,
-                referer or session.current_url,
-            )
-            self._persist_session_state(cfg, session)
-            return result, HTTP_CHROMIUM_LOG_FILE
+            self._abort_session_process("SESSION RESTART REQUIRED: browser click after warmup is forbidden")
 
         if mode == "http_only":
             if not self._session_has_live_cookies(session):
-                result = self._fetch_index_browser_once(
-                    session,
-                    cfg,
-                    url,
-                    kind,
-                    task_id,
-                    cb_id,
-                    referer or session.current_url,
-                )
-                self._persist_session_state(cfg, session)
-                return result, HTTP_CHROMIUM_LOG_FILE
+                self._abort_session_process("SESSION RESTART REQUIRED: warmed session lost cookies")
             return (
                 self._fetch_http_once(
                     session,
@@ -2298,17 +2076,7 @@ class BrowserSessionRouter:
             )
 
         if not self._session_has_live_cookies(session):
-            result = self._fetch_index_browser_once(
-                session,
-                cfg,
-                url,
-                kind,
-                task_id,
-                cb_id,
-                referer or session.current_url,
-            )
-            self._persist_session_state(cfg, session)
-            return result, HTTP_CHROMIUM_LOG_FILE
+            self._abort_session_process("SESSION RESTART REQUIRED: browser fallback is forbidden")
 
         return (
             self._fetch_http_once(
@@ -2391,10 +2159,56 @@ class BrowserSessionRouter:
         requested_mode = str(mode or "")
         self.reap_idle_runtimes()
         last_error = None
-        current_log_file = HTTP_LIGHT_LOG_FILE
-        tried: set[tuple[str, int]] = set()
         deadline = time.time() + WAIT_TIMEOUT_SEC
+        fixed_slot = self._fixed_slot_request(
+            preferred_slot_name=str(preferred_slot_name or "").strip(),
+            preferred_slot_idx=int(preferred_slot_idx),
+            allowed_slot_names=allowed_slot_names,
+        )
 
+        if fixed_slot is not None:
+            fixed_slot_name, fixed_slot_idx = fixed_slot
+            while time.time() < deadline:
+                try:
+                    slot = self._load_slots(cfg, [fixed_slot_name])[0]
+                except RuntimeError as exc:
+                    last_error = exc
+                    time.sleep(0.5)
+                    continue
+                checked = self._checkout_runtime(cfg, slot, int(fixed_slot_idx))
+                if checked is None:
+                    with self._runtime_cv:
+                        self._runtime_cv.wait(timeout=0.5)
+                    continue
+                session, lease = checked
+                needs_warm = bool(lease.needs_warm)
+                try:
+                    return self._execute_checked_runtime(
+                        site=site,
+                        cfg=cfg,
+                        slot=slot,
+                        session=session,
+                        lease=lease,
+                        needs_warm=needs_warm,
+                        url=url,
+                        kind=kind,
+                        task_id=task_id,
+                        cb_id=cb_id,
+                        referer=referer,
+                        requested_mode=requested_mode,
+                        method=method,
+                        form=form,
+                        extra_headers=extra_headers,
+                    )
+                except SkippedFetchError:
+                    raise
+                except Exception as exc:
+                    last_error = exc
+                    time.sleep(0.05)
+                    continue
+            raise RuntimeError(str(last_error or f"FETCH FAILED {site} {url}"))
+
+        tried: set[tuple[str, int]] = set()
         while time.time() < deadline:
             try:
                 candidates = self._session_candidates(
@@ -2426,89 +2240,28 @@ class BrowserSessionRouter:
 
             session, lease = checked
             needs_warm = bool(lease.needs_warm)
-            effective_mode = self._resolve_request_mode(
-                cfg,
-                kind,
-                requested_mode,
-                int(session.requests_total) + (1 if needs_warm else 0),
-            )
-            clear_state = False
-            drop_runtime = False
-            drop_browser_runtime = False
             try:
-                current_log_file = (
-                    HTTP_CHROMIUM_LOG_FILE
-                    if needs_warm or effective_mode in {"index_browser", "browser_click"}
-                    else HTTP_LIGHT_LOG_FILE
-                )
-                drop_browser_runtime = bool(cfg.site == "11880" and effective_mode == "http_only")
-                result, current_log_file = self._execute_fetch_for_session(
-                    session,
-                    cfg,
-                    slot,
-                    needs_warm,
-                    url,
-                    kind,
-                    task_id,
-                    cb_id,
+                return self._execute_checked_runtime(
+                    site=site,
+                    cfg=cfg,
+                    slot=slot,
+                    session=session,
+                    lease=lease,
+                    needs_warm=needs_warm,
+                    url=url,
+                    kind=kind,
+                    task_id=task_id,
+                    cb_id=cb_id,
                     referer=referer,
-                    mode=effective_mode,
+                    requested_mode=requested_mode,
                     method=method,
                     form=form,
                     extra_headers=extra_headers,
                 )
-                return result
             except SkippedFetchError:
                 raise
-            except RuntimeError as exc:
-                last_error = exc
-                drop_runtime = True
-                if not str(exc).startswith("BLOCKED ") and not str(exc).startswith("WARM BLOCKED "):
-                    self._log_fetch_error(
-                        log_file=current_log_file,
-                        site=site,
-                        has_cookies=bool(session.http_session.cookies) if current_log_file == HTTP_LIGHT_LOG_FILE else bool(session.storage_state.get("cookies") if isinstance(session.storage_state, dict) else []),
-                        tunnel=slot,
-                        url=str(session.current_url or (cfg.home_url if needs_warm else url) or url),
-                        status=0,
-                        ms=0,
-                        error=self._format_error_message(exc),
-                    )
-            except PlaywrightTimeoutError as exc:
-                drop_runtime = True
-                last_error = exc
-                self._log_fetch_error(
-                    log_file=current_log_file,
-                    site=site,
-                    has_cookies=bool(session.http_session.cookies) if current_log_file == HTTP_LIGHT_LOG_FILE else bool(session.storage_state.get("cookies") if isinstance(session.storage_state, dict) else []),
-                    tunnel=slot,
-                    url=str(session.current_url or (cfg.home_url if needs_warm else url) or url),
-                    status=0,
-                    ms=0,
-                    error=self._format_error_message(exc),
-                )
             except Exception as exc:
-                drop_runtime = True
                 last_error = exc
-                self._log_fetch_error(
-                    log_file=current_log_file,
-                    site=site,
-                    has_cookies=bool(session.http_session.cookies) if current_log_file == HTTP_LIGHT_LOG_FILE else bool(session.storage_state.get("cookies") if isinstance(session.storage_state, dict) else []),
-                    tunnel=slot,
-                    url=str(session.current_url or (cfg.home_url if needs_warm else url) or url),
-                    status=0,
-                    ms=0,
-                    error=self._format_error_message(exc),
-                )
-            finally:
-                self._release_runtime(
-                    cfg,
-                    session,
-                    lease,
-                    clear_state=clear_state,
-                    drop_runtime=drop_runtime,
-                    drop_browser_runtime=drop_browser_runtime,
-                )
 
         raise RuntimeError(str(last_error or f"FETCH FAILED {site} {url}"))
 

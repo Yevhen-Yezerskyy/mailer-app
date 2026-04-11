@@ -123,12 +123,45 @@ services:
       DEBUG: "1"
       DJANGO_INSTANCE: "dev"
       PYTHONPATH: /app
+    ports:
+      - "127.0.0.1:18000:8000"
     volumes:
       - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - ./:/app
       - serenity-redis-run:/app/run/redis
       - serenity-secrets:/run/serenity-secrets:ro
     command: ["/app/config/sh/with-secrets.sh", "python", "manage.py", "runserver", "0.0.0.0:8000"]
+
+  browser-diag-capture:
+    image: mailer-python:latest
+    container_name: browser-diag-capture
+    init: true
+    working_dir: /app
+    restart: unless-stopped
+    user: "1001:1001"
+    environment:
+      PYTHONPATH: /app
+      BROWSER_DIAG_HTTP_PORT: "18080"
+      BROWSER_DIAG_HTTPS_PORT: "18443"
+      BROWSER_DIAG_CERT: /tmp/browser-diag-capture/cert.pem
+      BROWSER_DIAG_KEY: /tmp/browser-diag-capture/key.pem
+    volumes:
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
+      - ./:/app
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        set -e
+        mkdir -p /tmp/browser-diag-capture /home/eee/mailer-app/logs/testing
+        if [ ! -s "$$BROWSER_DIAG_CERT" ] || [ ! -s "$$BROWSER_DIAG_KEY" ]; then
+          openssl req -x509 -newkey rsa:2048 -nodes \
+            -keyout "$$BROWSER_DIAG_KEY" \
+            -out "$$BROWSER_DIAG_CERT" \
+            -days 365 \
+            -subj "/CN=browser-diag-capture" >/dev/null 2>&1
+        fi
+        exec python /app/tmp/browser_diag_capture.py
 
   mailer-web-prod:
     image: mailer-python:latest
@@ -147,6 +180,8 @@ services:
       DEBUG: "0"
       DJANGO_INSTANCE: "prod"
       PYTHONPATH: /app
+    ports:
+      - "127.0.0.1:18001:8000"
     volumes:
       - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - mailer-app-prod:/app
@@ -189,6 +224,8 @@ services:
       DEBUG: "1"
       DJANGO_INSTANCE: "admin-dev"
       PYTHONPATH: /app
+    ports:
+      - "127.0.0.1:18002:8000"
     volumes:
       - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - ./:/app
@@ -213,6 +250,8 @@ services:
       DEBUG: "0"
       DJANGO_INSTANCE: "admin-prod"
       PYTHONPATH: /app
+    ports:
+      - "127.0.0.1:18003:8000"
     volumes:
       - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - mailer-app-prod:/app
@@ -365,6 +404,8 @@ services:
         condition: service_started
     environment:
       PYTHONPATH: /app
+    cap_add:
+      - NET_ADMIN
     volumes:
       - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - mailer-app-prod:/app
@@ -374,9 +415,9 @@ services:
     command:
       [
         "/app/config/sh/with-secrets.sh",
-        "python",
-        "-m",
-        "engine.core_crawler.crawler_processor"
+        "/bin/sh",
+        "-lc",
+        "/bin/sh /app/config/sh/crawler-net-guard.sh && exec python -m engine.core_crawler.crawler_processor"
       ]
 
   mailer-engine-expander-prod:
@@ -528,6 +569,7 @@ services:
     image: nginx:1.26
     container_name: serenity-nginx
     init: true
+    network_mode: host
     restart: unless-stopped
     ulimits:
       nofile:
@@ -544,9 +586,6 @@ services:
         condition: service_started
       mailer-web-admin-prod:
         condition: service_started
-    ports:
-      - "80:80"
-      - "443:443"
     volumes:
       - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - ./logs:/host-logs

@@ -9,6 +9,10 @@ from urllib.parse import urljoin, urlsplit
 
 from curl_cffi import requests as curl_requests
 
+from engine.core_crawler.browser.browser_signature import (
+    build_navigation_headers,
+    http_impersonate,
+)
 from engine.core_crawler.browser.session_config import BrowserProfile
 
 
@@ -53,80 +57,8 @@ def _storage_origins(storage_state: dict[str, Any] | None) -> list[dict[str, Any
     return [dict(row) for row in origins if isinstance(row, dict)]
 
 
-def _same_site(url: str, referer: str) -> bool:
-    if not referer:
-        return False
-    try:
-        return urlsplit(url).netloc == urlsplit(referer).netloc
-    except Exception:
-        return False
-
-
-def _sec_ch_ua(profile: BrowserProfile) -> str:
-    brands = profile.user_agent_metadata.get("brands") or []
-    out: list[str] = []
-    for row in brands:
-        brand = str((row or {}).get("brand") or "").replace('"', "")
-        version = str((row or {}).get("version") or "").replace('"', "")
-        if brand and version:
-            out.append(f'"{brand}";v="{version}"')
-    return ", ".join(out)
-
-
-def _sec_ch_ua_full_version_list(profile: BrowserProfile) -> str:
-    brands = profile.user_agent_metadata.get("fullVersionList") or []
-    out: list[str] = []
-    for row in brands:
-        brand = str((row or {}).get("brand") or "").replace('"', "")
-        version = str((row or {}).get("version") or "").replace('"', "")
-        if brand and version:
-            out.append(f'"{brand}";v="{version}"')
-    return ", ".join(out)
-
-
-def _quoted_client_hint(value: Any) -> str:
-    raw = str(value or "").replace('"', "")
-    return f"\"{raw}\""
-
-
-def _http_impersonate(profile: BrowserProfile) -> str:
-    major_version = str((profile.user_agent_metadata or {}).get("fullVersion") or "").split(".", 1)[0]
-    if major_version in {"116", "119", "120", "123", "124"}:
-        return f"chrome{major_version}"
-    raise RuntimeError(f"Unsupported browser profile for http impersonation: chrome{major_version}")
-
-
 def build_http_headers(profile: BrowserProfile, url: str, referer: str = "") -> dict[str, str]:
-    same_site = _same_site(url, referer)
-    ua_meta = dict(profile.user_agent_metadata or {})
-    headers = {
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br, zstd",
-        "Accept-Language": profile.accept_language,
-        "Cache-Control": "max-age=0",
-        "Pragma": "no-cache",
-        "Priority": "u=0, i",
-        "Upgrade-Insecure-Requests": "1",
-        "User-Agent": profile.user_agent,
-        "Sec-CH-UA": _sec_ch_ua(profile),
-        "Sec-CH-UA-Arch": _quoted_client_hint(ua_meta.get("architecture") or "x86"),
-        "Sec-CH-UA-Bitness": _quoted_client_hint(ua_meta.get("bitness") or "64"),
-        "Sec-CH-UA-Full-Version-List": _sec_ch_ua_full_version_list(profile),
-        "Sec-CH-UA-Model": _quoted_client_hint(ua_meta.get("model") or ""),
-        "Sec-CH-UA-Mobile": "?0",
-        "Sec-CH-UA-Platform": f"\"{profile.platform}\"",
-        "Sec-CH-UA-Platform-Version": _quoted_client_hint(ua_meta.get("platformVersion") or "10.0.0"),
-        "Sec-CH-UA-WoW64": "?1" if bool(ua_meta.get("wow64")) else "?0",
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "same-origin" if same_site else "none",
-        "Sec-Fetch-User": "?1",
-    }
-    if referer:
-        headers["Referer"] = referer
-        if not same_site:
-            headers["Sec-Fetch-Site"] = "cross-site"
-    return headers
+    return build_navigation_headers(profile, url, referer)
 
 
 def _load_cookies(session: Any, storage_state: dict[str, Any] | None) -> None:
@@ -143,6 +75,13 @@ def _load_cookies(session: Any, storage_state: dict[str, Any] | None) -> None:
             continue
 
 
+def _http_proxy_server(proxy_server: str) -> str:
+    raw = str(proxy_server or "").strip()
+    if raw.startswith("socks5://"):
+        return "socks5h://" + raw[len("socks5://") :]
+    return raw
+
+
 def build_http_session(profile: BrowserProfile, tunnel: dict[str, Any], storage_state: dict[str, Any] | None) -> Any:
     session = curl_requests.Session()
     try:
@@ -151,8 +90,11 @@ def build_http_session(profile: BrowserProfile, tunnel: dict[str, Any], storage_
         pass
     session.headers.update(build_http_headers(profile, "", ""))
     proxy_server = str(tunnel.get("proxy_server") or "")
-    if proxy_server:
-        session.proxies = {"http": proxy_server, "https": proxy_server}
+    if not proxy_server:
+        tunnel_name = str(tunnel.get("name") or "").strip()
+        raise RuntimeError(f"MISSING SLOT PROXY {tunnel_name or 'unknown'}")
+    http_proxy_server = _http_proxy_server(proxy_server)
+    session.proxies = {"http": http_proxy_server, "https": http_proxy_server}
     _load_cookies(session, storage_state)
     return session
 
@@ -246,7 +188,7 @@ def fetch_html(
             timeout=timeout_sec,
             allow_redirects=False,
             stream=False,
-            impersonate=_http_impersonate(profile),
+            impersonate=http_impersonate(profile),
         )
         status_code = int(response.status_code or 0)
         location = _redirect_location(response)

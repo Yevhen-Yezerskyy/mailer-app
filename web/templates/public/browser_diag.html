@@ -1,0 +1,101 @@
+{% extends "public/base.html" %}
+
+{% block content %}
+<section style="max-width: 1100px; margin: 40px auto; padding: 0 20px;">
+  <h1>Browser Diagnostics</h1>
+  <p>Request ID: <code>{{ request_id }}</code></p>
+
+  <h2>Server Request</h2>
+  <pre id="server-request" style="white-space: pre-wrap; overflow-wrap: anywhere;"></pre>
+
+  <h2>Client Fingerprint</h2>
+  <pre id="client-fingerprint" style="white-space: pre-wrap; overflow-wrap: anywhere;">Collecting...</pre>
+
+  <h2>POST Result</h2>
+  <pre id="post-result" style="white-space: pre-wrap; overflow-wrap: anywhere;">Pending...</pre>
+
+  <h2>Light Check Result</h2>
+  <pre id="light-check-result" style="white-space: pre-wrap; overflow-wrap: anywhere;">Pending...</pre>
+</section>
+
+{{ server_request|json_script:"server-request-data" }}
+
+<script>
+  const serverData = JSON.parse(document.getElementById("server-request-data").textContent);
+  document.getElementById("server-request").textContent = JSON.stringify(serverData, null, 2);
+
+  async function collectFingerprint() {
+    const nav = navigator;
+    const uaData = nav.userAgentData;
+    const payload = {
+      collected_at: new Date().toISOString(),
+      location: window.location.href,
+      referrer: document.referrer,
+      userAgent: nav.userAgent,
+      webdriver: nav.webdriver,
+      language: nav.language,
+      languages: nav.languages,
+      platform: nav.platform,
+      vendor: nav.vendor,
+      cookieEnabled: nav.cookieEnabled,
+      deviceMemory: nav.deviceMemory ?? null,
+      hardwareConcurrency: nav.hardwareConcurrency ?? null,
+      maxTouchPoints: nav.maxTouchPoints ?? null,
+      doNotTrack: nav.doNotTrack,
+      pdfViewerEnabled: nav.pdfViewerEnabled ?? null,
+      pluginsLength: nav.plugins ? nav.plugins.length : null,
+      mimeTypesLength: nav.mimeTypes ? nav.mimeTypes.length : null,
+      userAgentData: uaData ? {
+        brands: uaData.brands,
+        mobile: uaData.mobile,
+        platform: uaData.platform,
+      } : null,
+      screen: {
+        width: window.screen.width,
+        height: window.screen.height,
+        availWidth: window.screen.availWidth,
+        availHeight: window.screen.availHeight,
+        colorDepth: window.screen.colorDepth,
+        pixelDepth: window.screen.pixelDepth,
+      },
+      viewport: {
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+        outerWidth: window.outerWidth,
+        outerHeight: window.outerHeight,
+        devicePixelRatio: window.devicePixelRatio,
+      },
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    };
+
+    document.getElementById("client-fingerprint").textContent = JSON.stringify(payload, null, 2);
+
+    const response = await fetch("{{ post_url }}", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Diag-Request-Id": "{{ request_id }}",
+      },
+      body: JSON.stringify(payload),
+    });
+    const responseText = await response.text();
+    document.getElementById("post-result").textContent = responseText;
+
+    const lightResponse = await fetch("{{ light_check_url }}", {
+      method: "GET",
+      credentials: "same-origin",
+      headers: {
+        "X-Diag-Flow-Stage": "light-check",
+      },
+    });
+    const lightText = await lightResponse.text();
+    document.getElementById("light-check-result").textContent = lightText;
+  }
+
+  collectFingerprint().catch((error) => {
+    document.getElementById("post-result").textContent = String(error && error.stack ? error.stack : error);
+    document.getElementById("light-check-result").textContent = "Skipped due to previous error";
+  });
+</script>
+{% endblock %}

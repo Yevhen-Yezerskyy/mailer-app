@@ -17,6 +17,7 @@ RUN apt-get update \
       less \
       procps \
       iproute2 \
+      iptables \
       openssh-client \
       sshpass \
       tzdata \

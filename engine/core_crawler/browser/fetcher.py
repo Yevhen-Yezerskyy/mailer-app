@@ -11,9 +11,7 @@ from parsel import Selector
 
 from engine.core_crawler.browser.session_router import BrowserSessionRouter, FetchResult
 
-_ROUTER_LOCAL = threading.local()
-_ROUTER_REGISTRY_MU = threading.Lock()
-_ROUTER_REGISTRY: list[BrowserSessionRouter] = []
+_ROUTER_SINGLETON = BrowserSessionRouter(register_atexit=False)
 _ROUTE_CONTEXT_MU = threading.Lock()
 
 
@@ -28,48 +26,18 @@ _ROUTE_CONTEXT: FetchRouteContext | None = None
 
 
 def _get_router() -> BrowserSessionRouter:
-    router = getattr(_ROUTER_LOCAL, "router", None)
-    if router is not None:
-        return router
-    router = BrowserSessionRouter(register_atexit=False)
-    _ROUTER_LOCAL.router = router
-    with _ROUTER_REGISTRY_MU:
-        _ROUTER_REGISTRY.append(router)
-    return router
+    return _ROUTER_SINGLETON
 
 
 def close_all_fetch_routers() -> None:
-    with _ROUTER_REGISTRY_MU:
-        routers = list(_ROUTER_REGISTRY)
-        _ROUTER_REGISTRY.clear()
     try:
-        _ROUTER_LOCAL.router = None
+        _ROUTER_SINGLETON.close_all()
     except Exception:
         pass
-    for router in routers:
-        try:
-            router.close_all()
-        except Exception:
-            pass
 
 
 def close_current_fetch_router() -> None:
-    router = getattr(_ROUTER_LOCAL, "router", None)
-    if router is None:
-        return
-    with _ROUTER_REGISTRY_MU:
-        try:
-            _ROUTER_REGISTRY.remove(router)
-        except ValueError:
-            pass
-    try:
-        _ROUTER_LOCAL.router = None
-    except Exception:
-        pass
-    try:
-        router.close_all()
-    except Exception:
-        pass
+    return
 
 
 def set_fetch_route_context(site: str, slot_name: str, slot_idx: int = 0) -> None:
@@ -89,7 +57,7 @@ def clear_fetch_route_context() -> None:
 
 
 def reset_fetch_route_session(site: str, slot_name: str, slot_idx: int = 0) -> None:
-    _get_router().reset_slot_session(str(site or "").strip(), str(slot_name or "").strip(), int(slot_idx))
+    return
 
 
 def get_fetch_route_context() -> FetchRouteContext | None:

@@ -23,7 +23,6 @@ from engine.core_crawler.browser.broker_server import current_site_route_plan
 from engine.core_crawler.browser.fetcher import (
     clear_fetch_route_context,
     close_all_fetch_routers,
-    reset_fetch_route_session,
     set_fetch_route_context,
 )
 from engine.core_crawler.spiders.spider_gs_cb import GelbeSeitenCBSpider
@@ -41,6 +40,8 @@ DISPATCHER_LOOP_SEC = 1.5
 DISPATCH_POOL_LIMIT = 10
 DISPATCH_HEAD_LIMIT = 5
 ACTIVE_TASK_REFRESH_SEC = 10.0
+GS_SLOT_WORKER_MIN_LIFETIME_SEC = 60 * 60.0
+GS_SLOT_WORKER_MAX_LIFETIME_SEC = 90 * 60.0
 
 
 @dataclass(frozen=True)
@@ -287,9 +288,9 @@ def _claim_specific_route(site: str, slot_name: str) -> RouteLease | None:
     active_names = [str(name or "").strip() for name in list((current_site_route_plan().get(site_name) or [])) if str(name or "").strip()]
     if tunnel_name not in active_names:
         return None
-    statuses = load_tunnel_statuses([tunnel_name] if tunnel_name != "direct" else [])
-    launch_id = "direct" if tunnel_name == "direct" else str((statuses.get(tunnel_name) or {}).get("launch_id") or "").strip()
-    if tunnel_name != "direct" and not launch_id:
+    statuses = load_tunnel_statuses([tunnel_name])
+    launch_id = str((statuses.get(tunnel_name) or {}).get("launch_id") or "").strip()
+    if not launch_id:
         return None
     owner = f"{os.getpid()}:{site_name}:{tunnel_name}"
     lock_key = _route_lock_key(site_name, tunnel_name)
@@ -311,12 +312,12 @@ def _claim_route(site: str) -> RouteLease | None:
     available = [str(name or "").strip() for name in list((current_site_route_plan().get(site_name) or [])) if str(name or "").strip()]
     if not available:
         return None
-    statuses = load_tunnel_statuses([name for name in available if name != "direct"])
+    statuses = load_tunnel_statuses(list(available))
     shuffled = list(available)
     random.shuffle(shuffled)
     for slot_name in shuffled:
-        launch_id = "direct" if slot_name == "direct" else str((statuses.get(slot_name) or {}).get("launch_id") or "").strip()
-        if slot_name != "direct" and not launch_id:
+        launch_id = str((statuses.get(slot_name) or {}).get("launch_id") or "").strip()
+        if not launch_id:
             continue
         owner = f"{os.getpid()}:{site_name}:{slot_name}"
         lock_key = _route_lock_key(site_name, slot_name)
@@ -350,8 +351,6 @@ def _route_still_valid(route: RouteLease | None) -> bool:
     active_names = [str(name or "").strip() for name in list((plan.get(route.site) or [])) if str(name or "").strip()]
     if str(route.slot_name or "").strip() not in active_names:
         return False
-    if str(route.slot_name or "").strip() == "direct":
-        return True
     statuses = load_tunnel_statuses([route.slot_name])
     current_launch_id = str((statuses.get(route.slot_name) or {}).get("launch_id") or "").strip()
     if not current_launch_id:
@@ -362,11 +361,6 @@ def _route_still_valid(route: RouteLease | None) -> bool:
 def _reset_and_release_route(route: RouteLease | None, heartbeat: RouteLeaseHeartbeat | None) -> None:
     try:
         _stop_route_heartbeat(heartbeat)
-    except Exception:
-        pass
-    try:
-        if route is not None:
-            reset_fetch_route_session(route.site, route.slot_name, route.slot_idx)
     except Exception:
         pass
     try:
@@ -498,7 +492,6 @@ def _release_item_lock(item: QueueItem) -> None:
 def _start_item_timeout_watchdog(
     item: QueueItem,
     route: RouteLease | None,
-    heartbeat: RouteLeaseHeartbeat | None,
 ) -> ItemTimeoutWatchdog:
     stop_event = threading.Event()
 
@@ -513,11 +506,7 @@ def _start_item_timeout_watchdog(
         except Exception:
             pass
         try:
-            _stop_route_heartbeat(heartbeat)
-        except Exception:
-            pass
-        try:
-            _release_route(route)
+            close_all_fetch_routers()
         except Exception:
             pass
         os._exit(124)
@@ -946,8 +935,13 @@ def slot_worker_main(catalog: str, slot_name: str) -> None:
     if not catalog_name or not fixed_slot_name:
         raise RuntimeError("slot worker requires catalog and slot name")
     stop_requested = {"value": False}
-    route: RouteLease | None = None
-    heartbeat: RouteLeaseHeartbeat | None = None
+    active_launch_id = ""
+    lifetime_deadline = 0.0
+    if catalog_name == "gs":
+        lifetime_deadline = time.time() + random.uniform(
+            GS_SLOT_WORKER_MIN_LIFETIME_SEC,
+            GS_SLOT_WORKER_MAX_LIFETIME_SEC,
+        )
 
     def _handle_signal(_signum, _frame) -> None:
         stop_requested["value"] = True
@@ -957,20 +951,35 @@ def slot_worker_main(catalog: str, slot_name: str) -> None:
 
     try:
         while not stop_requested["value"]:
-            if route is not None and not _route_still_valid(route):
-                _reset_and_release_route(route, heartbeat)
-                route = None
-                heartbeat = None
-                clear_fetch_route_context()
-                time.sleep(DISPATCH_TICK_SEC)
-                continue
+            if lifetime_deadline > 0.0 and time.time() >= lifetime_deadline:
+                break
+            desired_slots = [
+                str(name or "").strip()
+                for name in list((current_site_route_plan().get(catalog_name) or []))
+                if str(name or "").strip()
+            ]
+            if fixed_slot_name not in set(desired_slots):
+                break
 
-            if route is None:
-                route = _claim_specific_route(catalog_name, fixed_slot_name)
-                if route is None:
-                    time.sleep(DISPATCH_TICK_SEC)
-                    continue
-                heartbeat = _start_route_heartbeat(route)
+            statuses = load_tunnel_statuses([fixed_slot_name])
+            current_launch_id = str((statuses.get(fixed_slot_name) or {}).get("launch_id") or "").strip()
+            if not current_launch_id:
+                break
+
+            if active_launch_id != current_launch_id:
+                if active_launch_id:
+                    break
+                active_launch_id = current_launch_id
+
+            route = RouteLease(
+                site=catalog_name,
+                slot_name=fixed_slot_name,
+                slot_idx=0,
+                lock_key="",
+                lock_token="",
+                launch_id=current_launch_id,
+            )
+            set_fetch_route_context(catalog_name, fixed_slot_name, 0)
 
             item = _queue_pop_item(catalog_name)
             if item is None:
@@ -983,7 +992,7 @@ def slot_worker_main(catalog: str, slot_name: str) -> None:
                 continue
 
             item_heartbeat = _start_item_lock_heartbeat(item)
-            watchdog = _start_item_timeout_watchdog(item, route, heartbeat)
+            watchdog = _start_item_timeout_watchdog(item, route)
             finalize_info: dict[str, Any] | None = None
             try:
                 finalize_info = _run_item(item, route)
@@ -994,13 +1003,7 @@ def slot_worker_main(catalog: str, slot_name: str) -> None:
                     item,
                     release_lock=bool((finalize_info or {}).get("release_lock")),
                 )
-                if route is not None and not _route_still_valid(route):
-                    _reset_and_release_route(route, heartbeat)
-                    route = None
-                    heartbeat = None
     finally:
-        if route is not None or heartbeat is not None:
-            _reset_and_release_route(route, heartbeat)
         clear_fetch_route_context()
         close_all_fetch_routers()
 

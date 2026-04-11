@@ -44,12 +44,7 @@ class SiteSessionConfig:
     home_url: str
     egress_slots: tuple[str, ...]
     slot_quarantine_sec: int
-    sessions_per_egress: int
     concurrent_pages_per_session: int
-    max_requests_per_session: int
-    max_session_age_sec: int
-    runtime_recycle_min_sec: int
-    runtime_recycle_max_sec: int
     pause_min_sec: float
     pause_max_sec: float
     browser_timeout_ms: int
@@ -60,17 +55,14 @@ BROKER_QUEUE_MAX = 256
 CRAWLER_ACTIVE_TUNNEL_CAP = 1
 CRAWLER_SLOT_HOLD_MIN_SEC = 15 * 60
 CRAWLER_SLOT_HOLD_MAX_SEC = 25 * 60
-ONE_ONE_EIGHTY_WINDOW_MIN_SEC = 8 * 60
+ONE_ONE_EIGHTY_WINDOW_MIN_SEC = 10 * 60
 ONE_ONE_EIGHTY_WINDOW_MAX_SEC = 14 * 60
-ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC = 90 * 60
+ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC = 65 * 60
 ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC = 150 * 60
-ONE_ONE_EIGHTY_QUARANTINE_MIN_SEC = 6 * 60 * 60
 ONE_ONE_EIGHTY_QUARANTINE_MAX_SEC = 60 * 60 * 60
 ONE_ONE_EIGHTY_ACTIVE_TUNNEL_RATIO = 0.50
 ONE_ONE_EIGHTY_ACTIVE_TUNNEL_MAX = CRAWLER_ACTIVE_TUNNEL_CAP
 GS_ACTIVE_TUNNEL_MAX = CRAWLER_ACTIVE_TUNNEL_CAP
-ONE_ONE_EIGHTY_MISMATCH_VISIT_MAX = 2
-ONE_ONE_EIGHTY_MISMATCH_VISIT_PROBABILITY = 0.35
 
 
 def _chrome_windows(
@@ -258,15 +250,9 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
             "aws_3_67_184_15",
             "aws_3_75_230_23",
             "aws_18_199_122_185",
-            "direct",
         ),
         slot_quarantine_sec=ONE_ONE_EIGHTY_QUARANTINE_MAX_SEC,
-        sessions_per_egress=1,
         concurrent_pages_per_session=2,
-        max_requests_per_session=500,
-        max_session_age_sec=1200,
-        runtime_recycle_min_sec=0,
-        runtime_recycle_max_sec=0,
         pause_min_sec=1.5,
         pause_max_sec=3.5,
         browser_timeout_ms=90_000,
@@ -310,15 +296,9 @@ SITE_CONFIGS: dict[str, SiteSessionConfig] = {
             "aws_3_67_184_15",
             "aws_3_75_230_23",
             "aws_18_199_122_185",
-            "direct",
         ),
         slot_quarantine_sec=1 * 60 * 60,
-        sessions_per_egress=1,
         concurrent_pages_per_session=2,
-        max_requests_per_session=500,
-        max_session_age_sec=1200,
-        runtime_recycle_min_sec=0,
-        runtime_recycle_max_sec=0,
         pause_min_sec=1.0,
         pause_max_sec=2.0,
         browser_timeout_ms=90_000,

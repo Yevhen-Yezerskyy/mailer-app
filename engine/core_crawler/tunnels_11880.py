@@ -394,10 +394,10 @@ def _log_watchdog_snapshot(status_map: dict[str, dict[str, Any]], configured_nam
     _log_tunnel(json.dumps(payload, ensure_ascii=False, indent=2))
     cooldown_count = len(payload["cooldown"].get("11880") or {})
     quarantine_count = len(quarantine_11880)
-    total_count = len(configured_set) + 1
+    total_count = len(configured_set)
     cooldown_names = {str(name or "").strip() for name in (payload["cooldown"].get("11880") or {}).keys() if str(name or "").strip()}
     quarantine_names = {str(name or "").strip() for name in quarantine_11880.keys() if str(name or "").strip()}
-    available_count = len((set(configured_set) | {"direct"}) - cooldown_names - quarantine_names)
+    available_count = len(set(configured_set) - cooldown_names - quarantine_names)
     _log_tunnel(
         f"Alive: {available_count}, Cooldown: {cooldown_count}, "
         f"Quarantine: {quarantine_count}, Total: {total_count}"
