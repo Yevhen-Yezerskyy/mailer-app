@@ -669,6 +669,7 @@ class BrowserSessionRouter:
             ttl_sec=self._quarantine_backoff_ttl_sec(backoff, max(60.0, float(quarantine_max_sec))),
         )
         self._drop_egress_session_state(cfg, slot_name)
+        self._clear_cache_obj(self._slot_profile_key(cfg.site, slot_name))
         log(
             ROUTER_STATE_LOG_FILE,
             folder=LOG_FOLDER,
