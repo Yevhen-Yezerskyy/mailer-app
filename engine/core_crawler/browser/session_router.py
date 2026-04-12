@@ -69,6 +69,8 @@ ONE_ONE_EIGHTY_QUARANTINE_LEVEL_RANGES_SEC = (
     (24 * 60 * 60, 28 * 60 * 60),
     (72 * 60 * 60, 72 * 60 * 60),
 )
+ONE_ONE_EIGHTY_GLOBAL_WARMUP_LOCK_MIN_SEC = 10 * 60
+ONE_ONE_EIGHTY_GLOBAL_WARMUP_LOCK_MAX_SEC = 15 * 60
 
 
 @dataclass
@@ -413,6 +415,13 @@ class BrowserSessionRouter:
         return f"core_crawler:slot_quarantine_history:{site_name}"
 
     @staticmethod
+    def _global_warmup_lock_key(site: str) -> str:
+        site_name = str(site or "").strip()
+        if not site_name:
+            raise ValueError("global warmup lock key requires site")
+        return f"core_crawler:global_warmup_lock:{site_name}"
+
+    @staticmethod
     def _dispatch_gate_key(site: str, slot_name: str, slot_idx: int) -> str:
         site_name = str(site or "").strip()
         tunnel_name = str(slot_name or "").strip()
@@ -601,6 +610,18 @@ class BrowserSessionRouter:
         )
         return level, duration_sec
 
+    def _global_warmup_lock_until(self, cfg: SiteSessionConfig) -> float:
+        raw = self._cache_get_obj(self._global_warmup_lock_key(cfg.site)) or {}
+        if not isinstance(raw, dict):
+            return 0.0
+        try:
+            until = float(raw.get("until") or 0.0)
+        except Exception:
+            return 0.0
+        if until <= time.time():
+            return 0.0
+        return until
+
     def _load_quarantine_backoff(self, cfg: SiteSessionConfig) -> dict[str, dict[str, float | int]]:
         raw = self._cache_get_obj(self._quarantine_backoff_key(cfg.site)) or {}
         if not isinstance(raw, dict):
@@ -668,6 +689,24 @@ class BrowserSessionRouter:
             backoff,
             ttl_sec=self._quarantine_backoff_ttl_sec(backoff, max(60.0, float(quarantine_max_sec))),
         )
+        if cfg.site == "11880":
+            warmup_lock_sec = int(
+                random.uniform(
+                    float(ONE_ONE_EIGHTY_GLOBAL_WARMUP_LOCK_MIN_SEC),
+                    float(ONE_ONE_EIGHTY_GLOBAL_WARMUP_LOCK_MAX_SEC),
+                )
+            )
+            warmup_until = time.time() + float(warmup_lock_sec)
+            self._cache_set_obj(
+                self._global_warmup_lock_key(cfg.site),
+                {
+                    "until": float(warmup_until),
+                    "reason": str(reason or ""),
+                    "slot_name": str(slot_name or ""),
+                },
+                ttl_sec=warmup_lock_sec + 60,
+            )
+            self._clear_cache_obj("core_crawler:route_plan")
         self._drop_egress_session_state(cfg, slot_name)
         self._clear_cache_obj(self._slot_profile_key(cfg.site, slot_name))
         log(
@@ -2112,6 +2151,10 @@ class BrowserSessionRouter:
         extra_headers: dict[str, str] | None = None,
     ) -> tuple[FetchResult, str]:
         if needs_warm:
+            if cfg.site == "11880":
+                warmup_lock_until = self._global_warmup_lock_until(cfg)
+                if warmup_lock_until > time.time():
+                    raise RuntimeError(f"WARMUP GLOBAL LOCK ACTIVE until={int(warmup_lock_until)}")
             warm = self._warm_session(session, cfg, task_id, cb_id)
             if warm.status != 200:
                 if self._should_quarantine_response(cfg, warm.status, warm.title, warm.html):

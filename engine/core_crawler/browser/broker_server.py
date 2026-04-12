@@ -200,6 +200,26 @@ def _quarantine_key(site: str) -> str:
     return f"core_crawler:slot_quarantine:{site_name}"
 
 
+def _global_warmup_lock_key(site: str) -> str:
+    site_name = str(site or "").strip()
+    if not site_name:
+        raise ValueError("global warmup lock key requires site")
+    return f"core_crawler:global_warmup_lock:{site_name}"
+
+
+def _global_warmup_lock_until(site: str) -> float:
+    raw = _cache_get_obj(_global_warmup_lock_key(site)) or {}
+    if not isinstance(raw, dict):
+        return 0.0
+    try:
+        until = float(raw.get("until") or 0.0)
+    except Exception:
+        return 0.0
+    if until <= time.time():
+        return 0.0
+    return until
+
+
 def _try_lock(key: str, ttl_sec: float, owner: str) -> str:
     info = CLIENT.lock_try(key, ttl_sec=ttl_sec, owner=owner)
     if not info or not bool(info.get("acquired")):
@@ -368,12 +388,16 @@ def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
         state = _load_window_state(site, available)
         active_names = _active_window_names(site, available)
         target_count = _11880_target_active_count(len(available))
+        warmup_lock_until = _global_warmup_lock_until(site)
         if len(active_names) > target_count:
             keep_names = set(active_names[:target_count])
             for name in available:
                 if name not in keep_names and name in state:
                     state[name]["active_until"] = 0.0
             active_names = [name for name in active_names if name in keep_names]
+        if warmup_lock_until > now:
+            _cache_set_obj(_window_key(site), state)
+            return [name for name in available if name in active_names]
         if len(active_names) < target_count:
             eligible_names = [
                 name
