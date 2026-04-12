@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 import time
 from html import unescape
@@ -16,7 +17,8 @@ from psycopg.types.json import Json
 
 from engine.common.db import get_connection
 from engine.common.gpt import GPTClient
-from engine.common.prompts.process import get_prompt, translate_text
+from engine.common.logs import log
+from engine.common.translate import get_prompt, translate_text
 from engine.common.utils import h64_text, parse_json_object, parse_json_response
 from engine.core_status.is_active import is_more_needed
 
@@ -26,6 +28,8 @@ MAX_PAGE_TEXT_LEN = 8000
 MAX_WEBSITE_INPUT_LEN = 12000
 MAX_MEANINGFUL_BLOCKS = 30
 MIN_WORK_BATCH_SIZE = 15
+LOG_FILE = "rate_contacts.log"
+LOG_FOLDER = "processing"
 NOISY_LINE_MARKERS = (
     "cookie",
     "datenschutz",
@@ -35,6 +39,10 @@ NOISY_LINE_MARKERS = (
     "newsletter",
     "kontakt",
 )
+
+
+def _log_event(payload: Dict[str, Any]) -> None:
+    log(LOG_FILE, folder=LOG_FOLDER, message=json.dumps(payload, ensure_ascii=False, default=str))
 
 
 def _uniq_text_list(values: Any) -> List[str]:
@@ -373,14 +381,30 @@ def run_once() -> Dict[str, Any]:
                             website_input = website_input[:MAX_WEBSITE_INPUT_LEN]
                         try:
                             website_resp = GPTClient().ask(
-                                model="gpt-5-nano",
+                                model="nano",
                                 service_tier="flex",
                                 user_id=str(user_id),
                                 instructions=get_prompt("process_website"),
                                 input=website_input,
-                                use_cache=False,
+                                use_local_cache=False,
                                 web_search=False,
                             )
+                            if str(website_resp.status or "").strip().upper() != "OK":
+                                wait_sec = random.randint(40, 60)
+                                result["status"] = "gpt_not_ok_website"
+                                _log_event(
+                                    {
+                                        "event": "rate_contacts",
+                                        "mode": "gpt_not_ok_website",
+                                        "task_id": int(task_id),
+                                        "task_type": task_type,
+                                        "contact_id": int(contact_id),
+                                        "gpt_status": str(website_resp.status or "").strip(),
+                                        "wait_sec": int(wait_sec),
+                                    }
+                                )
+                                time.sleep(float(wait_sec))
+                                return result
                             description_web = str(website_resp.content or "").strip()
                         except Exception:
                             description_web = ""
@@ -423,16 +447,32 @@ def run_once() -> Dict[str, Any]:
 
         try:
             resp = GPTClient().ask(
-                model="gpt-5.4",
+                model="standard",
                 service_tier="flex",
                 user_id=str(user_id),
                 instructions=instructions,
                 input=payload,
-                use_cache=False,
+                use_local_cache=False,
                 web_search=False,
             )
         except Exception:
             result["status"] = "gpt_error"
+            return result
+        if str(resp.status or "").strip().upper() != "OK":
+            wait_sec = random.randint(40, 60)
+            result["status"] = "gpt_not_ok"
+            _log_event(
+                {
+                    "event": "rate_contacts",
+                    "mode": "gpt_not_ok",
+                    "task_id": int(task_id),
+                    "task_type": task_type,
+                    "gpt_status": str(resp.status or "").strip(),
+                    "wait_sec": int(wait_sec),
+                    "picked_cnt": int(result.get("picked_cnt", 0)),
+                }
+            )
+            time.sleep(float(wait_sec))
             return result
 
         parsed = parse_json_response(resp.content or "")

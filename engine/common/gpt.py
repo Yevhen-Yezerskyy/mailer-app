@@ -6,50 +6,48 @@ from __future__ import annotations
 
 import hashlib
 import os
+import random
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from engine.common.cache.client import memo as cache_memo
+from engine.common.cache.client import CLIENT, memo as cache_memo
+from engine.common.logs import log as host_log
 
 # ---------- CONSTANTS & TYPES ----------
 
-TierName = Literal["nano", "mini", "maxi", "maxi-51"]  # legacy only
-ServiceTier = Literal["flex", "standard", "priority"]
+MIN_LOCAL_CACHE_DAYS = 7
+MAX_LOCAL_CACHE_DAYS = 14
 
-DEFAULT_TTL_SEC = 7 * 24 * 60 * 60
-
-TIER_TO_MODEL: dict[str, str] = {
-    "nano": "gpt-5-nano",
-    "mini": "gpt-5-mini",
-    "maxi": "gpt-5.1",
-    "maxi-51": "gpt-5.1",
+MODEL_PRESETS: dict[str, str] = {
+    "standard": "gpt-5.4",
+    "mini": "gpt-5.4-mini",
+    "nano": "gpt-5.4-nano",
 }
 
-MODEL_ALIASES: dict[str, str] = {
-    "nano": "gpt-5-nano",
-    "mini": "gpt-5-mini",
-    "maxi": "gpt-5.1",
-    "maxi-51": "gpt-5.1",
-}
-
-MODEL_WEB_TOOL: dict[str, str] = {
-    "gpt-5.1": "web_search_preview",
-    "gpt-5.4": "web_search_preview",
-    "gpt-5.4-mini": "web_search_preview",
-    "gpt-5-mini": "web_search_preview",
-    "gpt-5-nano": "web_search_preview",
-}
+DEFAULT_MODEL_ALIAS = "standard"
 
 OPENAI_ENV_VAR = "OPENAI_API_KEY"
 
-ALLOWED_SERVICE_TIERS: set[str] = {"flex", "standard", "priority"}
+GPT_LOG_FOLDER = "gpt"
+HOST_STREAM_FILE = "stream.log"
+HOST_ERRORS_FILE = "errors.log"
+SYS_REQUESTS_FILE = "requests.log"
 
-HOST_STREAM_FILE = Path("/home/eee/mailer-app/logs/gpt/stream.log")
-HOST_ERRORS_FILE = Path("/home/eee/mailer-app/logs/gpt/errors.log")
-SYS_REQUESTS_FILE = Path("/home/eee/mailer-app/logs/gpt/requests.log")
+STATUS_OK = "OK"
+STATUS_ERROR_TMP = "ERROR_TMP"
+STATUS_ERROR_INT = "ERROR_INT"
+STATUS_ERROR = "ERROR"
+
+REQUEST_GATE_KEY = "gpt:request_gate"
+REQUEST_GATE_TTL_SEC = 0.5
+REQUEST_GATE_BACKOFF_SEC = 0.25
+REQUEST_GATE_ATTEMPTS = 20
+
+TMP_ERROR_BLOCK_KEY = "gpt:tmp_error_block"
+TMP_ERROR_BLOCK_TTL_SEC = 5 * 60
 
 
 class GptConfigError(RuntimeError):
@@ -63,9 +61,10 @@ class GptValidationError(ValueError):
 class GptSoftError(RuntimeError):
     """Soft GPT failure that must NOT crash Django views (no cache write)."""
 
-    def __init__(self, user_message: str, *, error_message: str = "") -> None:
+    def __init__(self, user_message: str, *, status: str, error_message: str = "") -> None:
         super().__init__(error_message or user_message)
         self.user_message = user_message
+        self.status = status
         self.error_message = error_message or user_message
 
 
@@ -81,6 +80,7 @@ class GptResponse:
     content: str
     raw: Dict[str, Any]
     usage: GptUsage
+    status: str = STATUS_OK
 
 
 # ---------- INTERNAL UTILS ----------
@@ -107,13 +107,63 @@ def _is_openai_related_exception(exc: Exception) -> bool:
     return "help.openai.com" in s or "request ID req_" in s or "server_error" in s
 
 
-def _is_retryable_soft_error_text(text: str) -> bool:
-    s = _optional_str(text).lower()
-    return (
-        "openai internal server error" in s
-        or "openai rate limit reached" in s
-        or "too many requests" in s
-    )
+def _status_code_from_exception(exc: Exception) -> Optional[int]:
+    code = getattr(exc, "status_code", None)
+    if isinstance(code, int):
+        return code
+
+    s = str(exc) or ""
+    m = re.search(r"(?:Error code|status code)\s*:\s*(\d{3})", s, flags=re.IGNORECASE)
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except Exception:
+        return None
+
+
+def _is_tmp_http_status(status_code: Optional[int]) -> bool:
+    return status_code == 429 or (isinstance(status_code, int) and status_code >= 500)
+
+
+def _error_status_for_exception(exc: Exception) -> str:
+    status_code = _status_code_from_exception(exc)
+    if _is_tmp_http_status(status_code):
+        return STATUS_ERROR_TMP
+    if _is_openai_related_exception(exc):
+        return STATUS_ERROR
+    return STATUS_ERROR_INT
+
+
+def _tmp_block_message() -> str:
+    return "OpenAI temporary unavailable. Try again later."
+
+
+def _internal_error_message() -> str:
+    return "Internal GPT connector error. Try again later."
+
+
+def _is_tmp_error_block_active() -> bool:
+    state = CLIENT.lock_status(TMP_ERROR_BLOCK_KEY)
+    return bool(state and bool(state.get("held")))
+
+
+def _set_tmp_error_block() -> None:
+    owner = f"gpt-tmp-block:{os.getpid()}:{int(time.time())}"
+    try:
+        CLIENT.lock_try(TMP_ERROR_BLOCK_KEY, ttl_sec=float(TMP_ERROR_BLOCK_TTL_SEC), owner=owner)
+    except Exception:
+        return
+
+
+def _acquire_request_gate() -> bool:
+    owner = f"gpt-gate:{os.getpid()}:{int(time.time() * 1000)}"
+    for _ in range(int(REQUEST_GATE_ATTEMPTS)):
+        info = CLIENT.lock_try(REQUEST_GATE_KEY, ttl_sec=float(REQUEST_GATE_TTL_SEC), owner=owner)
+        if info and bool(info.get("acquired")):
+            return True
+        time.sleep(float(REQUEST_GATE_BACKOFF_SEC))
+    return False
 
 
 def _require_api_key() -> str:
@@ -134,6 +184,22 @@ def _optional_str(value: Any) -> str:
         return ""
 
 
+def _resolve_model_name(model: Optional[str]) -> str:
+    model_raw = _optional_str(model)
+    if not model_raw:
+        return MODEL_PRESETS[DEFAULT_MODEL_ALIAS]
+    model_key = model_raw.casefold()
+    preset = MODEL_PRESETS.get(model_key)
+    if preset:
+        return preset
+    return model_raw
+
+
+def _random_local_cache_ttl_sec() -> int:
+    days = random.randint(MIN_LOCAL_CACHE_DAYS, MAX_LOCAL_CACHE_DAYS)
+    return days * 24 * 60 * 60
+
+
 def _short_hash(text: str, length: int = 16) -> str:
     if not text:
         return ""
@@ -141,22 +207,8 @@ def _short_hash(text: str, length: int = 16) -> str:
     return h[:length]
 
 
-def _write_log_block(path: Path, *lines: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as f:
-        for line in lines:
-            f.write(line)
-            if not line.endswith("\n"):
-                f.write("\n")
-
-
-def _guard_tier_for_engine(service_tier: ServiceTier) -> None:
-    """
-    Guard только для корректного service_tier (может быть расширен позже).
-    """
-    # Сейчас просто оставляем как есть (guard может быть расширен).
-    if service_tier not in ALLOWED_SERVICE_TIERS:
-        raise GptValidationError(f"Unsupported service_tier {service_tier!r}.")
+def _write_log_block(log_file: str, *lines: str) -> None:
+    host_log(log_file, folder=GPT_LOG_FOLDER, message="\n".join(lines))
 
 
 # ---------- LOGGING ----------
@@ -167,7 +219,7 @@ def _log_header(
     now: datetime,
     status: str,
     model_name: str,
-    service_tier: ServiceTier,
+    service_tier: str,
     user_id: str,
     usage: Optional[GptUsage],
     cache_hit: bool,
@@ -188,7 +240,7 @@ def _log_host_stream(
     now: datetime,
     status: str,
     model_name: str,
-    service_tier: ServiceTier,
+    service_tier: str,
     user_id: str,
     instructions: str,
     input_text: str,
@@ -227,7 +279,7 @@ def _log_host_error(
     now: datetime,
     status: str,
     model_name: str,
-    service_tier: ServiceTier,
+    service_tier: str,
     user_id: str,
     instructions: str,
     input_text: str,
@@ -266,7 +318,7 @@ def _log_system_request(
     now: datetime,
     status: str,
     model_name: str,
-    service_tier: ServiceTier,
+    service_tier: str,
     user_id: str,
     usage: Optional[GptUsage],
 ) -> None:
@@ -299,8 +351,9 @@ def _build_payload(
     model_name: str,
     instructions: str,
     input_text: str,
-    service_tier: ServiceTier,
-    web_search: Optional[bool] = None,
+    service_tier: str,
+    web_search: bool = False,
+    use_gpt_cache: bool = True,
 ) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
         "model": model_name,
@@ -311,9 +364,10 @@ def _build_payload(
 
     if instructions:
         payload["instructions"] = instructions
-        payload["prompt_cache_key"] = _short_hash(instructions, 16)
+        if use_gpt_cache:
+            payload["prompt_cache_key"] = _short_hash(instructions, 16)
 
-    _apply_web_search(payload, model_name=model_name, web_search=web_search, default_enabled=True)
+    _apply_web_search(payload, web_search=web_search)
 
     return payload
 
@@ -321,41 +375,22 @@ def _build_payload(
 def _apply_web_search(
     payload: Dict[str, Any],
     *,
-    model_name: str,
-    web_search: Optional[bool],
-    default_enabled: bool,
+    web_search: bool,
 ) -> None:
-    web_tool = MODEL_WEB_TOOL.get(model_name)
-    if not web_tool:
+    if not web_search:
         return
-
-    if web_search is None:
-        enabled = default_enabled
-    else:
-        enabled = bool(web_search)
 
     tools_value = payload.get("tools")
     tools_list = tools_value if isinstance(tools_value, list) else []
 
     def _is_web_tool(tool: Any) -> bool:
-        return isinstance(tool, dict) and str(tool.get("type") or "").strip() == web_tool
+        return isinstance(tool, dict) and str(tool.get("type") or "").strip() == "web_search"
 
-    if enabled:
-        if not any(_is_web_tool(tool) for tool in tools_list):
-            payload["tools"] = [*tools_list, {"type": web_tool}]
-        elif isinstance(tools_value, list):
-            payload["tools"] = tools_list
-        payload.setdefault("tool_choice", "auto")
-        return
-
-    if isinstance(tools_value, list):
-        filtered_tools = [tool for tool in tools_list if not _is_web_tool(tool)]
-        if filtered_tools:
-            payload["tools"] = filtered_tools
-        else:
-            payload.pop("tools", None)
-            if payload.get("tool_choice") == "auto":
-                payload.pop("tool_choice", None)
+    if not any(_is_web_tool(tool) for tool in tools_list):
+        payload["tools"] = [*tools_list, {"type": "web_search"}]
+    elif isinstance(tools_value, list):
+        payload["tools"] = tools_list
+    payload.setdefault("tool_choice", "auto")
 
 
 # ---------- MAIN CLIENT ----------
@@ -364,73 +399,144 @@ def _apply_web_search(
 class GPTClient:
     def __init__(self, debug: bool = False) -> None:
         # debug оставлен только для обратной совместимости вызовов.
-        _require_api_key()
         _ = debug
 
-    def ask(
+    @staticmethod
+    def _forced_error_response(
+        *,
+        model_name: str,
+        service_tier: str,
+        user_id_str: str,
+        instructions: str,
+        input_text: str,
+    ) -> GptResponse:
+        message = _tmp_block_message()
+        status = f"{STATUS_ERROR_TMP} (forced_always)"
+        now = datetime.now()
+
+        _log_host_stream(
+            now=now,
+            status=status,
+            model_name=model_name,
+            service_tier=service_tier,
+            user_id=user_id_str,
+            instructions=instructions,
+            input_text=input_text,
+            output_text=message,
+            usage=None,
+            cache_hit=False,
+            real_request=False,
+            error_message="forced GPT failure for UI check",
+        )
+        _log_host_error(
+            now=now,
+            status=status,
+            model_name=model_name,
+            service_tier=service_tier,
+            user_id=user_id_str,
+            instructions=instructions,
+            input_text=input_text,
+            output_text=message,
+            usage=None,
+            cache_hit=False,
+            real_request=False,
+            error_message="forced GPT failure for UI check",
+        )
+        _log_system_request(
+            now=now,
+            status=status,
+            model_name=model_name,
+            service_tier=service_tier,
+            user_id=user_id_str,
+            usage=None,
+        )
+
+        return GptResponse(
+            content=message,
+            raw={"soft_error": True, "forced_error": True},
+            usage=GptUsage(),
+            status=STATUS_ERROR_TMP,
+        )
+
+    def _run_payload(
         self,
         *,
-        model: Optional[str] = None,
-        instructions: Optional[str] = None,
-        input: Optional[str] = None,
-        override: Optional[Dict[str, Any]] = None,
-        use_cache: bool = True,
-        user_id: Any = "SET USER URGENTLY",
-        service_tier: Optional[ServiceTier] = None,
-        web_search: Optional[bool] = None,
-        # --- Legacy --- #
-        tier: TierName = "nano",
-        system: str = "",
-        user: str = "",
-        **kwargs,
+        payload: Dict[str, Any],
+        user_id_str: str,
+        default_tier: str,
     ) -> GptResponse:
-        _require_api_key()
+        model_for_log = _optional_str(payload.get("model")) or "-"
+        instructions_for_log = str(payload.get("instructions", ""))
+        input_for_log = str(payload.get("input", ""))
+        tier_for_log = _optional_str(payload.get("service_tier")) or default_tier
 
-        user_id_str = _optional_str(user_id) or "SET USER URGENTLY"
-        effective_tier: ServiceTier = service_tier or "flex"
-        if effective_tier not in ALLOWED_SERVICE_TIERS:
-            raise GptValidationError(f"Unsupported service_tier {effective_tier!r}.")
+        if _is_tmp_error_block_active():
+            message = _tmp_block_message()
+            _log_host_stream(
+                now=datetime.now(),
+                status=f"{STATUS_ERROR_TMP} (global_lock_active)",
+                model_name=model_for_log,
+                service_tier=tier_for_log,
+                user_id=user_id_str,
+                instructions=instructions_for_log,
+                input_text=input_for_log,
+                output_text=message,
+                usage=None,
+                cache_hit=False,
+                real_request=False,
+            )
+            return GptResponse(content=message, raw={"soft_error": True, "blocked": True}, usage=GptUsage(), status=STATUS_ERROR_TMP)
 
-        # override: bypass всех guard'ов (как ты и хотел)
-        if override is not None:
-            if not isinstance(override, dict):
-                raise GptValidationError("override must be a dict.")
-            override_payload = dict(override)
-            if web_search is not None:
-                override_model_name = MODEL_ALIASES.get(
-                    _optional_str(override_payload.get("model")),
-                    _optional_str(override_payload.get("model")),
+        for api_attempt in range(2):
+            if not _acquire_request_gate():
+                message = _internal_error_message()
+                _log_host_stream(
+                    now=datetime.now(),
+                    status=f"{STATUS_ERROR_INT} (gate_timeout)",
+                    model_name=model_for_log,
+                    service_tier=tier_for_log,
+                    user_id=user_id_str,
+                    instructions=instructions_for_log,
+                    input_text=input_for_log,
+                    output_text=message,
+                    usage=None,
+                    cache_hit=False,
+                    real_request=False,
                 )
-                _apply_web_search(
-                    override_payload,
-                    model_name=override_model_name,
-                    web_search=web_search,
-                    default_enabled=False,
+                _log_host_error(
+                    now=datetime.now(),
+                    status=f"{STATUS_ERROR_INT} (gate_timeout)",
+                    model_name=model_for_log,
+                    service_tier=tier_for_log,
+                    user_id=user_id_str,
+                    instructions=instructions_for_log,
+                    input_text=input_for_log,
+                    output_text=message,
+                    usage=None,
+                    cache_hit=False,
+                    real_request=False,
+                    error_message="gpt request gate lock timeout",
                 )
+                return GptResponse(
+                    content=message,
+                    raw={"soft_error": True, "gate_timeout": True},
+                    usage=GptUsage(),
+                    status=STATUS_ERROR_INT,
+                )
+
             try:
                 t0 = time.monotonic()
                 client = _get_openai_client()
-                resp = client.responses.create(**override_payload)
+                resp = client.responses.create(**payload)
                 elapsed_ms = int((time.monotonic() - t0) * 1000)
 
                 raw = resp.model_dump()
                 content = str(getattr(resp, "output_text", "") or "")
                 usage = self._extract_usage(raw)
-
-                log_tier = (
-                    str(override_payload.get("service_tier")).strip()
-                    if str(override_payload.get("service_tier", "")).strip()
-                    else effective_tier
-                )
-                now = datetime.now()
-                tier_for_log = log_tier if log_tier in ALLOWED_SERVICE_TIERS else effective_tier
-                model_for_log = str(override_payload.get("model", "-"))
-                instructions_for_log = str(override_payload.get("instructions", ""))
-                input_for_log = str(override_payload.get("input", ""))
-                status_for_log = f"ok ({elapsed_ms} ms)"
+                status_for_log = f"{STATUS_OK} ({elapsed_ms} ms)"
 
                 _log_host_stream(
-                    now=now,
+                    now=datetime.now(),
                     status=status_for_log,
                     model_name=model_for_log,
                     service_tier=tier_for_log,
@@ -443,31 +549,26 @@ class GPTClient:
                     real_request=True,
                 )
                 _log_system_request(
-                    now=now,
+                    now=datetime.now(),
                     status=status_for_log,
                     model_name=model_for_log,
                     service_tier=tier_for_log,
                     user_id=user_id_str,
                     usage=usage,
                 )
-                return GptResponse(content=content, raw=raw, usage=usage)
+                return GptResponse(content=content, raw=raw, usage=usage, status=STATUS_OK)
             except Exception as exc:
-                log_tier = (
-                    str(override_payload.get("service_tier")).strip()
-                    if str(override_payload.get("service_tier", "")).strip()
-                    else effective_tier
-                )
-                now = datetime.now()
-                tier_for_log = log_tier if log_tier in ALLOWED_SERVICE_TIERS else effective_tier
-                model_for_log = str(override_payload.get("model", "-"))
-                instructions_for_log = str(override_payload.get("instructions", ""))
-                input_for_log = str(override_payload.get("input", ""))
+                status_out = _error_status_for_exception(exc)
+                http_code = _status_code_from_exception(exc)
                 error_message = str(exc)
-                output_for_log = _soft_error_message(exc) if _is_openai_related_exception(exc) else ""
+                if status_out == STATUS_ERROR_INT:
+                    output_for_log = _internal_error_message()
+                else:
+                    output_for_log = _soft_error_message(exc)
 
                 _log_host_stream(
-                    now=now,
-                    status="error",
+                    now=datetime.now(),
+                    status=f"{status_out}" if http_code is None else f"{status_out} ({http_code})",
                     model_name=model_for_log,
                     service_tier=tier_for_log,
                     user_id=user_id_str,
@@ -480,8 +581,8 @@ class GPTClient:
                     error_message=error_message,
                 )
                 _log_host_error(
-                    now=now,
-                    status="error",
+                    now=datetime.now(),
+                    status=f"{status_out}" if http_code is None else f"{status_out} ({http_code})",
                     model_name=model_for_log,
                     service_tier=tier_for_log,
                     user_id=user_id_str,
@@ -494,176 +595,154 @@ class GPTClient:
                     error_message=error_message,
                 )
                 _log_system_request(
-                    now=now,
-                    status="error",
+                    now=datetime.now(),
+                    status=f"{status_out}" if http_code is None else f"{status_out} ({http_code})",
                     model_name=model_for_log,
                     service_tier=tier_for_log,
                     user_id=user_id_str,
                     usage=None,
                 )
-                if _is_openai_related_exception(exc):
-                    return GptResponse(content=_soft_error_message(exc), raw={"soft_error": True}, usage=GptUsage())
-                raise
 
-        instr = _optional_str(instructions) if instructions is not None else _optional_str(system)
-        inp = _optional_str(input) if input is not None else _optional_str(user)
+                if status_out == STATUS_ERROR_TMP and api_attempt == 0:
+                    time.sleep(float(REQUEST_GATE_BACKOFF_SEC))
+                    continue
+                if status_out == STATUS_ERROR_TMP:
+                    _set_tmp_error_block()
+                    return GptResponse(
+                        content=_tmp_block_message(),
+                        raw={"soft_error": True, "tmp_error_block": True},
+                        usage=GptUsage(),
+                        status=STATUS_ERROR_TMP,
+                    )
+                return GptResponse(
+                    content=output_for_log,
+                    raw={"soft_error": True},
+                    usage=GptUsage(),
+                    status=status_out,
+                )
 
-        model_in = _optional_str(model)
-        if model_in:
-            model_name = MODEL_ALIASES.get(model_in, model_in)
-        else:
-            model_name = TIER_TO_MODEL.get(str(tier), "gpt-5-nano")
+        return GptResponse(
+            content=_internal_error_message(),
+            raw={"soft_error": True, "unexpected_flow": True},
+            usage=GptUsage(),
+            status=STATUS_ERROR_INT,
+        )
+
+    def ask(
+        self,
+        *,
+        model: Optional[str] = None,
+        instructions: Optional[str] = None,
+        input: Optional[str] = None,
+        override: Optional[Dict[str, Any]] = None,
+        use_local_cache: bool = False,
+        use_gpt_cache: bool = True,
+        user_id: Any = "SET USER URGENTLY",
+        service_tier: Optional[str] = None,
+        web_search: bool = False,
+    ) -> GptResponse:
+        user_id_str = _optional_str(user_id) or "SET USER URGENTLY"
+        effective_tier: str = service_tier or "flex"
+
+        # override: bypass всех guard'ов (как ты и хотел)
+        if override is not None:
+            if not isinstance(override, dict):
+                raise GptValidationError("override must be a dict.")
+            override_payload = dict(override)
+            override_model = _optional_str(override_payload.get("model"))
+            if override_model:
+                override_payload["model"] = _resolve_model_name(override_model)
+            override_instructions = _optional_str(override_payload.get("instructions"))
+            if use_gpt_cache:
+                if override_instructions and not _optional_str(override_payload.get("prompt_cache_key")):
+                    override_payload["prompt_cache_key"] = _short_hash(override_instructions, 16)
+            else:
+                override_payload.pop("prompt_cache_key", None)
+            if web_search:
+                _apply_web_search(override_payload, web_search=True)
+            return self._run_payload(
+                payload=override_payload,
+                user_id_str=user_id_str,
+                default_tier=effective_tier,
+            )
+
+        instr = _optional_str(instructions)
+        inp = _optional_str(input)
+        model_name = _resolve_model_name(model)
 
         if not instr and not inp:
             # Пустой запрос — платформу не зовём, и лог не пишем.
-            return GptResponse(content="", raw={}, usage=GptUsage())
+            return GptResponse(content="", raw={}, usage=GptUsage(), status=STATUS_OK)
 
-        query: Tuple[str, str, str, str] = (
+        query: Tuple[str, str, str, str, str] = (
             model_name,
             instr,
             inp,
-            "default" if web_search is None else ("on" if web_search else "off"),
+            "web:on" if web_search else "web:off",
+            "gptcache:on" if use_gpt_cache else "gptcache:off",
         )
 
         last_raw: Optional[Dict[str, Any]] = None
         last_usage: Optional[GptUsage] = None
 
-        def _fn(q: Tuple[str, str, str, str]) -> str:
+        def _fn(q: Tuple[str, str, str, str, str]) -> str:
             nonlocal last_raw, last_usage
 
-            m, ins, inpt, _ = q
+            m, ins, inpt, _, _ = q
             payload = _build_payload(
                 model_name=m,
                 instructions=ins,
                 input_text=inpt,
                 service_tier=effective_tier,
                 web_search=web_search,
+                use_gpt_cache=use_gpt_cache,
             )
 
-            # Guard: только для НЕ-override вызовов, прямо перед платформой
-            _guard_tier_for_engine(effective_tier)
+            payload["service_tier"] = effective_tier
 
-            api_tier = "default" if effective_tier == "standard" else effective_tier
-            payload["service_tier"] = api_tier
+            resp = self._run_payload(
+                payload=payload,
+                user_id_str=user_id_str,
+                default_tier=effective_tier,
+            )
+            if resp.status != STATUS_OK:
+                raise GptSoftError(resp.content, status=resp.status, error_message=resp.content)
 
-            try:
-                t0 = time.monotonic()
-                client = _get_openai_client()
-                resp = client.responses.create(**payload)
-                elapsed_ms = int((time.monotonic() - t0) * 1000)
+            last_raw = resp.raw
+            last_usage = resp.usage
+            return str(resp.content or "")
 
-                raw = resp.model_dump()
-                usage = self._extract_usage(raw)
-                out_text = str(getattr(resp, "output_text", "") or "")
-
-                last_raw = raw
-                last_usage = usage
-
-                now = datetime.now()
-                status_for_log = f"ok ({elapsed_ms} ms)"
-                _log_host_stream(
-                    now=now,
-                    status=status_for_log,
-                    model_name=m,
-                    service_tier=effective_tier,
-                    user_id=user_id_str,
-                    instructions=ins,
-                    input_text=inpt,
-                    usage=usage,
-                    output_text=out_text,
-                    cache_hit=False,
-                    real_request=True,
+        try:
+            if use_local_cache:
+                local_cache_ttl_sec = _random_local_cache_ttl_sec()
+                content = cache_memo(
+                    query,
+                    _fn,
+                    ttl=local_cache_ttl_sec,
+                    version="gpt.content.v2",
+                    update=False,
                 )
-                _log_system_request(
-                    now=now,
-                    status=status_for_log,
-                    model_name=m,
-                    service_tier=effective_tier,
-                    user_id=user_id_str,
-                    usage=usage,
-                )
-                return out_text
-            except Exception as exc:
-                now = datetime.now()
-                error_message = str(exc)
-                output_for_log = _soft_error_message(exc) if _is_openai_related_exception(exc) else ""
-                _log_host_stream(
-                    now=now,
-                    status="error",
-                    model_name=m,
-                    service_tier=effective_tier,
-                    user_id=user_id_str,
-                    instructions=ins,
-                    input_text=inpt,
-                    usage=None,
-                    output_text=output_for_log,
-                    cache_hit=False,
-                    real_request=True,
-                    error_message=error_message,
-                )
-                _log_host_error(
-                    now=now,
-                    status="error",
-                    model_name=m,
-                    service_tier=effective_tier,
-                    user_id=user_id_str,
-                    instructions=ins,
-                    input_text=inpt,
-                    output_text=output_for_log,
-                    usage=None,
-                    cache_hit=False,
-                    real_request=True,
-                    error_message=error_message,
-                )
-                _log_system_request(
-                    now=now,
-                    status="error",
-                    model_name=m,
-                    service_tier=effective_tier,
-                    user_id=user_id_str,
-                    usage=None,
-                )
-                if _is_openai_related_exception(exc):
-                    raise GptSoftError(_soft_error_message(exc), error_message=str(exc))
-                raise
-
-        for attempt in range(2):
-            try:
-                if use_cache:
-                    content = cache_memo(
-                        query,
-                        _fn,
-                        ttl=DEFAULT_TTL_SEC,
-                        version="gpt.content.v2",
-                        update=False,
+                if last_raw is None:
+                    _log_host_stream(
+                        now=datetime.now(),
+                        status="cache",
+                        model_name=model_name,
+                        service_tier=effective_tier,
+                        user_id=user_id_str,
+                        instructions=instr,
+                        input_text=inp,
+                        output_text=str(content or ""),
+                        usage=None,
+                        cache_hit=True,
+                        real_request=False,
                     )
-                    if last_raw is None:
-                        _log_host_stream(
-                            now=datetime.now(),
-                            status="cache",
-                            model_name=model_name,
-                            service_tier=effective_tier,
-                            user_id=user_id_str,
-                            instructions=instr,
-                            input_text=inp,
-                            output_text=str(content or ""),
-                            usage=None,
-                            cache_hit=True,
-                            real_request=False,
-                        )
-                        return GptResponse(content=str(content or ""), raw={"cached": True}, usage=GptUsage())
-                    return GptResponse(content=str(content or ""), raw=last_raw or {}, usage=last_usage or GptUsage())
+                    return GptResponse(content=str(content or ""), raw={"cached": True}, usage=GptUsage(), status=STATUS_OK)
+                return GptResponse(content=str(content or ""), raw=last_raw or {}, usage=last_usage or GptUsage(), status=STATUS_OK)
 
-                content = _fn(query)
-                return GptResponse(content=str(content or ""), raw=last_raw or {}, usage=last_usage or GptUsage())
-
-            except GptSoftError as exc:
-                if attempt == 0 and _is_retryable_soft_error_text(exc.user_message):
-                    time.sleep(3.0)
-                    last_raw = None
-                    last_usage = None
-                    continue
-                return GptResponse(content=exc.user_message, raw={"soft_error": True}, usage=GptUsage())
+            content = _fn(query)
+            return GptResponse(content=str(content or ""), raw=last_raw or {}, usage=last_usage or GptUsage(), status=STATUS_OK)
+        except GptSoftError as exc:
+            return GptResponse(content=exc.user_message, raw={"soft_error": True}, usage=GptUsage(), status=exc.status)
 
     @staticmethod
     def _extract_usage(raw: Dict[str, Any]) -> GptUsage:
@@ -677,14 +756,15 @@ class GPTClient:
     def ask_dialog(
         self,
         *,
-        model: str,
+        model: Optional[str] = None,
         input: str,
         instructions: str = "",
+        use_gpt_cache: bool = True,
         user_id: Any = "SET USER URGENTLY",
-        service_tier: Optional[ServiceTier] = None,
+        service_tier: Optional[str] = None,
         conversation: Optional[str] = None,
         previous_response_id: Optional[str] = None,
-        web_search: Optional[bool] = None,
+        web_search: bool = False,
     ) -> GptResponse:
         """
         Dialog branch (platform-managed context):
@@ -692,15 +772,13 @@ class GPTClient:
         - no local cache/history
         - caller keeps only key ids (conversation/response)
         """
-        model_name = _optional_str(model)
-        if not model_name:
-            raise GptValidationError("model is required for ask_dialog.")
+        model_name = _resolve_model_name(model)
 
         payload: Dict[str, Any] = {
-            "model": MODEL_ALIASES.get(model_name, model_name),
+            "model": model_name,
             "input": _optional_str(input),
             "store": True,
-            "service_tier": "default" if (service_tier or "flex") == "standard" else (service_tier or "flex"),
+            "service_tier": (service_tier or "flex"),
         }
 
         instr = _optional_str(instructions)
@@ -715,16 +793,13 @@ class GPTClient:
         if prev:
             payload["previous_response_id"] = prev
 
-        _apply_web_search(
-            payload,
-            model_name=str(payload["model"]),
-            web_search=web_search,
-            default_enabled=True,
-        )
+        if web_search:
+            _apply_web_search(payload, web_search=True)
 
         resp = self.ask(
             override=payload,
-            use_cache=False,
+            use_local_cache=False,
+            use_gpt_cache=use_gpt_cache,
             user_id=user_id,
             service_tier=service_tier or "flex",
             web_search=web_search,
