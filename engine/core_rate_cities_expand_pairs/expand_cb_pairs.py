@@ -16,8 +16,9 @@ from engine.common.logs import log
 from engine.common.utils import h64_text
 
 
-EXPAND_LIMIT = 50_000
-LOW_WATERMARK = 1_000
+INITIAL_EXPAND_LIMIT = 10_000
+TOPUP_INTERVAL = 5_000
+LOW_WATERMARK = 5_000
 TMP_STAGE_PASSES = 3
 TASK_LOCK_TTL_SEC = 300
 LOG_FILE = "expand_cb_pairs.log"
@@ -399,55 +400,150 @@ def _pick_active_task() -> Tuple[Optional[Dict[str, Any]], Optional[str], int]:
     return task, token, sql_pick_ms
 
 
-def _load_task_pair_count(task_id: int) -> int:
+def _probe_task_rows(task_id: int, offset: int, *, only_positive: bool = False) -> list[tuple[int]]:
+    sql = """
+        SELECT tcr.id
+        FROM public.task_cb_ratings tcr
+        WHERE tcr.task_id = %s
+          {rate_filter}
+        ORDER BY tcr.rate ASC NULLS LAST, tcr.id ASC
+        OFFSET %s
+        LIMIT 2
+    """.format(rate_filter="AND tcr.rate > 0" if only_positive else "")
     with get_connection() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT COUNT(*)::int
-            FROM public.task_cb_ratings
-            WHERE task_id = %s
-            """,
-            (int(task_id),),
-        )
-        return int((cur.fetchone() or [0])[0] or 0)
+        cur.execute(sql, (int(task_id), max(0, int(offset))))
+        return list(cur.fetchall() or [])
 
 
-def _load_has_1000th_uncollected(task_id: int) -> bool:
-    with get_connection() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
+def _has_task_row_at_rank(task_id: int, rank_1_based: int, *, only_positive: bool = False) -> bool:
+    if int(rank_1_based) <= 0:
+        return False
+    rows = _probe_task_rows(int(task_id), int(rank_1_based) - 1, only_positive=bool(only_positive))
+    return bool(rows)
+
+
+def _load_task_pair_count_without_count(task_id: int, *, only_positive: bool = False) -> int:
+    if not _has_task_row_at_rank(int(task_id), 1, only_positive=bool(only_positive)):
+        return 0
+
+    step = int(max(1, TOPUP_INTERVAL))
+    probe_size = int(step)
+    lower_bound = 1
+
+    while True:
+        rows = _probe_task_rows(int(task_id), int(probe_size) - 1, only_positive=bool(only_positive))
+        if len(rows) >= 2:
+            lower_bound = int(probe_size) + 1
+            probe_size = int(probe_size) * 2
+            continue
+        if len(rows) == 1:
+            return int(probe_size)
+        break
+
+    lo = int(max(1, lower_bound))
+    hi = int(probe_size) - 1
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        if _has_task_row_at_rank(int(task_id), int(mid), only_positive=bool(only_positive)):
+            lo = int(mid)
+        else:
+            hi = int(mid) - 1
+    return int(lo)
+
+
+def _has_watermark_uncollected(task_id: int, *, prefix_limit: Optional[int] = None) -> bool:
+    if prefix_limit is not None and int(prefix_limit) <= 0:
+        return False
+
+    if prefix_limit is None:
+        sql = """
             SELECT 1
             FROM public.task_cb_ratings tcr
             JOIN public.cb_crawl_pairs cp
               ON cp.id = tcr.cb_id
             WHERE tcr.task_id = %s
+              AND tcr.rate > 0
               AND cp.collected = false
-            ORDER BY tcr.rate ASC NULLS LAST, tcr.cb_id ASC
+            ORDER BY tcr.rate ASC NULLS LAST, tcr.id ASC
             OFFSET %s
             LIMIT 1
-            """,
-            (int(task_id), int(LOW_WATERMARK - 1)),
-        )
+        """
+        params: tuple[int, int] = (int(task_id), int(LOW_WATERMARK - 1))
+    else:
+        sql = """
+            WITH prefix AS (
+                SELECT tcr.id, tcr.cb_id, tcr.rate
+                FROM public.task_cb_ratings tcr
+                WHERE tcr.task_id = %s
+                  AND tcr.rate > 0
+                ORDER BY tcr.rate ASC NULLS LAST, tcr.id ASC
+                LIMIT %s
+            )
+            SELECT 1
+            FROM prefix p
+            JOIN public.cb_crawl_pairs cp
+              ON cp.id = p.cb_id
+            WHERE cp.collected = false
+            ORDER BY p.rate ASC NULLS LAST, p.id ASC
+            OFFSET %s
+            LIMIT 1
+        """
+        params = (int(task_id), int(prefix_limit), int(LOW_WATERMARK - 1))
+
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(sql, params)
         return cur.fetchone() is not None
 
 
-def _load_existing_keys(task_id: int) -> Set[Tuple[int, int]]:
+def _zero_task_rates(task_id: int, *, city_hash: int, branch_hash: int) -> int:
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            SELECT cb.plz_id, cb.branch_id
-            FROM public.task_cb_ratings tcr
-            JOIN public.cb_crawl_pairs cb
-              ON cb.id = tcr.cb_id
+            UPDATE public.task_cb_ratings tcr
+            SET rate = 0,
+                updated_at = now()
             WHERE tcr.task_id = %s
+              AND tcr.rate IS DISTINCT FROM 0
             """,
             (int(task_id),),
         )
-        return {
-            (int(row[0]), int(row[1]))
-            for row in (cur.fetchall() or [])
-            if row
-        }
+        updated_cnt = int(cur.rowcount or 0)
+        _save_task_hashes(cur, int(task_id), int(city_hash), int(branch_hash))
+        conn.commit()
+    return int(updated_cnt)
+
+
+def _has_watermark_uncollected_in_pairs(pairs: List[PairRate]) -> bool:
+    if not pairs:
+        return False
+    with get_connection() as conn, conn.cursor() as cur:
+        _stage_task_pairs(cur, pairs)
+        cur.execute(
+            """
+            INSERT INTO public.cb_crawl_pairs (plz_id, branch_id)
+            SELECT t.plz_id, t.branch_id
+            FROM __cb_ratings_tmp__ t
+            ON CONFLICT (plz_id, branch_id) DO NOTHING
+            """
+        )
+        cur.execute(
+            """
+            SELECT 1
+            FROM __cb_ratings_tmp__ t
+            JOIN public.cb_crawl_pairs cp
+              ON cp.plz_id = t.plz_id
+             AND cp.branch_id = t.branch_id
+            WHERE cp.collected = false
+            ORDER BY t.rate ASC, t.plz_id ASC, t.branch_id ASC
+            OFFSET %s
+            LIMIT 1
+            """,
+            (int(LOW_WATERMARK - 1),),
+        )
+        found = cur.fetchone() is not None
+        _clear_task_pairs_tmp(cur)
+        conn.commit()
+    return bool(found)
 
 
 def _write_selected_pairs(
@@ -531,81 +627,45 @@ def run_initial_once() -> Dict[str, Any]:
         sql_delete_tail_ms = 0
         sql_save_hash_ms = 0
         sql_clear_tmp_ms = 0
-        has_1000th_uncollected = False
+        has_watermark_uncollected = False
         stale = False
-        need_full_refresh = True
+        need_full_refresh = False
         need_topup = False
 
         started_at = time.perf_counter()
-        has_pairs = bool(_load_task_pair_count(task_id) > 0)
+        has_pairs = _has_task_row_at_rank(task_id, 1)
         sql_check_has_pairs_ms = int((time.perf_counter() - started_at) * 1000)
 
         if has_pairs:
             mode = "noop"
             reason = "already_has_pairs"
-            result = {
-                "mode": str(mode),
-                "task_id": task_id,
-                "city_hash": int(city_hash),
-                "branch_hash": int(branch_hash),
-                "has_pairs": bool(has_pairs),
-                "has_1000th_uncollected": bool(has_1000th_uncollected),
-                "stale": bool(stale),
-                "need_full_refresh": bool(need_full_refresh),
-                "need_topup": bool(need_topup),
-                "plz_cnt": int(plz_cnt),
-                "branch_cnt": int(branch_cnt),
-                "full_pairs_cnt": int(full_pairs_cnt),
-                "selected_pairs_cnt": len(selected_pairs),
-                "written": int(written),
-                "deleted": int(deleted),
-                "low_watermark": int(LOW_WATERMARK),
-                "expand_limit": int(EXPAND_LIMIT),
-                "sql_pick_ms": int(sql_pick_ms),
-                "sql_snapshot_ms": int(sql_snapshot_ms),
-                "sql_full_snapshot_ms": int(sql_full_snapshot_ms),
-                "sql_check_has_pairs_ms": int(sql_check_has_pairs_ms),
-                "sql_check_full_ms": int(sql_check_full_ms),
-                "sql_check_uncollected_ms": int(sql_check_uncollected_ms),
-                "sql_existing_keys_ms": int(sql_existing_keys_ms),
-                "sql_stage_ms": int(sql_stage_ms),
-                "sql_upsert_ms": int(sql_upsert_ms),
-                "sql_delete_tail_ms": int(sql_delete_tail_ms),
-                "sql_save_hash_ms": int(sql_save_hash_ms),
-                "sql_clear_tmp_ms": int(sql_clear_tmp_ms),
-                "reason": str(reason),
-            }
-            log(LOG_FILE, folder=LOG_FOLDER, message=json.dumps({"event": "expand_cb_pairs_initial", **result}, ensure_ascii=False, default=str))
-            return result
-
-        started_at = time.perf_counter()
-        city_hash, branch_hash, full_pairs, plz_cnt, branch_cnt = _load_full_snapshot(task_id)
-        sql_full_snapshot_ms = int((time.perf_counter() - started_at) * 1000)
-        full_pairs_cnt = len(full_pairs)
-
-        if not full_pairs_cnt:
-            mode = "noop"
-            reason = "empty_expansion"
         else:
-            mode = "initial_insert"
-            selected_pairs = list(full_pairs[:EXPAND_LIMIT])
+            started_at = time.perf_counter()
+            city_hash, branch_hash, full_pairs, plz_cnt, branch_cnt = _load_full_snapshot(task_id)
+            sql_full_snapshot_ms = int((time.perf_counter() - started_at) * 1000)
+            full_pairs_cnt = len(full_pairs)
 
-        if selected_pairs:
-            write_stats = _write_selected_pairs(
-                task_id,
-                selected_pairs,
-                city_hash=int(city_hash),
-                branch_hash=int(branch_hash),
-                delete_tail=True,
-                save_hashes=True,
-            )
-            written = int(write_stats["written"])
-            deleted = int(write_stats["deleted"])
-            sql_stage_ms = int(write_stats["sql_stage_ms"])
-            sql_upsert_ms = int(write_stats["sql_upsert_ms"])
-            sql_delete_tail_ms = int(write_stats["sql_delete_tail_ms"])
-            sql_save_hash_ms = int(write_stats["sql_save_hash_ms"])
-            sql_clear_tmp_ms = int(write_stats["sql_clear_tmp_ms"])
+            if not full_pairs_cnt:
+                mode = "noop"
+                reason = "empty_expansion"
+            else:
+                mode = "initial_insert"
+                selected_pairs = list(full_pairs[:int(INITIAL_EXPAND_LIMIT)])
+                write_stats = _write_selected_pairs(
+                    task_id,
+                    selected_pairs,
+                    city_hash=int(city_hash),
+                    branch_hash=int(branch_hash),
+                    delete_tail=True,
+                    save_hashes=True,
+                )
+                written = int(write_stats["written"])
+                deleted = int(write_stats["deleted"])
+                sql_stage_ms = int(write_stats["sql_stage_ms"])
+                sql_upsert_ms = int(write_stats["sql_upsert_ms"])
+                sql_delete_tail_ms = int(write_stats["sql_delete_tail_ms"])
+                sql_save_hash_ms = int(write_stats["sql_save_hash_ms"])
+                sql_clear_tmp_ms = int(write_stats["sql_clear_tmp_ms"])
 
         result = {
             "mode": str(mode),
@@ -613,7 +673,7 @@ def run_initial_once() -> Dict[str, Any]:
             "city_hash": int(city_hash),
             "branch_hash": int(branch_hash),
             "has_pairs": bool(has_pairs),
-            "has_1000th_uncollected": bool(has_1000th_uncollected),
+            "has_watermark_uncollected": bool(has_watermark_uncollected),
             "stale": bool(stale),
             "need_full_refresh": bool(need_full_refresh),
             "need_topup": bool(need_topup),
@@ -624,7 +684,7 @@ def run_initial_once() -> Dict[str, Any]:
             "written": int(written),
             "deleted": int(deleted),
             "low_watermark": int(LOW_WATERMARK),
-            "expand_limit": int(EXPAND_LIMIT),
+            "expand_limit": int(INITIAL_EXPAND_LIMIT),
             "sql_pick_ms": int(sql_pick_ms),
             "sql_snapshot_ms": int(sql_snapshot_ms),
             "sql_full_snapshot_ms": int(sql_full_snapshot_ms),
@@ -664,7 +724,7 @@ def run_active_once() -> Dict[str, Any]:
         full_pairs_cnt = 0
         selected_pairs: List[PairRate] = []
         written = 0
-        has_1000th_uncollected = False
+        has_watermark_uncollected = False
         stale = False
         need_full_refresh = False
         need_topup = False
@@ -680,10 +740,10 @@ def run_active_once() -> Dict[str, Any]:
         sql_delete_tail_ms = 0
         sql_save_hash_ms = 0
         sql_clear_tmp_ms = 0
+        zeroed_rates = 0
 
         started_at = time.perf_counter()
-        existing_pair_cnt = _load_task_pair_count(task_id)
-        has_pairs = bool(existing_pair_cnt > 0)
+        has_pairs = _has_task_row_at_rank(task_id, 1)
         sql_check_has_pairs_ms = int((time.perf_counter() - started_at) * 1000)
 
         if not has_pairs:
@@ -691,18 +751,32 @@ def run_active_once() -> Dict[str, Any]:
             city_hash, branch_hash, full_pairs, plz_cnt, branch_cnt = _load_full_snapshot(task_id)
             sql_full_snapshot_ms = int((time.perf_counter() - started_at) * 1000)
             full_pairs_cnt = len(full_pairs)
-
             if not full_pairs_cnt:
                 mode = "noop"
                 reason = "empty_expansion"
             else:
+                target_cnt = min(int(INITIAL_EXPAND_LIMIT), int(full_pairs_cnt))
+                selected_pairs = list(full_pairs[:target_cnt])
+                write_stats = _write_selected_pairs(
+                    task_id,
+                    selected_pairs,
+                    city_hash=int(city_hash),
+                    branch_hash=int(branch_hash),
+                    delete_tail=True,
+                    save_hashes=True,
+                )
+                written = int(write_stats["written"])
+                deleted = int(write_stats["deleted"])
+                sql_stage_ms = int(write_stats["sql_stage_ms"])
+                sql_upsert_ms = int(write_stats["sql_upsert_ms"])
+                sql_delete_tail_ms = int(write_stats["sql_delete_tail_ms"])
+                sql_save_hash_ms = int(write_stats["sql_save_hash_ms"])
+                sql_clear_tmp_ms = int(write_stats["sql_clear_tmp_ms"])
                 mode = "insert"
-                selected_pairs = list(full_pairs[:EXPAND_LIMIT])
         else:
             started_at = time.perf_counter()
             city_hash, branch_hash, plz_cnt, branch_cnt = _load_task_state(task_id)
             sql_snapshot_ms = int((time.perf_counter() - started_at) * 1000)
-            full_pairs_cnt = int(plz_cnt) * int(branch_cnt)
             stale = (
                 int(task["rating_city_hash"]) != int(city_hash) if task["rating_city_hash"] is not None else True
             ) or (
@@ -710,36 +784,97 @@ def run_active_once() -> Dict[str, Any]:
             )
 
             if stale:
+                need_full_refresh = True
+
+                started_at = time.perf_counter()
+                current_pair_cnt = _load_task_pair_count_without_count(task_id, only_positive=False)
+                sql_check_full_ms = int((time.perf_counter() - started_at) * 1000)
+
                 started_at = time.perf_counter()
                 city_hash, branch_hash, full_pairs, plz_cnt, branch_cnt = _load_full_snapshot(task_id)
                 sql_full_snapshot_ms = int((time.perf_counter() - started_at) * 1000)
                 full_pairs_cnt = len(full_pairs)
-                need_full_refresh = True
-                if not full_pairs_cnt:
-                    mode = "update_noop"
-                    reason = "empty_expansion"
-                else:
-                    mode = "update_refresh"
-                    selected_pairs = list(full_pairs[:EXPAND_LIMIT])
-            else:
-                mode = "update_noop"
 
-        if selected_pairs:
-            write_stats = _write_selected_pairs(
-                task_id,
-                selected_pairs,
-                city_hash=int(city_hash),
-                branch_hash=int(branch_hash),
-                delete_tail=bool(need_full_refresh),
-                save_hashes=bool(not has_pairs or need_full_refresh),
-            )
-            written = int(write_stats["written"])
-            deleted = int(write_stats["deleted"])
-            sql_stage_ms = int(write_stats["sql_stage_ms"])
-            sql_upsert_ms = int(write_stats["sql_upsert_ms"])
-            sql_delete_tail_ms = int(write_stats["sql_delete_tail_ms"])
-            sql_save_hash_ms = int(write_stats["sql_save_hash_ms"])
-            sql_clear_tmp_ms = int(write_stats["sql_clear_tmp_ms"])
+                if full_pairs_cnt <= 0:
+                    zeroed_rates = _zero_task_rates(task_id, city_hash=int(city_hash), branch_hash=int(branch_hash))
+                    mode = "update_zero_rates"
+                    reason = "empty_expansion_zeroed"
+                else:
+                    base_target = min(int(current_pair_cnt), int(full_pairs_cnt))
+                    base_pairs = list(full_pairs[:base_target])
+                    started_at = time.perf_counter()
+                    has_watermark_uncollected = _has_watermark_uncollected_in_pairs(base_pairs)
+                    sql_check_uncollected_ms = int((time.perf_counter() - started_at) * 1000)
+
+                    final_target = int(base_target)
+                    if not has_watermark_uncollected:
+                        grown_target = min(int(base_target) + int(TOPUP_INTERVAL), int(full_pairs_cnt))
+                        if grown_target > final_target:
+                            need_topup = True
+                            final_target = int(grown_target)
+
+                    selected_pairs = list(full_pairs[:final_target])
+                    if selected_pairs:
+                        final_stats = _write_selected_pairs(
+                            task_id,
+                            selected_pairs,
+                            city_hash=int(city_hash),
+                            branch_hash=int(branch_hash),
+                            delete_tail=True,
+                            save_hashes=True,
+                        )
+                        written = int(final_stats["written"])
+                        deleted = int(final_stats["deleted"])
+                        sql_stage_ms = int(final_stats["sql_stage_ms"])
+                        sql_upsert_ms = int(final_stats["sql_upsert_ms"])
+                        sql_delete_tail_ms = int(final_stats["sql_delete_tail_ms"])
+                        sql_save_hash_ms = int(final_stats["sql_save_hash_ms"])
+                        sql_clear_tmp_ms = int(final_stats["sql_clear_tmp_ms"])
+
+                    mode = "update_refresh_topup" if need_topup else "update_refresh"
+            else:
+                started_at = time.perf_counter()
+                has_watermark_uncollected = _has_watermark_uncollected(task_id)
+                sql_check_uncollected_ms = int((time.perf_counter() - started_at) * 1000)
+
+                if has_watermark_uncollected:
+                    mode = "update_noop"
+                else:
+                    need_topup = True
+                    started_at = time.perf_counter()
+                    current_pair_cnt = _load_task_pair_count_without_count(task_id, only_positive=True)
+                    sql_check_full_ms = int((time.perf_counter() - started_at) * 1000)
+
+                    started_at = time.perf_counter()
+                    city_hash, branch_hash, full_pairs, plz_cnt, branch_cnt = _load_full_snapshot(task_id)
+                    sql_full_snapshot_ms = int((time.perf_counter() - started_at) * 1000)
+                    full_pairs_cnt = len(full_pairs)
+
+                    if full_pairs_cnt <= 0:
+                        mode = "update_noop"
+                        reason = "empty_expansion"
+                    else:
+                        target_cnt = min(int(current_pair_cnt) + int(TOPUP_INTERVAL), int(full_pairs_cnt))
+                        if target_cnt <= int(current_pair_cnt):
+                            mode = "update_noop"
+                            reason = "snapshot_exhausted"
+                        else:
+                            selected_pairs = list(full_pairs[:target_cnt])
+                            write_stats = _write_selected_pairs(
+                                task_id,
+                                selected_pairs,
+                                city_hash=int(city_hash),
+                                branch_hash=int(branch_hash),
+                                delete_tail=True,
+                                save_hashes=False,
+                            )
+                            written = int(write_stats["written"])
+                            deleted = int(write_stats["deleted"])
+                            sql_stage_ms = int(write_stats["sql_stage_ms"])
+                            sql_upsert_ms = int(write_stats["sql_upsert_ms"])
+                            sql_delete_tail_ms = int(write_stats["sql_delete_tail_ms"])
+                            sql_clear_tmp_ms = int(write_stats["sql_clear_tmp_ms"])
+                            mode = "update_topup"
 
         result = {
             "mode": str(mode),
@@ -747,7 +882,7 @@ def run_active_once() -> Dict[str, Any]:
             "city_hash": int(city_hash),
             "branch_hash": int(branch_hash),
             "has_pairs": bool(has_pairs),
-            "has_1000th_uncollected": bool(has_1000th_uncollected),
+            "has_watermark_uncollected": bool(has_watermark_uncollected),
             "stale": bool(stale),
             "need_full_refresh": bool(need_full_refresh),
             "need_topup": bool(need_topup),
@@ -757,8 +892,10 @@ def run_active_once() -> Dict[str, Any]:
             "selected_pairs_cnt": len(selected_pairs),
             "written": int(written),
             "deleted": int(deleted),
+            "zeroed_rates": int(zeroed_rates),
             "low_watermark": int(LOW_WATERMARK),
-            "expand_limit": int(EXPAND_LIMIT),
+            "expand_limit": int(INITIAL_EXPAND_LIMIT),
+            "topup_interval": int(TOPUP_INTERVAL),
             "sql_pick_ms": int(sql_pick_ms),
             "sql_snapshot_ms": int(sql_snapshot_ms),
             "sql_full_snapshot_ms": int(sql_full_snapshot_ms),

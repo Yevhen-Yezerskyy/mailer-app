@@ -15,12 +15,12 @@ from engine.common.cache.client import CLIENT
 from engine.common.db import get_connection
 from engine.common.gpt import GPTClient
 from engine.common.logs import log
-from engine.common.prompts.process import get_prompt, translate_text
+from engine.common.translate import get_prompt, translate_text
 from engine.common.utils import h64_text, parse_json_response
 
 
 BATCH_SIZE = 50
-MODEL = "gpt-5.4-mini"
+MODEL = "standard"
 SERVICE_TIER = "flex"
 TASK_LOCK_TTL_SEC = 300
 TASK_PICK_LIMIT = 200
@@ -304,8 +304,36 @@ def run_once() -> Dict[str, Any]:
             user_id=str(task["user_id"]),
             instructions=instructions,
             input=payload,
-            use_cache=False,
+            use_local_cache=False,
+            use_gpt_cache=True,
+            web_search=False,
         )
+        if str(response.status or "").strip().upper() != "OK":
+            wait_sec = random.randint(20, 60)
+            result = {
+                "mode": "gpt_not_ok",
+                "task_id": int(task["task_id"]),
+                "task_type": str(task["task_type"]),
+                "title": str(task["title"]),
+                "gpt_status": str(response.status or "").strip(),
+                "wait_sec": int(wait_sec),
+                **sql_ms,
+            }
+            _log_event(
+                {
+                    "event": "rate_cities",
+                    "mode": "gpt_not_ok",
+                    "task_id": result["task_id"],
+                    "task_type": result["task_type"],
+                    "gpt_status": result["gpt_status"],
+                    "wait_sec": result["wait_sec"],
+                    "pick_task_ids_ms": result.get("pick_task_ids_ms", 0),
+                    "load_task_ms": result.get("load_task_ms", 0),
+                    "load_candidates_ms": result.get("load_candidates_ms", 0),
+                }
+            )
+            time.sleep(float(wait_sec))
+            return result
 
         data = parse_json_response(response.content or "")
         rated_items = data.get("rated_items") if isinstance(data, dict) else None
