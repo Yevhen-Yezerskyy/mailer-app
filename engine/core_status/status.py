@@ -28,29 +28,37 @@ def run_ready_once() -> dict[str, int | str]:
                 SELECT t.id::bigint AS task_id
                 FROM public.aap_audience_audiencetask t
                 WHERE COALESCE(t.archived, false) = false
-                  AND COALESCE(t.ready, false) = false
             ),
-            task_ready AS (
+            task_state AS (
                 SELECT ts.task_id
                 FROM task_scan ts
                 WHERE EXISTS (
                     SELECT 1
                     FROM public.task_cb_ratings tcr
                     WHERE tcr.task_id = ts.task_id
+                      AND tcr.rate > 0
                 )
             ),
             upd AS (
                 UPDATE public.aap_audience_audiencetask t
-                SET ready = true,
+                SET ready = CASE
+                                WHEN ts.task_id IS NOT NULL THEN true
+                                ELSE false
+                            END,
                     updated_at = now()
-                FROM task_ready tr
-                WHERE t.id = tr.task_id
-                  AND t.ready IS DISTINCT FROM true
+                FROM task_scan s
+                LEFT JOIN task_state ts
+                  ON ts.task_id = s.task_id
+                WHERE t.id = s.task_id
+                  AND t.ready IS DISTINCT FROM CASE
+                                                   WHEN ts.task_id IS NOT NULL THEN true
+                                                   ELSE false
+                                               END
                 RETURNING t.id
             )
             SELECT
                 (SELECT COUNT(*)::int FROM task_scan) AS scanned_cnt,
-                (SELECT COUNT(*)::int FROM task_ready) AS matched_cnt,
+                (SELECT COUNT(*)::int FROM task_state) AS matched_cnt,
                 (SELECT COUNT(*)::int FROM upd) AS updated_cnt
             """
         )
