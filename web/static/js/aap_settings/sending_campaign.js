@@ -2,7 +2,7 @@
 // DATE: 2026-01-21
 // PURPOSE: Campaigns add/edit: окно отправки + валидация формы на submit.
 // CHANGE:
-// - Добавлена проверка обязательности select[name="template"] + подсветка (как mailing_list/mailbox).
+// - Валидация под flow-форму: required для sending_list + mailbox (без template).
 // - Ничего в логике окон/дропдаунов/сериализации не менялось.
 
 (function () {
@@ -87,76 +87,23 @@
     inp.style.borderColor = "#ef4444";
   }
 
-  // --- dates (client defaults + helpers) ---
-
-  const startDD = form.querySelector('input[name="start_dd"]');
-  const startMM = form.querySelector('input[name="start_mm"]');
-  const startYY = form.querySelector('input[name="start_yy"]');
-  const endDD = form.querySelector('input[name="end_dd"]');
-  const endMM = form.querySelector('input[name="end_mm"]');
-  const endYY = form.querySelector('input[name="end_yy"]');
-
-  function todayParts() {
-    const d = new Date();
-    return { dd: d.getDate(), mm: d.getMonth() + 1, yy: d.getFullYear() };
+  function mappedButtonClass(key) {
+    const classMap = window.yyClassMap || (document.documentElement && document.documentElement.yyClassMap) || {};
+    const mapped = String(classMap[key] || "").trim();
+    return mapped ? (key + " " + mapped) : key;
   }
 
-  function addDaysParts(dd, mm, yy, addDays) {
-    const d = new Date(yy, mm - 1, dd);
+  // --- dates (ISO inputs) ---
+  const startDateInput = form.querySelector('input[name="start_date"]');
+  const endDateInput = form.querySelector('input[name="end_date"]');
+
+  function parseISODate(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return null;
+    const d = new Date(raw + "T00:00:00");
     if (Number.isNaN(d.getTime())) return null;
-    d.setDate(d.getDate() + addDays);
-    return { dd: d.getDate(), mm: d.getMonth() + 1, yy: d.getFullYear() };
-  }
-
-  function readDateParts(inpDD, inpMM, inpYY) {
-    const dd = toInt(inpDD && inpDD.value);
-    const mm = toInt(inpMM && inpMM.value);
-    const yy = toInt(inpYY && inpYY.value);
-    return { dd, mm, yy };
-  }
-
-  function isAllEmptyDate(inpDD, inpMM, inpYY) {
-    return !String((inpDD && inpDD.value) || "").trim()
-      && !String((inpMM && inpMM.value) || "").trim()
-      && !String((inpYY && inpYY.value) || "").trim();
-  }
-
-  function isAnyEmptyDate(inpDD, inpMM, inpYY) {
-    const a = String((inpDD && inpDD.value) || "").trim();
-    const b = String((inpMM && inpMM.value) || "").trim();
-    const c = String((inpYY && inpYY.value) || "").trim();
-    return (!a || !b || !c) && !(!a && !b && !c);
-  }
-
-  function buildDate(dd, mm, yy) {
-    if (dd == null || mm == null || yy == null) return null;
-    const d = new Date(yy, mm - 1, dd);
-    if (Number.isNaN(d.getTime())) return null;
-    if (d.getFullYear() !== yy || (d.getMonth() + 1) !== mm || d.getDate() !== dd) return null;
     return d;
   }
-
-  function applyDateDefaultsIfEmpty() {
-    if (startDD && startMM && startYY && isAllEmptyDate(startDD, startMM, startYY)) {
-      const t = todayParts();
-      startDD.value = String(t.dd);
-      startMM.value = String(t.mm);
-      startYY.value = String(t.yy);
-    }
-
-    if (endDD && endMM && endYY && isAllEmptyDate(endDD, endMM, endYY)) {
-      const s = readDateParts(startDD, startMM, startYY);
-      const base = (s.dd && s.mm && s.yy) ? s : todayParts();
-      const e = addDaysParts(base.dd, base.mm, base.yy, 90);
-      if (e) {
-        endDD.value = String(e.dd);
-        endMM.value = String(e.mm);
-        endYY.value = String(e.yy);
-      }
-    }
-  }
-
-  applyDateDefaultsIfEmpty();
 
   // --- Dropdown (single global, same behavior as sending.js: mousedown) ---
 
@@ -460,10 +407,25 @@
   function clearReds() {
     form.querySelectorAll("input, select").forEach((el) => { el.style.borderColor = ""; });
     body.querySelectorAll(".yy-day-windows input").forEach((inp) => { inp.style.borderColor = ""; });
+    const linkedTitle = document.querySelector('input[name="title"][form="yyCampaignForm"]');
+    if (linkedTitle) linkedTitle.style.borderColor = "";
+  }
+
+  function getNamedControl(name) {
+    if (!name) return null;
+    const named = form.elements && form.elements.namedItem ? form.elements.namedItem(name) : null;
+    if (named && named.nodeType === 1) return named;
+    if (named && typeof named.length === "number" && named.length > 0 && named[0] && named[0].nodeType === 1) {
+      return named[0];
+    }
+    return (
+      form.querySelector(`[name="${name}"]`) ||
+      document.querySelector(`[name="${name}"][form="${form.id}"]`)
+    );
   }
 
   function validateRequiredText(name) {
-    const el = form.querySelector(`[name="${name}"]`);
+    const el = getNamedControl(name);
     if (!el) return true;
     const v = String(el.value || "").trim();
     if (!v) {
@@ -474,7 +436,7 @@
   }
 
   function validateRequiredSelect(name) {
-    const el = form.querySelector(`select[name="${name}"]`);
+    const el = getNamedControl(name);
     if (!el) return true;
     const v = String(el.value || "").trim();
     if (!v) {
@@ -485,60 +447,34 @@
   }
 
   function validateStartDate() {
-    if (!startDD || !startMM || !startYY) return true;
-
-    const anyEmpty = isAnyEmptyDate(startDD, startMM, startYY);
-    if (anyEmpty) {
-      if (!String(startDD.value || "").trim()) setInputRed(startDD);
-      if (!String(startMM.value || "").trim()) setInputRed(startMM);
-      if (!String(startYY.value || "").trim()) setInputRed(startYY);
+    if (!startDateInput) return true;
+    const v = String(startDateInput.value || "").trim();
+    if (!v) return true;
+    if (!parseISODate(v)) {
+      setInputRed(startDateInput);
       return false;
     }
-
-    const p = readDateParts(startDD, startMM, startYY);
-    const d = buildDate(p.dd, p.mm, p.yy);
-    if (!d) {
-      setInputRed(startDD); setInputRed(startMM); setInputRed(startYY);
-      return false;
-    }
-
-    startDD.value = pad2(startDD.value);
-    startMM.value = pad2(startMM.value);
     return true;
   }
 
   function validateEndDateAndOrder() {
-    if (!endDD || !endMM || !endYY) return true;
+    if (!endDateInput) return true;
 
-    if (isAllEmptyDate(endDD, endMM, endYY)) {
-      return true; // optional
-    }
+    const sRaw = String(startDateInput && startDateInput.value ? startDateInput.value : "").trim();
+    const eRaw = String(endDateInput.value || "").trim();
+    if (!eRaw) return true;
 
-    const anyEmpty = isAnyEmptyDate(endDD, endMM, endYY);
-    if (anyEmpty) {
-      if (!String(endDD.value || "").trim()) setInputRed(endDD);
-      if (!String(endMM.value || "").trim()) setInputRed(endMM);
-      if (!String(endYY.value || "").trim()) setInputRed(endYY);
-      return false;
-    }
-
-    const s = readDateParts(startDD, startMM, startYY);
-    const sd = buildDate(s.dd, s.mm, s.yy);
-    const e = readDateParts(endDD, endMM, endYY);
-    const ed = buildDate(e.dd, e.mm, e.yy);
-
+    const sd = parseISODate(sRaw);
+    const ed = parseISODate(eRaw);
     if (!ed) {
-      setInputRed(endDD); setInputRed(endMM); setInputRed(endYY);
+      setInputRed(endDateInput);
       return false;
     }
 
     if (sd && ed.getTime() < sd.getTime()) {
-      setInputRed(endDD); setInputRed(endMM); setInputRed(endYY);
+      setInputRed(endDateInput);
       return false;
     }
-
-    endDD.value = pad2(endDD.value);
-    endMM.value = pad2(endMM.value);
     return true;
   }
 
@@ -547,66 +483,7 @@
       ta.value = "";
       return true;
     }
-
-    let hasInvalid = false;
-    const out = {};
-    for (const day of DAY_KEYS) out[day] = [];
-
-    for (const day of DAY_KEYS) {
-      const row = body.querySelector(`tr[data-yy-day="${day}"]`);
-      if (!row) continue;
-
-      const box = row.querySelector(".yy-day-windows");
-      if (!box) continue;
-
-      const lines = Array.from(box.children || []);
-      for (const line of lines) {
-        const inputs = Array.from(line.querySelectorAll("input"));
-        if (inputs.length !== 4) continue; // "+" row
-
-        const [fh, fm, th, tm] = inputs;
-        const vfh = String(fh.value || "").trim();
-        const vfm = String(fm.value || "").trim();
-        const vth = String(th.value || "").trim();
-        const vtm = String(tm.value || "").trim();
-
-        const empty = [];
-        if (!vfh) empty.push(fh);
-        if (!vfm) empty.push(fm);
-        if (!vth) empty.push(th);
-        if (!vtm) empty.push(tm);
-
-        if (empty.length > 0) {
-          hasInvalid = true;
-          empty.forEach(setInputRed);
-          continue;
-        }
-
-        const H1 = toInt(vfh);
-        const M1 = toInt(vfm);
-        const H2 = toInt(vth);
-        const M2 = toInt(vtm);
-
-        const fMin = toMinutes(H1, M1);
-        const tMin = toMinutes(H2, M2);
-
-        if (fMin == null || tMin == null || fMin >= tMin) {
-          hasInvalid = true;
-          inputs.forEach(setInputRed);
-          continue;
-        }
-
-        out[day].push({
-          from: pad2(H1) + ":" + pad2(M1),
-          to: pad2(H2) + ":" + pad2(M2),
-        });
-      }
-    }
-
-    if (hasInvalid) return false;
-
-    state = ensureState(out);
-    ta.value = JSON.stringify(state);
+    ta.value = JSON.stringify(ensureState(state));
     return true;
   }
 
@@ -615,15 +492,17 @@
     let action = submitter && submitter.value ? String(submitter.value).trim() : "";
     if (!action) action = lastAction;
 
-    // --- FIX: Enter submit -> treat as Save/Add (and serialize window) ---
+    // Enter submit -> treat as save-on-current-step
     if (!action) {
       const hasId = !!form.querySelector('input[name="id"]');
-      action = hasId ? "save_campaign" : "add_campaign";
+      action = hasId ? "save_campaign_stay" : "add_campaign_stay";
     }
 
     if (
       action !== "add_campaign" &&
       action !== "save_campaign" &&
+      action !== "add_campaign_stay" &&
+      action !== "save_campaign_stay" &&
       action !== "add_campaign_close" &&
       action !== "save_campaign_close"
     ) {
@@ -634,12 +513,8 @@
 
     let ok = true;
     ok = validateRequiredText("title") && ok;
-    ok = validateRequiredSelect("mailing_list") && ok;
+    ok = validateRequiredSelect("sending_list") && ok;
     ok = validateRequiredSelect("mailbox") && ok;
-    ok = validateRequiredSelect("template") && ok; // NEW
-
-    ok = validateStartDate() && ok;
-    ok = validateEndDateAndOrder() && ok;
 
     ok = validateWindowsAndSerialize() && ok;
 
@@ -649,4 +524,87 @@
       return false;
     }
   });
+
+  // --- "Шаблон" button state: enabled only when saved + no unsaved edits ---
+  const templateBtn = document.getElementById("yyGoTemplateBtn");
+  const titleInput = document.getElementById("yyCampaignTitleInput");
+  const topSaveBtn = document.getElementById("yyTopSaveBtn");
+  const saveLeftBtn = document.getElementById("yySaveLeftBtn");
+  const saveRightBtn = document.getElementById("yySaveRightBtn");
+  const hasCampaignId = !!form.querySelector('input[name="id"]');
+
+  function readWindowSnapshot() {
+    if (cb.checked) return "";
+    return JSON.stringify(ensureState(state));
+  }
+
+  function readFormSnapshot() {
+    return JSON.stringify({
+      title: String(titleInput && titleInput.value ? titleInput.value : "").trim(),
+      sending_list: String((form.querySelector('select[name="sending_list"]') || {}).value || "").trim(),
+      mailbox: String((form.querySelector('select[name="mailbox"]') || {}).value || "").trim(),
+      start_date: String((form.querySelector('input[name="start_date"]') || {}).value || "").trim(),
+      end_date: String((form.querySelector('input[name="end_date"]') || {}).value || "").trim(),
+      send_after_parent_days: String((form.querySelector('input[name="send_after_parent_days"]') || {}).value || "").trim(),
+      use_global_window: cb.checked ? "1" : "0",
+      window: readWindowSnapshot(),
+    });
+  }
+
+  function hasRequiredFieldsFilled() {
+    const titleVal = String(titleInput && titleInput.value ? titleInput.value : "").trim();
+    const sendingEl = form.querySelector('select[name="sending_list"]');
+    const mailboxEl = form.querySelector('select[name="mailbox"]');
+    const sendingVal = String((sendingEl || {}).value || "").trim();
+    const mailboxVal = String((mailboxEl || {}).value || "").trim();
+    if (titleInput && titleVal) titleInput.classList.remove("!border-red-500");
+    if (sendingEl && sendingVal) sendingEl.classList.remove("!border-red-500");
+    if (mailboxEl && mailboxVal) mailboxEl.classList.remove("!border-red-500");
+    return !!(titleVal && sendingVal && mailboxVal);
+  }
+
+  const initialSnapshot = readFormSnapshot();
+  const initialTitle = String(titleInput && titleInput.value ? titleInput.value : "").trim();
+
+  function setButtonState(btn, enabled, enabledClass, disabledClass, extraClass) {
+    if (!btn) return;
+    btn.disabled = !enabled;
+    if (enabledClass && disabledClass) {
+      const base = mappedButtonClass(enabled ? enabledClass : disabledClass);
+      const extra = String(extraClass || "").trim();
+      btn.setAttribute("class", extra ? (base + " " + extra) : base);
+    }
+  }
+
+  function syncTemplateButtonState() {
+    const isClean = readFormSnapshot() === initialSnapshot;
+    const requiredFilled = hasRequiredFieldsFilled();
+    const templateEnabled = hasCampaignId && requiredFilled && isClean;
+    setButtonState(templateBtn, templateEnabled, "YY-BUTTON_MAIN_FULL", "YY-BUTTON_GRAY_FULL");
+
+    const anyChanged = !isClean;
+    const titleChanged = String(titleInput && titleInput.value ? titleInput.value : "").trim() !== initialTitle;
+    setButtonState(saveLeftBtn, anyChanged && requiredFilled, "YY-BUTTON_MAIN", "YY-BUTTON_GRAY");
+    setButtonState(saveRightBtn, anyChanged && requiredFilled, "YY-BUTTON_MAIN_FULL", "YY-BUTTON_GRAY_FULL");
+    setButtonState(topSaveBtn, titleChanged && requiredFilled, "YY-BUTTON_MAIN", "YY-BUTTON_GRAY", "!w-fit !mb-0");
+  }
+
+  if (templateBtn) {
+    templateBtn.addEventListener("click", function () {
+      if (templateBtn.disabled) return;
+      const url = String(templateBtn.dataset.url || "").trim();
+      if (!url) return;
+      window.location.href = url;
+    });
+  }
+
+  form.addEventListener("input", syncTemplateButtonState);
+  form.addEventListener("change", syncTemplateButtonState);
+  if (titleInput) {
+    titleInput.addEventListener("input", syncTemplateButtonState);
+    titleInput.addEventListener("change", syncTemplateButtonState);
+  }
+  body.addEventListener("input", syncTemplateButtonState);
+  body.addEventListener("change", syncTemplateButtonState);
+  syncTemplateButtonState();
 })();

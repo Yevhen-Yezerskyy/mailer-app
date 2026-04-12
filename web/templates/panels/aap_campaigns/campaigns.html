@@ -60,11 +60,11 @@
             {% if form_error_msg %}
               <div class="YY-STATUS_RED mb-3 !py-1">{{ form_error_msg }}</div>
             {% endif %}
-            <select name="mailing_list" class="YY-INPUT mb-3 {% if form_error_field == 'mailing_list' %}!border-red-500{% endif %}">
+            <select name="sending_list" class="YY-INPUT mb-3 {% if form_error_field == 'sending_list' %}!border-red-500{% endif %}">
               <option value="">{% trans "— не выбран —" %}</option>
               {% for it in list_items %}
                 <option value="{{ it.ui_id }}"
-                  {% if edit_obj and edit_obj.mailing_list_id == it.id %}selected{% endif %}>
+                  {% if edit_obj and edit_obj.sending_list_id == it.id %}selected{% endif %}>
                   {{ it.title }}
                 </option>
               {% endfor %}
@@ -400,7 +400,7 @@
                         {% trans "по" %} {{ it.end_at|date:"d.m.Y" }}
                       {% endif %}</p>
                       <div class="grid grid-cols-[150px_1fr] gap-x-2 gap-y-1">
-                          <div class="font-semibold">{% trans "Список рассылки" %}:</div> <div>{{ it.mailing_list.title }}</div>
+                          <div class="font-semibold">{% trans "Список рассылки" %}:</div> <div>{{ it.sending_list.title }}</div>
                           <div class="font-semibold">{% trans "Отправка" %}:</div><div>{{ it.sender_label }}</div>
                           <div class="font-semibold">{% trans "Шаблон письма:" %}:</div><div>{{ it.letter_tpl_label }}</div>
                       </div>

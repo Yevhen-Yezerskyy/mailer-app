@@ -824,6 +824,7 @@ def handle_contacts_step_view(
         request,
         flow_conf["template_name"],
         build_flow_render_context(
+            request=request,
             flow_type=flow_type,
             item_id=item_id,
             task=task,

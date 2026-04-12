@@ -422,13 +422,13 @@ def _restore_specs(text: str, specs: List[str]) -> str:
     return out
 
 
-def _gpt_translate(client: GPTClient, src: str, lang: str, *, use_cache: bool) -> str:
+def _gpt_translate(client: GPTClient, src: str, lang: str, *, use_local_cache: bool) -> str:
     resp = client.ask(
         model="mini",
         user_id="system",
         instructions=SYSTEM_PROMPT + f"\nTarget language: {lang}",
         input=src,
-        use_cache=use_cache,
+        use_local_cache=use_local_cache,
     )
     return (resp.content or "").strip()
 
@@ -439,7 +439,7 @@ def _translate_safe(
     lang: str,
     guard: bool,
     *,
-    use_cache: bool,
+    use_local_cache: bool,
     attempts: int = 2,
 ) -> Tuple[str, str]:
     """
@@ -451,7 +451,7 @@ def _translate_safe(
         return ("", "gpt_empty")
 
     if not guard:
-        tr0 = _gpt_translate(client, src0, lang, use_cache=use_cache)
+        tr0 = _gpt_translate(client, src0, lang, use_local_cache=use_local_cache)
         if not tr0:
             return ("", "gpt_empty")
         if _BAD_TOKEN_RE.search(tr0):
@@ -462,7 +462,7 @@ def _translate_safe(
 
     last_reason = "gpt_empty"
     for _ in range(max(1, int(attempts))):
-        tr = _gpt_translate(client, frozen, lang, use_cache=use_cache)
+        tr = _gpt_translate(client, frozen, lang, use_local_cache=use_local_cache)
         if not tr:
             last_reason = "gpt_empty"
             continue
@@ -516,7 +516,7 @@ def _print_leftovers(issues: List[LeftoverIssue]) -> None:
 # ---------------- translate pass ----------------
 
 
-def _translate_lang_once(lang: str, *, pass_no: int, use_cache: bool) -> Tuple[int, int, int, List[LeftoverIssue]]:
+def _translate_lang_once(lang: str, *, pass_no: int, use_local_cache: bool) -> Tuple[int, int, int, List[LeftoverIssue]]:
     """
     returns: (candidates, translated_ok, left_empty_or_bad, leftover_issues)
     """
@@ -571,7 +571,7 @@ def _translate_lang_once(lang: str, *, pass_no: int, use_cache: bool) -> Tuple[i
                     src,
                     lang,
                     guard,
-                    use_cache=use_cache,
+                    use_local_cache=use_local_cache,
                     attempts=2 if pass_no == 1 else 4,
                 )
                 if tr:
@@ -612,7 +612,7 @@ def _translate_lang_once(lang: str, *, pass_no: int, use_cache: bool) -> Tuple[i
             msgid,
             lang,
             guard,
-            use_cache=use_cache,
+            use_local_cache=use_local_cache,
             attempts=2 if pass_no == 1 else 4,
         )
         if tr:
@@ -753,10 +753,10 @@ def main() -> None:
         (3, False),  # pass3: cache OFF
     ]
 
-    for pass_no, use_cache in passes:
-        print(f"  [pass {pass_no}/3] use_cache={use_cache}")
+    for pass_no, use_local_cache in passes:
+        print(f"  [pass {pass_no}/3] use_local_cache={use_local_cache}")
         for lang in TARGET_LANGS:
-            total, ok, left, issues = _translate_lang_once(lang, pass_no=pass_no, use_cache=use_cache)
+            total, ok, left, issues = _translate_lang_once(lang, pass_no=pass_no, use_local_cache=use_local_cache)
             totals[lang] = (total, ok, left)
             print(f"    - {lang}: candidates={total} translated={ok} left={left}")
             # NOTE: keep issues only for visibility; final scan below is the source of truth.

@@ -5,14 +5,16 @@
 from __future__ import annotations
 
 import json
+from urllib.parse import urlsplit
 from typing import Any, Mapping
 
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.text import format_lazy
 from django.utils.translation import gettext_lazy as _
 
 from engine.common.gpt import GPTClient
-from engine.common.prompts.process import get_prompt
+from engine.common.translate import get_prompt
 from mailer_web.access import decode_id
 from panel.aap_audience.models import AudienceTask
 
@@ -29,6 +31,8 @@ FLOW_STEP_ORDER = (
 
 TEXT_STEP_KEYS = ("product", "company", "geo")
 TASK_CREATION_STEP_KEYS = frozenset({"product", "company"})
+FLOW_GPT_UNAVAILABLE_SESSION_KEY = "aap:create_flow:gpt_unavailable_popup_text"
+FLOW_GPT_UNAVAILABLE_TEXT = "Ассистент ИИ сейчас недоступен. Повторите попытку в течение пяти минут."
 
 STEP_URL_PARTS = {
     "product": "product",
@@ -58,12 +62,12 @@ COMMON_FUTURE_STEPS = {
         "dirty_label": _("Города"),
     },
     "contacts": {
-        "nav_label": _("Наполнение"),
+        "nav_label": _("Контакты"),
         "summary_label": _("Сбор контактов"),
         "dirty_label": _("Сбор контактов"),
     },
     "mailing_list": {
-        "nav_label": _("Список"),
+        "nav_label": _("Рейтинг"),
         "summary_label": _("Список рассылки"),
         "dirty_label": _("Список рассылки"),
     },
@@ -378,6 +382,52 @@ def build_edit_url(flow_type: str, item_id: str, step_key: str) -> str:
     return reverse(route_name)
 
 
+def is_gpt_ok(resp: Any) -> bool:
+    return str(getattr(resp, "status", "") or "").strip().upper() == "OK"
+
+
+def mark_flow_gpt_unavailable(request) -> None:
+    request.session[FLOW_GPT_UNAVAILABLE_SESSION_KEY] = FLOW_GPT_UNAVAILABLE_TEXT
+    request.session.modified = True
+
+
+def pop_flow_gpt_unavailable_text(request) -> str:
+    if request is None:
+        return ""
+    value = str(request.session.pop(FLOW_GPT_UNAVAILABLE_SESSION_KEY, "") or "").strip()
+    if value:
+        request.session.modified = True
+    return value
+
+
+def clear_dialog_state(state: dict[str, Any]) -> None:
+    state["conversation_id"] = ""
+    state["response_id"] = ""
+
+
+def flow_back_url(request, fallback_url: str) -> str:
+    ref = str(request.META.get("HTTP_REFERER") or "").strip()
+    if not ref:
+        return fallback_url
+    try:
+        host = request.get_host()
+    except Exception:
+        return fallback_url
+    if not url_has_allowed_host_and_scheme(
+        ref,
+        allowed_hosts={host},
+        require_https=request.is_secure(),
+    ):
+        return fallback_url
+    parsed = urlsplit(ref)
+    target = parsed.path or "/"
+    if parsed.query:
+        target = f"{target}?{parsed.query}"
+    if target == request.get_full_path():
+        return fallback_url
+    return target
+
+
 def session_key(request, flow_type: str, item_id: str, section: str) -> str:
     flow_conf = get_flow_config(flow_type)
     return (
@@ -388,8 +438,9 @@ def session_key(request, flow_type: str, item_id: str, section: str) -> str:
 
 def prompt_instructions(request, prompt_key: str) -> str:
     lang_name = request.ui_lang_name_en
-    lang_prompt = get_prompt("lang_response").replace("{LANG}", lang_name).strip()
-    prompt_text = get_prompt(prompt_key).strip()
+    on_gpt_error = lambda: mark_flow_gpt_unavailable(request)
+    lang_prompt = get_prompt("lang_response", on_gpt_error=on_gpt_error).replace("{LANG}", lang_name).strip()
+    prompt_text = get_prompt(prompt_key, on_gpt_error=on_gpt_error).strip()
     return "\n\n".join(part for part in (lang_prompt, prompt_text) if part).strip()
 
 
@@ -416,30 +467,36 @@ def has_technical_title(task) -> bool:
     return f"#{int(task.id)}" in str(task.title or "")
 
 
-def suggest_title_for_task(request, task) -> str:
+def suggest_title_for_task(request, task) -> tuple[str, bool]:
     resp = GPTClient().ask(
-        model="gpt-5.4",
+        model="standard",
         instructions=prompt_instructions(request, title_prompt_key(task)),
         input=title_input(task),
         user_id=title_user_id(task),
         service_tier="flex",
         web_search=False,
     )
-    return str(resp.content or "").strip()
+    if not is_gpt_ok(resp):
+        mark_flow_gpt_unavailable(request)
+        return "", False
+    return str(resp.content or "").strip(), True
 
 
-def maybe_update_title_on_geo_enter(request, *, requested_step: str, task):
+def maybe_update_title_on_geo_enter(request, *, requested_step: str, task) -> tuple[Any, bool]:
     if request.method == "POST" or requested_step != "geo" or not task or not has_technical_title(task):
-        return task
+        return task, False
     try:
-        title = suggest_title_for_task(request, task)
+        title, ok = suggest_title_for_task(request, task)
     except Exception:
-        return task
+        mark_flow_gpt_unavailable(request)
+        return task, True
+    if not ok:
+        return task, True
     if not title:
-        return task
+        return task, False
     AudienceTask.objects.filter(id=task.id).update(title=title)
     task.title = title
-    return task
+    return task, False
 
 
 def parse_ai_json(text: str, main_key: str) -> tuple[str, str, str]:
@@ -612,6 +669,8 @@ def build_summary_items(
 
 def build_flow_js_config(
     step_definitions: Mapping[str, Mapping[str, Any]],
+    *,
+    geo_title_autogen_pending: bool,
 ) -> dict[str, Any]:
     return {
         "labels": {
@@ -625,11 +684,13 @@ def build_flow_js_config(
         "missingTitle": str(_("Не заполнены обязательные разделы")),
         "missingText": str(_("Не заполнены или не сохранены разделы:")),
         "closeLabel": str(_("Отменить")),
+        "geoTitleAutogenPending": bool(geo_title_autogen_pending),
     }
 
 
 def build_flow_render_context(
     *,
+    request,
     flow_type: str,
     item_id: str,
     task,
@@ -641,6 +702,8 @@ def build_flow_render_context(
     extra_context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     flow_conf = get_flow_config(flow_type)
+    gpt_unavailable_popup_text = pop_flow_gpt_unavailable_text(request)
+    geo_title_autogen_pending = bool(task and has_technical_title(task))
     context = {
         "type": flow_type,
         "status": current_step_key,
@@ -655,7 +718,11 @@ def build_flow_render_context(
         "flow_step_states": flow_status["step_states"],
         "flow_current_step_key": current_step_key,
         "summary_items": build_summary_items(step_definitions, saved_values),
-        "flow_js_config": build_flow_js_config(step_definitions),
+        "flow_js_config": build_flow_js_config(
+            step_definitions,
+            geo_title_autogen_pending=geo_title_autogen_pending,
+        ),
+        "flow_gpt_unavailable_popup_text": gpt_unavailable_popup_text,
         "step_template": step_template,
     }
     if extra_context:

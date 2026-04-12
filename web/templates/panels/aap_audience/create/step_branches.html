@@ -23,7 +23,7 @@
             {% trans "Ассистент ИИ выполняет первичный отбор категорий и рубрик. Далее вы можете с его помощью расширить список — как по функциональности, так и по видам деятельности, а также указать, какие именно категории необходимо добавить. Лишние категории можно удалить." %}<br><br>
             {% trans "Жёлтые строки — предложения ассистента. Чтобы сохранить их, необходимо явно добавить их в список." %}<br>
             {% trans "Зелёные строки — категории, уже сохранённые для последующего сбора контактов." %}<br><br>
-            {% trans "Для добавленных категорий (зелёные строки) указан сравнительный рейтинг (от 1 до 20, где 1 — наилучший). Рейтинг определяет порядок сбора контактов. Он кликабелен и может быть изменён — при изменении рейтинга автоматически меняется порядок сбора контактов." %}
+            {% trans "Для добавленных категорий (зелёные строки) слева указан сравнительный рейтинг (от 1 до 20, где 1 — наилучший). Рейтинг определяет порядок сбора контактов. Он кликабелен и может быть изменён — при изменении рейтинга автоматически меняется порядок сбора контактов." %}
           </div>
           <button type="submit" name="action" value="branches_pick" class="YY-BUTTON_MAIN_FULL mt-auto">
             {% trans "Подобрать бизнес-категории и рубрики" %}
@@ -59,12 +59,48 @@
           <input type="hidden" name="branches_response_id" value="{{ branches_cities_step.branch_response_id }}">
           <input type="hidden" name="branches_records_json" value="{{ branches_cities_step.branch_records_json }}">
           {% if type == "buy" %}
-            <div class="YY-STATUS_YELLOW !mb-3">{% trans "Бизнес-категории и рубрики" %}</div>
+            <div class="YY-STATUS_YELLOW !mb-3 !justify-between gap-2">
+              <span>{% trans "Бизнес-категории и рубрики" %}</span>
+              <button
+                type="button"
+                class="inline-flex shrink-0"
+                aria-label="{% trans 'Бизнес-категории и рубрики' %}"
+                title="{% trans 'Бизнес-категории и рубрики' %}"
+                data-step-help-open="1">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                </svg>
+              </button>
+            </div>
           {% else %}
-            <div class="YY-STATUS_GREEN !mb-3">{% trans "Бизнес-категории и рубрики" %}</div>
+            <div class="YY-STATUS_GREEN !mb-3 !justify-between gap-2">
+              <span>{% trans "Бизнес-категории и рубрики" %}</span>
+              <button
+                type="button"
+                class="inline-flex shrink-0"
+                aria-label="{% trans 'Бизнес-категории и рубрики' %}"
+                title="{% trans 'Бизнес-категории и рубрики' %}"
+                data-step-help-open="1">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                </svg>
+              </button>
+            </div>
           {% endif %}
           {% if branches_cities_step.branch_show_hash_alert %}
-            <div class="YY-STATUS_RED !mb-3">{% trans "Задача была изменена." %}</div>
+            <div class="YY-STATUS_RED !mb-3 !justify-between gap-2">
+              <span>{% trans "Информация о продукте / компании изменилась" %}</span>
+              <button
+                type="button"
+                class="inline-flex shrink-0"
+                aria-label="{% trans 'Информация о продукте / компании изменилась' %}"
+                title="{% trans 'Информация о продукте / компании изменилась' %}"
+                data-branches-hash-help-open="1">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                </svg>
+              </button>
+            </div>
             <div class="grid grid-cols-3 gap-4 !mb-6">
               <button type="submit" name="action" value="branches_recalc_ratings" class="YY-BUTTON_MAIN_FULL">
                 {% trans "Пересчитать рейтинги" %}
@@ -167,14 +203,14 @@
               <div class="YY-TEXT !mb-2">
                 {% trans "Вы можете расширить список за счёт смежных бизнес-категорий и рубрик." %}
               </div>
-              <div class="grid gap-2 !mb-0" style="grid-template-columns: 3fr 2fr;">
+              <div class="grid gap-2 !mb-0 grid-cols-1 min-[1600px]:[grid-template-columns:3fr_2fr]">
                 <div class="YY-STATUS_BLUE !mb-0 !py-2 !px-3">
                   {% trans "Смежные категории и рубрики:" %}
                 </div>
                 <button type="submit" name="action" value="branches_expand_adjacent" class="YY-BUTTON_MAIN_FULL">
                   <span class="flex items-center justify-center gap-1 w-full">
                     <span>{% trans "Расширить список" %}</span>
-                    <svg class="size-4 shrink-0" aria-hidden="true">
+                    <svg class="size-[22px] shrink-0" aria-hidden="true">
                       <use href="#icon-arrow-circle"></use>
                     </svg>
                   </span>
@@ -185,14 +221,14 @@
               <div class="YY-TEXT !mb-2">
                 {% trans "Вы можете расширить список за счёт бизнес-категорий и рубрик посредников и торговых компаний." %}
               </div>
-              <div class="grid gap-2 !mb-0" style="grid-template-columns: 3fr 2fr;">
+              <div class="grid gap-2 !mb-0 grid-cols-1 min-[1600px]:[grid-template-columns:3fr_2fr]">
                 <div class="YY-STATUS_BLUE !mb-0 !py-2 !px-3">
                   {% trans "Посредники и торговые компании:" %}
                 </div>
                 <button type="submit" name="action" value="branches_expand_middlemen" class="YY-BUTTON_MAIN_FULL">
                   <span class="flex items-center justify-center gap-1 w-full">
                     <span>{% trans "Расширить список" %}</span>
-                    <svg class="size-4 shrink-0" aria-hidden="true">
+                    <svg class="size-[22px] shrink-0" aria-hidden="true">
                       <use href="#icon-arrow-circle"></use>
                     </svg>
                   </span>
@@ -211,7 +247,7 @@
               <button type="submit" name="action" value="branches_expand_custom" class="YY-BUTTON_MAIN_FULL">
                 <span class="flex items-center justify-center gap-1 w-full">
                   <span>{% trans "Расширить список" %}</span>
-                  <svg class="size-4 shrink-0" aria-hidden="true">
+                  <svg class="size-[22px] shrink-0" aria-hidden="true">
                     <use href="#icon-arrow-circle"></use>
                   </svg>
                 </span>
@@ -234,7 +270,7 @@
                     data-dirty-nav="{{ step.url }}">
                     <span class="flex items-center justify-center gap-1 w-full">
                       <span>{% trans "Города и населенные пункты" %}</span>
-                      <svg class="size-4 shrink-0" aria-hidden="true">
+                      <svg class="size-[22px] shrink-0" aria-hidden="true">
                         <use href="#icon-arrow-circle"></use>
                       </svg>
                     </span>
@@ -246,7 +282,7 @@
                     disabled>
                     <span class="flex items-center justify-center gap-1 w-full">
                       <span>{% trans "Города и населенные пункты" %}</span>
-                      <svg class="size-4 shrink-0" aria-hidden="true">
+                      <svg class="size-[22px] shrink-0" aria-hidden="true">
                         <use href="#icon-arrow-circle"></use>
                       </svg>
                     </span>
@@ -260,4 +296,49 @@
     </td>
   </tr>
 </table>
+<template id="yy-branches-hash-help-template">
+  <div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:650px;">
+    <button
+      type="button"
+      class="YY-BUTTON_MAIN !w-fit"
+      data-yy-modal-close
+      style="position:absolute;top:10px;right:10px;">✕</button>
+    <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
+      <div class="YY-STATUS_RED !w-fit !mb-3">{% trans "Информация о продукте / компании изменилась" %}</div>
+      <div class="YY-TEXT !mb-0">
+        {% trans "Вы изменили информацию о продукте и/или компании. Подбор категорий и их рейтингование осуществляется на основании информации о продукте и компании и был выполнен до внесённых изменений. Поэтому подбор аудиторий и их рейтинг могут стать некорректными." %}<br><br>
+        {% trans "Если информация о компании/продукте изменилась несущественно и не влияет на выбор категорий и их рейтинг, проигнорируйте это несоответствие. Кнопка «Игнорировать» справа." %}<br><br>
+        {% trans "Если изменения достаточно существенны и требуется пересчитать рейтинги категорий, проведите только пересчёт рейтингов. Кнопка «Пересчитать рейтинги» слева." %}<br><br>
+        {% trans "Если изменения кардинально меняют логику выбора категорий, требуется произвести набор категорий заново. Все подобранные категории будут удалены, и вы начнёте их подбор сначала. Кнопка «Очистить / наполнить» посередине." %}
+      </div>
+    </div>
+  </div>
+</template>
+<template id="yy-step-help-template">
+  <div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:650px;">
+    <button
+      type="button"
+      class="YY-BUTTON_MAIN !w-fit"
+      data-yy-modal-close
+      style="position:absolute;top:10px;right:10px;">✕</button>
+    <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
+      {% if type == "buy" %}
+        <div class="YY-STATUS_YELLOW !w-fit !mb-3">{% trans "Бизнес-категории и рубрики" %}</div>
+      {% else %}
+        <div class="YY-STATUS_GREEN !w-fit !mb-3">{% trans "Бизнес-категории и рубрики" %}</div>
+      {% endif %}
+      <div class="YY-TEXT !mb-0">
+        {% trans "Необходимо подобрать рубрики и бизнес-категории для поиска контактов в бизнес-справочниках. Подбор выполняется с помощью ассистента ИИ." %}<br><br>
+        {% trans "Ассистент ИИ выполняет первичный отбор категорий и рубрик. Далее вы можете с его помощью расширить список — как по функциональности, так и по видам деятельности, а также указать, какие именно категории необходимо добавить. Лишние категории можно удалить." %}<br><br>
+        {% trans "Жёлтые строки — предложения ассистента. Чтобы сохранить их, необходимо явно добавить их в список." %}<br>
+        {% trans "Зелёные строки — категории, уже сохранённые для последующего сбора контактов." %}<br><br>
+        {% trans "Для добавленных категорий (зелёные строки) слева указан сравнительный рейтинг (от 1 до 20, где 1 — наилучший). Рейтинг определяет порядок сбора контактов. Он кликабелен и может быть изменён — при изменении рейтинга автоматически меняется порядок сбора контактов." %}<br><br>
+        {% trans "Ассистент ИИ подбирает категории на основе лингвистического и семантического анализа с использованием нейросетевых алгоритмов. Поэтому результат может не в полной мере учитывать бизнес-логику конкретной задачи." %}<br><br>
+        {% trans "Лишние категории, добавленные ассистентом, необходимо удалить — это повысит эффективность адресной рассылки. Удаление категорий с помощью ИИ-ассистента не предусмотрено." %}<br><br>
+        {% trans "Если вы считаете, что список нужно расширить, используйте стандартные элементы интерфейса: добавляйте смежные категории или категории, представляющие посредников." %}<br><br>
+        {% trans "Вы также можете задать инструкцию для расширения списка категорий — указать конкретные категории или дать смысловое указание (например: «добавь все категории, связанные с туризмом»)." %}
+      </div>
+    </div>
+  </div>
+</template>
 {% endif %}

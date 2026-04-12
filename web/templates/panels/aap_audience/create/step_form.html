@@ -10,9 +10,46 @@
     <tr>
       <td class="YY-MAIN_TOP_LEFT_TD">
         <div class="YY-CARD_WHITE">
-          <label class="YY-LABEL">
-            {{ current_step.editor_label }}
-          </label>
+          <div class="flex items-start justify-between gap-2">
+            <label class="YY-LABEL !mb-0">
+              {{ current_step.editor_label }}
+            </label>
+            {% if current_step.key == "product" or current_step.key == "company" or current_step.key == "geo" %}
+              <button
+                type="button"
+                class="inline-flex shrink-0"
+                aria-label="{% if current_step.key == 'product' %}{% trans 'Описание продукта / услуги' %}{% elif current_step.key == 'company' %}{% trans 'Описание компании' %}{% else %}{% trans 'Описание географии' %}{% endif %}"
+                title="{% if current_step.key == 'product' %}{% trans 'Описание продукта / услуги' %}{% elif current_step.key == 'company' %}{% trans 'Описание компании' %}{% else %}{% trans 'Описание географии' %}{% endif %}"
+                data-step-help-open="1">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                </svg>
+              </button>
+            {% endif %}
+          </div>
+          {% if current_step.key == "product" or current_step.key == "company" or current_step.key == "geo" %}
+            <template id="yy-step-help-template">
+              <div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:650px;">
+                <button
+                  type="button"
+                  class="YY-BUTTON_MAIN !w-fit"
+                  data-yy-modal-close
+                  style="position:absolute;top:10px;right:10px;">✕</button>
+                <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
+                  <div class="{{ flow_mode_class }} !w-fit !mb-3">
+                    {% if current_step.key == "product" %}
+                      {% trans "Описание продукта / услуги" %}
+                    {% elif current_step.key == "company" %}
+                      {% trans "Описание компании" %}
+                    {% else %}
+                      {% trans "Описание географии" %}
+                    {% endif %}
+                  </div>
+                  <div class="YY-TEXT !mb-0">{{ current_step.placeholder|linebreaksbr }}</div>
+                </div>
+              </div>
+            </template>
+          {% endif %}
           <textarea
             name="{{ current_step.field_name }}"
             class="YY-TEXTAREA"
@@ -116,7 +153,7 @@
               data-dirty-nav="{{ current_step.next_url }}">
               <span class="flex items-center justify-center gap-1 w-full">
                 <span>{{ current_step.next_footer_label }}</span>
-                <svg class="size-4 shrink-0" aria-hidden="true">
+                <svg class="size-[22px] shrink-0" aria-hidden="true">
                   <use href="#icon-arrow-circle"></use>
                 </svg>
               </span>

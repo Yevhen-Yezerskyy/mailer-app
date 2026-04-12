@@ -1,0 +1,111 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_campaigns/flow_step_campaign.html -->
+<!-- DATE: 2026-04-09 -->
+<!-- PURPOSE: Шаг флоу "Кампания". -->
+
+<form method="post" id="yyCampaignForm">
+  {% csrf_token %}
+  {% if edit_obj %}
+    <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
+  {% endif %}
+
+  <table class="YY-MAIN_TABLE !mt-3">
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD w-[50%] align-top">
+        <div class="YY-CARD_WHITE">
+          <div class="h-full min-h-0 flex flex-col">
+          <div class="YY-STATUS_BLUE !w-full !mb-0">{% trans "Кампания по рассылке" %}</div>
+          <label class="YY-LABEL mt-5">{% trans "Список рассылки" %}:</label>
+          <select name="sending_list" class="YY-INPUT !mb-0 {% if flow_error_sending_list %}!border-red-500{% endif %}">
+            <option value="">{% trans "— не выбран —" %}</option>
+            {% for it in list_items %}
+              <option value="{{ it.ui_id }}" {% if edit_obj and edit_obj.sending_list_id == it.id %}selected{% endif %}>
+                {{ it.title }}
+              </option>
+            {% endfor %}
+          </select>
+
+          <label class="YY-LABEL mt-5">{% trans "Почтовый сервер для отправки" %}:</label>
+          <select name="mailbox" class="YY-INPUT !mb-0 {% if flow_error_mailbox %}!border-red-500{% endif %}">
+            <option value="">{% trans "— не выбрано —" %}</option>
+            {% for it in mb_items %}
+              <option value="{{ it.ui_id }}" {% if edit_obj and edit_obj.mailbox_id == it.id %}selected{% endif %}>
+                {{ it.sender_label }}
+              </option>
+            {% endfor %}
+          </select>
+
+          <label class="YY-LABEL mt-5">{% trans "Период кампании" %}:</label>
+          <div class="grid grid-cols-4 gap-3 mb-4 w-full">
+            <div class="YY-STATUS_BLUE !mb-0 !py-1 w-full text-center">{% trans "Начать с:" %}</div>
+            <input type="date" name="start_date" class="YY-INPUT !mb-0 w-full" value="{% if edit_obj and edit_obj.start_at %}{{ edit_obj.start_at|date:'Y-m-d' }}{% else %}{% now 'Y-m-d' %}{% endif %}">
+            <div class="YY-STATUS_BLUE !mb-0 !py-1 w-full text-center">{% trans "Закончить в:" %}</div>
+            <input type="date" name="end_date" class="YY-INPUT !mb-0 w-full" value="{% if edit_obj and edit_obj.end_at %}{{ edit_obj.end_at|date:'Y-m-d' }}{% endif %}">
+          </div>
+
+          {% if campaign_mode == "edit" and edit_obj and edit_obj.campaign_parent %}
+            <div class="YY-TEXT mb-1">
+              {% trans "Следуем за кампанией" %}: <strong>{{ edit_obj.campaign_parent.title }}</strong>
+            </div>
+            <label class="YY-LABEL mt-5">{% trans "Отправлять письма через (дней)" %}</label>
+            <input type="number" name="send_after_parent_days" class="YY-INPUT !mb-0" value="{{ edit_obj.send_after_parent_days }}">
+          {% endif %}
+
+          <div class="grid grid-cols-2 gap-3 mt-auto pt-5">
+            <button type="submit" name="action" value="close" formnovalidate class="YY-BUTTON_MAIN">{% trans "Закрыть" %}</button>
+            <button id="yySaveLeftBtn" type="submit" name="action" value="{{ campaign_save_action }}" class="YY-BUTTON_MAIN">{% trans "Сохранить" %}</button>
+          </div>
+          </div>
+
+        </div>
+
+      </td>
+
+      <td class="YY-MAIN_TOP_RIGHT_TD w-[50%] align-top">
+        <div class="YY-CARD_WHITE">
+          <label class="YY-TEXT flex items-center gap-2 mb-3">
+            <input type="checkbox" id="yyUseGlobalWindow" name="use_global_window" {% if not edit_obj or not edit_window_nonempty %}checked{% endif %}>
+            {% trans "Использовать глобальные настройки окна отправки" %}
+          </label>
+
+          <textarea id="yyGlobalWindowJson" class="hidden">{{ global_window_json_str }}</textarea>
+          <textarea name="window" id="yyValueJson" class="hidden">{{ edit_window_json_str }}</textarea>
+
+          <div id="yyWindowBox">
+            <table class="w-full text-left">
+              <tbody id="yySendingBody">
+                <tr data-yy-day="mon" class="border-b border-t border-[#71d0f4]"><td class="align-top px-2 py-2 w-[35%]"><div class="YY-STATUS_GREEN !py-1">{% trans "Понедельник" %}</div></td><td class="align-top px-2 py-2 w-[65%]"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="tue" class="border-b border-[#71d0f4]"><td class="align-top px-2 py-2"><div class="YY-STATUS_GREEN !py-1">{% trans "Вторник" %}</div></td><td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="wed" class="border-b border-[#71d0f4]"><td class="align-top px-2 py-2"><div class="YY-STATUS_GREEN !py-1">{% trans "Среда" %}</div></td><td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="thu" class="border-b border-[#71d0f4]"><td class="align-top px-2 py-2"><div class="YY-STATUS_GREEN !py-1">{% trans "Четверг" %}</div></td><td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="fri" class="border-b border-[#71d0f4]"><td class="align-top px-2 py-2"><div class="YY-STATUS_GREEN !py-1">{% trans "Пятница" %}</div></td><td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="sat" class="border-b border-[#71d0f4]"><td class="align-top px-2 py-2"><div class="YY-STATUS_YELLOW !py-1">{% trans "Суббота" %}</div></td><td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="sun" class="border-b border-[#71d0f4]"><td class="align-top px-2 py-2"><div class="YY-STATUS_YELLOW !py-1">{% trans "Воскресенье" %}</div></td><td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td></tr>
+                <tr data-yy-day="hol" class="border-b border-[#71d0f4]"><td class="align-top px-2 py-2"><div class="YY-STATUS_RED !py-1">{% trans "Праздники" %}</div></td><td class="align-top px-2 py-2"><div class="yy-day-windows"></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mt-5">
+            <button id="yySaveRightBtn" type="submit" name="action" value="{{ campaign_save_action }}" class="YY-BUTTON_MAIN_FULL">{% trans "Сохранить" %}</button>
+            <button
+              type="button"
+              id="yyGoTemplateBtn"
+              class="YY-BUTTON_GRAY_FULL"
+              data-url="{{ flow_template_step_url }}"
+              data-saved="{% if campaign_form_saved %}1{% else %}0{% endif %}"
+              disabled>
+              <span class="flex items-center justify-center gap-1 w-full">
+                <span>{% trans "Шаблон" %}</span>
+                <svg class="size-[22px] shrink-0" aria-hidden="true">
+                  <use href="#icon-arrow-circle"></use>
+                </svg>
+              </span>
+            </button>
+          </div>
+
+        </div>
+      </td>
+    </tr>
+  </table>
+</form>

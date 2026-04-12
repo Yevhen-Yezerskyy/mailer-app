@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from django.shortcuts import redirect
+from django.urls import reverse
 
 from .create_edit_flow_branches_cities import (
     handle_branches_step_view,
@@ -17,6 +18,7 @@ from .create_edit_flow_shared import (
     FLOW_STEP_ORDER,
     TEXT_STEP_KEYS,
     build_edit_url,
+    flow_back_url,
     build_step_definitions,
     maybe_update_title_on_geo_enter,
     resolve_task,
@@ -45,7 +47,13 @@ def create_edit_flow_view(
                 task.save(update_fields=["user_active", "updated_at"])
             return redirect(request.get_full_path())
 
-    task = maybe_update_title_on_geo_enter(request, requested_step=requested_step, task=task)
+    task, geo_title_gpt_failed = maybe_update_title_on_geo_enter(
+        request,
+        requested_step=requested_step,
+        task=task,
+    )
+    if geo_title_gpt_failed and request.method != "POST":
+        return redirect(flow_back_url(request, reverse("audience:create_list")))
     saved_values = task_saved_values(task)
     flow_status = build_flow_step_states(
         step_order=FLOW_STEP_ORDER,

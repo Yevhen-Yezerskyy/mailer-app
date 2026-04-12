@@ -16,7 +16,7 @@ from django.utils.html import escape
 from engine.common.cache.client import CLIENT, memo, memo_many_iter
 from engine.common.gpt import GPTClient
 from engine.common.utils import parse_json_response
-from engine.common.prompts.process import get_prompt
+from engine.common.translate import get_prompt
 import json
 import re
 
@@ -420,7 +420,7 @@ def get_branches_sys_translations(branch_ids: List[int], ui_lang: str) -> Dict[i
                 continue
 
             resp = GPTClient().ask(
-                model="gpt-5.4-mini",
+                model="mini",
                 instructions=prompt,
                 input=json.dumps(
                     {
@@ -433,7 +433,7 @@ def get_branches_sys_translations(branch_ids: List[int], ui_lang: str) -> Dict[i
                 ),
                 user_id=f"mailer_web.branches_sys_translate.{lang}",
                 service_tier="flex",
-                use_cache=True,
+                use_local_cache=True,
                 web_search=False,
             )
             data = parse_json_response(resp.content or "")

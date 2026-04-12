@@ -21,7 +21,7 @@
                          viewBox="0 0 24 24"
                          stroke-width="1.5"
                          stroke="currentColor"
-                         class="size-[21px] shrink-0 relative top-[0px]"
+                         class="size-[22px] shrink-0 relative top-[0px]"
                          aria-hidden="true">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
                     </svg>
@@ -45,7 +45,7 @@
                          viewBox="0 0 24 24"
                          stroke-width="1.5"
                          stroke="currentColor"
-                         class="size-[21px] shrink-0 rotate-180 relative top-[2px]"
+                         class="size-[22px] shrink-0 rotate-180 relative top-[2px]"
                          aria-hidden="true">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
                     </svg>
@@ -86,7 +86,16 @@
             <tr class="YY-TH_TR">
               <th class="YY-TH_TH w-[40%]">{% trans "Контакт" %}</th>
               <th class="YY-TH_TH w-[40%]">{% trans "Категория - Город" %}</th>
-              <th class="YY-TH_TH text-center whitespace-nowrap">{% trans "Pair-R" %}</th>
+              <th class="YY-TH_TH text-center whitespace-nowrap">
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center !p-0 !m-0 bg-transparent border-0 underline"
+                  data-pair-rate-help-open="1"
+                  aria-label="{% trans 'Рейтинг Pair-R' %}"
+                  title="{% trans 'Рейтинг Pair-R' %}">
+                  {% trans "Pair-R" %}
+                </button>
+              </th>
               <th class="YY-TH_TH whitespace-nowrap">{% trans "Добавлено" %}</th>
               <th class="YY-TH_TH">&nbsp;</th>
             </tr>
@@ -115,7 +124,7 @@
                      class="YY-LINK flex items-center gap-1 whitespace-nowrap"
                      data-yy-modal="url={{ row.contact_modal_url|escape }}">
                     <span>{% trans "Подробнее" %}</span>
-                    <svg class="size-4 shrink-0" aria-hidden="true">
+                    <svg class="size-[22px] shrink-0" aria-hidden="true">
                       <use href="#icon-arrow-circle"></use>
                     </svg>
                   </a>
@@ -151,7 +160,7 @@
                          viewBox="0 0 24 24"
                          stroke-width="1.5"
                          stroke="currentColor"
-                         class="size-[21px] shrink-0 relative top-[0px]"
+                         class="size-[22px] shrink-0 relative top-[0px]"
                          aria-hidden="true">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
                     </svg>
@@ -175,7 +184,7 @@
                          viewBox="0 0 24 24"
                          stroke-width="1.5"
                          stroke="currentColor"
-                         class="size-[21px] shrink-0 rotate-180 relative top-[2px]"
+                         class="size-[22px] shrink-0 rotate-180 relative top-[2px]"
                          aria-hidden="true">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
                     </svg>

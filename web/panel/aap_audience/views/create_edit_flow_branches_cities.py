@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import re
 import secrets
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from django.db import connection, transaction
 from django.http import HttpResponseRedirect
@@ -17,13 +17,17 @@ from django.shortcuts import render
 from engine.common.cache.client import CLIENT
 from engine.common.gpt import GPTClient
 from engine.common.utils import h64_text, parse_json_response
-from engine.common.prompts.process import get_prompt, translate_text
+from engine.common.translate import get_prompt, translate_text
 from mailer_web.format_contact import get_category_title, get_city_title_by_city_id
 
 from .create_edit_flow_shared import (
     build_flow_render_context,
     build_step_definitions,
+    clear_dialog_state,
+    flow_back_url,
     get_flow_config,
+    is_gpt_ok,
+    mark_flow_gpt_unavailable,
 )
 
 
@@ -126,14 +130,17 @@ def _request_branch_rating_map(
     branch_state: dict[str, Any],
     already_rated_items: list[dict[str, Any]],
     items_to_rate: list[dict[str, Any]],
-) -> tuple[dict[str, int], dict[str, Any]]:
+) -> tuple[dict[str, int], dict[str, Any], bool]:
     rating_map: dict[str, int] = {}
     if not items_to_rate:
-        return rating_map, branch_state
+        return rating_map, branch_state, False
 
     resp = GPTClient().ask_dialog(
-        model="gpt-5.4",
-        instructions=get_prompt("create_branches_buy_rate" if flow_type == "buy" else "create_branches_sell_rate"),
+        model="standard",
+        instructions=get_prompt(
+            "create_branches_buy_rate" if flow_type == "buy" else "create_branches_sell_rate",
+            on_gpt_error=lambda: mark_flow_gpt_unavailable(request),
+        ),
         input=json.dumps(
             {
                 "what_is_needed" if flow_type == "buy" else "what_is_sold": product_de,
@@ -148,8 +155,12 @@ def _request_branch_rating_map(
         previous_response_id=(str(branch_state.get("response_id") or "").strip() or None),
         user_id=str(request.user.id),
         service_tier="flex",
-        web_search=False,
+        web_search=True,
     )
+    if not is_gpt_ok(resp):
+        clear_dialog_state(branch_state)
+        mark_flow_gpt_unavailable(request)
+        return {}, branch_state, True
     raw = resp.raw if isinstance(resp.raw, dict) else {}
     branch_state["response_id"] = str(raw.get("id") or "").strip()
     conversation = raw.get("conversation")
@@ -172,7 +183,7 @@ def _request_branch_rating_map(
             if not branch_name or rate < 1 or rate > 20:
                 continue
             rating_map[branch_name.casefold()] = rate
-    return rating_map, branch_state
+    return rating_map, branch_state, False
 
 
 def _ensure_saved_branch_ratings(
@@ -180,10 +191,10 @@ def _ensure_saved_branch_ratings(
     *,
     task,
     flow_type: str,
-    product_de: str,
-    company_de: str,
+    resolve_translated_context: Callable[[], tuple[str, str]],
     branch_state: dict[str, Any],
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], bool]:
+    gpt_failed = False
     for _attempt in range(2):
         with connection.cursor() as cur:
             cur.execute(
@@ -210,7 +221,8 @@ def _ensure_saved_branch_ratings(
         items_to_rate = _collapse_branch_records_for_rating(
             [{"branch_name": str(row[1] or "").strip()} for row in unrated_rows if row and row[1]]
         )
-        rating_map, branch_state = _request_branch_rating_map(
+        product_de, company_de = resolve_translated_context()
+        rating_map, branch_state, gpt_failed = _request_branch_rating_map(
             request,
             flow_type=flow_type,
             product_de=product_de,
@@ -219,6 +231,8 @@ def _ensure_saved_branch_ratings(
             already_rated_items=already_rated_items,
             items_to_rate=items_to_rate,
         )
+        if gpt_failed:
+            break
         if not rating_map:
             break
 
@@ -241,7 +255,7 @@ def _ensure_saved_branch_ratings(
         if not updated_any:
             break
 
-    return branch_state
+    return branch_state, gpt_failed
 
 
 def _current_city_hash(task, geo_text: str) -> int:
@@ -382,13 +396,24 @@ def _handle_branches_cities_step_view(
     city_rating_rated_count = 0
     city_rating_percent = 0
     city_probe: dict[str, Any] = {}
-    product_de = ""
-    company_de = ""
-    if task and (request.method == "POST" or not is_city_partial):
-        product_de = (translate_text(task.source_product or "", "de") or "").strip()
+    translated_context_cache: tuple[str, str] | None = None
+    on_gpt_error = lambda: mark_flow_gpt_unavailable(request)
+
+    def _resolve_product_company_de() -> tuple[str, str]:
+        nonlocal translated_context_cache
+        if translated_context_cache is not None:
+            return translated_context_cache
+        if not task:
+            translated_context_cache = ("", "")
+            return translated_context_cache
+
+        product_de = (translate_text(task.source_product or "", "de", on_gpt_error=on_gpt_error) or "").strip()
         product_de = product_de or (task.source_product or "").strip()
-        company_de = (translate_text(task.source_company or "", "de") or "").strip()
+        company_de = (translate_text(task.source_company or "", "de", on_gpt_error=on_gpt_error) or "").strip()
         company_de = company_de or (task.source_company or "").strip()
+        translated_context_cache = (product_de, company_de)
+        return translated_context_cache
+
     geo_text = (task.source_geo or "").strip() if task else ""
 
     branch_form = str(request.GET.get("branch_form") or "").strip()
@@ -537,14 +562,17 @@ def _handle_branches_cities_step_view(
                 title = ""
             return title or fallback_name
 
-        branch_state = _ensure_saved_branch_ratings(
+        branch_state, branch_ratings_gpt_failed = _ensure_saved_branch_ratings(
             request,
             task=task,
             flow_type=flow_type,
-            product_de=product_de,
-            company_de=company_de,
+            resolve_translated_context=_resolve_product_company_de,
             branch_state=branch_state,
         )
+        if branch_ratings_gpt_failed and request.method != "POST":
+            if branch_key:
+                CLIENT.set(branch_key, json.dumps(branch_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
+            return HttpResponseRedirect(flow_back_url(request, reverse("audience:create_list")))
         current_task_hash = h64_text((task.source_product or "") + (task.source_company or ""))
         with connection.cursor() as cur:
             cur.execute(
@@ -748,7 +776,7 @@ def _handle_branches_cities_step_view(
             city_state["conversation_id"] = ""
             city_state["response_id"] = ""
             CLIENT.set(city_key, json.dumps(city_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
-            action = "cities_pick_refine"
+            return HttpResponseRedirect(request.get_full_path())
 
         if action == "cities_ignore_hash" and city_key:
             with connection.cursor() as cur:
@@ -764,16 +792,16 @@ def _handle_branches_cities_step_view(
             if geo_text:
                 city_probe_instructions = "\n\n".join(
                     part for part in (
-                        get_prompt("lang_response").replace(
+                        get_prompt("lang_response", on_gpt_error=on_gpt_error).replace(
                             "{LANG}",
                             f"{request.ui_lang_name_en} for all label values only",
                         ).strip(),
-                        get_prompt("create_cities_geo_probe").strip(),
+                        get_prompt("create_cities_geo_probe", on_gpt_error=on_gpt_error).strip(),
                     )
                     if part
                 ).strip()
                 resp = GPTClient().ask_dialog(
-                    model="gpt-5.4",
+                    model="standard",
                     instructions=city_probe_instructions,
                     input=json.dumps(
                         {
@@ -795,8 +823,14 @@ def _handle_branches_cities_step_view(
                     previous_response_id=(str(city_state.get("response_id") or "").strip() or None),
                     user_id=str(request.user.id),
                     service_tier="flex",
-                    web_search=False,
+                    web_search=True,
                 )
+                if not is_gpt_ok(resp):
+                    clear_dialog_state(city_state)
+                    city_state["probe"] = {}
+                    CLIENT.set(city_key, json.dumps(city_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
+                    mark_flow_gpt_unavailable(request)
+                    return HttpResponseRedirect(request.get_full_path())
                 raw = resp.raw if isinstance(resp.raw, dict) else {}
                 city_state["response_id"] = str(raw.get("id") or "").strip()
                 conversation = raw.get("conversation")
@@ -882,9 +916,13 @@ def _handle_branches_cities_step_view(
             )
             rating_map: dict[str, int] = {}
             if items_to_rate:
+                product_de, company_de = _resolve_product_company_de()
                 resp = GPTClient().ask_dialog(
-                    model="gpt-5.4",
-                    instructions=get_prompt("create_branches_buy_rate" if flow_type == "buy" else "create_branches_sell_rate"),
+                    model="standard",
+                    instructions=get_prompt(
+                        "create_branches_buy_rate" if flow_type == "buy" else "create_branches_sell_rate",
+                        on_gpt_error=on_gpt_error,
+                    ),
                     input=json.dumps(
                         {
                             "what_is_needed" if flow_type == "buy" else "what_is_sold": product_de,
@@ -899,8 +937,13 @@ def _handle_branches_cities_step_view(
                     previous_response_id=(str(branch_state.get("response_id") or "").strip() or None),
                     user_id=str(request.user.id),
                     service_tier="flex",
-                    web_search=False,
+                    web_search=True,
                 )
+                if not is_gpt_ok(resp):
+                    clear_dialog_state(branch_state)
+                    CLIENT.set(branch_key, json.dumps(branch_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
+                    mark_flow_gpt_unavailable(request)
+                    return HttpResponseRedirect(request.get_full_path())
                 raw = resp.raw if isinstance(resp.raw, dict) else {}
                 branch_state["response_id"] = str(raw.get("id") or "").strip()
                 conversation = raw.get("conversation")
@@ -966,7 +1009,8 @@ def _handle_branches_cities_step_view(
             branch_state["expanded_clean_ids"] = []
             branch_state["conversation_id"] = ""
             branch_state["response_id"] = ""
-            action = "branches_pick"
+            CLIENT.set(branch_key, json.dumps(branch_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
+            return HttpResponseRedirect(request.get_full_path())
 
         if action == "branches_delete_selected" and branch_key:
             delete_ids: list[int] = []
@@ -1044,9 +1088,13 @@ def _handle_branches_cities_step_view(
 
                 rating_map: dict[str, int] = {}
                 if items_to_rate:
+                    product_de, company_de = _resolve_product_company_de()
                     resp = GPTClient().ask_dialog(
-                        model="gpt-5.4",
-                        instructions=get_prompt("create_branches_buy_rate" if flow_type == "buy" else "create_branches_sell_rate"),
+                        model="standard",
+                        instructions=get_prompt(
+                            "create_branches_buy_rate" if flow_type == "buy" else "create_branches_sell_rate",
+                            on_gpt_error=on_gpt_error,
+                        ),
                         input=json.dumps(
                             {
                                 "what_is_needed" if flow_type == "buy" else "what_is_sold": product_de,
@@ -1061,8 +1109,13 @@ def _handle_branches_cities_step_view(
                         previous_response_id=(str(branch_state.get("response_id") or "").strip() or None),
                         user_id=str(request.user.id),
                         service_tier="flex",
-                        web_search=False,
+                        web_search=True,
                     )
+                    if not is_gpt_ok(resp):
+                        clear_dialog_state(branch_state)
+                        CLIENT.set(branch_key, json.dumps(branch_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
+                        mark_flow_gpt_unavailable(request)
+                        return HttpResponseRedirect(request.get_full_path())
                     raw = resp.raw if isinstance(resp.raw, dict) else {}
                     branch_state["response_id"] = str(raw.get("id") or "").strip()
                     conversation = raw.get("conversation")
@@ -1117,6 +1170,7 @@ def _handle_branches_cities_step_view(
             return HttpResponseRedirect(request.get_full_path())
 
         if action == "branches_pick":
+            product_de, company_de = _resolve_product_company_de()
             initial_input = json.dumps(
                 {
                     "what_is_needed" if flow_type == "buy" else "what_is_sold": product_de,
@@ -1128,15 +1182,24 @@ def _handle_branches_cities_step_view(
 
             previous_response_id = str(branch_state.get("response_id") or "").strip()
             resp = GPTClient().ask_dialog(
-                model="gpt-5.4",
-                instructions=get_prompt("create_branches_buy" if flow_type == "buy" else "create_branches_sell"),
+                model="standard",
+                instructions=get_prompt(
+                    "create_branches_buy" if flow_type == "buy" else "create_branches_sell",
+                    on_gpt_error=on_gpt_error,
+                ),
                 input=initial_input,
                 conversation=(str(branch_state.get("conversation_id") or "").strip() or None),
                 previous_response_id=(previous_response_id or None),
                 user_id=str(request.user.id),
                 service_tier="flex",
-                web_search=False,
+                web_search=True,
             )
+            if not is_gpt_ok(resp):
+                clear_dialog_state(branch_state)
+                if branch_key:
+                    CLIENT.set(branch_key, json.dumps(branch_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
+                mark_flow_gpt_unavailable(request)
+                return HttpResponseRedirect(request.get_full_path())
             raw = resp.raw if isinstance(resp.raw, dict) else {}
             branch_state["response_id"] = str(raw.get("id") or "").strip()
             conversation = raw.get("conversation")
@@ -1172,10 +1235,13 @@ def _handle_branches_cities_step_view(
             branch_state["expanded_clean_ids"] = []
 
             if current_records:
-                clean_prompt = get_prompt("create_branches_buy_clean" if flow_type == "buy" else "create_branches_sell_clean")
+                clean_prompt = get_prompt(
+                    "create_branches_buy_clean" if flow_type == "buy" else "create_branches_sell_clean",
+                    on_gpt_error=on_gpt_error,
+                )
                 previous_response_id = str(branch_state.get("response_id") or "").strip()
                 resp = GPTClient().ask_dialog(
-                    model="gpt-5.4",
+                    model="standard",
                     instructions=clean_prompt,
                     input=json.dumps(
                         {
@@ -1190,8 +1256,14 @@ def _handle_branches_cities_step_view(
                     previous_response_id=(previous_response_id or None),
                     user_id=str(request.user.id),
                     service_tier="flex",
-                    web_search=False,
+                    web_search=True,
                 )
+                if not is_gpt_ok(resp):
+                    clear_dialog_state(branch_state)
+                    if branch_key:
+                        CLIENT.set(branch_key, json.dumps(branch_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
+                    mark_flow_gpt_unavailable(request)
+                    return HttpResponseRedirect(request.get_full_path())
                 raw = resp.raw if isinstance(resp.raw, dict) else {}
                 branch_state["response_id"] = str(raw.get("id") or "").strip()
                 conversation = raw.get("conversation")
@@ -1279,11 +1351,15 @@ def _handle_branches_cities_step_view(
                 ) if custom else ""
 
             if instruction_ru:
-                instruction_en = (translate_text(instruction_ru, "en") or "").strip() or instruction_ru
+                instruction_en = (translate_text(instruction_ru, "en", on_gpt_error=on_gpt_error) or "").strip() or instruction_ru
+                product_de, company_de = _resolve_product_company_de()
                 previous_response_id = str(branch_state.get("response_id") or "").strip()
                 resp = GPTClient().ask_dialog(
-                    model="gpt-5.4",
-                    instructions=get_prompt("create_branches_buy_expand" if flow_type == "buy" else "create_branches_sell_expand"),
+                    model="standard",
+                    instructions=get_prompt(
+                        "create_branches_buy_expand" if flow_type == "buy" else "create_branches_sell_expand",
+                        on_gpt_error=on_gpt_error,
+                    ),
                     input=json.dumps(
                         {
                             "instruction": instruction_en,
@@ -1298,8 +1374,13 @@ def _handle_branches_cities_step_view(
                     previous_response_id=(previous_response_id or None),
                     user_id=str(request.user.id),
                     service_tier="flex",
-                    web_search=False,
+                    web_search=True,
                 )
+                if not is_gpt_ok(resp):
+                    clear_dialog_state(branch_state)
+                    CLIENT.set(branch_key, json.dumps(branch_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
+                    mark_flow_gpt_unavailable(request)
+                    return HttpResponseRedirect(request.get_full_path())
                 raw = resp.raw if isinstance(resp.raw, dict) else {}
                 branch_state["response_id"] = str(raw.get("id") or "").strip()
                 conversation = raw.get("conversation")
@@ -1352,10 +1433,13 @@ def _handle_branches_cities_step_view(
                     branch_state["expanded_raw_ids"] = merged_expand_raw_ids
 
                     if current_records:
-                        clean_prompt = get_prompt("create_branches_buy_clean" if flow_type == "buy" else "create_branches_sell_clean")
+                        clean_prompt = get_prompt(
+                            "create_branches_buy_clean" if flow_type == "buy" else "create_branches_sell_clean",
+                            on_gpt_error=on_gpt_error,
+                        )
                         previous_response_id = str(branch_state.get("response_id") or "").strip()
                         resp = GPTClient().ask_dialog(
-                            model="gpt-5.4",
+                            model="standard",
                             instructions=clean_prompt,
                             input=json.dumps(
                                 {
@@ -1370,8 +1454,13 @@ def _handle_branches_cities_step_view(
                             previous_response_id=(previous_response_id or None),
                             user_id=str(request.user.id),
                             service_tier="flex",
-                            web_search=False,
+                            web_search=True,
                         )
+                        if not is_gpt_ok(resp):
+                            clear_dialog_state(branch_state)
+                            CLIENT.set(branch_key, json.dumps(branch_state, ensure_ascii=False).encode("utf-8"), ttl_sec=FORM_TTL_SEC)
+                            mark_flow_gpt_unavailable(request)
+                            return HttpResponseRedirect(request.get_full_path())
                         raw = resp.raw if isinstance(resp.raw, dict) else {}
                         branch_state["response_id"] = str(raw.get("id") or "").strip()
                         conversation = raw.get("conversation")
@@ -1481,6 +1570,7 @@ def _handle_branches_cities_step_view(
         request,
         flow_conf["template_name"],
         build_flow_render_context(
+            request=request,
             flow_type=flow_type,
             item_id=item_id,
             task=task,

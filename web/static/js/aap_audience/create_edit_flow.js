@@ -21,6 +21,10 @@
   let contactsPollTimer = 0;
   let contactsTotalPollInFlight = false;
   let contactsSectionPollInFlight = false;
+  let contactsSectionRefreshQueued = false;
+  let contactsQueuedSectionUrl = "";
+  const CONTACTS_POLL_INTERVAL_MS = 5000;
+  const geoTitleAutogenPending = !!config.geoTitleAutogenPending;
 
   function isWaitAction(submitter) {
     const action = submitter && submitter.name === "action" ? String(submitter.value || "") : "";
@@ -38,6 +42,25 @@
       action === "cities_pick_refine" ||
       action === "cities_refill"
     );
+  }
+
+  function isGeoStepUrl(url) {
+    const raw = String(url || "").trim();
+    if (!raw) return false;
+    try {
+      const parsed = new URL(raw, window.location.origin);
+      return parsed.pathname.indexOf("/geo/") !== -1 || /\/geo$/.test(parsed.pathname);
+    } catch (e) {
+      return raw.indexOf("/geo/") !== -1 || /\/geo$/.test(raw);
+    }
+  }
+
+  function maybeOpenGeoEnterWait(url) {
+    if (!geoTitleAutogenPending) return;
+    if (!isGeoStepUrl(url)) return;
+    if (window.YYWaitModal && typeof window.YYWaitModal.open === "function") {
+      window.YYWaitModal.open();
+    }
   }
 
   function norm(value) {
@@ -167,13 +190,68 @@
     }
   }
 
+  function pauseInfoModalErrorNode(form) {
+    return form ? form.querySelector("[data-pause-info-error='1']") : null;
+  }
+
+  function pauseInfoModalErrorWrap(form) {
+    return form ? form.querySelector("[data-pause-info-error-wrap='1']") : null;
+  }
+
+  function setPauseInfoModalError(form, message) {
+    const errorNode = pauseInfoModalErrorNode(form);
+    const wrapNode = pauseInfoModalErrorWrap(form);
+    const text = String(message || "").trim();
+    if (errorNode) {
+      errorNode.textContent = text;
+    }
+    if (wrapNode) {
+      wrapNode.classList.toggle("hidden", !text);
+    }
+  }
+
+  function readCookie(name) {
+    const key = String(name || "").trim();
+    if (!key) return "";
+    const source = String(document.cookie || "");
+    if (!source) return "";
+    const parts = source.split(";");
+    for (let i = 0; i < parts.length; i += 1) {
+      const part = String(parts[i] || "").trim();
+      if (!part) continue;
+      const eq = part.indexOf("=");
+      const rawName = eq === -1 ? part : part.slice(0, eq);
+      if (rawName !== key) continue;
+      const rawValue = eq === -1 ? "" : part.slice(eq + 1);
+      try {
+        return decodeURIComponent(rawValue);
+      } catch (e) {
+        return rawValue;
+      }
+    }
+    return "";
+  }
+
+  function resolveFormActionUrl(form) {
+    const fromAttr = form && typeof form.getAttribute === "function"
+      ? String(form.getAttribute("action") || "").trim()
+      : "";
+    if (fromAttr) return fromAttr;
+    try {
+      return String((form && form.action) || "").trim();
+    } catch (e) {
+      return "";
+    }
+  }
+
   function postEditTitle(form, action) {
     const data = new FormData(form);
     data.set("action", action);
+    const actionUrl = resolveFormActionUrl(form) || window.location.href;
     if (window.YYWaitModal && typeof window.YYWaitModal.open === "function") {
       window.YYWaitModal.open();
     }
-    return window.fetch(form.action, {
+    return window.fetch(actionUrl, {
       method: "POST",
       body: data,
       credentials: "same-origin",
@@ -350,6 +428,13 @@
     }
   }
 
+  function handleGptUnavailablePayload(payload) {
+    const data = payload && typeof payload === "object" ? payload : null;
+    if (!data || !data.gpt_unavailable) return false;
+    window.location.reload();
+    return true;
+  }
+
   forms.forEach(function (form) {
     syncActionButtons(form);
 
@@ -418,18 +503,71 @@
 
   document.querySelectorAll("[data-dirty-nav]").forEach(function (button) {
     button.addEventListener("click", function () {
+      const targetUrl = button.getAttribute("data-dirty-nav");
       const names = dirtyFormNames(null);
       if (!names.length) {
-        window.location.href = button.getAttribute("data-dirty-nav");
+        maybeOpenGeoEnterWait(targetUrl);
+        window.location.href = targetUrl;
         return;
       }
       openDirtyModal(names, function () {
-        window.location.href = button.getAttribute("data-dirty-nav");
+        maybeOpenGeoEnterWait(targetUrl);
+        window.location.href = targetUrl;
       });
     });
   });
 
   document.addEventListener("click", function (event) {
+    const conRateHelpBtn = event.target.closest("[data-con-rate-help-open='1']");
+    if (conRateHelpBtn) {
+      event.preventDefault();
+      const tpl = document.getElementById("yy-con-rate-help-template");
+      if (tpl && window.YYModal && typeof window.YYModal.open === "function") {
+        window.YYModal.open("text=" + tpl.innerHTML);
+      }
+      return;
+    }
+
+    const pairRateHelpBtn = event.target.closest("[data-pair-rate-help-open='1']");
+    if (pairRateHelpBtn) {
+      event.preventDefault();
+      const tpl = document.getElementById("yy-pair-rate-help-template");
+      if (tpl && window.YYModal && typeof window.YYModal.open === "function") {
+        window.YYModal.open("text=" + tpl.innerHTML);
+      }
+      return;
+    }
+
+    const citiesHashHelpBtn = event.target.closest("[data-cities-hash-help-open='1']");
+    if (citiesHashHelpBtn) {
+      event.preventDefault();
+      const tpl = document.getElementById("yy-cities-hash-help-template");
+      if (tpl && window.YYModal && typeof window.YYModal.open === "function") {
+        window.YYModal.open("text=" + tpl.innerHTML);
+      }
+      return;
+    }
+
+    const branchesHashHelpBtn = event.target.closest("[data-branches-hash-help-open='1']");
+    if (branchesHashHelpBtn) {
+      event.preventDefault();
+      const tpl = document.getElementById("yy-branches-hash-help-template");
+      if (tpl && window.YYModal && typeof window.YYModal.open === "function") {
+        window.YYModal.open("text=" + tpl.innerHTML);
+      }
+      return;
+    }
+
+    const stepHelpBtn = event.target.closest("[data-step-help-open='1']");
+    if (stepHelpBtn) {
+      event.preventDefault();
+      const tpl = document.getElementById("yy-step-help-template");
+      if (tpl && window.YYModal && typeof window.YYModal.open === "function") {
+        window.YYModal.open("text=" + tpl.innerHTML);
+      }
+      return;
+    }
+
     const suggestBtn = event.target.closest("[data-edit-title-suggest='1']");
     if (!suggestBtn) return;
     const form = suggestBtn.closest("[data-edit-title-form='1']");
@@ -441,6 +579,9 @@
     postEditTitle(form, "suggest_title").then(function (result) {
       const payload = result.payload || {};
       if (!result.response.ok || !payload.ok) {
+        if (handleGptUnavailablePayload(payload)) {
+          return;
+        }
         setTitleModalError(form, payload.error || "Request failed");
         return;
       }
@@ -463,6 +604,9 @@
     postEditTitle(form, "save_title").then(function (result) {
       const payload = result.payload || {};
       if (!result.response.ok || !payload.ok) {
+        if (handleGptUnavailablePayload(payload)) {
+          return;
+        }
         setTitleModalError(form, payload.error || "Request failed");
         return;
       }
@@ -476,6 +620,81 @@
   });
 
   document.addEventListener("submit", function (event) {
+    const form = event.target.closest("[data-pause-info-continue-form='1']");
+    if (!form) return;
+
+    event.preventDefault();
+    setPauseInfoModalError(form, "");
+
+    const data = new FormData(form);
+    const actionUrl = resolveFormActionUrl(form) || window.location.href;
+    const csrfInput = form.querySelector("input[name='csrfmiddlewaretoken']");
+    const csrfFromInput = csrfInput ? String(csrfInput.value || "").trim() : "";
+    const csrfFromCookie = String(readCookie("csrftoken") || "").trim();
+    const csrfToken = csrfFromInput || csrfFromCookie;
+    if (!String(data.get("csrfmiddlewaretoken") || "").trim() && csrfToken) {
+      data.set("csrfmiddlewaretoken", csrfToken);
+    }
+
+    if (window.YYWaitModal && typeof window.YYWaitModal.open === "function") {
+      window.YYWaitModal.open();
+    }
+
+    window.fetch(actionUrl, {
+      method: "POST",
+      body: data,
+      credentials: "same-origin",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+        "X-CSRFToken": csrfToken,
+      },
+    }).then(function (response) {
+      return response.text().then(function (text) {
+        let payload = {};
+        try {
+          payload = JSON.parse(String(text || ""));
+        } catch (e) {
+          payload = {};
+        }
+        return { response: response, payload: payload, text: String(text || "") };
+      });
+    }).then(function (result) {
+      const payload = result.payload || {};
+      if (result.response.ok) {
+        if (payload.ok === false) {
+          if (handleGptUnavailablePayload(payload)) {
+            return;
+          }
+          setPauseInfoModalError(form, payload.error || "Request failed");
+          return;
+        }
+        window.location.reload();
+        return;
+      }
+
+      const bodyText = String(result.text || "");
+      if (handleGptUnavailablePayload(payload)) {
+        return;
+      }
+      if (payload && payload.error) {
+        setPauseInfoModalError(form, payload.error);
+        return;
+      }
+      if (bodyText && /csrf/i.test(bodyText)) {
+        setPauseInfoModalError(form, "CSRF validation failed");
+        return;
+      }
+      setPauseInfoModalError(form, "Request failed");
+    }).catch(function () {
+      setPauseInfoModalError(form, "Request failed");
+    }).finally(function () {
+      if (window.YYWaitModal && typeof window.YYWaitModal.close === "function") {
+        window.YYWaitModal.close();
+      }
+    });
+  });
+
+  document.addEventListener("submit", function (event) {
     const form = event.target.closest("[data-edit-branch-rate-form='1']");
     if (!form) return;
 
@@ -483,11 +702,12 @@
     setBranchRateModalError(form, "");
 
     const data = new FormData(form);
+    const actionUrl = resolveFormActionUrl(form) || window.location.href;
     if (window.YYWaitModal && typeof window.YYWaitModal.open === "function") {
       window.YYWaitModal.open();
     }
 
-    window.fetch(form.action, {
+    window.fetch(actionUrl, {
       method: "POST",
       body: data,
       credentials: "same-origin",
@@ -503,6 +723,9 @@
     }).then(function (result) {
       const payload = result.payload || {};
       if (!result.response.ok || !payload.ok) {
+        if (handleGptUnavailablePayload(payload)) {
+          return;
+        }
         setBranchRateModalError(form, payload.error || "Request failed");
         return;
       }
@@ -631,6 +854,46 @@
     return String(rootNode.getAttribute("data-contacts-flow-active") || "").trim() === "1";
   }
 
+  function contactsTopStateNode(stateKey) {
+    const key = String(stateKey || "").trim();
+    if (!key) return null;
+    return document.querySelector("[data-contacts-top-state='" + key + "']");
+  }
+
+  function setNodeForceVisible(node, visible) {
+    if (!node) return;
+    if (visible) {
+      node.removeAttribute("hidden");
+      node.style.removeProperty("display");
+      return;
+    }
+    node.setAttribute("hidden", "hidden");
+    node.style.setProperty("display", "none", "important");
+  }
+
+  function syncContactsTopState(isActive) {
+    const active = !!isActive;
+    const activeNode = contactsTopStateNode("active");
+    const inactiveNode = contactsTopStateNode("inactive");
+    setNodeForceVisible(activeNode, active);
+    setNodeForceVisible(inactiveNode, !active);
+
+    const rootNode = contactsSectionsRoot();
+    if (rootNode) {
+      rootNode.setAttribute("data-contacts-flow-active", active ? "1" : "0");
+    }
+
+    const collectWrapper = contactsSectionWrapper("collect");
+    if (!collectWrapper) return;
+    if (active) {
+      if (String(collectWrapper.getAttribute("data-contacts-section-url") || "").trim()) {
+        collectWrapper.setAttribute("data-contacts-section-running", "1");
+      }
+      return;
+    }
+    collectWrapper.setAttribute("data-contacts-section-running", "0");
+  }
+
   function contactsSectionButtons() {
     return Array.from(document.querySelectorAll("[data-contacts-section-button]"));
   }
@@ -673,6 +936,14 @@
     syncContactsSectionButtons();
   }
 
+  function queueContactsSectionRefresh(urlOverride) {
+    const url = String(urlOverride || "").trim();
+    if (url) {
+      contactsQueuedSectionUrl = url;
+    }
+    contactsSectionRefreshQueued = true;
+  }
+
   function formatContactsTotal(value) {
     const number = Number(value || 0);
     if (!Number.isFinite(number)) {
@@ -702,21 +973,25 @@
   }
 
   function contactsShouldPoll() {
-    if (!contactsFlowActive()) return false;
     const panel = contactsTotalPanel();
     if (!panel) return false;
     if (!String(panel.getAttribute("data-contacts-total-url") || "").trim()) return false;
-    const wrapper = contactsSectionWrapper("collect");
-    if (!wrapper) return true;
-    if (wrapper.getAttribute("data-contacts-section-running") === "1") {
-      if (!String(wrapper.getAttribute("data-contacts-section-url") || "").trim()) return false;
-    }
     return true;
   }
 
   function refreshContactsTick() {
-    if (!contactsFlowActive()) return;
     refreshContactsTotalPanel();
+
+    if (contactsSectionRefreshQueued) {
+      if (contactsSectionPollInFlight) return;
+      const queuedUrl = contactsQueuedSectionUrl;
+      contactsQueuedSectionUrl = "";
+      contactsSectionRefreshQueued = false;
+      refreshContactsSectionPanel(queuedUrl);
+      return;
+    }
+
+    if (!contactsFlowActive()) return;
     const activeSection = contactsActiveSectionKey();
     if (activeSection === "all") {
       return;
@@ -734,9 +1009,8 @@
 
   function startContactsPolling() {
     stopContactsPolling();
-    if (!contactsFlowActive()) return;
     if (!contactsShouldPoll()) return;
-    contactsPollTimer = window.setInterval(refreshContactsTick, 10000);
+    contactsPollTimer = window.setInterval(refreshContactsTick, CONTACTS_POLL_INTERVAL_MS);
   }
 
   function refreshCityRatingPanel() {
@@ -771,10 +1045,9 @@
   }
 
   function refreshContactsTotalPanel() {
-    if (!contactsFlowActive()) return;
     const panel = contactsTotalPanel();
-    const valueNode = panel ? panel.querySelector("[data-contacts-total-value='1']") : null;
-    if (!panel || !valueNode || contactsTotalPollInFlight) return;
+    const valueNodes = panel ? Array.from(panel.querySelectorAll("[data-contacts-total-value='1']")) : [];
+    if (!panel || !valueNodes.length || contactsTotalPollInFlight) return;
 
     const url = String(panel.getAttribute("data-contacts-total-url") || "").trim();
     if (!url) return;
@@ -794,20 +1067,16 @@
     }).then(function (result) {
       const payload = result.payload || {};
       if (!result.response.ok || !payload.ok) {
-        stopContactsPolling();
         return;
       }
-      valueNode.textContent = formatContactsTotal(payload.contacts_total || 0);
-      if (payload.is_active === false) {
-        const rootNode = contactsSectionsRoot();
-        if (rootNode) {
-          rootNode.setAttribute("data-contacts-flow-active", "0");
-        }
-        const collectWrapper = contactsSectionWrapper("collect");
-        if (collectWrapper) {
-          collectWrapper.setAttribute("data-contacts-section-running", "0");
-        }
-        stopContactsPolling();
+      const totalText = formatContactsTotal(payload.contacts_total || 0);
+      valueNodes.forEach(function (node) {
+        node.textContent = totalText;
+      });
+      if (payload.is_active === true) {
+        syncContactsTopState(true);
+      } else if (payload.is_active === false) {
+        syncContactsTopState(false);
       }
     }).catch(function () {
     }).finally(function () {
@@ -816,7 +1085,6 @@
   }
 
   function refreshContactsSectionPanel(urlOverride) {
-    if (!contactsFlowActive()) return;
     const wrapper = contactsSectionWrapper();
     if (!wrapper || contactsSectionPollInFlight) return;
 
@@ -858,7 +1126,6 @@
         formatPairProcessedTimes();
         window.setTimeout(scheduleContactsBranchCityHeightSync, 0);
         window.setTimeout(scheduleContactsPairsHeightSync, 0);
-        startContactsPolling();
       }, useFadeSwap ? 140 : 0);
     }).catch(function () {
     }).finally(function () {
@@ -957,7 +1224,7 @@
       args.push("q=" + encodeURIComponent(query));
     }
     const separator = baseUrl.indexOf("?") === -1 ? "?" : "&";
-    refreshContactsSectionPanel(baseUrl + separator + args.join("&"));
+    queueContactsSectionRefresh(baseUrl + separator + args.join("&"));
   }
 
   function scrollBranchesToLastGreen() {
@@ -1226,8 +1493,7 @@
       const sectionKey = String(sectionButton.getAttribute("data-contacts-section-button") || "").trim();
       if (sectionKey) {
         showContactsSection(sectionKey);
-        refreshContactsSectionPanel();
-        startContactsPolling();
+        queueContactsSectionRefresh();
       }
       return;
     }
@@ -1368,6 +1634,7 @@
   formatPairProcessedTimes();
   syncContactsSectionButtons();
   showContactsSection(contactsActiveSectionKey() || "collect");
+  syncContactsTopState(contactsFlowActive());
   startCityRatingPolling();
   startContactsPolling();
 })();

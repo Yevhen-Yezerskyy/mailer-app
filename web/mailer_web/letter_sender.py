@@ -13,7 +13,7 @@ from django.db import transaction
 from engine.common import db
 from engine.common.email_template import render_html, sanitize
 from engine.common.mail.smtp import SMTPConn
-from engine.common.prompts.process import translate_text
+from engine.common.translate import translate_text
 from mailer_web.models import MailLetter, MailLetterLang, MailTemplate
 
 

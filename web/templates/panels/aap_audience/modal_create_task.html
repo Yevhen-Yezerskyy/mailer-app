@@ -8,12 +8,13 @@
 
   <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
     {% if task %}
+      {% if task.type == "buy" %}
+        <div class="YY-STATUS_YELLOW !w-full !mb-6">{% trans "Поиск поставщиков / подрядчиков" %}</div>
+      {% else %}
+        <div class="YY-STATUS_GREEN !w-full !mb-6">{% trans "Поиск клиентов / покупателей" %}</div>
+      {% endif %}
+
       <div class="YY-CARD_WHITE mb-6">
-        {% if task.type == "buy" %}
-          <div class="YY-STATUS_YELLOW !w-fit">{% trans "Поиск поставщиков / подрядчиков" %}</div>
-        {% else %}
-          <div class="YY-STATUS_GREEN !w-fit">{% trans "Поиск клиентов / покупателей" %}</div>
-        {% endif %}
         <div class="YY-TEXT-BOLD !mb-0">{{ task.title|default:""|linebreaksbr }}</div>
       </div>
 

@@ -1,0 +1,29 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_campaigns/campaigns_list.html -->
+<!-- DATE: 2026-04-09 -->
+<!-- PURPOSE: Первая страница кампаний: большая кнопка создания + список кампаний. -->
+
+{% block content %}
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_TD">
+      <div class="YY-CARD_WHITE">
+        <a href="{% url 'campaigns:campaigns_flow_campaign' %}" class="YY-BUTTON_MAIN w-full !py-3 text-center">
+          {% trans "Создать кампанию" %}
+        </a>
+      </div>
+    </td>
+  </tr>
+</table>
+
+{% include "panels/aap_campaigns/_campaigns_table.html" %}
+
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script src="/static/js/campaign_templates/campaigns_preview.js"></script>
+  <script src="/static/js/campaign_templates/modal_preview.js"></script>
+{% endblock %}

@@ -54,12 +54,12 @@ def get_category_title(category_id: Any, request: HttpRequest, single: bool = Fa
                 continue
 
             resp = GPTClient().ask(
-                model="gpt-5.4",
+                model="standard",
                 instructions=prompt,
                 input=payload["de"],
                 user_id=f"mailer_web.format_contact.category_translate.{target_lang}",
                 service_tier="flex",
-                use_cache=True,
+                use_local_cache=True,
                 web_search=False,
             )
             translated_title = " ".join(str(resp.content or "").split()).strip()

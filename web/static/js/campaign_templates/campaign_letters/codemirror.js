@@ -11,6 +11,12 @@
   let cmHtml = null;
   let cmHeaders = null;
 
+  function resolveFlowEditorHeight() {
+    const raw = Number(window.yyCampFlowEditorHeight || 0);
+    if (Number.isFinite(raw) && raw > 240) return Math.floor(raw);
+    return 700;
+  }
+
   function commonBase() {
     return {
       theme: "material-darker",
@@ -36,7 +42,7 @@
 
     const cfg = Object.assign(commonBase(), { mode: "htmlmixed" });
     cmHtml = window.CodeMirror.fromTextArea(advHtml, cfg);
-    cmHtml.setSize("100%", "700px");
+    cmHtml.setSize("100%", String(resolveFlowEditorHeight()) + "px");
     return true;
   }
 
@@ -101,5 +107,16 @@
     } catch (_) {
       return "";
     }
+  };
+
+  window.yyCampSetCodeMirrorHeight = function (h) {
+    if (!ensureHtml() || !cmHtml) return;
+    const raw = Number(h || 0);
+    const height = Number.isFinite(raw) && raw > 240 ? Math.floor(raw) : resolveFlowEditorHeight();
+    const px = String(height) + "px";
+    try {
+      cmHtml.setSize("100%", px);
+      cmHtml.refresh();
+    } catch (_) {}
   };
 })();

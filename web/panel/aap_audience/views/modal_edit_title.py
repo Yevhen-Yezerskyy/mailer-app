@@ -9,9 +9,10 @@ from django.shortcuts import render
 from django.utils.translation import gettext as _
 
 from engine.common.gpt import GPTClient
-from engine.common.prompts.process import get_prompt
+from engine.common.translate import get_prompt
 from mailer_web.access import decode_id
 from panel.aap_audience.models import AudienceTask
+from .create_edit_flow_shared import FLOW_GPT_UNAVAILABLE_TEXT, is_gpt_ok, mark_flow_gpt_unavailable
 
 def _resolve_task(request, token: str):
     if not token:
@@ -35,8 +36,9 @@ def _can_suggest(task) -> bool:
 
 def _prompt_instructions(request, prompt_key: str) -> str:
     lang_name = request.ui_lang_name_en
-    lang_prompt = get_prompt("lang_response").replace("{LANG}", lang_name).strip()
-    prompt_text = get_prompt(prompt_key).strip()
+    on_gpt_error = lambda: mark_flow_gpt_unavailable(request)
+    lang_prompt = get_prompt("lang_response", on_gpt_error=on_gpt_error).replace("{LANG}", lang_name).strip()
+    prompt_text = get_prompt(prompt_key, on_gpt_error=on_gpt_error).strip()
     return "\n\n".join(part for part in (lang_prompt, prompt_text) if part).strip()
 
 
@@ -85,13 +87,24 @@ def modal_edit_title_view(request):
                 )
 
             resp = GPTClient().ask(
-                model="gpt-5.4",
+                model="standard",
                 instructions=_prompt_instructions(request, _title_prompt_key(task)),
                 input=_title_input(task),
                 user_id=_title_user_id(task),
                 service_tier="flex",
                 web_search=False,
             )
+            if not is_gpt_ok(resp):
+                mark_flow_gpt_unavailable(request)
+                return JsonResponse(
+                    {
+                        "ok": False,
+                        "error": str(_(FLOW_GPT_UNAVAILABLE_TEXT)),
+                        "gpt_unavailable": True,
+                        "popup_text": FLOW_GPT_UNAVAILABLE_TEXT,
+                    },
+                    status=503,
+                )
             title = (resp.content or "").strip()
             if not title:
                 return JsonResponse(

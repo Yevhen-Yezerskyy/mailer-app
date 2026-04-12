@@ -11,6 +11,12 @@
   let cmHtml = null;
   let cmCss = null;
 
+  function resolveFlowEditorHeight() {
+    const raw = Number(window.yyTplFlowEditorHeight || 0);
+    if (Number.isFinite(raw) && raw > 240) return Math.floor(raw);
+    return 700;
+  }
+
   function ensure() {
     if (cmHtml && cmCss) return true;
     if (!window.CodeMirror) return false;
@@ -36,8 +42,10 @@
     cmHtml = window.CodeMirror.fromTextArea(advHtml, Object.assign({}, common, { mode: "htmlmixed" }));
     cmCss = window.CodeMirror.fromTextArea(advCss, Object.assign({}, common, { mode: "css" }));
 
-    cmHtml.setSize("100%", "700px");
-    cmCss.setSize("100%", "700px");
+    const h = resolveFlowEditorHeight();
+    const px = String(h) + "px";
+    cmHtml.setSize("100%", px);
+    cmCss.setSize("100%", px);
 
     return true;
   }
@@ -71,5 +79,18 @@
     } catch (_) {
       return false;
     }
+  };
+
+  window.yyTplSetCodeMirrorHeight = function (h) {
+    if (!ensure() || !cmHtml || !cmCss) return;
+    const raw = Number(h || 0);
+    const height = Number.isFinite(raw) && raw > 240 ? Math.floor(raw) : resolveFlowEditorHeight();
+    const px = String(height) + "px";
+    try {
+      cmHtml.setSize("100%", px);
+      cmCss.setSize("100%", px);
+      cmHtml.refresh();
+      cmCss.refresh();
+    } catch (_) {}
   };
 })();

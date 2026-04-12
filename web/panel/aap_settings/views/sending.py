@@ -11,7 +11,11 @@ from typing import Any, Dict
 from django.shortcuts import redirect, render
 from django.utils.translation import gettext as _
 
-from panel.aap_settings.models import SendingSettings
+from panel.aap_settings.models import (
+    GlobalSendingSettings,
+    SendingSettings,
+    default_global_global_window_json,
+)
 
 
 DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun", "hol"]
@@ -26,16 +30,13 @@ def _guard(request):
 
 
 def _default_value_json() -> Dict[str, Any]:
-    return {
-        "mon": [],
-        "tue": [{"from": "09:00", "to": "12:00"}],
-        "wed": [{"from": "09:00", "to": "12:00"}],
-        "thu": [{"from": "09:00", "to": "12:00"}],
-        "fri": [],
-        "sat": [],
-        "sun": [],
-        "hol": [],
-    }
+    fallback = default_global_global_window_json()
+    obj, _ = GlobalSendingSettings.objects.get_or_create(
+        singleton_key=1,
+        defaults={"global_global_window": fallback},
+    )
+    data = obj.global_global_window if isinstance(obj.global_global_window, dict) else {}
+    return data or fallback
 
 
 def sending_settings_view(request):

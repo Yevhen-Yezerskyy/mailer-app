@@ -72,6 +72,9 @@
     if (uR) uR.classList.remove("hidden");
 
     setMode("user");
+    if (typeof window.yyTplScheduleFlowHeightSync === "function") {
+      window.yyTplScheduleFlowHeightSync();
+    }
   }
 
   function showAdvancedMode() {
@@ -86,6 +89,9 @@
     if (aR) aR.classList.remove("hidden");
 
     setMode("advanced");
+    if (typeof window.yyTplScheduleFlowHeightSync === "function") {
+      window.yyTplScheduleFlowHeightSync();
+    }
   }
 
   

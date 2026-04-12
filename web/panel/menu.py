@@ -82,12 +82,6 @@ PANEL_MENU = [
                 "url_name": "settings:url_stats",
                 "active_prefixes": ["/panel/settings/url-stats/"],
             },
-            {
-                "title": _("Домены"),
-                "page_title": _("Настройки : Домены"),
-                "url_name": "settings:domains",
-                "active_prefixes": ["/panel/settings/domains/"],
-            },
         ],
     },
 ]

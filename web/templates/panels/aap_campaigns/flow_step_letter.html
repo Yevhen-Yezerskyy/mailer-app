@@ -1,0 +1,89 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_campaigns/flow_step_letter.html -->
+<!-- DATE: 2026-04-09 -->
+<!-- PURPOSE: Шаг флоу "Письмо". -->
+
+{% if edit_obj %}
+  <form method="post" id="yySendingForm">
+    {% csrf_token %}
+
+    <input type="hidden" id="yyCampaignId" value="{{ edit_obj.ui_id }}">
+    <input type="hidden" name="id" value="{{ edit_obj.ui_id }}">
+    <input type="hidden" name="editor_mode" id="yyEditorMode" value="user">
+    <input type="hidden" name="editor_html" id="yyEditorHtml">
+    <input type="hidden" name="subjects_json" id="yySubjectsJson">
+    <input type="hidden" name="headers_json" id="yyHeadersJson">
+
+    <textarea id="yyInitHtml" class="hidden">{{ letter_init_html }}</textarea>
+    <textarea id="yyInitCss" class="hidden">{{ letter_init_css }}</textarea>
+    <textarea id="yyInitSubjects" class="hidden">{{ letter_init_subjects }}</textarea>
+    <textarea id="yyInitHeaders" class="hidden">{{ letter_init_headers }}</textarea>
+    <textarea id="yyTemplateHtml" class="hidden">{{ letter_template_html }}</textarea>
+
+    <table class="YY-MAIN_TABLE !mt-3 !mb-10" data-campaign-letter-flow-root="1">
+      <tr>
+        <td class="YY-MAIN_TOP_LEFT_TD w-[60%]">
+          <div class="YY-CARD_WHITE h-full min-h-0 flex flex-col" data-campaign-letter-left-card="1">
+            <div id="yyUserModeLeft" class="flex-1 min-h-0">
+              <textarea id="yyTinyEditor" class="border border-[#cbcbcb] bg-white w-full h-full" spellcheck="false"></textarea>
+            </div>
+
+            <div id="yyAdvancedModeLeft" class="hidden flex-1 min-h-0">
+              <textarea id="yyAdvHtml" class="w-full h-full" spellcheck="false"></textarea>
+            </div>
+          </div>
+        </td>
+
+        <td class="YY-MAIN_TOP_RIGHT_TD w-[40%]">
+          <div class="YY-CARD_WHITE h-full min-h-0 flex flex-col" data-campaign-letter-right-card="1">
+            <div class="flex-1 min-h-0 flex flex-col">
+              <div id="yyUserModeRight" class="mb-6">
+                <div class="grid grid-cols-2 gap-3">
+                  <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampSwitchToAdvanced()">{% trans "Экспертный режим" %}</button>
+                  <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampPreviewCurrent()">{% trans "Предпросмотр" %}</button>
+                </div>
+              </div>
+
+              <div id="yyAdvancedModeRight" class="hidden mb-6">
+                <div class="grid grid-cols-2 gap-3 mb-5">
+                  <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampSwitchToUser()">{% trans "Визуальный режим" %}</button>
+                  <button type="button" class="YY-BUTTON_MAIN" onclick="yyCampPreviewCurrent()">{% trans "Предпросмотр" %}</button>
+                </div>
+
+                <label class="YY-LABEL">{% trans "Дополнительные заголовки JSON" %}</label>
+                <textarea id="yyHeadersJsonArea" class="w-full" spellcheck="false" style="height:240px;"></textarea>
+              </div>
+
+              <div class="mb-6">
+                <label class="YY-LABEL">{% trans "Тема письма 1 (ротация)" %}:</label>
+                <input type="text" id="yySubject1" class="YY-INPUT">
+
+                <label class="YY-LABEL">{% trans "Тема письма 2 (ротация)" %}:</label>
+                <input type="text" id="yySubject2" class="YY-INPUT">
+
+                <label class="YY-LABEL">{% trans "Тема письма 3 (ротация)" %}:</label>
+                <input type="text" id="yySubject3" class="YY-INPUT !mb-0">
+              </div>
+
+              {% if has_letter %}
+                <div class="mt-3 mb-8">
+                  <label class="YY-LABEL">{% trans "Отправить тестовое письмо по адресу:" %}</label>
+                  <div class="flex items-stretch gap-3">
+                    <input type="email" name="test_email" class="YY-INPUT !mb-0 flex-1" placeholder="test@example.com">
+                    <button type="submit" name="action" value="send_test" class="YY-BUTTON_MAIN !mb-0 whitespace-nowrap px-5">{% trans "Отправить тестовое письмо" %}</button>
+                  </div>
+                </div>
+              {% endif %}
+
+              <div class="grid grid-cols-2 gap-3 mt-auto pt-5">
+                <button type="submit" name="action" value="save_letter" class="YY-BUTTON_MAIN">{% trans "Сохранить" %}</button>
+                <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN" formnovalidate>{% trans "Закрыть" %}</button>
+              </div>
+            </div>
+          </div>
+        </td>
+      </tr>
+    </table>
+  </form>
+
+{% endif %}

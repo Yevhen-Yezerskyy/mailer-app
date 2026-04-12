@@ -32,6 +32,38 @@
     font: "yyCssOverlayFont",
   };
 
+  function normalizeEditorHeight(v) {
+    const raw = Number(v || 0);
+    if (Number.isFinite(raw) && raw > 240) return Math.floor(raw);
+    return 700;
+  }
+
+  function applyTinyEditorHeight(editor, h) {
+    if (!editor || typeof editor.getContainer !== "function") return;
+    const n = normalizeEditorHeight(h);
+    try {
+      const container = editor.getContainer();
+      if (!container) return;
+
+      // total editor box height (inside card)
+      container.style.height = String(n) + "px";
+
+      // reserve header/status bars so iframe area fits exactly into remaining space
+      let reserved = 0;
+      const header = container.querySelector(".tox-editor-header");
+      const status = container.querySelector(".tox-statusbar");
+      if (header && header.offsetParent !== null) reserved += header.offsetHeight;
+      if (status && status.offsetParent !== null) reserved += status.offsetHeight;
+
+      const contentHeight = Math.max(120, n - reserved);
+      const px = String(contentHeight) + "px";
+      const area = container.querySelector(".tox-edit-area");
+      const iframe = container.querySelector(".tox-edit-area iframe");
+      if (area) area.style.height = px;
+      if (iframe) iframe.style.height = px;
+    } catch (_) {}
+  }
+
   function ensureStyle(editor, id) {
     const doc = editor && editor.getDoc ? editor.getDoc() : null;
     if (!doc) return null;
@@ -123,9 +155,27 @@
     },
   };
 
+  window.yyTplSetEditorHeight = function (h) {
+    const n = normalizeEditorHeight(h);
+    window.yyTplFlowEditorHeight = n;
+
+    try {
+      const ed = window.tinymce ? window.tinymce.get("yyTinyEditor") : null;
+      if (ed) applyTinyEditorHeight(ed, n);
+    } catch (_) {}
+
+    try {
+      if (typeof window.yyTplSetCodeMirrorHeight === "function") {
+        window.yyTplSetCodeMirrorHeight(n);
+      }
+    } catch (_) {}
+  };
+
   function loadExistingInto(editor) {
     const state = (getParam("state") || "").trim();
     const uiId = (getParam("id") || "").trim();
+    const tplState = (getParam("tpl_state") || "").trim();
+    const tplId = (getParam("tpl_id") || "").trim();
     const glTpl = (getParam("gl_tpl") || "").trim();
 
     // 1) OVERRIDE: если есть gl_tpl — грузим GlobalTemplate независимо от state.
@@ -164,6 +214,24 @@
       return;
     }
 
+    // 3) flow template-step: tpl_state/tpl_id.
+    if (tplState === "edit" && tplId) {
+      const id = encodeURIComponent(tplId);
+      const urlHtml = `/panel/campaigns/templates/_render-user-html/?id=${id}`;
+      const urlCss = `/panel/campaigns/templates/_render-user-css/?id=${id}`;
+
+      fetchText(urlHtml)
+        .then((html) => {
+          try {
+            editor.setContent(html || "");
+          } catch (_) {}
+          return fetchText(urlCss);
+        })
+        .then((css) => window.yyTplSetCss(css || ""))
+        .catch(() => {});
+      return;
+    }
+
     // default
     try {
       editor.setContent("");
@@ -175,7 +243,15 @@
     ensureStyle(editor, IDS.base);
     ensureStyle(editor, IDS.color);
     ensureStyle(editor, IDS.font);
+    applyTinyEditorHeight(editor, window.yyTplFlowEditorHeight || 0);
     loadExistingInto(editor);
+    setTimeout(function () {
+      if (typeof window.yyTplScheduleFlowHeightSync === "function") {
+        window.yyTplScheduleFlowHeightSync();
+      } else {
+        applyTinyEditorHeight(editor, window.yyTplFlowEditorHeight || 0);
+      }
+    }, 0);
   };
 
   function init() {

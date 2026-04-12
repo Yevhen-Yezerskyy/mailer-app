@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-03-18 13:56+0100\n"
+"POT-Creation-Date: 2026-04-10 16:00+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -20,328 +20,669 @@ msgstr ""
 "100 > 14) ? 1 : n % 1 == 0 && (n % 10 ==0 || (n % 10 >=5 && n % 10 <=9) || "
 "(n % 100 >=11 && n % 100 <=14 )) ? 2: 3);\n"
 
-#: panel/aap_audience/forms.py:17
-msgid "Ваш продукт / услуга. Что именно продаётся? Суть, бизнес-характеристики"
-msgstr "Ваш продукт / послуга. Що саме продається? Суть, бізнес-характеристики"
-
-#: panel/aap_audience/forms.py:24
+#: panel/aap_audience/views/create_edit_flow_shared.py:44
 msgid ""
-"Кратко опишите продукт / услугу. Что именно продаётся. Что получает "
-"покупатель.."
+"В процессе обработки ИИ будет задавать вопросы и давать подсказки для "
+"уточнения описания. Поскольку основные варианты уже указаны в начальном "
+"описании, часть подсказок может быть нерелевантной. При необходимости "
+"добавьте информацию в описание или в команду для ассистента ИИ."
 msgstr ""
-"Коротко опишіть продукт / послугу. Що саме продається. Що отримує покупець.."
+"У процесі обробки ШІ буде ставити запитання та давати підказки для уточнення "
+"опису. Оскільки основні варіанти вже вказані в початковому описі, частина "
+"підказок може бути нерелевантною. У разі необхідності додайте інформацію до "
+"опису або в команду для помічника ШІ."
 
-#: panel/aap_audience/forms.py:31
-msgid ""
-"Компания-продавец. Кто Вы? Направление деятельности, опыт, достижения, "
-"репутация."
-msgstr ""
-"Компанія-продавець. Хто Ви? Напрям діяльності, досвід, досягнення, репутація."
-
-#: panel/aap_audience/forms.py:39
-msgid ""
-"Название компании, страна, адрес, юридическая форма, адрес сайта, размер "
-"компании, специализация, сколько лет на рынке."
-msgstr ""
-"Назва компанії, країна, адреса, юридична форма, адреса сайту, розмір "
-"компанії, спеціалізація, скільки років на ринку."
-
-#: panel/aap_audience/forms.py:46
-msgid ""
-"География работы в Германии. Возможности и ограничения. Территория, "
-"логистика."
-msgstr ""
-"Географія роботи в Німеччині. Можливості та обмеження. Територія, логістика."
-
-#: panel/aap_audience/forms.py:54
-msgid ""
-"Партнеры, дилеры, представители в Германии, их адреса. Логистика поставок. "
-"Территория предоставления услуг. Где продукт применим в Германии."
-msgstr ""
-"Партнери, дилери, представники в Німеччині, їх адреси. Логістика поставок. "
-"Територія надання послуг. Де продукт застосовний у Німеччині."
-
-#: panel/aap_audience/forms.py:68
-msgid "Заполните хотя бы одно поле."
-msgstr "Заповніть хоча б одне поле."
-
-#: panel/aap_audience/forms.py:87 panel/aap_audience/forms.py:90
-msgid ""
-"Продукт / услуга. Что именно Вы приобретаете? Суть, бизнес-характеристики"
-msgstr "Продукт / послуга. Що саме Ви набуваєте? Суть, бізнес-характеристики"
-
-#: panel/aap_audience/forms.py:94
-msgid ""
-"Компания-покупатель. Кто Вы? Направление деятельности, опыт, достижения, "
-"репутация."
-msgstr ""
-"Компанія-покупець. Хто Ви? Напрям діяльності, досвід, досягнення, репутація."
-
-#: panel/aap_audience/forms.py:97
-msgid "Название компании, сайт, страна и краткая информация о покупателе"
-msgstr "Назва компанії, сайт, країна та коротка інформація про покупця"
-
-#: panel/aap_audience/forms.py:101
-msgid ""
-"География покупки в Германии. Возможности и ограничения. Территория, "
-"логистика."
-msgstr ""
-"Географія покупок у Німеччині. Можливості та обмеження. Територія, логістика."
-
-#: panel/aap_audience/forms.py:104
-msgid ""
-"Регионы Германии, допустимая логистика, требования к месту доставки / месту "
-"оказания услуги."
-msgstr ""
-"Регіони Німеччини, допустима логістика, вимоги до місця доставки / місця "
-"надання послуги."
-
-#: panel/aap_audience/forms.py:112 panel/aap_audience/forms.py:115
-#: panel/aap_audience/forms.py:185 panel/aap_audience/forms.py:190
-msgid "Название задачи"
-msgstr "Назва завдання"
-
-#: panel/aap_audience/forms.py:120 panel/aap_audience/forms.py:126
-msgid "КЛИЕНТ: Критерии для ранжирования клиентов"
-msgstr "КЛІЄНТ: Критерії для ранжування клієнтів"
-
-#: panel/aap_audience/forms.py:132 panel/aap_audience/forms.py:138
-#: panel/aap_audience/forms.py:208
-msgid "КАТЕГОРИИ: Критерии для ранжирования бизнес-категорий"
-msgstr "КАТЕГОРІЇ: Критерії для ранжування бізнес-категорій"
-
-#: panel/aap_audience/forms.py:144 panel/aap_audience/forms.py:220
-msgid "ГЕОГРАФИЯ: Критерии для ранжирования городов (Германия)"
-msgstr "ГЕОГРАФІЯ: Критерії для ранжування міст (Німеччина)"
-
-#: panel/aap_audience/forms.py:150
-msgid "Какая география подходит."
-msgstr "Яка географія підходить?"
-
-#: panel/aap_audience/forms.py:176 panel/aap_audience/forms.py:251
-#: panel/aap_audience/forms.py:307 panel/aap_lists/forms.py:40
-msgid "Заполните все поля."
-msgstr "Заповніть усі поля."
-
-#: panel/aap_audience/forms.py:196
-msgid "ПРОДАВЕЦ: Критерии для ранжирования продавцов"
-msgstr "Продавець: Критерії для ранжування продавців"
-
-#: panel/aap_audience/forms.py:202
-msgid "Критерии для ранжирования продавцов."
-msgstr "Критерії для ранжування продавців."
-
-#: panel/aap_audience/forms.py:214
-msgid "Какие типы компаний/специализаций подходят."
-msgstr "Які типи компаній/спеціалізацій підходять."
-
-#: panel/aap_audience/forms.py:226
-msgid "Регионы Германии, логистика, удаленная/локальная работа."
-msgstr "Регіони Німеччини, логістика, віддалена/локальна робота."
-
-#: panel/aap_audience/forms.py:268 templates/panels/aap_audience/how.html:217
-msgid "Задача"
-msgstr "Завдання"
-
-#: panel/aap_audience/forms.py:269
-msgid "Опишите основную задачу."
-msgstr "Опишіть основну задачу."
-
-#: panel/aap_audience/forms.py:319
-msgid "Задача. Что продаём и кого хотим привлечь"
-msgstr "Завдання. Що продаємо і кого хочемо залучити"
-
-#: panel/aap_audience/forms.py:321
-msgid ""
-"1–2 предложения: что продаёте (суть), кто целевой клиент в Германии и какой "
-"результат нужен (лиды/встречи/заявки)."
-msgstr ""
-"1–2 речення: що продаєте (сутність), хто цільовий клієнт у Німеччині і який "
-"результат потрібен (ліди/зустрічі/заявки)."
-
-#: panel/aap_audience/forms.py:323
-msgid "Нужно найти клиентов: "
-msgstr "Потрібно знайти клієнтів:"
-
-#: panel/aap_audience/forms.py:331
-msgid "Задача. Что нужно купить и какой подрядчик подходит"
-msgstr "Завдання. Що потрібно купити і який підрядник підходить"
-
-#: panel/aap_audience/forms.py:333
-msgid ""
-"1–2 предложения: что нужно купить/заказать, ключевые требования и какой "
-"поставщик/подрядчик нужен (тип, опыт, условия)."
-msgstr ""
-"1–2 речення: що потрібно купити/замовити, ключові вимоги і який постачальник/"
-"підрядник потрібен (тип, досвід, умови)."
-
-#: panel/aap_audience/forms.py:335
-msgid "Нужно найти поставщиков / подрядчиков: "
-msgstr "Потрібно знайти постачальників / підрядників:"
-
-#: panel/aap_audience/views/modal_clar.py:70
-#: templates/panels/aap_audience/clar.html:172
-msgid "Города"
-msgstr "Міста"
-
-#: panel/aap_audience/views/modal_clar.py:74
-#: templates/panels/aap_audience/clar.html:164
-#: templates/panels/aap_audience/clar.html:364
-#: templates/panels/aap_audience/how.html:264
-#: templates/panels/aap_audience/status.html:68
-#: templates/panels/aap_audience/status_task.html:232
-#: templates/panels/aap_audience/status_task.html:350
+#: panel/aap_audience/views/create_edit_flow_shared.py:51
+#: panel/aap_audience/views/create_edit_flow_shared.py:52
+#: panel/aap_audience/views/create_edit_flow_shared.py:53
 #: templates/panels/aap_lists/contacts.html:147
 #: templates/panels/aap_lists/lists_list.html:164
 msgid "Категории"
 msgstr "Категорії"
 
-#: panel/aap_campaigns/views/campaigns.py:349
-#: panel/aap_campaigns/views/campaigns.py:446
+#: panel/aap_audience/views/create_edit_flow_shared.py:56
+#: panel/aap_audience/views/create_edit_flow_shared.py:57
+#: panel/aap_audience/views/create_edit_flow_shared.py:58
+msgid "Города"
+msgstr "Міста"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:61
+#: templates/panels/aap_lists/contacts.html:26
+msgid "Контакты"
+msgstr "Контакти"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:62
+#: panel/aap_audience/views/create_edit_flow_shared.py:63
+msgid "Сбор контактов"
+msgstr "Збір контактів увімкнено"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:66
+#| msgid "Рейтинг:"
+msgid "Рейтинг"
+msgstr "Рейтинг 1-30"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:67
+#: panel/aap_audience/views/create_edit_flow_shared.py:68
+#: panel/aap_audience/views/create_edit_flow_shared.py:503
+#: panel/aap_audience/views/modal_edit_title.py:64
+#: panel/aap_audience/views/modal_insert_company.py:38
+#: templates/panels/aap_campaigns/campaigns.html:59
+#: templates/panels/aap_campaigns/campaigns.html:403
+#: templates/panels/aap_campaigns/flow_step_campaign.html:18
+#: templates/panels/aap_lists/contacts.html:26
+#: templates/panels/aap_lists/lists_list.html:17
+msgid "Список рассылки"
+msgstr "Список розсилки"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:150
+#, python-brace-format
+msgid ""
+"Введите команду для работы с {subject} — что нужно добавить, удалить или "
+"изменить. Указанная команда будет применена к текущему описанию."
+msgstr ""
+"Введіть команду для роботи з описом компанії — що потрібно додати, видалити "
+"або змінити. Вказана команда буде застосована до поточного опису."
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:157
+#, python-brace-format
+msgid ""
+"Вы также можете задать вопрос ИИ-ассистенту в контексте работы над "
+"{subject}. Ответ на вопрос будет дан отдельно и не изменит текст описания."
+msgstr ""
+"Ви також можете поставити запитання ШІ-асистентові в контексті роботи над "
+"описом компанії. Відповідь на запитання буде надана окремо і не змінить "
+"текст опису."
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:197
+#: templates/panels/aap_audience/create_list.html:77
+#: templates/panels/aap_audience/modal_create_task.html:14
+#: templates/panels/aap_audience/modal_insert_company.html:19
+msgid "Поиск клиентов / покупателей"
+msgstr "Пошук клієнтів"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:198
+msgid "Список рассылки: поиск клиентов / покупателей"
+msgstr "Пошук клієнтів"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:203
+#: panel/aap_audience/views/create_edit_flow_shared.py:284
+msgid "Продукт"
+msgstr "Продукт/Послуга"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:204
+#: panel/aap_audience/views/create_edit_flow_shared.py:205
+#: panel/aap_audience/views/create_edit_flow_shared.py:285
+#: panel/aap_audience/views/create_edit_flow_shared.py:286
+#: templates/panels/aap_audience/modal_create_task.html:26
+msgid "Продукт / услуга"
+msgstr "Продукт / послуга"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:206
+msgid "Продукт / услуга. Что продаётся? Где применяется? Кто покупатель?"
+msgstr "Ваш продукт / послуга. Що саме продається? Суть, бізнес-характеристики"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:208
+msgid ""
+"Для корректного выбора бизнес-категорий и рейтингования потенциальных "
+"клиентов необходимо сформировать описание продукта или услуги. Введите "
+"описание продукта / услуги. Можно использовать ссылку / ссылки в формате "
+"https://www.example.com. Можно воспользоваться помощью ИИ-ассистента.\n"
+"\n"
+"«Обработать» — помощь ИИ.\n"
+"При нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, сделает "
+"его более подробным, структурированным и удобным для машинной обработки. В "
+"дальнейшем любые добавленные вами данные будут автоматически встроены в "
+"структуру описания. Удалённые элементы также будут корректно исключены. "
+"Результат обработки не сохраняется автоматически.\n"
+"\n"
+"«Сохранить» — сохранить описание\n"
+"Кнопка «Сохранить» записывает текущую версию описания для дальнейшего "
+"использования."
+msgstr ""
+"Для коректного вибору бізнес‑категорій і рейтингування потенційних клієнтів "
+"необхідно сформувати опис продукту або послуги. Введіть опис продукту / "
+"послуги. Можна використовувати посилання / посилання у форматі https://"
+"www.example.com. Можна скористатися допомогою ШІ-асистента.\n"
+"\n"
+"«Опрацювати» — допомога ШІ.\n"
+"Після натискання кнопки «Опрацювати» ШІ-асистент розгорне опис, зробить його "
+"більш детальним, структурованим і зручним для машинної обробки. Надалі "
+"будь‑які додані вами дані будуть автоматично вбудовані в структуру опису. "
+"Видалені елементи також будуть коректно виключені. Результат опрацювання не "
+"зберігається автоматично.\n"
+"\n"
+"«Зберегти» — зберегти опис\n"
+"Кнопка «Зберегти» записує поточну версію опису для подальшого використання."
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:220
+msgid "описанием продукта или услуги"
+msgstr "Продукт / послуга"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:225
+#: panel/aap_audience/views/create_edit_flow_shared.py:227
+#: panel/aap_audience/views/create_edit_flow_shared.py:309
+#: templates/panels/aap_audience/modal_create_task.html:37
+#: templates/panels/aap_lists/contacts.html:71
+#: templates/panels/aap_lists/contacts.html:146
+#: templates/panels/aap_lists/lists_list.html:65
+#: templates/panels/aap_lists/lists_list.html:163
+#: templates/panels/aap_lists/modal_contacts.html:37
+#: templates/panels/modals/switch_user.html:17 templates/panels/stats.html:23
+#: templates/public/register.html:27
+msgid "Компания"
+msgstr "Компанія"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:226
+msgid "Компания - продавец"
+msgstr "Кампанія ввімкнена"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:228
+msgid ""
+"Компания - продавец. Название, адрес, страна, размер, опыт, специализация."
+msgstr ""
+"Компанія-продавець. Хто Ви? Напрям діяльності, досвід, досягнення, репутація."
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:230
+msgid ""
+"Для корректного выбора бизнес-категорий и рейтингования потенциальных "
+"клиентов необходимо сформировать описание компании-продавца. Укажите "
+"название компании, страну и адрес. Уточните специализацию компании, опыт "
+"работы, возраст и размер компании. Укажите сайт компании. Используйте ссылки "
+"в формате: https://www.example.com. При необходимости можно воспользоваться "
+"помощью ИИ-ассистента.\n"
+"\n"
+"«Обработать» — помощь ИИ\n"
+"При нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, сделает "
+"его более подробным, структурированным и удобным для машинной обработки. В "
+"дальнейшем любые добавленные вами данные будут встроены в описание. "
+"Удалённые элементы также будут корректно исключены. Результат обработки "
+"автоматически не сохраняется.\n"
+"\n"
+"«Сохранить» — сохранить описание\n"
+"Кнопка «Сохранить» записывает текущую версию описания для дальнейшего "
+"использования."
+msgstr ""
+"Для коректного вибору бізнес-категорій та рейтингування потенційних клієнтів "
+"необхідно сформувати опис компанії‑продавця. Вкажіть назву компанії, країну "
+"та адресу. Уточніть спеціалізацію компанії, досвід роботи, вік та розмір "
+"компанії. Вкажіть сайт компанії. Використовуйте посилання у форматі: https://"
+"www.example.com. При необхідності можна скористатися допомогою ШІ-"
+"асистента.\n"
+"\n"
+"«Обробити» — допомога ШІ\n"
+"При натисканні на кнопку «Обробити» ШІ-асистент розгорне опис, зробить його "
+"більш детальним, структурованим та зручним для машинної обробки. Надалі "
+"будь‑які додані вами дані будуть вбудовані в опис. Видалені елементи також "
+"будуть коректно виключені. Результат обробки автоматично не зберігається.\n"
+"\n"
+"«Зберегти» — зберегти опис\n"
+"Кнопка «Зберегти» записує поточну версію опису для подальшого використання."
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:243
+msgid "описанием компании"
+msgstr "Назва компанії"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:248
+#: panel/aap_audience/views/create_edit_flow_shared.py:250
+#: panel/aap_audience/views/create_edit_flow_shared.py:332
+#: panel/aap_audience/views/create_edit_flow_shared.py:334
+#: templates/panels/aap_audience/modal_create_task.html:44
+msgid "География"
+msgstr "Географія"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:249
+#: panel/aap_audience/views/create_edit_flow_shared.py:251
+#: panel/aap_audience/views/create_edit_flow_shared.py:333
+#: panel/aap_audience/views/create_edit_flow_shared.py:335
+msgid "География. Ограничения, предпочтения, приоритеты."
+msgstr "Географія. Обмеження, переваги, пріоритети."
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:253
+msgid ""
+"Для корректного отбора и приоритезации городов необходимо сформировать "
+"географические критерии.\n"
+"Если существуют конкретные ограничения по географии поиска клиентов, укажите "
+"их. Это может быть конкретный город, радиус вокруг города, федеральная "
+"земля, агломерация и т. д.\n"
+"\n"
+"При необходимости можно воспользоваться помощью ИИ-ассистента.\n"
+"\n"
+"«Обработать» — помощь ИИ\n"
+"При нажатии на кнопку «Обработать» ИИ-ассистент развернёт географические "
+"предпочтения и ограничения, сделает их более подробными и конкретными. В "
+"дальнейшем любые добавленные вами данные будут встроены в описание. "
+"Удалённые элементы также будут корректно исключены. Результат обработки "
+"автоматически не сохраняется.\n"
+"\n"
+"«Сохранить» — сохранить географические ограничения и предпочтения\n"
+"Кнопка «Сохранить» записывает текущую версию географических критериев для "
+"дальнейшего использования."
+msgstr ""
+"Для коректного відбору та пріоритезації міст необхідно сформувати "
+"географічні критерії.\n"
+"Якщо існують конкретні обмеження щодо географії пошуку клієнтів, вкажіть їх. "
+"Це може бути конкретне місто, радіус навколо міста, федеральна земля, "
+"агломерація тощо.\n"
+"\n"
+"За потреби можна скористатися допомогою ШІ-асистента.\n"
+"\n"
+"«Обробити» — допомога ШІ\n"
+"При натисканні кнопки «Обробити» ШІ-асистент розгорне географічні уподобання "
+"та обмеження, зробить їх більш детальними та конкретними. Надалі будь-які "
+"додані вами дані будуть вбудовані в опис. Видалені елементи також будуть "
+"коректно виключені. Результат обробки автоматично не зберігається.\n"
+"\n"
+"«Зберегти» — зберегти географічні обмеження та уподобання\n"
+"Кнопка «Зберегти» записує поточну версію географічних критеріїв для "
+"подальшого використання."
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:266
+msgid "описанием географии"
+msgstr "Обробити географію"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:278
+#: templates/panels/aap_audience/create_list.html:75
+#: templates/panels/aap_audience/modal_create_task.html:12
+#: templates/panels/aap_audience/modal_insert_company.html:17
+msgid "Поиск поставщиков / подрядчиков"
+msgstr "Пошук постачальників / підрядників"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:279
+msgid "Список рассылки: поиск поставщиков / подрядчиков"
+msgstr "Пошук постачальників / підрядників"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:288
+msgid ""
+"Продукт / услуга. Что нужно купить / заказать? Кто поставляет / выполняет "
+"работы?"
+msgstr ""
+"Продукт / послуга / роботи. Що потрібно купити або замовити? Де "
+"застосовується? Хто постачальник / підрядник?"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:291
+msgid ""
+"Для корректного выбора бизнес-категорий и рейтингования потенциальных "
+"поставщиков и подрядчиков необходимо сформировать описание закупаемого "
+"продукта, услуги или работ. Введите описание того, что нужно купить, "
+"заказать или отдать на подряд. Можно использовать ссылку / ссылки в формате "
+"https://www.example.com. Можно воспользоваться помощью ИИ-ассистента.\n"
+"\n"
+"«Обработать» — помощь ИИ.\n"
+"При нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, сделает "
+"его более подробным, структурированным и удобным для машинной обработки. В "
+"дальнейшем любые добавленные вами данные будут автоматически встроены в "
+"структуру описания. Удалённые элементы также будут корректно исключены. "
+"Результат обработки не сохраняется автоматически.\n"
+"\n"
+"«Сохранить» — сохранить описание\n"
+"Кнопка «Сохранить» записывает текущую версию описания для дальнейшего "
+"использования."
+msgstr ""
+"Для коректного вибору бізнес- категорій і рейтингування потенційних "
+"постачальників та підрядників необхідно сформувати опис закуповуваного "
+"продукту, послуги або робіт. Введіть опис того, що потрібно купити, замовити "
+"або віддати в підряд. Можна використовувати одну або кілька посилань у "
+"форматі https://www.example.com. Можна скористатися допомогою ШІ-асистента.\n"
+"\n"
+"«Опрацювати» — допомога ШІ.\n"
+"При натисканні на кнопку «Опрацювати» ШІ-асистент розгорне опис, зробить "
+"його більш детальним, структурованим і зручним для машинної обробки. Надалі "
+"будь-які додані вами дані будуть автоматично вбудовані в структуру опису. "
+"Видалені елементи також будуть коректно виключені. Результат опрацювання не "
+"зберігається автоматично.\n"
+"\n"
+"«Зберегти» — зберегти опис.\n"
+"Кнопка «Зберегти» зберігає поточну версію опису для подальшого використання."
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:304
+#| msgid "описанием продукта или услуги"
+msgid "описанием закупаемого продукта, услуги или работ"
+msgstr "Продукт / послуга"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:310
+#: panel/aap_audience/views/create_edit_flow_shared.py:311
+#: templates/panels/aap_audience/modal_create_task.html:35
+msgid "Компания-заказчик"
+msgstr "Кампанія ввімкнена"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:312
+msgid ""
+"Компания-заказчик. Название, адрес, страна, размер, опыт, специализация."
+msgstr ""
+"Компанія-продавець. Хто Ви? Напрям діяльності, досвід, досягнення, репутація."
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:314
+msgid ""
+"Для корректного выбора бизнес-категорий и рейтингования потенциальных "
+"поставщиков и подрядчиков необходимо сформировать описание компании-"
+"заказчика. Укажите название компании, страну и адрес. Уточните специализацию "
+"компании, опыт работы, возраст и размер компании. Укажите сайт компании. "
+"Используйте ссылки в формате: https://www.example.com. При необходимости "
+"можно воспользоваться помощью ИИ-ассистента.\n"
+"\n"
+"«Обработать» — помощь ИИ\n"
+"При нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, сделает "
+"его более подробным, структурированным и удобным для машинной обработки. В "
+"дальнейшем любые добавленные вами данные будут встроены в описание. "
+"Удалённые элементы также будут корректно исключены. Результат обработки "
+"автоматически не сохраняется.\n"
+"\n"
+"«Сохранить» — сохранить описание\n"
+"Кнопка «Сохранить» записывает текущую версию описания для дальнейшего "
+"использования."
+msgstr ""
+"Для коректного вибору бізнес-категорій та ранжування потенційних "
+"постачальників і підрядників необхідно сформувати опис компанії-замовника. "
+"Вкажіть назву компанії, країну та адресу. Уточніть спеціалізацію компанії, "
+"досвід роботи, вік і розмір компанії. Вкажіть сайт компанії. Використовуйте "
+"посилання у форматі: https://www.example.com. За потреби можна скористатися "
+"допомогою ШІ-асистента.\n"
+"\n"
+"«Обробити» — допомога ШІ\n"
+"При натисканні на кнопку «Обробити» ШІ-асистент розгорне опис, зробить його "
+"більш детальним, структурованим та зручним для машинної обробки. Надалі будь-"
+"які додані вами дані будуть вбудовані в опис. Видалені елементи також будуть "
+"коректно виключені. Результат обробки автоматично не зберігається.\n"
+"\n"
+"«Зберегти» — зберегти опис\n"
+"Кнопка «Зберегти» записує поточну версію опису для подальшого використання."
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:327
+msgid "описанием компании-заказчика"
+msgstr "Кампанія ввімкнена"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:337
+msgid ""
+"Для корректного отбора и приоритезации городов необходимо сформировать "
+"географические критерии поиска поставщиков и подрядчиков.\n"
+"Если существуют конкретные ограничения по географии поиска поставщиков и "
+"подрядчиков, укажите их. Это может быть конкретный город, радиус вокруг "
+"города, федеральная земля, агломерация и т. д.\n"
+"\n"
+"При необходимости можно воспользоваться помощью ИИ-ассистента.\n"
+"\n"
+"«Обработать» — помощь ИИ\n"
+"При нажатии на кнопку «Обработать» ИИ-ассистент развернёт географические "
+"предпочтения и ограничения, сделает их более подробными и конкретными. В "
+"дальнейшем любые добавленные вами данные будут встроены в описание. "
+"Удалённые элементы также будут корректно исключены. Результат обработки "
+"автоматически не сохраняется.\n"
+"\n"
+"«Сохранить» — сохранить географические ограничения и предпочтения\n"
+"Кнопка «Сохранить» записывает текущую версию географических критериев для "
+"дальнейшего использования."
+msgstr ""
+"Для коректного відбору та пріоритезації міст необхідно сформувати "
+"географічні критерії пошуку постачальників і підрядників.\n"
+"Якщо існують конкретні обмеження щодо географії пошуку постачальників і "
+"підрядників, вкажіть їх. Це може бути конкретне місто, радіус навколо міста, "
+"федеральна земля, агломерація тощо.\n"
+"\n"
+"За потреби можна скористатися допомогою ШІ-асистента.\n"
+"\n"
+"«Обробити» — допомога ШІ\n"
+"Після натискання кнопки «Обробити» ШІ-асистент розгорне географічні переваги "
+"та обмеження, зробить їх більш детальними та конкретними. Надалі будь-які "
+"додані вами дані будуть інтегровані в опис. Видалені елементи також будуть "
+"коректно виключені. Результат обробки автоматично не зберігається.\n"
+"\n"
+"«Зберегти» — зберегти географічні обмеження та переваги\n"
+"Кнопка «Зберегти» записує поточну версію географічних критеріїв для "
+"подальшого використання."
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:351
+msgid "описанием географии поиска поставщиков и подрядчиков"
+msgstr "Пошук постачальників / підрядників"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:625
+msgid "Не заполнены обязательные разделы"
+msgstr "Будь ласка, заповніть усі обов'язкові поля"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:626
+msgid "Не заполнены или не сохранены разделы:"
+msgstr "Не заповнені або не збережені розділи:"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:627
+#: templates/panels/aap_audience/create/step_branches.html:161
+#: templates/panels/aap_audience/create/step_cities.html:247
+#: templates/panels/aap_lists/lists.html:64
+#: templates/panels/aap_settings/sending.html:86
+msgid "Отменить"
+msgstr "Скасувати"
+
+#: panel/aap_audience/views/create_edit_flow_shared.py:650
+#: templates/panels/aap_lists/lists.html:25
+msgid "Новый список рассылки"
+msgstr "Новий список розсилки"
+
+#: panel/aap_audience/views/modal_edit_branch_rate.py:58
+#: panel/aap_audience/views/modal_edit_city_rate.py:57
+#: panel/aap_audience/views/modal_edit_rate_limit.py:38
+#: panel/aap_audience/views/modal_edit_title.py:73
+msgid "Запись не найдена."
+msgstr "Нічого не знайдено"
+
+#: panel/aap_audience/views/modal_edit_branch_rate.py:60
+msgid "Категория не найдена."
+msgstr "Нічого не знайдено"
+
+#: panel/aap_audience/views/modal_edit_branch_rate.py:65
+#: panel/aap_audience/views/modal_edit_branch_rate.py:68
+msgid "Введите рейтинг от 1 до 20."
+msgstr "Додати контакти з рейтингом від 1 до:"
+
+#: panel/aap_audience/views/modal_edit_city_rate.py:59
+msgid "Город не найден."
+msgstr "Нічого не знайдено"
+
+#: panel/aap_audience/views/modal_edit_city_rate.py:64
+#: panel/aap_audience/views/modal_edit_city_rate.py:67
+msgid "Введите рейтинг от 1 до 100."
+msgstr "Додати контакти з рейтингом від 1 до:"
+
+#: panel/aap_audience/views/modal_edit_rate_limit.py:43
+#: panel/aap_audience/views/modal_edit_rate_limit.py:46
+msgid "Введите лимит от 20 до 60."
+msgstr "Введіть коректний email"
+
+#: panel/aap_audience/views/modal_edit_title.py:82
+msgid "Для предложения названия нужно сохранить продукт и компанию."
+msgstr "Щоб запропонувати назву, потрібно зберегти продукт і компанію."
+
+#: panel/aap_audience/views/modal_edit_title.py:98
+msgid "Не удалось предложить название."
+msgstr "Ваш шаблон: назва"
+
+#: panel/aap_audience/views/modal_edit_title.py:107
+msgid "Введите название списка рассылки."
+msgstr "Немає в списках розсилок"
+
+#: panel/aap_audience/views/modal_edit_title.py:114
+msgid "Неизвестное действие."
+msgstr "Невідома дія."
+
+#: panel/aap_campaigns/views/campaigns.py:484
+#: panel/aap_campaigns/views/campaigns.py:648
 msgid "Шаблон удален"
 msgstr "Шаблон видалено"
 
-#: panel/aap_campaigns/views/campaigns.py:521
-msgid "Письмо ещё не создано — сначала откройте редактор письма и сохраните."
-msgstr "Лист ще не створено — спочатку відкрийте редактор листа і збережіть."
+#: panel/aap_campaigns/views/campaigns.py:534
+#| msgid "Логин информация"
+msgid "Общая информация"
+msgstr "Інформація для входу"
 
-#: panel/aap_campaigns/views/campaigns.py:614
-msgid "Пожалуйста, заполните все обязательные поля"
-msgstr "Будь ласка, заповніть усі обов'язкові поля"
+#: panel/aap_campaigns/views/campaigns.py:535
+#: templates/panels/aap_campaigns/campaigns.html:84
+#: templates/panels/aap_campaigns/flow_step_template.html:35
+msgid "Шаблон письма"
+msgstr "Шаблон листа"
 
-#: panel/aap_campaigns/views/campaigns.py:641
-msgid "Некорректные значения формы"
-msgstr "Некоректні значення форми"
+#: panel/aap_campaigns/views/campaigns.py:536
+#: templates/panels/aap_campaigns/flow_step_template.html:119
+#| msgid "Ваши кампании:"
+msgid "Письмо кампании"
+msgstr "Ваші кампанії:"
 
-#: panel/aap_campaigns/views/campaigns.py:702
-msgid "Этот список рассылки уже используется в другой кампании"
-msgstr "Цей список розсилки вже використовується у іншій кампанії"
-
+#: panel/aap_campaigns/views/campaigns.py:928
 #: panel/aap_campaigns/views/templates.py:200
 msgid "Имя шаблона обязательно."
 msgstr "Назва шаблону обов'язкова."
 
+#: panel/aap_campaigns/views/campaigns.py:941
+#: panel/aap_campaigns/views/campaigns.py:958
 #: panel/aap_campaigns/views/templates.py:217
 #: panel/aap_campaigns/views/templates.py:255
 msgid "Шаблон с таким именем уже существует."
 msgstr "Шаблон з такою назвою вже існує."
 
+#: panel/aap_campaigns/views/campaigns.py:979
+msgid "Письмо ещё не создано — сначала откройте редактор письма и сохраните."
+msgstr "Лист ще не створено — спочатку відкрийте редактор листа і збережіть."
+
+#: panel/aap_campaigns/views/campaigns.py:1025
+#: panel/aap_campaigns/views/campaigns.py:1101
+#: panel/aap_campaigns/views/campaigns.py:1231
+#| msgid "Добавить кампанию"
+msgid "Новая кампания"
+msgstr "Додати кампанію"
+
 #: panel/aap_lists/forms.py:10 panel/aap_lists/forms.py:13
 msgid "Название списка"
 msgstr "Назва списку"
 
-#: panel/aap_lists/forms.py:18 templates/panels/aap_audience/clar.html:316
-#: templates/panels/aap_audience/status.html:21
-#: templates/panels/aap_lists/lists.html:50
+#: panel/aap_lists/forms.py:18 templates/panels/aap_lists/lists.html:50
 #: templates/panels/aap_lists/lists.html:117
 #: templates/panels/aap_lists/lists_list.html:18
 #: templates/panels/overview.html:24 templates/panels/overview.html:181
 msgid "Аудитория"
 msgstr "Аудиторія"
 
-#: panel/aap_settings/forms.py:86 panel/aap_settings/forms.py:277
-#: public/aap_auth/views.py:143 public/aap_auth/views.py:166
+#: panel/aap_lists/forms.py:40
+msgid "Заполните все поля."
+msgstr "Заповніть усі поля."
+
+#: panel/aap_settings/forms.py:87 panel/aap_settings/forms.py:318
+#: public/aap_auth/views.py:155 public/aap_auth/views.py:178
 msgid "Email"
 msgstr "Email"
 
-#: panel/aap_settings/forms.py:100
+#: panel/aap_settings/forms.py:101
 msgid "Заполните Email."
 msgstr "Заповніть Email."
 
-#: panel/aap_settings/forms.py:107
+#: panel/aap_settings/forms.py:108
 msgid "Этот Email уже используется."
 msgstr "Цей Email вже використовується."
 
-#: panel/aap_settings/forms.py:134
+#: panel/aap_settings/forms.py:130
+#: templates/panels/aap_settings/domains.html:48
+#: templates/panels/aap_settings/mail_servers.html:46
+#: templates/panels/aap_settings/mail_servers.html:240
+msgid "Домен"
+msgstr "Домен"
+
+#: panel/aap_settings/forms.py:143
+msgid "Такой домен уже добавлен."
+msgstr "Домен не підтверджений"
+
+#: panel/aap_settings/forms.py:175
 msgid "Отправитель:"
 msgstr "Відправник:"
 
-#: panel/aap_settings/forms.py:136 panel/aap_settings/forms.py:271
+#: panel/aap_settings/forms.py:177 panel/aap_settings/forms.py:312
 #: templates/panels/aap_settings/smtp_server.html:39
 msgid "Отправитель"
 msgstr "Відправник"
 
-#: panel/aap_settings/forms.py:140 panel/aap_settings/forms.py:283
+#: panel/aap_settings/forms.py:181 panel/aap_settings/forms.py:324
 msgid "Лимит/час"
 msgstr "Ліміт/год"
 
-#: panel/aap_settings/forms.py:190
+#: panel/aap_settings/forms.py:231
 msgid "Заполните все поля SMTP."
 msgstr "Заповніть всі поля SMTP."
 
-#: panel/aap_settings/forms.py:198 panel/aap_settings/forms.py:326
+#: panel/aap_settings/forms.py:239 panel/aap_settings/forms.py:367
 msgid "Лимит должен быть не меньше 1 письма в час."
 msgstr "Ліміт має бути не менше 1 листа на годину."
 
-#: panel/aap_settings/forms.py:201 panel/aap_settings/forms.py:329
+#: panel/aap_settings/forms.py:242 panel/aap_settings/forms.py:370
 msgid "Максимум 300 писем в час."
 msgstr "Максимум 300 листів на годину."
 
-#: panel/aap_settings/forms.py:206 panel/aap_settings/forms.py:254
-#: panel/aap_settings/forms.py:347
+#: panel/aap_settings/forms.py:247 panel/aap_settings/forms.py:295
+#: panel/aap_settings/forms.py:388
 msgid "Некорректное значение шифрования."
 msgstr "Некоректне значення шифрування."
 
-#: panel/aap_settings/forms.py:249
+#: panel/aap_settings/forms.py:290
 msgid "Заполните все поля IMAP."
 msgstr "Заповніть всі поля IMAP."
 
-#: panel/aap_settings/forms.py:335
+#: panel/aap_settings/forms.py:376
 msgid "Заполните все поля SMTP (RELAY NOAUTH)."
 msgstr "Заповніть усі поля SMTP (LOGIN)."
 
-#: panel/aap_settings/forms.py:340
+#: panel/aap_settings/forms.py:381
 msgid "Заполните все поля SMTP (LOGIN)."
 msgstr "Заповніть усі поля SMTP (LOGIN)."
 
-#: panel/aap_settings/views/sending.py:70
+#: panel/aap_settings/views/sending.py:71
 msgid "Неверный JSON."
 msgstr "Невірний JSON."
 
-#: panel/aap_settings/views/sending.py:82
+#: panel/aap_settings/views/sending.py:83
 #: templates/panels/aap_campaigns/campaigns.html:186
+#: templates/panels/aap_campaigns/flow_step_campaign.html:77
 #: templates/panels/aap_settings/sending.html:28
 msgid "Понедельник"
 msgstr "Понеділок"
 
-#: panel/aap_settings/views/sending.py:83
+#: panel/aap_settings/views/sending.py:84
 #: templates/panels/aap_campaigns/campaigns.html:193
+#: templates/panels/aap_campaigns/flow_step_campaign.html:78
 #: templates/panels/aap_settings/sending.html:34
 msgid "Вторник"
 msgstr "Вівторок"
 
-#: panel/aap_settings/views/sending.py:84
+#: panel/aap_settings/views/sending.py:85
 #: templates/panels/aap_campaigns/campaigns.html:200
+#: templates/panels/aap_campaigns/flow_step_campaign.html:79
 #: templates/panels/aap_settings/sending.html:41
 msgid "Среда"
 msgstr "Середа"
 
-#: panel/aap_settings/views/sending.py:85
+#: panel/aap_settings/views/sending.py:86
 #: templates/panels/aap_campaigns/campaigns.html:207
+#: templates/panels/aap_campaigns/flow_step_campaign.html:80
 #: templates/panels/aap_settings/sending.html:48
 msgid "Четверг"
 msgstr "Четвер"
 
-#: panel/aap_settings/views/sending.py:86
+#: panel/aap_settings/views/sending.py:87
 #: templates/panels/aap_campaigns/campaigns.html:214
+#: templates/panels/aap_campaigns/flow_step_campaign.html:81
 #: templates/panels/aap_settings/sending.html:55
 msgid "Пятница"
 msgstr "П'ятниця"
 
-#: panel/aap_settings/views/sending.py:87
+#: panel/aap_settings/views/sending.py:88
 #: templates/panels/aap_campaigns/campaigns.html:221
+#: templates/panels/aap_campaigns/flow_step_campaign.html:82
 #: templates/panels/aap_settings/sending.html:61
 msgid "Суббота"
 msgstr "Субота"
 
-#: panel/aap_settings/views/sending.py:88
+#: panel/aap_settings/views/sending.py:89
 #: templates/panels/aap_campaigns/campaigns.html:228
+#: templates/panels/aap_campaigns/flow_step_campaign.html:83
 #: templates/panels/aap_settings/sending.html:67
 msgid "Воскресенье"
 msgstr "Неділя"
 
-#: panel/aap_settings/views/sending.py:89
+#: panel/aap_settings/views/sending.py:90
 #: templates/panels/aap_campaigns/campaigns.html:235
+#: templates/panels/aap_campaigns/flow_step_campaign.html:84
 #: templates/panels/aap_settings/sending.html:73
 msgid "Праздники"
 msgstr "Свята"
@@ -375,109 +716,63 @@ msgstr "Огляд: Панель керування"
 msgid "Управление аудиториями"
 msgstr "Управління аудиторіями"
 
-#: panel/menu.py:36
-msgid "Создание аудиторий"
-msgstr "Створення аудиторій"
-
-#: panel/menu.py:37
-msgid "Аудитории : создание"
-msgstr "Аудиторії: створення"
-
-#: panel/menu.py:42
-msgid "Города и категории"
-msgstr "Міста та категорії"
-
-#: panel/menu.py:43
-msgid "Города и бизнес-категории"
-msgstr "Міста та бізнес-категорії"
-
-#: panel/menu.py:48
-msgid "Сбор контактов / Рейтинг"
-msgstr "Збір контактів / Рейтинг"
-
-#: panel/menu.py:49
-msgid "Аудитории : Сбор контактов"
-msgstr "Аудиторії: Збір контактів"
-
-#: panel/menu.py:54
-#| msgid "Название задачи"
-msgid "Постановка задачи"
-msgstr "Назва завдання"
-
-#: panel/menu.py:55
-#| msgid "Аудитории : создание"
-msgid "Аудитории : Постановка задачи"
-msgstr "Аудиторії: створення"
-
-#: panel/menu.py:63 templates/panels/aap_lists/contacts.html:172
+#: panel/menu.py:36 panel/menu.py:37
+#: templates/panels/aap_audience/create_list.html:46
+#: templates/panels/aap_lists/contacts.html:172
 msgid "Списки рассылок"
 msgstr "Списки розсилки"
 
-#: panel/menu.py:67
-msgid "Управление списками"
-msgstr "Управління списками"
-
-#: panel/menu.py:68
-msgid "Контакты : Списки рассылок"
-msgstr "Контакти: Списки розсилок"
-
-#: panel/menu.py:73
-msgid "Все контакты списков"
-msgstr "Всі контакти списків"
-
-#: panel/menu.py:74
-msgid "Контакты : Все контакты"
-msgstr "Контакти: Всі контакти"
-
-#: panel/menu.py:82
+#: panel/menu.py:45
 msgid "Кампании и рассылки"
 msgstr "Кампанії та розсилки"
 
-#: panel/menu.py:86
+#: panel/menu.py:49
 msgid "Кампании / письма"
 msgstr "Кампанії / листи"
 
-#: panel/menu.py:87
+#: panel/menu.py:50
 msgid "Кампании : рассылки и письма"
 msgstr "Кампанії: розсилки та листи"
 
-#: panel/menu.py:92
+#: panel/menu.py:55
 msgid "Шаблоны писем"
 msgstr "Шаблони листів"
 
-#: panel/menu.py:93
+#: panel/menu.py:56
 msgid "Кампании : Шаблоны писем"
 msgstr "Кампанії: Шаблони листів"
 
-#: panel/menu.py:101
+#: panel/menu.py:64
 msgid "Настройки"
 msgstr "Налаштування"
 
-#: panel/menu.py:105
+#: panel/menu.py:68
 msgid "'Окна' отправки"
 msgstr "'Вікна' відправлення"
 
-#: panel/menu.py:106
+#: panel/menu.py:69
 msgid "Настройки : 'Окна' отправки"
 msgstr "Налаштування: 'Вікна' відправлення"
 
-#: panel/menu.py:111
+#: panel/menu.py:74
 msgid "Почтовые серверы"
 msgstr "Поштові сервери"
 
-#: panel/menu.py:112
+#: panel/menu.py:75
 msgid "Настройки : Почтовые серверы"
 msgstr "Налаштування: Поштові сервери"
 
-#: panel/menu.py:117 templates/panels/aap_settings/url_stats.html:14
+#: panel/menu.py:80 templates/panels/aap_settings/url_stats.html:14
 msgid "Учет переходов"
 msgstr "Відстеження переходів"
 
-#: panel/menu.py:118
+#: panel/menu.py:81
 msgid "Настройки : Учет переходов"
 msgstr "Налаштування: Відстеження переходів"
 
-#: public/aap_auth/forms.py:40 templates/public/register.html:30
+#: public/aap_auth/forms.py:40
+#: templates/panels/modals/contact_from_audience.html:14
+#: templates/public/register.html:30
 msgid "Название компании"
 msgstr "Назва компанії"
 
@@ -535,31 +830,31 @@ msgstr "Паролі не збігаються"
 msgid "Новый пароль"
 msgstr "Новий пароль"
 
-#: public/aap_auth/views.py:32
+#: public/aap_auth/views.py:33
 msgid "Логин заблокирован"
 msgstr "Логін заблоковано"
 
-#: public/aap_auth/views.py:33
+#: public/aap_auth/views.py:34
 msgid "Логин больше не обслуживается"
 msgstr "Логін більше не обслуговується"
 
-#: public/aap_auth/views.py:34 templates/public/login.html:22
+#: public/aap_auth/views.py:35 templates/public/login.html:22
 msgid "Неверный логин или пароль"
 msgstr "Невірний логін або пароль"
 
-#: public/aap_auth/views.py:231
+#: public/aap_auth/views.py:246
 msgid "Не удалось отправить письмо"
 msgstr "Не вдалося відправити лист"
 
-#: public/aap_auth/views.py:239
+#: public/aap_auth/views.py:254
 msgid "Ссылка подтверждения недействительна или устарела"
 msgstr "Посилання для підтвердження недійсне або прострочене"
 
-#: public/aap_auth/views.py:268
+#: public/aap_auth/views.py:283
 msgid "Рабочее пространство не найдено"
 msgstr "Робочий простір не знайдено"
 
-#: public/aap_auth/views.py:291
+#: public/aap_auth/views.py:306
 msgid "Данные обновлены"
 msgstr "Дані оновлено"
 
@@ -571,214 +866,104 @@ msgstr "Нічого не знайдено"
 msgid "На главную"
 msgstr "На головну"
 
-#: templates/panels/aap_audience/clar.html:25
-#: templates/panels/aap_audience/clar.html:328
-#: templates/panels/aap_audience/how.html:22
-#: templates/panels/aap_audience/how.html:35
-#: templates/panels/aap_audience/how.html:160
-#: templates/panels/aap_audience/how.html:228
-#: templates/panels/aap_audience/status.html:32
-#: templates/panels/aap_audience/status_task.html:18
-msgid "Поиск клиентов"
-msgstr "Пошук клієнтів"
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:13
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:152
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:13
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:183
+msgid "Найдено:"
+msgstr "Знайдено:"
 
-#: templates/panels/aap_audience/clar.html:29
-#: templates/panels/aap_audience/clar.html:332
-#: templates/panels/aap_audience/create_edit_buy.html:44
-#: templates/panels/aap_audience/create_edit_buy.html:428
-#: templates/panels/aap_audience/create_list.html:53
-#: templates/panels/aap_audience/how.html:29
-#: templates/panels/aap_audience/how.html:39
-#: templates/panels/aap_audience/how.html:164
-#: templates/panels/aap_audience/how.html:232
-#: templates/panels/aap_audience/modal_create_task.html:13
-#: templates/panels/aap_audience/status.html:36
-#: templates/panels/aap_audience/status_task.html:23
-msgid "Поиск поставщиков / подрядчиков"
-msgstr "Пошук постачальників / підрядників"
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:14
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:153
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:14
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:184
+msgid "Страница:"
+msgstr "Сторінки"
 
-#: templates/panels/aap_audience/clar.html:58
-#: templates/panels/aap_audience/how.html:195
-#: templates/panels/aap_campaigns/campaigns.html:154
-#: templates/panels/aap_lists/lists.html:61
-#: templates/panels/aap_settings/mail_servers.html:174
-msgid "Сохранить изменения"
-msgstr "Зберегти зміни"
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:62
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:201
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:64
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:234
+msgid "Поиск по компании или email"
+msgstr "Рейтинг компанії"
 
-#: templates/panels/aap_audience/clar.html:61
-#: templates/panels/aap_audience/create_edit_buy.html:477
-#: templates/panels/aap_audience/create_edit_sell.html:477
-#: templates/panels/aap_audience/how.html:198
-#: templates/panels/aap_lists/lists.html:64
-#: templates/panels/aap_settings/sending.html:86
-msgid "Отменить"
-msgstr "Скасувати"
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:65
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:204
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:67
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:237
+#: templates/panels/aap_lists/contacts.html:94
+#: templates/panels/aap_lists/lists_list.html:93
+msgid "Искать"
+msgstr "Шукати"
 
-#: templates/panels/aap_audience/clar.html:76
-msgid "Категории и география не обрабатываются"
-msgstr "Категорії та географія не обробляються"
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:69
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:208
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:71
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:241
+#: templates/panels/aap_audience/create/step_branches.html:174
+msgid "Очистить"
+msgstr "Очистити"
 
-#: templates/panels/aap_audience/clar.html:79
-msgid "Запустить обработку географии и категории"
-msgstr "Запустити обробку географії та категорії"
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:87
+#: templates/panels/aap_audience/create/_contacts_collect_inner.html:13
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:112
+msgid "Контакт"
+msgstr "Контакти"
 
-#: templates/panels/aap_audience/clar.html:85
-msgid "Бизнес-категории: обрабатываются"
-msgstr "Бізнес-категорії: обробляються"
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:88
+#: templates/panels/aap_audience/create/_contacts_collect_inner.html:14
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:113
+msgid "Категория - Город"
+msgstr "Категорія"
 
-#: templates/panels/aap_audience/clar.html:91
-msgid "Бизнес-категории: обработаны"
-msgstr "Бізнес-категорії: оброблено"
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:94
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:95
+#: templates/panels/aap_audience/create/_contacts_collect_inner.html:20
+#: templates/panels/aap_audience/create/_contacts_collect_inner.html:21
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:119
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:120
+#: templates/panels/aap_audience/create/step_contacts.html:115
+#: templates/panels/aap_audience/create/step_mailing_list.html:73
+#| msgid "Рейтинг 1-30"
+msgid "Рейтинг Pair-R"
+msgstr "Рейтинг 1-30"
 
-#: templates/panels/aap_audience/clar.html:95
-msgid "Бизнес-категории: задача изменилась"
-msgstr "Бізнес-категорії: завдання змінилося"
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:96
+#: templates/panels/aap_audience/create/_contacts_collect_inner.html:22
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:121
+msgid "Pair-R"
+msgstr "Pair-R"
 
-#: templates/panels/aap_audience/clar.html:102
-msgid "Обработать категории снова"
-msgstr "Обробити категорії знову"
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:99
+#: templates/panels/aap_audience/create/_contacts_collect_inner.html:25
+msgid "Добавлено"
+msgstr "Доставлено"
 
-#: templates/panels/aap_audience/clar.html:107
-msgid "Бизнес-категории: не обработаны"
-msgstr "Бізнес-категорії: не оброблені"
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:126
+#: templates/panels/aap_audience/create/_contacts_collect_inner.html:52
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:157
+#: templates/panels/aap_audience/create_list.html:116
+#: templates/panels/aap_audience/create_list.html:127
+msgid "Подробнее"
+msgstr "Детальніше"
 
-#: templates/panels/aap_audience/clar.html:114
-msgid "Обработать категории"
-msgstr "Обробити категорії"
-
-#: templates/panels/aap_audience/clar.html:120
-msgid "География: обрабатывается"
-msgstr "Географія: обробляється"
-
-#: templates/panels/aap_audience/clar.html:126
-msgid "География: обработана"
-msgstr "Географія: оброблена"
-
-#: templates/panels/aap_audience/clar.html:130
-msgid "География: задача изменилась"
-msgstr "Географія: завдання змінилося"
-
-#: templates/panels/aap_audience/clar.html:137
-msgid "Обработать географию снова"
-msgstr "Обробити географію знову"
-
-#: templates/panels/aap_audience/clar.html:142
-msgid "География: не обработана"
-msgstr "Географія: не оброблена"
-
-#: templates/panels/aap_audience/clar.html:149
-msgid "Обработать географию"
-msgstr "Обробити географію"
-
-#: templates/panels/aap_audience/clar.html:223
-msgid "Бизнес-категории не обработаны"
-msgstr "Бізнес-категорії не оброблені"
-
-#: templates/panels/aap_audience/clar.html:228
-#: templates/panels/aap_audience/clar.html:290
-#: templates/panels/aap_audience/status_task.html:234
-#: templates/panels/aap_audience/status_task.html:352
-#: templates/panels/aap_lists/lists_list.html:165
-msgid "Поиск"
-msgstr "Пошук"
-
-#: templates/panels/aap_audience/clar.html:232
-#: templates/panels/aap_audience/clar.html:294
-msgid "Начните вводить."
-msgstr "Почніть вводити."
-
-#: templates/panels/aap_audience/clar.html:285
-msgid "Города не обработаны"
-msgstr "Міста не оброблені"
-
-#: templates/panels/aap_audience/clar.html:317
-#: templates/panels/aap_audience/status.html:22
-msgid "Критерии"
-msgstr "Критерії"
-
-#: templates/panels/aap_audience/clar.html:318
-msgid "Статус / Действия"
-msgstr "Статус / Дії"
-
-#: templates/panels/aap_audience/clar.html:354
-#: templates/panels/aap_audience/how.html:253
-#: templates/panels/aap_audience/status.html:57
-#: templates/panels/aap_audience/status_task.html:235
-#: templates/panels/aap_lists/lists_list.html:166
-msgid "Клиент"
-msgstr "Клієнт"
-
-#: templates/panels/aap_audience/clar.html:356
-#: templates/panels/aap_audience/how.html:255
-#: templates/panels/aap_audience/status.html:59
-msgid "Поставщик"
-msgstr "Постачальник"
-
-#: templates/panels/aap_audience/clar.html:371
-#: templates/panels/aap_audience/create_edit_buy.html:100
-#: templates/panels/aap_audience/create_edit_buy.html:102
-#: templates/panels/aap_audience/create_edit_buy.html:149
-#: templates/panels/aap_audience/create_edit_buy.html:213
-#: templates/panels/aap_audience/create_edit_buy.html:474
-#: templates/panels/aap_audience/create_edit_sell.html:100
-#: templates/panels/aap_audience/create_edit_sell.html:102
-#: templates/panels/aap_audience/create_edit_sell.html:149
-#: templates/panels/aap_audience/create_edit_sell.html:213
-#: templates/panels/aap_audience/create_edit_sell.html:474
-#: templates/panels/aap_audience/how.html:272
-#: templates/panels/aap_audience/modal_create_task.html:43
-#: templates/panels/aap_audience/status.html:76
-msgid "География"
-msgstr "Географія"
-
-#: templates/panels/aap_audience/clar.html:389
-#: templates/panels/aap_lists/lists.html:181
-msgid "Управлять"
-msgstr "Керувати"
-
-#: templates/panels/aap_audience/clar.html:394
-msgid "Категории: обработка"
-msgstr "Категорії: обробка"
-
-#: templates/panels/aap_audience/clar.html:400
-msgid "Категории: обработаны"
-msgstr "Категорії: оброблені"
-
-#: templates/panels/aap_audience/clar.html:405
-msgid "Посмотреть категории"
-msgstr "Переглянути категорії"
-
-#: templates/panels/aap_audience/clar.html:409
-#: templates/panels/aap_audience/clar.html:414
-msgid "Категории не обработаны"
-msgstr "Категорії не оброблені"
-
-#: templates/panels/aap_audience/clar.html:421
-msgid "Города: обработка"
-msgstr "Міста: обробка"
-
-#: templates/panels/aap_audience/clar.html:427
-msgid "Города: обработаны"
-msgstr "Міста: опрацьовано"
-
-#: templates/panels/aap_audience/clar.html:432
-msgid "Посмотреть города"
-msgstr "Переглянути міста"
-
-#: templates/panels/aap_audience/clar.html:436
-#: templates/panels/aap_audience/clar.html:441
-msgid "Города: не обработаны"
-msgstr "Міста: не оброблені"
-
-#: templates/panels/aap_audience/clar.html:456
-#: templates/panels/aap_audience/create_list.html:96
-#: templates/panels/aap_audience/how.html:324
-#: templates/panels/aap_audience/modal_create_task.html:47
-#: templates/panels/aap_audience/modal_status_task.html:80
-#: templates/panels/aap_audience/status.html:172
-#: templates/panels/aap_audience/status_task.html:300
-#: templates/panels/aap_audience/status_task.html:416
+#: templates/panels/aap_audience/create/_contacts_all_inner.html:135
+#: templates/panels/aap_audience/create/_contacts_branch_city_inner.html:27
+#: templates/panels/aap_audience/create/_contacts_branch_city_inner.html:51
+#: templates/panels/aap_audience/create/_contacts_collect_inner.html:61
+#: templates/panels/aap_audience/create/_contacts_pairs_inner.html:40
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:166
+#: templates/panels/aap_audience/create_list.html:313
+#: templates/panels/aap_audience/modal_create_task.html:48
+#: templates/panels/aap_audience/modal_edit_branch_rate.html:57
+#: templates/panels/aap_audience/modal_edit_city_rate.html:51
+#: templates/panels/aap_audience/modal_edit_rate_limit.html:48
+#: templates/panels/aap_audience/modal_edit_title.html:44
+#: templates/panels/aap_audience/modal_insert_company.html:41
+#: templates/panels/aap_audience/modal_pause_info.html:52
+#: templates/panels/aap_campaigns/_campaigns_table.html:138
 #: templates/panels/aap_campaigns/campaigns.html:482
+#: templates/panels/aap_campaigns/flow_step_template.html:148
 #: templates/panels/aap_campaigns/modal_full_preview.html:53
 #: templates/panels/aap_campaigns/modal_preview.html:50
 #: templates/panels/aap_campaigns/templates.html:215
@@ -787,175 +972,555 @@ msgstr "Міста: не оброблені"
 #: templates/panels/aap_lists/lists_list.html:272
 #: templates/panels/aap_lists/modal_contacts.html:90
 #: templates/panels/aap_lists/modal_lists_list.html:74
-#: templates/panels/aap_settings/mail_servers.html:395
+#: templates/panels/aap_settings/mail_servers.html:388
 #: templates/panels/overview.html:119 templates/panels/overview.html:171
-#: templates/panels/overview.html:220 templates/panels/stats.html:49
+#: templates/panels/overview.html:220 templates/panels/stats.html:45
 msgid "Здесь пока нет данных"
 msgstr "Тут поки що немає даних"
 
-#: templates/panels/aap_audience/create_edit_buy.html:10
+#: templates/panels/aap_audience/create/_contacts_branch_city_inner.html:11
+#: templates/panels/aap_audience/create/_contacts_branch_city_inner.html:13
+msgid "Бизнес-категории и рубрики (собрано контактов)"
+msgstr "Бізнес-категорії не оброблені"
+
+#: templates/panels/aap_audience/create/_contacts_branch_city_inner.html:35
+#: templates/panels/aap_audience/create/_contacts_branch_city_inner.html:37
+msgid "Города и населенные пункты (собрано контактов)"
+msgstr "Усього зібрано контактів"
+
+#: templates/panels/aap_audience/create/_contacts_pairs_inner.html:11
+#: templates/panels/aap_audience/create/_contacts_pairs_inner.html:13
+msgid "Пары категории / города (необработанные данные)"
+msgstr "Категорії не оброблені"
+
+#: templates/panels/aap_audience/create/_mailing_nav_inner.html:31
+msgid "С РЕЙТИНГОМ"
+msgstr "З РЕЙТИНГОМ"
+
+#: templates/panels/aap_audience/create/_mailing_nav_inner.html:38
+msgid "БЕЗ РЕЙТИНГА"
+msgstr "БЕЗ РЕЙТИНГУ"
+
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:79
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:83
+#| msgid "Рейтинг компании"
+msgid "Рейтинг отсечения:"
+msgstr "Рейтинг компанії"
+
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:89
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:90
+#: templates/panels/aap_audience/create/flow.html:31
+#: templates/panels/aap_audience/create/step_form.html:189
+#: templates/panels/aap_audience/create/step_form.html:208
+#: templates/panels/aap_audience/create_list.html:276
+#: templates/panels/aap_audience/create_list.html:283
+#: templates/panels/aap_campaigns/_campaigns_table.html:44
+#: templates/panels/aap_campaigns/_campaigns_table.html:112
+#: templates/panels/aap_campaigns/campaigns.html:463
+#: templates/panels/aap_campaigns/campaigns_flow.html:33
+#: templates/panels/aap_campaigns/templates.html:204
+#: templates/panels/aap_lists/lists.html:168
+#: templates/panels/aap_settings/mail_servers.html:368
+msgid "Изменить"
+msgstr "Змінити"
+
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:129
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:130
+#| msgid "Рейтинг поиска"
+msgid "Рейтинг контакта Con-R"
+msgstr "Рейтинг пошуку"
+
+#: templates/panels/aap_audience/create/_mailing_section_inner.html:131
+msgid "Con-R"
+msgstr "Con-R"
+
+#: templates/panels/aap_audience/create/flow.html:21
+msgid "Покупка"
+msgstr "Покупець:"
+
+#: templates/panels/aap_audience/create/flow.html:23
+msgid "Продажа"
+msgstr "Продовжити"
+
+#: templates/panels/aap_audience/create/flow.html:40
+#: templates/panels/aap_audience/create_list.html:84
+#: templates/panels/aap_campaigns/_campaigns_table.html:87
+#| msgid "Обработка включена. Отключить"
+msgid "Обработка включена"
+msgstr "Обробка увімкнена"
+
+#: templates/panels/aap_audience/create/flow.html:42
+#: templates/panels/aap_audience/create_list.html:86
+#: templates/panels/aap_campaigns/_campaigns_table.html:89
+#| msgid "Обработка отключена. Включить"
+msgid "Обработка отключена"
+msgstr "Обробка відключена"
+
+#: templates/panels/aap_audience/create/flow.html:49
+#: templates/panels/aap_audience/create/flow.html:50
+#: templates/panels/aap_audience/create_list.html:92
+#: templates/panels/aap_audience/create_list.html:93
+#| msgid "Отправить письмо"
+msgid "Остановить сбор"
+msgstr "Відправити лист"
+
+#: templates/panels/aap_audience/create/flow.html:49
+#: templates/panels/aap_audience/create/flow.html:50
+#: templates/panels/aap_audience/create_list.html:92
+#: templates/panels/aap_audience/create_list.html:93
+#| msgid "Включить"
+msgid "Включить сбор"
+msgstr "Увімкнути"
+
+#: templates/panels/aap_audience/create/flow.html:70
+msgid "Закрыть / к спискам"
+msgstr "Повернутися до списків"
+
+#: templates/panels/aap_audience/create/step_branches.html:17
+#: templates/panels/aap_audience/create/step_branches.html:19
+#: templates/panels/aap_audience/create/step_branches.html:63
+#: templates/panels/aap_audience/create/step_branches.html:67
+#: templates/panels/aap_audience/create/step_branches.html:68
+#: templates/panels/aap_audience/create/step_branches.html:77
+#: templates/panels/aap_audience/create/step_branches.html:81
+#: templates/panels/aap_audience/create/step_branches.html:82
+#: templates/panels/aap_audience/create/step_branches.html:326
+#: templates/panels/aap_audience/create/step_branches.html:328
+msgid "Бизнес-категории и рубрики"
+msgstr "Бізнес-категорії: оброблено"
+
+#: templates/panels/aap_audience/create/step_branches.html:22
+#: templates/panels/aap_audience/create/step_branches.html:331
 msgid ""
-"Для корректного выбора бизнес-категорий и рейтингования потенциальных "
-"поставщиков и подрядчиков необходимо сформировать описание компании-"
-"заказчика. Укажите название компании, страну и адрес. Уточните специализацию "
-"компании, опыт работы, возраст и размер компании. Укажите сайт компании. "
-"Используйте ссылки в формате: https://www.example.com. При необходимости "
-"можно воспользоваться помощью ИИ-ассистента.\n"
-"\n"
-"«Обработать» — помощь ИИ\n"
-"При нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, сделает "
-"его более подробным, структурированным и удобным для машинной обработки. В "
-"дальнейшем любые добавленные вами данные будут встроены в описание. "
-"Удалённые элементы также будут корректно исключены. Результат обработки "
-"автоматически не сохраняется.\n"
-"\n"
-"«Сохранить» — сохранить описание\n"
-"Кнопка «Сохранить» записывает текущую версию описания для дальнейшего "
-"использования."
-msgstr "Для коректного вибору бізнес-категорій та ранжування потенційних постачальників і підрядників необхідно сформувати опис компанії-замовника. Вкажіть назву компанії, країну та адресу. Уточніть спеціалізацію компанії, досвід роботи, вік і розмір компанії. Вкажіть сайт компанії. Використовуйте посилання у форматі: https://www.example.com. За потреби можна скористатися допомогою ШІ-асистента.\n\n«Обробити» — допомога ШІ\nПри натисканні на кнопку «Обробити» ШІ-асистент розгорне опис, зробить його більш детальним, структурованим та зручним для машинної обробки. Надалі будь-які додані вами дані будуть вбудовані в опис. Видалені елементи також будуть коректно виключені. Результат обробки автоматично не зберігається.\n\n«Зберегти» — зберегти опис\nКнопка «Зберегти» записує поточну версію опису для подальшого використання."
+"Необходимо подобрать рубрики и бизнес-категории для поиска контактов в "
+"бизнес-справочниках. Подбор выполняется с помощью ассистента ИИ."
+msgstr "Потрібно підібрати рубрики та бізнес-категорії для пошуку контактів у бізнес-довідниках. Підбір виконується за допомогою асистента ШІ."
 
-#: templates/panels/aap_audience/create_edit_buy.html:17
+#: templates/panels/aap_audience/create/step_branches.html:23
+#: templates/panels/aap_audience/create/step_branches.html:332
 msgid ""
-"Для корректного отбора и приоритезации городов необходимо сформировать "
-"географические критерии поиска поставщиков и подрядчиков.\n"
-"Если существуют конкретные ограничения по географии поиска поставщиков и "
-"подрядчиков, укажите их. Это может быть конкретный город, радиус вокруг "
-"города, федеральная земля, агломерация и т. д.\n"
-"\n"
-"При необходимости можно воспользоваться помощью ИИ-ассистента.\n"
-"\n"
-"«Обработать» — помощь ИИ\n"
-"При нажатии на кнопку «Обработать» ИИ-ассистент развернёт географические "
-"предпочтения и ограничения, сделает их более подробными и конкретными. В "
-"дальнейшем любые добавленные вами данные будут встроены в описание. "
-"Удалённые элементы также будут корректно исключены. Результат обработки "
-"автоматически не сохраняется.\n"
-"\n"
-"«Сохранить» — сохранить географические ограничения и предпочтения\n"
-"Кнопка «Сохранить» записывает текущую версию географических критериев для "
-"дальнейшего использования."
-msgstr "Для коректного відбору та пріоритезації міст необхідно сформувати географічні критерії пошуку постачальників і підрядників.\nЯкщо існують конкретні обмеження щодо географії пошуку постачальників і підрядників, вкажіть їх. Це може бути конкретне місто, радіус навколо міста, федеральна земля, агломерація тощо.\n\nЗа потреби можна скористатися допомогою ШІ-асистента.\n\n«Обробити» — допомога ШІ\nПісля натискання кнопки «Обробити» ШІ-асистент розгорне географічні переваги та обмеження, зробить їх більш детальними та конкретними. Надалі будь-які додані вами дані будуть інтегровані в опис. Видалені елементи також будуть коректно виключені. Результат обробки автоматично не зберігається.\n\n«Зберегти» — зберегти географічні обмеження та переваги\nКнопка «Зберегти» записує поточну версію географічних критеріїв для подальшого використання."
+"Ассистент ИИ выполняет первичный отбор категорий и рубрик. Далее вы можете с "
+"его помощью расширить список — как по функциональности, так и по видам "
+"деятельности, а также указать, какие именно категории необходимо добавить. "
+"Лишние категории можно удалить."
+msgstr "Асистент ШІ виконує первинний відбір категорій та рубрик. Далі ви можете за його допомогою розширити список — як за функціональністю, так і за видами діяльності, а також вказати, які саме категорії необхідно додати. Зайві категорії можна видалити."
 
-#: templates/panels/aap_audience/create_edit_buy.html:27
+#: templates/panels/aap_audience/create/step_branches.html:24
+#: templates/panels/aap_audience/create/step_branches.html:333
 msgid ""
-"Для корректного выбора бизнес-категорий и рейтингования потенциальных "
-"поставщиков и подрядчиков необходимо сформировать описание закупаемого "
-"продукта, услуги или работ. Введите описание того, что нужно купить, "
-"заказать или отдать на подряд. Можно использовать ссылку / ссылки в формате "
-"https://www.example.com. Можно воспользоваться помощью ИИ-ассистента.\n"
-"\n"
-"«Обработать» — помощь ИИ.\n"
-"При нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, сделает "
-"его более подробным, структурированным и удобным для машинной обработки. В "
-"дальнейшем любые добавленные вами данные будут автоматически встроены в "
-"структуру описания. Удалённые элементы также будут корректно исключены. "
-"Результат обработки не сохраняется автоматически.\n"
-"\n"
-"«Сохранить» — сохранить описание\n"
-"Кнопка «Сохранить» записывает текущую версию описания для дальнейшего "
-"использования."
-msgstr "Для коректного вибору бізнес- категорій і рейтингування потенційних постачальників та підрядників необхідно сформувати опис закуповуваного продукту, послуги або робіт. Введіть опис того, що потрібно купити, замовити або віддати в підряд. Можна використовувати одну або кілька посилань у форматі https://www.example.com. Можна скористатися допомогою ШІ-асистента.\n\n«Опрацювати» — допомога ШІ.\nПри натисканні на кнопку «Опрацювати» ШІ-асистент розгорне опис, зробить його більш детальним, структурованим і зручним для машинної обробки. Надалі будь-які додані вами дані будуть автоматично вбудовані в структуру опису. Видалені елементи також будуть коректно виключені. Результат опрацювання не зберігається автоматично.\n\n«Зберегти» — зберегти опис.\nКнопка «Зберегти» зберігає поточну версію опису для подальшого використання."
+"Жёлтые строки — предложения ассистента. Чтобы сохранить их, необходимо явно "
+"добавить их в список."
+msgstr "Жовті рядки — пропозиції асистента. Щоб зберегти їх, необхідно явно додати їх до списку."
 
-#: templates/panels/aap_audience/create_edit_buy.html:47
-#: templates/panels/aap_audience/create_edit_sell.html:47
-#| msgid "На основании сформированной задачи система собирает"
-msgid "Создание / редактирование задачи для сбора аудитории"
-msgstr "На основі сформованого завдання система збирає"
+#: templates/panels/aap_audience/create/step_branches.html:25
+#: templates/panels/aap_audience/create/step_branches.html:334
+msgid ""
+"Зелёные строки — категории, уже сохранённые для последующего сбора контактов."
+msgstr "Зелені рядки — категорії, вже збережені для подальшого збору контактів."
 
-#: templates/panels/aap_audience/create_edit_buy.html:60
-#: templates/panels/aap_audience/create_edit_buy.html:433
-#: templates/panels/aap_audience/create_edit_sell.html:60
-#: templates/panels/aap_audience/create_edit_sell.html:433
-#: templates/panels/aap_audience/create_list.html:44
-#| msgid "Создание аудиторий"
-msgid "Название аудитории"
-msgstr "Створення аудиторій"
+#: templates/panels/aap_audience/create/step_branches.html:26
+#: templates/panels/aap_audience/create/step_branches.html:335
+msgid ""
+"Для добавленных категорий (зелёные строки) слева указан сравнительный "
+"рейтинг (от 1 до 20, где 1 — наилучший). Рейтинг определяет порядок сбора "
+"контактов. Он кликабелен и может быть изменён — при изменении рейтинга "
+"автоматически меняется порядок сбора контактов."
+msgstr "Для доданих категорій (зелені рядки) зліва вказано порівняльний рейтинг (від 1 до 20, де 1 — найкращий). Рейтинг визначає порядок збору контактів. Він клікабельний і може бути змінений — при зміні рейтингу порядок збору контактів змінюється автоматично."
 
-#: templates/panels/aap_audience/create_edit_buy.html:63
-#: templates/panels/aap_audience/create_edit_sell.html:63
-#| msgid "Ваш шаблон: название"
-msgid "Предложить название"
+#: templates/panels/aap_audience/create/step_branches.html:29
+msgid "Подобрать бизнес-категории и рубрики"
+msgstr "Міста та бізнес-категорії"
+
+#: templates/panels/aap_audience/create/step_branches.html:37
+#: templates/panels/aap_audience/create/step_branches.html:39
+#: templates/panels/aap_audience/create/step_branches.html:197
+#: templates/panels/aap_audience/create/step_branches.html:199
+msgid "Расширение списка бизнес-категорий и рубрик"
+msgstr "Міста та бізнес-категорії"
+
+#: templates/panels/aap_audience/create/step_branches.html:42
+#: templates/panels/aap_audience/create/step_branches.html:336
+msgid ""
+"Ассистент ИИ подбирает категории на основе лингвистического и семантического "
+"анализа с использованием нейросетевых алгоритмов. Поэтому результат может не "
+"в полной мере учитывать бизнес-логику конкретной задачи."
+msgstr "Асистент ШІ підбирає категорії на основі лінгвістичного та семантичного аналізу з використанням нейромережевих алгоритмів. Тому результат може не в повній мірі враховувати бізнес-логіку конкретного завдання."
+
+#: templates/panels/aap_audience/create/step_branches.html:43
+#: templates/panels/aap_audience/create/step_branches.html:337
+msgid ""
+"Лишние категории, добавленные ассистентом, необходимо удалить — это повысит "
+"эффективность адресной рассылки. Удаление категорий с помощью ИИ-ассистента "
+"не предусмотрено."
+msgstr "Зайві категорії, додані асистентом, необхідно видалити — це підвищить ефективність адресної розсилки. Видалення категорій за допомогою ШІ-асистента не передбачено."
+
+#: templates/panels/aap_audience/create/step_branches.html:44
+#: templates/panels/aap_audience/create/step_branches.html:338
+msgid ""
+"Если вы считаете, что список нужно расширить, используйте стандартные "
+"элементы интерфейса: добавляйте смежные категории или категории, "
+"представляющие посредников."
+msgstr "Якщо ви вважаєте, що список потрібно розширити, використовуйте стандартні елементи інтерфейсу: додавайте суміжні категорії або категорії, які представляють посередників."
+
+#: templates/panels/aap_audience/create/step_branches.html:45
+#: templates/panels/aap_audience/create/step_branches.html:339
+msgid ""
+"Вы также можете задать инструкцию для расширения списка категорий — указать "
+"конкретные категории или дать смысловое указание (например: «добавь все "
+"категории, связанные с туризмом»)."
+msgstr "Ви також можете задати інструкцію для розширення списку категорій — вказати конкретні категорії або дати смислову вказівку (наприклад: «додай усі категорії, пов’язані з туризмом»)."
+
+#: templates/panels/aap_audience/create/step_branches.html:92
+#: templates/panels/aap_audience/create/step_branches.html:96
+#: templates/panels/aap_audience/create/step_branches.html:97
+#: templates/panels/aap_audience/create/step_branches.html:307
+#| msgid "География: задача изменилась"
+msgid "Информация о продукте / компании изменилась"
+msgstr "Географія: завдання змінилося"
+
+#: templates/panels/aap_audience/create/step_branches.html:106
+msgid "Пересчитать рейтинги"
+msgstr "Присвоїти рейтинг"
+
+#: templates/panels/aap_audience/create/step_branches.html:109
+#: templates/panels/aap_audience/create/step_cities.html:64
+#: templates/panels/aap_audience/create/step_cities.html:170
+msgid "Очистить / наполнить"
+msgstr "Очистити пошук"
+
+#: templates/panels/aap_audience/create/step_branches.html:112
+#: templates/panels/aap_audience/create/step_cities.html:67
+#: templates/panels/aap_audience/create/step_cities.html:173
+msgid "Игнорировать"
+msgstr "Зареєструватися"
+
+#: templates/panels/aap_audience/create/step_branches.html:131
+#: templates/panels/aap_audience/create/step_branches.html:148
+#: templates/panels/aap_audience/create/step_branches.html:164
+#: templates/panels/aap_audience/create/step_cities.html:210
+#: templates/panels/aap_audience/create/step_cities.html:230
+#: templates/panels/aap_audience/create/step_cities.html:250
+#: templates/panels/aap_campaigns/_campaigns_table.html:123
+#: templates/panels/aap_campaigns/campaigns.html:471
+#: templates/panels/aap_campaigns/templates.html:192
+#: templates/panels/aap_lists/lists.html:176
+#: templates/panels/aap_settings/domains.html:61
+#: templates/panels/aap_settings/mail_servers.html:375
+msgid "Удалить"
+msgstr "Видалити"
+
+#: templates/panels/aap_audience/create/step_branches.html:182
+#: templates/panels/aap_campaigns/campaigns.html:150
+#: templates/panels/aap_lists/lists.html:68
+#: templates/panels/aap_lists/lists_list.html:32
+#: templates/panels/aap_settings/mail_servers.html:221
+msgid "Добавить"
+msgstr "Додати"
+
+#: templates/panels/aap_audience/create/step_branches.html:204
+#| msgid "Расширение списка бизнес-категорий и рубрик"
+msgid "Вы можете расширить список за счёт смежных бизнес-категорий и рубрик."
+msgstr "Міста та бізнес-категорії"
+
+#: templates/panels/aap_audience/create/step_branches.html:208
+msgid "Смежные категории и рубрики:"
+msgstr "Бізнес-категорії: оброблено"
+
+#: templates/panels/aap_audience/create/step_branches.html:212
+#: templates/panels/aap_audience/create/step_branches.html:230
+#: templates/panels/aap_audience/create/step_branches.html:249
+msgid "Расширить список"
+msgstr "Очистити список"
+
+#: templates/panels/aap_audience/create/step_branches.html:222
+msgid ""
+"Вы можете расширить список за счёт бизнес-категорий и рубрик посредников и "
+"торговых компаний."
+msgstr "Ви можете розширити список за рахунок бізнес-категорій і рубрик посередників та торгових компаній."
+
+#: templates/panels/aap_audience/create/step_branches.html:226
+#| msgid "Все названия компании"
+msgid "Посредники и торговые компании:"
+msgstr "Назва компанії"
+
+#: templates/panels/aap_audience/create/step_branches.html:240
+msgid "Вы можете задать инструкцию для расширения списка."
+msgstr "Ви можете задати інструкцію для розширення списку."
+
+#: templates/panels/aap_audience/create/step_branches.html:246
+msgid "Как расширить список?"
+msgstr "Очистити список"
+
+#: templates/panels/aap_audience/create/step_branches.html:259
+msgid "Кнопки расширения появятся после первичного подбора категорий."
+msgstr "Кнопки розширення з'являться після первинного підбору категорій."
+
+#: templates/panels/aap_audience/create/step_branches.html:272
+#: templates/panels/aap_audience/create/step_branches.html:284
+#: templates/panels/aap_audience/create/step_cities.html:19
+#: templates/panels/aap_audience/create/step_cities.html:21
+#: templates/panels/aap_audience/create/step_cities.html:40
+#: templates/panels/aap_audience/create/step_cities.html:42
+#: templates/panels/aap_audience/create/step_cities.html:123
+#: templates/panels/aap_audience/create/step_cities.html:127
+#: templates/panels/aap_audience/create/step_cities.html:128
+#: templates/panels/aap_audience/create/step_cities.html:137
+#: templates/panels/aap_audience/create/step_cities.html:141
+#: templates/panels/aap_audience/create/step_cities.html:142
+#: templates/panels/aap_audience/create/step_cities.html:340
+#: templates/panels/aap_audience/create/step_cities.html:342
+msgid "Города и населенные пункты"
+msgstr "Міста та категорії"
+
+#: templates/panels/aap_audience/create/step_branches.html:309
+msgid ""
+"Вы изменили информацию о продукте и/или компании. Подбор категорий и их "
+"рейтингование осуществляется на основании информации о продукте и компании и "
+"был выполнен до внесённых изменений. Поэтому подбор аудиторий и их рейтинг "
+"могут стать некорректными."
+msgstr "Ви змінили інформацію про продукт і/або компанію. Підбір категорій та їх рейтингування здійснюється на основі інформації про продукт і компанію і був виконаний до внесених змін. Тому підбір аудиторій та їхні рейтинги можуть стати некоректними."
+
+#: templates/panels/aap_audience/create/step_branches.html:310
+msgid ""
+"Если информация о компании/продукте изменилась несущественно и не влияет на "
+"выбор категорий и их рейтинг, проигнорируйте это несоответствие. Кнопка "
+"«Игнорировать» справа."
+msgstr "Якщо інформація про компанію/продукт змінилася неістотно і не впливає на вибір категорій та їхній рейтинг, проігноруйте цю невідповідність. Кнопка «Ігнорувати» праворуч."
+
+#: templates/panels/aap_audience/create/step_branches.html:311
+msgid ""
+"Если изменения достаточно существенны и требуется пересчитать рейтинги "
+"категорий, проведите только пересчёт рейтингов. Кнопка «Пересчитать "
+"рейтинги» слева."
+msgstr "Якщо зміни достатньо суттєві і потрібно перерахувати рейтинги категорій, проведіть лише перерахунок рейтингів. Кнопка «Перерахувати рейтинги» зліва."
+
+#: templates/panels/aap_audience/create/step_branches.html:312
+msgid ""
+"Если изменения кардинально меняют логику выбора категорий, требуется "
+"произвести набор категорий заново. Все подобранные категории будут удалены, "
+"и вы начнёте их подбор сначала. Кнопка «Очистить / наполнить» посередине."
+msgstr "Якщо зміни кардинально змінюють логіку вибору категорій, потрібно сформувати набір категорій заново. Усі підібрані категорії будуть видалені, і ви почнете їх підбір спочатку. Кнопка «Очистити / наповнити» посередині."
+
+#: templates/panels/aap_audience/create/step_cities.html:24
+#: templates/panels/aap_audience/create/step_cities.html:345
+msgid ""
+"Необходимо подобрать города и населённые пункты Германии для поиска "
+"контактов в бизнес-справочниках. Обрабатываются города с населением более 12 "
+"000 человек."
+msgstr "Потрібно підібрати міста та населені пункти Німеччини для пошуку контактів у бізнес‑довідниках. Обробляються міста з населенням більше 12 000 осіб."
+
+#: templates/panels/aap_audience/create/step_cities.html:25
+#: templates/panels/aap_audience/create/step_cities.html:346
+msgid ""
+"Подбор выполняется с помощью ассистента ИИ. Если заданы ограничения по "
+"географии (территория, радиус, расстояние, конкретные города или федеральные "
+"земли), они учитываются при подборе."
+msgstr "Підбір виконується за допомогою асистента ШІ. Якщо задано обмеження за географією (територія, радіус, відстань, конкретні міста чи федеральні землі), вони враховуються під час підбору."
+
+#: templates/panels/aap_audience/create/step_cities.html:26
+#: templates/panels/aap_audience/create/step_cities.html:347
+#| msgid "Далее выполняется рейтингование городов и населённых пунктов."
+msgid ""
+"Если ограничений нет, используется полный список из 1 326 городов и "
+"населённых пунктов."
+msgstr "Розсилка виконується виключно від вашого імені та з використанням"
+
+#: templates/panels/aap_audience/create/step_cities.html:27
+msgid "Далее выполняется рейтингование городов и населённых пунктов."
+msgstr "Розсилка виконується виключно від вашого імені та з використанням"
+
+#: templates/panels/aap_audience/create/step_cities.html:28
+#: templates/panels/aap_audience/create/step_cities.html:348
+msgid ""
+"Для изменения результата измените географические критерии. Это можно сделать "
+"в разделе \\"
+msgstr "Щоб змінити результат, змініть географічні критерії. Це можна зробити в розділі \\"
+
+#: templates/panels/aap_audience/create/step_cities.html:31
+#| msgid "Города и населенные пункты"
+msgid "Подобрать города и населенные пункты"
+msgstr "Міста та категорії"
+
+#: templates/panels/aap_audience/create/step_cities.html:47
+#: templates/panels/aap_audience/create/step_cities.html:51
+#: templates/panels/aap_audience/create/step_cities.html:52
+#: templates/panels/aap_audience/create/step_cities.html:153
+#: templates/panels/aap_audience/create/step_cities.html:157
+#: templates/panels/aap_audience/create/step_cities.html:158
+#: templates/panels/aap_audience/create/step_cities.html:320
+msgid "Информация о продукте / компании / географии изменилась"
+msgstr "Інформація про продукт / компанію / географію змінилася"
+
+#: templates/panels/aap_audience/create/step_cities.html:61
+#: templates/panels/aap_audience/create/step_cities.html:167
+msgid "Обнулить рейтинги"
+msgstr "Видалити всі рейтинги"
+
+#: templates/panels/aap_audience/create/step_cities.html:103
+msgid "Вся Германия без ограничений"
+msgstr "Географія: не оброблена"
+
+#: templates/panels/aap_audience/create/step_cities.html:106
+msgid "Применить ограничение"
 msgstr "Ваш шаблон: назва"
 
-#: templates/panels/aap_audience/create_edit_buy.html:66
-#: templates/panels/aap_audience/create_edit_sell.html:66
-#| msgid "Сохранить изменения"
-msgid "Сохранить название"
-msgstr "Зберегти зміни"
-
-#: templates/panels/aap_audience/create_edit_buy.html:84
-#: templates/panels/aap_audience/create_edit_buy.html:86
-#: templates/panels/aap_audience/create_edit_buy.html:313
-#: templates/panels/aap_audience/create_edit_sell.html:84
-#: templates/panels/aap_audience/create_edit_sell.html:86
-#: templates/panels/aap_audience/create_edit_sell.html:313
-msgid "Продукт/Услуга"
-msgstr "Продукт/Послуга"
-
-#: templates/panels/aap_audience/create_edit_buy.html:92
-#: templates/panels/aap_audience/create_edit_buy.html:94
-#: templates/panels/aap_audience/create_edit_buy.html:349
-#: templates/panels/aap_audience/create_edit_buy.html:413
-#: templates/panels/aap_audience/create_edit_sell.html:92
-#: templates/panels/aap_audience/create_edit_sell.html:94
-#: templates/panels/aap_audience/create_edit_sell.html:349
-#: templates/panels/aap_audience/create_edit_sell.html:413
-#: templates/panels/aap_audience/create_edit_sell.html:449
-#: templates/panels/aap_audience/create_edit_sell.html:473
-#: templates/panels/aap_audience/modal_create_task.html:36
-#: templates/panels/aap_audience/status_task.html:231
-#: templates/panels/aap_audience/status_task.html:349
-#: templates/panels/aap_lists/contacts.html:71
-#: templates/panels/aap_lists/contacts.html:146
-#: templates/panels/aap_lists/lists_list.html:65
-#: templates/panels/aap_lists/lists_list.html:163
-#: templates/panels/aap_lists/modal_contacts.html:37
-#: templates/panels/modals/switch_user.html:17 templates/panels/stats.html:23
-#: templates/public/register.html:27
-msgid "Компания"
-msgstr "Компанія"
-
-#: templates/panels/aap_audience/create_edit_buy.html:111
-#: templates/panels/aap_audience/create_edit_sell.html:111
-msgid "Закрыть / перейти к списку аудиторий"
-msgstr "Закрити / перейти до списку аудиторій"
-
-#: templates/panels/aap_audience/create_edit_buy.html:129
-#| msgid ""
-#| "Компания-продавец. Кто Вы? Направление деятельности, опыт, достижения, "
-#| "репутация."
+#: templates/panels/aap_audience/create/step_cities.html:184
+#, python-format
 msgid ""
-"Компания-заказчик. Название, адрес, страна, размер, опыт, специализация."
-msgstr ""
-"Компанія-продавець. Хто Ви? Напрям діяльності, досвід, досягнення, репутація."
+"\n"
+"                        Рейтингование запущено: %(percent)s%% (%(rated)s / "
+"%(total)s)\n"
+"                      "
+msgstr "Рейтинґування запущено: %(percent)s%% (%(rated)s / %(total)s)"
 
-#: templates/panels/aap_audience/create_edit_buy.html:140
-#: templates/panels/aap_audience/create_edit_buy.html:240
-#: templates/panels/aap_audience/create_edit_buy.html:340
-#: templates/panels/aap_audience/create_edit_sell.html:140
-#: templates/panels/aap_audience/create_edit_sell.html:240
-#: templates/panels/aap_audience/create_edit_sell.html:340
-#: templates/panels/aap_audience/how.html:86
+#: templates/panels/aap_audience/create/step_cities.html:264
+#: templates/panels/aap_audience/create/step_cities.html:266
+msgid "Ретингование городов и населенных пунктов"
+msgstr "Рейтингування контактів запущено"
+
+#: templates/panels/aap_audience/create/step_cities.html:269
+#: templates/panels/aap_audience/create/step_cities.html:349
+msgid ""
+"Производится рейтингование городов. Рейтинг присваивается от 1 до 100, где 1 "
+"— наилучший. Он указан слева от названия города."
+msgstr "Проводиться рейтингування міст. Рейтинг присвоюється від 1 до 100, де 1 — найкращий. Він вказаний зліва від назви міста."
+
+#: templates/panels/aap_audience/create/step_cities.html:270
+#: templates/panels/aap_audience/create/step_cities.html:350
+msgid ""
+"На основании рейтинга определяется порядок сбора контактов. Рейтинг "
+"кликабелен и может быть изменён — таким образом вы меняете порядок сбора "
+"контактов."
+msgstr "На основі рейтингу визначається порядок збору контактів. Рейтинг клікабельний і може бути змінений — таким чином ви змінюєте порядок збору контактів."
+
+#: templates/panels/aap_audience/create/step_cities.html:271
+#: templates/panels/aap_audience/create/step_cities.html:351
+msgid ""
+"Вы также можете удалить города, которые считаете ненужными. Это повысит "
+"вероятность сбора контактов из приоритетных городов."
+msgstr "Ви також можете видалити міста, які вважаєте непотрібними. Це підвищить ймовірність збору контактів із пріоритетних міст."
+
+#: templates/panels/aap_audience/create/step_cities.html:283
+#: templates/panels/aap_audience/create/step_cities.html:297
+#| msgid "Контакты : Все контакты"
+msgid "Контакты - сбор контактов"
+msgstr "Контакти: Всі контакти"
+
+#: templates/panels/aap_audience/create/step_cities.html:322
+msgid ""
+"Вы изменили информацию о продукте, компании или географии. Подбор городов и "
+"населенных пунктов, их рейтингование осуществляется на основании информации "
+"о продукте, компании географии, был выполнен до внесённых изменений. Поэтому "
+"подбор городов и их рейтинг могут стать некорректными."
+msgstr "Ви змінили інформацію про продукт, компанію або географію. Підбір міст і населених пунктів та їх ранжування були виконані на основі інформації про продукт, компанію та географію, яка існувала до внесення змін. Тому підбір міст і їх ранжування можуть стати некоректними."
+
+#: templates/panels/aap_audience/create/step_cities.html:323
+msgid ""
+"Если информация о компании/продукте/географии изменилась несущественно и не "
+"влияет на выбор городов и их рейтинг, проигнорируйте это несоответствие. "
+"Кнопка «Игнорировать» справа."
+msgstr "Якщо інформація про компанію/продукт/географію змінилася неістотно та не впливає на вибір міст і їхній рейтинг, проігноруйте цю невідповідність. Кнопка «Ігнорувати» праворуч."
+
+#: templates/panels/aap_audience/create/step_cities.html:324
+msgid ""
+"Если изменения достаточно существенны и требуется пересчитать рейтинги "
+"городов, проведите только пересчёт рейтингов. Кнопка «Пересчитать рейтинги» "
+"слева."
+msgstr "Якщо зміни достатньо суттєві і потрібно перерахувати рейтинги міст, проведіть лише перерахунок рейтингів. Кнопка «Перерахувати рейтинги» зліва."
+
+#: templates/panels/aap_audience/create/step_cities.html:325
+msgid ""
+"Если изменения кардинально меняют логику выбора городов, требуется "
+"произвести набор городов заново. Все подобранные города будут удалены, и вы "
+"начнёте их подбор сначала. Кнопка «Очистить / наполнить» посередине."
+msgstr "Якщо зміни кардинально змінюють логіку вибору міст, потрібно виконати підбір міст заново. Усі підібрані міста будуть видалені, і ви почнете їх підбір з початку. Кнопка «Очистити / наповнити» посередині."
+
+#: templates/panels/aap_audience/create/step_contacts.html:20
+#: templates/panels/aap_audience/create_list.html:142
+#| msgid "Контакты : Все контакты"
+msgid "Контакты собираются"
+msgstr "Контакти: Всі контакти"
+
+#: templates/panels/aap_audience/create/step_contacts.html:24
+#: templates/panels/aap_audience/create/step_contacts.html:36
+#| msgid "Всего собрано контактов"
+msgid "Собрано контактов:"
+msgstr "Усього зібрано контактів"
+
+#: templates/panels/aap_audience/create/step_contacts.html:33
+#: templates/panels/aap_audience/create_list.html:168
+#| msgid "Сбор контактов / Рейтинг"
+msgid "Сбор контактов приостановлен"
+msgstr "Збір контактів / Рейтинг"
+
+#: templates/panels/aap_audience/create/step_contacts.html:60
+#: templates/panels/aap_audience/create/step_contacts.html:68
+msgid "50 последних"
+msgstr "50 останніх"
+
+#: templates/panels/aap_audience/create/step_contacts.html:78
+#: templates/panels/aap_lists/contacts.html:43
+msgid "Все контакты"
+msgstr "Всі контакти"
+
+#: templates/panels/aap_audience/create/step_contacts.html:87
+msgid "Категории / города"
+msgstr "Категорії / галузі:"
+
+#: templates/panels/aap_audience/create/step_contacts.html:96
+msgid "Пары категории / города"
+msgstr "Категорії / галузі:"
+
+#: templates/panels/aap_audience/create/step_form.html:21
+#: templates/panels/aap_audience/create/step_form.html:22
+#: templates/panels/aap_audience/create/step_form.html:41
+#| msgid "описанием продукта или услуги"
+msgid "Описание продукта / услуги"
+msgstr "Продукт / послуга"
+
+#: templates/panels/aap_audience/create/step_form.html:21
+#: templates/panels/aap_audience/create/step_form.html:22
+#: templates/panels/aap_audience/create/step_form.html:43
+#| msgid "описанием компании"
+msgid "Описание компании"
+msgstr "Назва компанії"
+
+#: templates/panels/aap_audience/create/step_form.html:21
+#: templates/panels/aap_audience/create/step_form.html:22
+#: templates/panels/aap_audience/create/step_form.html:45
+#| msgid "описанием географии"
+msgid "Описание географии"
+msgstr "Обробити географію"
+
+#: templates/panels/aap_audience/create/step_form.html:64
+#: templates/panels/aap_audience/create/step_form.html:65
 msgid "Обработать"
 msgstr "Обробити"
 
-#: templates/panels/aap_audience/create_edit_buy.html:148
-#: templates/panels/aap_audience/create_edit_buy.html:152
-#: templates/panels/aap_audience/create_edit_buy.html:248
-#: templates/panels/aap_audience/create_edit_buy.html:252
-#: templates/panels/aap_audience/create_edit_buy.html:348
-#: templates/panels/aap_audience/create_edit_buy.html:352
-#: templates/panels/aap_audience/create_edit_sell.html:148
-#: templates/panels/aap_audience/create_edit_sell.html:152
-#: templates/panels/aap_audience/create_edit_sell.html:248
-#: templates/panels/aap_audience/create_edit_sell.html:252
-#: templates/panels/aap_audience/create_edit_sell.html:348
-#: templates/panels/aap_audience/create_edit_sell.html:352
-#: templates/panels/aap_audience/how.html:92
+#: templates/panels/aap_audience/create/step_form.html:73
+#: templates/panels/aap_audience/modal_insert_company.html:33
+msgid "Подставить"
+msgstr "Додати"
+
+#: templates/panels/aap_audience/create/step_form.html:81
+#: templates/panels/aap_audience/create/step_form.html:82
+msgid "Вся Германия"
+msgstr "Компанія"
+
+#: templates/panels/aap_audience/create/step_form.html:91
+#: templates/panels/aap_audience/create/step_form.html:93
+#: templates/panels/aap_audience/modal_edit_branch_rate.html:47
+#: templates/panels/aap_audience/modal_edit_city_rate.html:41
+#: templates/panels/aap_audience/modal_edit_rate_limit.html:38
+#: templates/panels/aap_audience/modal_edit_title.html:39
 #: templates/panels/aap_campaigns/campaigns.html:342
+#: templates/panels/aap_campaigns/flow_step_campaign.html:56
+#: templates/panels/aap_campaigns/flow_step_campaign.html:90
+#: templates/panels/aap_campaigns/flow_step_letter.html:79
+#: templates/panels/aap_campaigns/flow_step_template.html:111
 #: templates/panels/aap_campaigns/templates.html:142
 #: templates/panels/aap_settings/imap_server.html:129
-#: templates/panels/aap_settings/mail_servers.html:174
+#: templates/panels/aap_settings/mail_servers.html:172
 #: templates/panels/aap_settings/sending.html:82
 #: templates/panels/aap_settings/smtp_server.html:145
 #: templates/public/password_reset_confirm.html:54
@@ -963,744 +1528,285 @@ msgstr "Обробити"
 msgid "Сохранить"
 msgstr "Зберегти"
 
-#: templates/panels/aap_audience/create_edit_buy.html:159
-#: templates/panels/aap_audience/create_edit_buy.html:259
-#: templates/panels/aap_audience/create_edit_buy.html:359
-#: templates/panels/aap_audience/create_edit_sell.html:159
-#: templates/panels/aap_audience/create_edit_sell.html:259
-#: templates/panels/aap_audience/create_edit_sell.html:359
+#: templates/panels/aap_audience/create/step_form.html:100
 msgid "Команда / вопрос для ИИ ассистента."
 msgstr "Команда / питання для ШІ асистента."
 
-#: templates/panels/aap_audience/create_edit_buy.html:166
-#: templates/panels/aap_audience/create_edit_buy.html:266
-#: templates/panels/aap_audience/create_edit_buy.html:366
-#: templates/panels/aap_audience/create_edit_sell.html:166
-#: templates/panels/aap_audience/create_edit_sell.html:266
-#: templates/panels/aap_audience/create_edit_sell.html:366
+#: templates/panels/aap_audience/create/step_form.html:107
 msgid ""
 "Дайте команду и / или задайте вопрос асситенту ИИ. Команда будет применена к "
 "описанию, на вопрос предлагается независимый ответ"
-msgstr "Дайте команду та/або задайте питання ШІ-асистенту. Команду буде застосовано до опису, на питання пропонується незалежна відповідь."
+msgstr ""
+"Дайте команду та/або задайте питання ШІ-асистенту. Команду буде застосовано "
+"до опису, на питання пропонується незалежна відповідь."
 
-#: templates/panels/aap_audience/create_edit_buy.html:168
-#: templates/panels/aap_audience/create_edit_buy.html:268
-#: templates/panels/aap_audience/create_edit_buy.html:368
-#: templates/panels/aap_audience/create_edit_sell.html:168
-#: templates/panels/aap_audience/create_edit_sell.html:268
-#: templates/panels/aap_audience/create_edit_sell.html:368
-#| msgid "Добавить аудиторию"
+#: templates/panels/aap_audience/create/step_form.html:109
 msgid "Выполнить / задать вопрос"
 msgstr "Додати аудиторію"
 
-#: templates/panels/aap_audience/create_edit_buy.html:172
-#: templates/panels/aap_audience/create_edit_buy.html:272
-#: templates/panels/aap_audience/create_edit_buy.html:372
-#: templates/panels/aap_audience/create_edit_sell.html:172
-#: templates/panels/aap_audience/create_edit_sell.html:272
-#: templates/panels/aap_audience/create_edit_sell.html:372
-#| msgid "Изменить данные"
+#: templates/panels/aap_audience/create/step_form.html:114
 msgid "Изменения сохранены"
 msgstr "Змінити дані"
 
-#: templates/panels/aap_audience/create_edit_buy.html:174
-#: templates/panels/aap_audience/create_edit_buy.html:200
-msgid ""
-"Введите команду для работы с описанием компании-заказчика — что нужно "
-"добавить, удалить или изменить. Указанная команда будет применена к текущему "
-"описанию."
-msgstr "Введіть команду для роботи з описом компанії-замовника — що потрібно додати, видалити або змінити. Указана команда буде застосована до поточного опису."
-
-#: templates/panels/aap_audience/create_edit_buy.html:175
-#: templates/panels/aap_audience/create_edit_buy.html:201
-msgid ""
-"Вы также можете задать вопрос ИИ-ассистенту в контексте работы над описанием "
-"компании-заказчика. Ответ на вопрос будет дан отдельно и не изменит текст "
-"описания."
-msgstr "Ви також можете задати питання ШІ-асистентові в контексті роботи над описом компанії-замовника. Відповідь на питання буде надана окремо і не змінить текст опису."
-
-#: templates/panels/aap_audience/create_edit_buy.html:176
-#: templates/panels/aap_audience/create_edit_buy.html:202
-#: templates/panels/aap_audience/create_edit_buy.html:276
-#: templates/panels/aap_audience/create_edit_buy.html:302
-#: templates/panels/aap_audience/create_edit_buy.html:376
-#: templates/panels/aap_audience/create_edit_buy.html:402
-#: templates/panels/aap_audience/create_edit_sell.html:176
-#: templates/panels/aap_audience/create_edit_sell.html:202
-#: templates/panels/aap_audience/create_edit_sell.html:276
-#: templates/panels/aap_audience/create_edit_sell.html:302
-#: templates/panels/aap_audience/create_edit_sell.html:376
-#: templates/panels/aap_audience/create_edit_sell.html:402
-msgid ""
-"В процессе обработки ИИ будет задавать вопросы и давать подсказки для "
-"уточнения описания. Поскольку основные варианты уже указаны в начальном "
-"описании, часть подсказок может быть нерелевантной. При необходимости "
-"добавьте информацию в описание или в команду для ассистента ИИ."
-msgstr "У процесі обробки ШІ буде ставити запитання та давати підказки для уточнення опису. Оскільки основні варіанти вже вказані в початковому описі, частина підказок може бути нерелевантною. У разі необхідності додайте інформацію до опису або в команду для помічника ШІ."
-
-#: templates/panels/aap_audience/create_edit_buy.html:182
-#: templates/panels/aap_audience/create_edit_buy.html:282
-#: templates/panels/aap_audience/create_edit_buy.html:382
-#: templates/panels/aap_audience/create_edit_sell.html:182
-#: templates/panels/aap_audience/create_edit_sell.html:282
-#: templates/panels/aap_audience/create_edit_sell.html:382
+#: templates/panels/aap_audience/create/step_form.html:122
 msgid "Команда / вопрос:"
 msgstr "Команда / питання:"
 
-#: templates/panels/aap_audience/create_edit_buy.html:186
-#: templates/panels/aap_audience/create_edit_buy.html:286
-#: templates/panels/aap_audience/create_edit_buy.html:386
-#: templates/panels/aap_audience/create_edit_sell.html:186
-#: templates/panels/aap_audience/create_edit_sell.html:286
-#: templates/panels/aap_audience/create_edit_sell.html:386
+#: templates/panels/aap_audience/create/step_form.html:126
 msgid "Ответ ассистента ИИ:"
 msgstr "Відповідь асистента ШІ:"
 
-#: templates/panels/aap_audience/create_edit_buy.html:190
-#: templates/panels/aap_audience/create_edit_buy.html:290
-#: templates/panels/aap_audience/create_edit_buy.html:390
-#: templates/panels/aap_audience/create_edit_sell.html:190
-#: templates/panels/aap_audience/create_edit_sell.html:290
-#: templates/panels/aap_audience/create_edit_sell.html:390
+#: templates/panels/aap_audience/create/step_form.html:130
 msgid "Выполнено"
 msgstr "Виконано"
 
-#: templates/panels/aap_audience/create_edit_buy.html:194
-#: templates/panels/aap_audience/create_edit_buy.html:294
-#: templates/panels/aap_audience/create_edit_buy.html:394
-#: templates/panels/aap_audience/create_edit_sell.html:194
-#: templates/panels/aap_audience/create_edit_sell.html:294
-#: templates/panels/aap_audience/create_edit_sell.html:394
+#: templates/panels/aap_audience/create/step_form.html:134
 msgid "Вопрос от ассистента ИИ:"
 msgstr "Питання від асистента ШІ:"
 
-#: templates/panels/aap_audience/create_edit_buy.html:207
-#: templates/panels/aap_audience/create_edit_buy.html:307
-#: templates/panels/aap_audience/create_edit_buy.html:407
-#: templates/panels/aap_audience/create_edit_sell.html:207
-#: templates/panels/aap_audience/create_edit_sell.html:307
-#: templates/panels/aap_audience/create_edit_sell.html:407
-#: templates/panels/aap_audience/how.html:89
-msgid "Очистить"
-msgstr "Очистити"
+#: templates/panels/aap_audience/create/step_form.html:146
+msgid "Очистить / начать с начала"
+msgstr "Очистити список"
 
-#: templates/panels/aap_audience/create_edit_buy.html:229
-#: templates/panels/aap_audience/create_edit_buy.html:457
-#: templates/panels/aap_audience/create_edit_sell.html:229
-#: templates/panels/aap_audience/create_edit_sell.html:457
-msgid "География. Ограничения, предпочтения, приоритеты."
-msgstr "Географія. Обмеження, переваги, пріоритети."
+#: templates/panels/aap_audience/create/step_mailing_list.html:23
+#: templates/panels/aap_audience/create_list.html:195
+#| msgid "Рейтингование - запущено"
+msgid "Рейтингование запущено"
+msgstr "Рейтингування запущено"
 
-#: templates/panels/aap_audience/create_edit_buy.html:249
-#: templates/panels/aap_audience/create_edit_buy.html:441
-#: templates/panels/aap_audience/create_edit_buy.html:472
-#: templates/panels/aap_audience/modal_create_task.html:23
-msgid "Продукт / услуга / работы"
-msgstr "Продукт / послуга / роботи"
+#: templates/panels/aap_audience/create/step_mailing_list.html:27
+#: templates/panels/aap_audience/create/step_mailing_list.html:39
+#| msgid "Всего собрано контактов"
+msgid "Отрейтинговано контактов:"
+msgstr "Усього зібрано контактів"
 
-#: templates/panels/aap_audience/create_edit_buy.html:274
-#: templates/panels/aap_audience/create_edit_buy.html:300
-msgid ""
-"Введите команду для работы с описанием географии поиска поставщиков и "
-"подрядчиков — что нужно добавить, удалить или изменить. Указанная команда "
-"будет применена к текущему описанию."
-msgstr "Введіть команду для роботи з описом географії пошуку постачальників і підрядників — що потрібно додати, видалити або змінити. Зазначена команда буде застосована до поточного опису."
-
-#: templates/panels/aap_audience/create_edit_buy.html:275
-#: templates/panels/aap_audience/create_edit_buy.html:301
-msgid ""
-"Вы также можете задать вопрос ИИ-ассистенту в контексте работы над описанием "
-"географии поиска поставщиков и подрядчиков. Ответ на вопрос будет дан "
-"отдельно и не изменит текст описания."
-msgstr "Ви також можете поставити питання ШІ-асистенту в контексті роботи над описом географії пошуку постачальників і підрядників. Відповідь на питання буде надана окремо і не змінить текст опису."
-
-#: templates/panels/aap_audience/create_edit_buy.html:329
-msgid ""
-"Продукт / услуга / работы. Что нужно купить или заказать? Где применяется? "
-"Кто поставщик / подрядчик?"
-msgstr "Продукт / послуга / роботи. Що потрібно купити або замовити? Де застосовується? Хто постачальник / підрядник?"
-
-#: templates/panels/aap_audience/create_edit_buy.html:374
-#: templates/panels/aap_audience/create_edit_buy.html:400
-msgid ""
-"Введите команду для работы с описанием закупаемого продукта, услуги или "
-"работ — что нужно добавить, удалить или изменить. Указанная команда будет "
-"применена к текущему описанию."
-msgstr "Введіть команду для роботи з описом закуповуваного продукту, послуги або робіт — що потрібно додати, видалити або змінити. Зазначена команда буде застосована до поточного опису."
-
-#: templates/panels/aap_audience/create_edit_buy.html:375
-#: templates/panels/aap_audience/create_edit_buy.html:401
-msgid ""
-"Вы также можете задать вопрос ИИ-ассистенту в контексте работы над описанием "
-"закупаемого продукта, услуги или работ. Ответ на вопрос будет дан отдельно и "
-"не изменит текст описания."
-msgstr "Ви також можете поставити запитання ШІ-асистенту в контексті роботи над описом закуповуваного продукту, послуги або робіт. Відповідь на запитання буде надана окремо і не змінить текст опису."
-
-#: templates/panels/aap_audience/create_edit_buy.html:449
-#: templates/panels/aap_audience/create_edit_buy.html:473
-#: templates/panels/aap_audience/modal_create_task.html:34
-#| msgid "Кампания включена"
-msgid "Компания-заказчик"
-msgstr "Кампанія ввімкнена"
-
-#: templates/panels/aap_audience/create_edit_buy.html:471
-#: templates/panels/aap_audience/create_edit_sell.html:471
-#: templates/panels/aap_lists/lists.html:42
-msgid "Название"
-msgstr "Назва"
-
-#: templates/panels/aap_audience/create_edit_buy.html:475
-#: templates/panels/aap_audience/create_edit_sell.html:475
-#| msgid "Пожалуйста, заполните все обязательные поля"
-msgid "Не заполнены обязательные разделы"
-msgstr "Будь ласка, заповніть усі обов'язкові поля"
-
-#: templates/panels/aap_audience/create_edit_buy.html:476
-#: templates/panels/aap_audience/create_edit_sell.html:476
-msgid "Не заполнены или не сохранены разделы:"
-msgstr "Не заповнені або не збережені розділи:"
-
-#: templates/panels/aap_audience/create_edit_sell.html:10
-msgid ""
-"Для корректного выбора бизнес-категорий и рейтингования потенциальных "
-"клиентов необходимо сформировать описание компании-продавца. Укажите "
-"название компании, страну и адрес. Уточните специализацию компании, опыт "
-"работы, возраст и размер компании. Укажите сайт компании. Используйте ссылки "
-"в формате: https://www.example.com. При необходимости можно воспользоваться "
-"помощью ИИ-ассистента.\n"
-"\n"
-"«Обработать» — помощь ИИ\n"
-"При нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, сделает "
-"его более подробным, структурированным и удобным для машинной обработки. В "
-"дальнейшем любые добавленные вами данные будут встроены в описание. "
-"Удалённые элементы также будут корректно исключены. Результат обработки "
-"автоматически не сохраняется.\n"
-"\n"
-"«Сохранить» — сохранить описание\n"
-"Кнопка «Сохранить» записывает текущую версию описания для дальнейшего "
-"использования."
-msgstr "Для коректного вибору бізнес-категорій та рейтингування потенційних клієнтів необхідно сформувати опис компанії‑продавця. Вкажіть назву компанії, країну та адресу. Уточніть спеціалізацію компанії, досвід роботи, вік та розмір компанії. Вкажіть сайт компанії. Використовуйте посилання у форматі: https://www.example.com. При необхідності можна скористатися допомогою ШІ-асистента.\n\n«Обробити» — допомога ШІ\nПри натисканні на кнопку «Обробити» ШІ-асистент розгорне опис, зробить його більш детальним, структурованим та зручним для машинної обробки. Надалі будь‑які додані вами дані будуть вбудовані в опис. Видалені елементи також будуть коректно виключені. Результат обробки автоматично не зберігається.\n\n«Зберегти» — зберегти опис\nКнопка «Зберегти» записує поточну версію опису для подальшого використання."
-
-#: templates/panels/aap_audience/create_edit_sell.html:17
-msgid ""
-"Для корректного отбора и приоритезации городов необходимо сформировать "
-"географические критерии.\n"
-"Если существуют конкретные ограничения по географии поиска клиентов, укажите "
-"их. Это может быть конкретный город, радиус вокруг города, федеральная "
-"земля, агломерация и т. д.\n"
-"\n"
-"При необходимости можно воспользоваться помощью ИИ-ассистента.\n"
-"\n"
-"«Обработать» — помощь ИИ\n"
-"При нажатии на кнопку «Обработать» ИИ-ассистент развернёт географические "
-"предпочтения и ограничения, сделает их более подробными и конкретными. В "
-"дальнейшем любые добавленные вами данные будут встроены в описание. "
-"Удалённые элементы также будут корректно исключены. Результат обработки "
-"автоматически не сохраняется.\n"
-"\n"
-"«Сохранить» — сохранить географические ограничения и предпочтения\n"
-"Кнопка «Сохранить» записывает текущую версию географических критериев для "
-"дальнейшего использования."
-msgstr "Для коректного відбору та пріоритезації міст необхідно сформувати географічні критерії.\nЯкщо існують конкретні обмеження щодо географії пошуку клієнтів, вкажіть їх. Це може бути конкретне місто, радіус навколо міста, федеральна земля, агломерація тощо.\n\nЗа потреби можна скористатися допомогою ШІ-асистента.\n\n«Обробити» — допомога ШІ\nПри натисканні кнопки «Обробити» ШІ-асистент розгорне географічні уподобання та обмеження, зробить їх більш детальними та конкретними. Надалі будь-які додані вами дані будуть вбудовані в опис. Видалені елементи також будуть коректно виключені. Результат обробки автоматично не зберігається.\n\n«Зберегти» — зберегти географічні обмеження та уподобання\nКнопка «Зберегти» записує поточну версію географічних критеріїв для подальшого використання."
-
-#: templates/panels/aap_audience/create_edit_sell.html:27
-msgid ""
-"Для корректного выбора бизнес-категорий и рейтингования потенциальных "
-"клиентов необходимо сформировать описание продукта или услуги. Введите "
-"описание продукта / услуги. Можно использовать ссылку / ссылки в формате "
-"https://www.example.com. Можно воспользоваться помощью ИИ-ассистента.\n"
-"\n"
-"«Обработать» — помощь ИИ.\n"
-"При нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, сделает "
-"его более подробным, структурированным и удобным для машинной обработки. В "
-"дальнейшем любые добавленные вами данные будут автоматически встроены в "
-"структуру описания. Удалённые элементы также будут корректно исключены. "
-"Результат обработки не сохраняется автоматически.\n"
-"\n"
-"«Сохранить» — сохранить описание\n"
-"Кнопка «Сохранить» записывает текущую версию описания для дальнейшего "
-"использования."
-msgstr "Для коректного вибору бізнес‑категорій і рейтингування потенційних клієнтів необхідно сформувати опис продукту або послуги. Введіть опис продукту / послуги. Можна використовувати посилання / посилання у форматі https://www.example.com. Можна скористатися допомогою ШІ-асистента.\n\n«Опрацювати» — допомога ШІ.\nПісля натискання кнопки «Опрацювати» ШІ-асистент розгорне опис, зробить його більш детальним, структурованим і зручним для машинної обробки. Надалі будь‑які додані вами дані будуть автоматично вбудовані в структуру опису. Видалені елементи також будуть коректно виключені. Результат опрацювання не зберігається автоматично.\n\n«Зберегти» — зберегти опис\nКнопка «Зберегти» записує поточну версію опису для подальшого використання."
-
-#: templates/panels/aap_audience/create_edit_sell.html:44
-#: templates/panels/aap_audience/create_edit_sell.html:428
-#: templates/panels/aap_audience/create_list.html:55
-#: templates/panels/aap_audience/modal_create_task.html:15
-#| msgid "Поиск клиентов"
-msgid "Поиск клиентов / покупателей"
-msgstr "Пошук клієнтів"
-
-#: templates/panels/aap_audience/create_edit_sell.html:129
-msgid "Продавец. Название, адрес, страна, размер, опыт, специальзация."
-msgstr "Продавець. Назва, адреса, країна, розмір, досвід, спеціалізація."
-
-#: templates/panels/aap_audience/create_edit_sell.html:174
-#: templates/panels/aap_audience/create_edit_sell.html:200
-msgid ""
-"Введите команду для работы с описанием компании — что нужно добавить, "
-"удалить или изменить. Указанная команда будет применена к текущему описанию."
-msgstr "Введіть команду для роботи з описом компанії — що потрібно додати, видалити або змінити. Вказана команда буде застосована до поточного опису."
-
-#: templates/panels/aap_audience/create_edit_sell.html:175
-#: templates/panels/aap_audience/create_edit_sell.html:201
-msgid ""
-"Вы также можете задать вопрос ИИ-ассистенту в контексте работы над описанием "
-"компании. Ответ на вопрос будет дан отдельно и не изменит текст описания."
-msgstr "Ви також можете поставити запитання ШІ-асистентові в контексті роботи над описом компанії. Відповідь на запитання буде надана окремо і не змінить текст опису."
-
-#: templates/panels/aap_audience/create_edit_sell.html:249
-#: templates/panels/aap_audience/create_edit_sell.html:441
-#: templates/panels/aap_audience/create_edit_sell.html:472
-#: templates/panels/aap_audience/modal_create_task.html:25
-msgid "Продукт / услуга"
-msgstr "Продукт / послуга"
-
-#: templates/panels/aap_audience/create_edit_sell.html:274
-#: templates/panels/aap_audience/create_edit_sell.html:300
-msgid ""
-"Введите команду для работы с описанием географии — что нужно добавить, "
-"удалить или изменить. Указанная команда будет применена к текущему описанию."
-msgstr "Введіть команду для роботи з описом географії — що потрібно додати, видалити або змінити. Зазначена команда буде застосована до поточного опису."
-
-#: templates/panels/aap_audience/create_edit_sell.html:275
-#: templates/panels/aap_audience/create_edit_sell.html:301
-msgid ""
-"Вы также можете задать вопрос ИИ-ассистенту в контексте работы над описанием "
-"географии. Ответ на вопрос будет дан отдельно и не изменит текст описания."
-msgstr "Ви також можете поставити ШІ-асистентові питання в контексті роботи над описом географії. Відповідь на питання буде надана окремо і не змінить текст опису."
-
-#: templates/panels/aap_audience/create_edit_sell.html:329
-#| msgid ""
-#| "Ваш продукт / услуга. Что именно продаётся? Суть, бизнес-характеристики"
-msgid "Продукт / услуга. Что продаётся? Где применяется? Кто покупатель?"
-msgstr "Ваш продукт / послуга. Що саме продається? Суть, бізнес-характеристики"
-
-#: templates/panels/aap_audience/create_edit_sell.html:374
-#: templates/panels/aap_audience/create_edit_sell.html:400
-msgid ""
-"Введите команду для работы с описанием продукта или услуги — что нужно "
-"добавить, удалить или изменить. Указанная команда будет применена к текущему "
-"описанию."
-msgstr "Введіть команду для роботи з описом продукту або послуги — що потрібно додати, видалити або змінити. Вказана команда буде застосована до поточного опису."
-
-#: templates/panels/aap_audience/create_edit_sell.html:375
-#: templates/panels/aap_audience/create_edit_sell.html:401
-msgid ""
-"Вы также можете задать вопрос ИИ-ассистенту в контексте работы над описанием "
-"продукта или услуги. Ответ на вопрос будет дан отдельно и не изменит текст "
-"описания."
-msgstr "Ви також можете поставити питання ШІ‑асистенту в контексті роботи над описом продукту або послуги. Відповідь на питання буде надана окремо й не змінить текст опису."
+#: templates/panels/aap_audience/create/step_mailing_list.html:36
+#: templates/panels/aap_audience/create_list.html:227
+#| msgid "Рейтингование - приостановлено"
+msgid "Рейтингование приостановлено"
+msgstr "Рейтингування контактів запущено"
 
 #: templates/panels/aap_audience/create_list.html:17
 #: templates/panels/aap_audience/create_list.html:28
-#| msgid "Добавить аудиторию"
-msgid "Создать аудиторию"
-msgstr "Додати аудиторію"
+msgid "Создать список рассылки"
+msgstr "Додати список розсилки"
 
 #: templates/panels/aap_audience/create_list.html:17
-#| msgid "Поиск клиентов"
 msgid "поиск клиентов / покупателей"
 msgstr "Пошук клієнтів"
 
 #: templates/panels/aap_audience/create_list.html:28
-#| msgid "Поиск поставщиков / подрядчиков"
 msgid "поиск поставщиков / подрядчиков"
 msgstr "Пошук постачальників / підрядників"
 
-#: templates/panels/aap_audience/create_list.html:43
-#| msgid "Аудитории"
-msgid "Тип аудитории"
-msgstr "Аудиторії"
+#: templates/panels/aap_audience/create_list.html:44
+#: templates/panels/aap_audience/create_list.html:60
+msgid "Архив"
+msgstr "Архів"
 
-#: templates/panels/aap_audience/create_list.html:65
-msgid "Подробнее"
-msgstr "Детальніше"
+#: templates/panels/aap_audience/create_list.html:53
+#| msgid "Активна с"
+msgid "Активные"
+msgstr "Активна з"
 
-#: templates/panels/aap_audience/create_list.html:72
-#: templates/panels/aap_audience/create_list.html:76
-#: templates/panels/aap_audience/how.html:292
-#: templates/panels/aap_campaigns/campaigns.html:463
-#: templates/panels/aap_campaigns/templates.html:204
-#: templates/panels/aap_lists/lists.html:168
-#: templates/panels/aap_settings/mail_servers.html:375
-msgid "Изменить"
-msgstr "Змінити"
+#: templates/panels/aap_audience/create_list.html:146
+#: templates/panels/aap_audience/create_list.html:171
+#| msgid "Собрано"
+msgid "Собрано:"
+msgstr "Всього зібрано"
 
-#: templates/panels/aap_audience/create_list.html:79
-#: templates/panels/aap_audience/how.html:296
-msgid "Удалить задачу?"
+#: templates/panels/aap_audience/create_list.html:150
+#: templates/panels/aap_audience/create_list.html:156
+#: templates/panels/aap_audience/create_list.html:175
+#: templates/panels/aap_audience/create_list.html:181
+#| msgid "Все контакты"
+msgid "Перейти в Контакты"
+msgstr "Всі контакти"
+
+#: templates/panels/aap_audience/create_list.html:200
+#: templates/panels/aap_audience/create_list.html:231
+#| msgid "Рейтинг:"
+msgid "Рейтинги"
+msgstr "Рейтинг 1-30"
+
+#: templates/panels/aap_audience/create_list.html:209
+#: templates/panels/aap_audience/create_list.html:215
+#: templates/panels/aap_audience/create_list.html:240
+#: templates/panels/aap_audience/create_list.html:246
+#| msgid "Пересчитать рейтинги"
+msgid "Перейти в Рейтинг"
+msgstr "Присвоїти рейтинг"
+
+#: templates/panels/aap_audience/create_list.html:259
+#| msgid "Удалить задачу?"
+msgid "Активировать задачу?"
 msgstr "Видалити завдання?"
 
-#: templates/panels/aap_audience/create_list.html:84
-#: templates/panels/aap_audience/how.html:301
-#: templates/panels/aap_campaigns/campaigns.html:471
-#: templates/panels/aap_campaigns/templates.html:192
-#: templates/panels/aap_lists/lists.html:176
-#: templates/panels/aap_settings/mail_servers.html:382
-msgid "Удалить"
-msgstr "Видалити"
+#: templates/panels/aap_audience/create_list.html:265
+#| msgid "Игнорировать"
+msgid "Активировать"
+msgstr "Зареєструватися"
 
-#: templates/panels/aap_audience/how.html:127
-msgid ""
-"Предоставленная Вами информация является непубличной и не передаётся третьим "
-"лицам."
-msgstr "Надана Вами інформація є непублічною і не передається третім особам."
+#: templates/panels/aap_audience/create_list.html:290
+#| msgid "Удалить задачу?"
+msgid "Архивировать задачу?"
+msgstr "Видалити завдання?"
 
-#: templates/panels/aap_audience/how.html:128
-msgid ""
-"Она используется исключительно для оценки вероятности заключения сделки с "
-"контрагентами."
-msgstr ""
-"Вона використовується виключно для оцінки ймовірності укладення угоди з "
-"контрагентами."
+#: templates/panels/aap_audience/create_list.html:296
+#| msgid "Игнорировать"
+msgid "Архивировать"
+msgstr "Зареєструватися"
 
-#: templates/panels/aap_audience/how.html:129
-msgid ""
-"Недостоверные данные искажают результат и снижают эффективность подбора "
-"контрагентов."
-msgstr ""
-"Недостовірні дані спотворюють результат і знижують ефективність підбору "
-"контрагентів."
+#: templates/panels/aap_audience/modal_create_task.html:24
+msgid "Продукт / услуга / работы"
+msgstr "Продукт / послуга / роботи"
 
-#: templates/panels/aap_audience/how.html:130
-msgid ""
-"Поэтому указывайте реальные факты, а не маркетинговые формулировки — это в "
-"Ваших интересах."
-msgstr ""
-"Тому вказуйте реальні факти, а не маркетингові формулювання — це у Ваших "
-"інтересах."
+#: templates/panels/aap_audience/modal_edit_branch_rate.html:32
+#: templates/panels/aap_audience/modal_edit_branch_rate.html:34
+#: templates/panels/aap_audience/modal_edit_city_rate.html:26
+#: templates/panels/aap_audience/modal_edit_city_rate.html:28
+msgid "Рейтинг:"
+msgstr "Рейтинг 1-30"
 
-#: templates/panels/aap_audience/how.html:134
-msgid ""
-"Это вспомогательный ассистент для формулирования критериев отбора и "
-"ранжирования контрагентов."
-msgstr ""
-"Це допоміжний асистент для формулювання критеріїв відбору та ранжування "
-"контрагентів."
+#: templates/panels/aap_audience/modal_edit_branch_rate.html:48
+#: templates/panels/aap_audience/modal_edit_city_rate.html:42
+#: templates/panels/aap_audience/modal_edit_rate_limit.html:39
+#: templates/panels/aap_settings/partials/mail_secret_modal.html:19
+#: templates/panels/modals/system/unsaved_changes.html:13
+#: templates/public/login.html:35
+#: templates/public/password_reset_confirm.html:53
+#: templates/public/password_reset_request.html:26
+#: templates/public/register.html:80 templates/public/register.html:82
+msgid "Отмена"
+msgstr "Скасувати"
 
-#: templates/panels/aap_audience/how.html:135
-msgid ""
-"Ответственность за сохранённые данные лежит на Вас: Вы должны исправлять "
-"ошибки, удалять неверные предположения и добавлять корректные факты. "
-"Недостоверная информация искажает оценку вероятности сделки."
-msgstr ""
-"Відповідальність за збережені дані лежить на Вас: Ви повинні виправляти "
-"помилки, видаляти невірні припущення та додавати коректні факти. "
-"Недостовірна інформація спотворює оцінку вірогідності угоди."
+#: templates/panels/aap_audience/modal_edit_rate_limit.html:16
+#: templates/panels/aap_audience/modal_edit_rate_limit.html:18
+msgid "Лимит для списка рассылки"
+msgstr "Додати список розсилки"
 
-#: templates/panels/aap_audience/how.html:140
-msgid ""
-"Ассистент задаёт вопросы, чтобы подсказать, какую информацию ещё можно "
-"добавить."
-msgstr "Асистент задає питання, щоб підказати, яку інформацію ще можна додати."
+#: templates/panels/aap_audience/modal_edit_rate_limit.html:23
+#: templates/panels/aap_audience/modal_edit_rate_limit.html:25
+msgid "Rate-Limit:"
+msgstr "Обмеження швидкості:"
 
-#: templates/panels/aap_audience/how.html:141
-msgid ""
-"Отвечать на них не обязательно. Если вопрос кажется лишним или у Вас нет "
-"ответа, просто пропустите его. Вопросы будут появляться постоянно. Когда "
-"результат Вас устроит, сохраните его."
-msgstr ""
-"Відповідати на них необов'язково. Якщо питання здається зайвим або у Вас "
-"немає відповіді, просто пропустіть його. Питання будуть з'являтися постійно. "
-"Коли результат Вас влаштує, збережіть його."
+#: templates/panels/aap_audience/modal_edit_title.html:16
+msgid "Название списка рассылки"
+msgstr "Новий список розсилки"
 
-#: templates/panels/aap_audience/how.html:145
-msgid ""
-"«Обработать» — вызвать ассистента для корректировки и дополнения введённой "
-"Вами информации."
-msgstr ""
-"«Обробити» — викликати асистента для корекції та доповнення введеної Вами "
-"інформації."
+#: templates/panels/aap_audience/modal_edit_title.html:36
+msgid "Предложить название"
+msgstr "Ваш шаблон: назва"
 
-#: templates/panels/aap_audience/how.html:146
-msgid ""
-"При сохранении формируются критерии выбора контрагентов, бизнес-категорий и "
-"городов Германии. Вы сможете отредактировать эти данные. Сбор и ранжирование "
-"контрагентов запускаются отдельно."
-msgstr ""
-"Після збереження формуються критерії відбору контрагентів, бізнес‑категорій "
-"та міст Німеччини. Ви зможете відредагувати ці дані. Збір і ранжування "
-"контрагентів запускаються окремо."
+#: templates/panels/aap_campaigns/_campaigns_table.html:14
+#: templates/panels/aap_campaigns/campaigns.html:385
+#: templates/panels/overview.html:21 templates/panels/overview.html:129
+#: templates/panels/stats.html:22
+msgid "Кампания"
+msgstr "Кампанія"
 
-#: templates/panels/aap_audience/how.html:150
-msgid "Указывайте интернет-адреса в виде ссылок (https://mysite.com)."
-msgstr "Вказуйте інтернет-адреси у вигляді посилань (https://mysite.com)."
+#: templates/panels/aap_campaigns/_campaigns_table.html:15
+#: templates/panels/aap_campaigns/campaigns.html:386
+msgid "Письмо"
+msgstr "Лист"
 
-#: templates/panels/aap_audience/how.html:151
-msgid ""
-"Если сомневаетесь, скопируйте адрес из строки браузера. Иначе ассистент не "
-"распознает, что это ссылка."
-msgstr ""
-"Якщо сумніваєтеся, скопіюйте адресу з адресного рядка браузера. Інакше "
-"асистент не розпізнає, що це посилання."
-
-#: templates/panels/aap_audience/how.html:218
-msgid "Критерии выбора"
-msgstr "Критерії вибору"
-
-#: templates/panels/aap_audience/how.html:219
-msgid "Действия / Статус"
-msgstr "Дії / Статус"
-
-#: templates/panels/aap_audience/how.html:308
-msgid "Обработка включена"
-msgstr "Обробка увімкнена"
-
-#: templates/panels/aap_audience/how.html:312
-msgid "Обработка отключена"
-msgstr "Обробка відключена"
-
-#: templates/panels/aap_audience/modal_status_task.html:22
-#: templates/panels/aap_lists/modal_lists_list.html:19
-msgid "Рейтинг компании"
-msgstr "Рейтинг компанії"
-
-#: templates/panels/aap_audience/modal_status_task.html:23
-#: templates/panels/aap_lists/modal_lists_list.html:20
-msgid "Рейтинг не присвоен"
-msgstr "Рейтинг не присвоєно"
-
-#: templates/panels/aap_audience/modal_status_task.html:27
-#: templates/panels/aap_lists/modal_lists_list.html:24
-msgid "Рейтинг поиска"
-msgstr "Рейтинг пошуку"
-
-#: templates/panels/aap_audience/modal_status_task.html:28
-#: templates/panels/aap_audience/status_task.html:233
-#: templates/panels/aap_audience/status_task.html:351
-#: templates/panels/aap_lists/modal_lists_list.html:25
-msgid "Город"
-msgstr "Місто"
-
-#: templates/panels/aap_audience/modal_status_task.html:29
-#: templates/panels/aap_lists/contacts.html:76
-#: templates/panels/aap_lists/lists_list.html:70
-#: templates/panels/aap_lists/modal_lists_list.html:26
-msgid "Категория"
-msgstr "Категорія"
-
-#: templates/panels/aap_audience/modal_status_task.html:33
-#: templates/panels/aap_lists/modal_contacts.html:46
-#: templates/panels/aap_lists/modal_lists_list.html:30
-msgid "Категории / отрасли:"
-msgstr "Категорії / галузі:"
-
-#: templates/panels/aap_audience/modal_status_task.html:38
-#: templates/panels/aap_lists/modal_contacts.html:51
-#: templates/panels/aap_lists/modal_lists_list.html:35
-msgid "Теги / направления деятельности:"
-msgstr "Теги / напрями діяльності:"
-
-#: templates/panels/aap_audience/modal_status_task.html:43
-#: templates/panels/aap_lists/modal_contacts.html:55
-#: templates/panels/aap_lists/modal_lists_list.html:39
-msgid "Адрес:"
-msgstr "Адреса:"
-
-#: templates/panels/aap_audience/modal_status_task.html:49
-#: templates/panels/aap_lists/modal_contacts.html:60
-#: templates/panels/aap_lists/modal_lists_list.html:44
-msgid "Телефон:"
-msgstr "Телефон:"
-
-#: templates/panels/aap_audience/modal_status_task.html:54
-#: templates/panels/aap_lists/modal_contacts.html:65
-#: templates/panels/aap_lists/modal_lists_list.html:49
-#: templates/public/login.html:29
-msgid "Email:"
-msgstr "Email:"
-
-#: templates/panels/aap_audience/modal_status_task.html:59
-#: templates/panels/aap_lists/modal_contacts.html:70
-#: templates/panels/aap_lists/modal_lists_list.html:54
-msgid "Web-site:"
-msgstr "Веб-сайт:"
-
-#: templates/panels/aap_audience/modal_status_task.html:64
-#: templates/panels/aap_lists/modal_contacts.html:75
-#: templates/panels/aap_lists/modal_lists_list.html:59
-msgid "Социальные сети:"
-msgstr "Соціальні мережі:"
-
-#: templates/panels/aap_audience/modal_status_task.html:69
-#: templates/panels/aap_lists/modal_contacts.html:80
-#: templates/panels/aap_lists/modal_lists_list.html:64
-msgid "Описание:"
-msgstr "Опис:"
-
-#: templates/panels/aap_audience/modal_status_task.html:74
-#: templates/panels/aap_lists/modal_contacts.html:85
-#: templates/panels/aap_lists/modal_lists_list.html:69
-msgid "Источник:"
-msgstr "Джерело:"
-
-#: templates/panels/aap_audience/status.html:23
+#: templates/panels/aap_campaigns/_campaigns_table.html:16
 #: templates/panels/aap_campaigns/campaigns.html:387
 #: templates/panels/overview.html:37 templates/panels/overview.html:184
 msgid "Статус"
 msgstr "Статус"
 
-#: templates/panels/aap_audience/status.html:95
-#: templates/panels/aap_audience/status_task.html:53
-msgid "Сбор контактов включён"
-msgstr "Збір контактів увімкнено"
+#: templates/panels/aap_campaigns/_campaigns_table.html:17
+#: templates/panels/aap_campaigns/campaigns.html:388
+msgid "Состояние"
+msgstr "Стан"
 
-#: templates/panels/aap_audience/status.html:98
-#: templates/panels/aap_audience/status.html:113
-#: templates/panels/aap_audience/status_task.html:33
-#: templates/panels/aap_lists/lists.html:81
-msgid "Всего собрано контактов"
-msgstr "Усього зібрано контактів"
+#: templates/panels/aap_campaigns/_campaigns_table.html:27
+#: templates/panels/aap_campaigns/campaigns.html:398
+msgid "Активна с"
+msgstr "Активна з"
 
-#: templates/panels/aap_audience/status.html:105
-msgid "Отключить сбор контактов"
+#: templates/panels/aap_campaigns/_campaigns_table.html:29
+#: templates/panels/aap_campaigns/campaigns.html:400
+msgid "по"
+msgstr "по"
+
+#: templates/panels/aap_campaigns/_campaigns_table.html:38
+#: templates/panels/aap_campaigns/campaigns.html:306
+#: templates/panels/aap_campaigns/campaigns.html:317
+#: templates/panels/aap_campaigns/campaigns.html:410
+#: templates/panels/aap_campaigns/flow_step_letter.html:43
+#: templates/panels/aap_campaigns/flow_step_letter.html:50
+#: templates/panels/aap_campaigns/flow_step_template.html:62
+#: templates/panels/aap_campaigns/flow_step_template.html:104
+#: templates/panels/aap_campaigns/flow_step_template.html:138
+#: templates/panels/aap_campaigns/templates.html:67
+#: templates/panels/aap_campaigns/templates.html:128
+#: templates/panels/aap_campaigns/templates.html:198
+msgid "Предпросмотр"
+msgstr "Попередній перегляд"
+
+#: templates/panels/aap_campaigns/_campaigns_table.html:52
+#: templates/panels/aap_campaigns/_campaigns_table.html:59
+msgid "Создать"
+msgstr "Створити"
+
+#: templates/panels/aap_campaigns/_campaigns_table.html:70
+#: templates/panels/aap_campaigns/campaigns.html:420
+msgid "Писем к отправке"
+msgstr "Листів до відправки"
+
+#: templates/panels/aap_campaigns/_campaigns_table.html:73
+#: templates/panels/aap_campaigns/campaigns.html:423
+#: templates/panels/overview.html:58 templates/panels/overview.html:135
+#: templates/panels/stats_campaign.html:20
+#: templates/panels/stats_campaign.html:45
+msgid "Отправлено"
+msgstr "Надіслано"
+
+#: templates/panels/aap_campaigns/_campaigns_table.html:76
+#: templates/panels/aap_campaigns/campaigns.html:426
+#: templates/panels/overview.html:59
+msgid "Осталось"
+msgstr "Залишилося"
+
+#: templates/panels/aap_campaigns/_campaigns_table.html:94
+#: templates/panels/aap_campaigns/_campaigns_table.html:95
+#| msgid "Отключить сбор контактов"
+msgid "Отключить обработку"
 msgstr "Вимкнути збір контактів"
 
-#: templates/panels/aap_audience/status.html:110
-#: templates/panels/aap_audience/status_task.html:63
-msgid "Сбор контактов отключён"
-msgstr "Збір контактів вимкнено"
+#: templates/panels/aap_campaigns/_campaigns_table.html:94
+#: templates/panels/aap_campaigns/_campaigns_table.html:95
+#| msgid "Отключить сбор контактов"
+msgid "Включить обработку"
+msgstr "Вимкнути збір контактів"
 
-#: templates/panels/aap_audience/status.html:120
-msgid "Включить сбор контактов"
-msgstr "Увімкнути збір контактів"
-
-#: templates/panels/aap_audience/status.html:127
-msgid "Рейтингование запущено"
-msgstr "Рейтингування запущено"
-
-#: templates/panels/aap_audience/status.html:132
-#: templates/panels/aap_audience/status_task.html:29
-#: templates/panels/aap_audience/status_task.html:137
-#: templates/panels/aap_audience/status_task.html:176
-msgid "Контакты: присвоен рейтинг"
-msgstr "Контакти: присвоєно рейтинг"
-
-#: templates/panels/aap_audience/status.html:137
-#: templates/panels/aap_audience/status_task.html:143
-#: templates/panels/aap_lists/lists.html:90
-#: templates/panels/aap_lists/lists.html:152 templates/panels/overview.html:202
-msgid "Рейтинг 1-30"
-msgstr "Рейтинг 1-30"
-
-#: templates/panels/aap_audience/status.html:141
-#: templates/panels/aap_audience/status_task.html:148
-#: templates/panels/aap_lists/lists.html:94
-#: templates/panels/aap_lists/lists.html:156 templates/panels/overview.html:203
-msgid "Рейтинг 31-70"
-msgstr "Рейтинг 31-70"
-
-#: templates/panels/aap_audience/status.html:145
-#: templates/panels/aap_audience/status_task.html:153
-#: templates/panels/aap_lists/lists.html:98
-#: templates/panels/aap_lists/lists.html:160 templates/panels/overview.html:204
-msgid "Рейтинг 71-100"
-msgstr "Рейтинг 71–100"
-
-#: templates/panels/aap_audience/status.html:153
-#: templates/panels/aap_audience/status_task.html:82
-msgid "Критерии оценки изменены"
-msgstr "Критерії оцінки змінені"
-
-#: templates/panels/aap_audience/status.html:159
-msgid "Смотреть / управлять"
-msgstr "Дивитися / керувати"
-
-#: templates/panels/aap_audience/status_task.html:37
-msgid "Контактов к рейтингованию"
-msgstr "Контакти для рейтингування"
-
-#: templates/panels/aap_audience/status_task.html:41
-msgid "Вернуться к аудиториям"
-msgstr "Повернутися до аудиторій"
-
-#: templates/panels/aap_audience/status_task.html:58
-#: templates/panels/aap_campaigns/campaigns.html:445
-msgid "Отключить"
-msgstr "Відключити"
-
-#: templates/panels/aap_audience/status_task.html:68
-#: templates/panels/aap_campaigns/campaigns.html:455
-#: templates/panels/aap_lists/lists_list.html:226
-msgid "Включить"
-msgstr "Увімкнути"
-
-#: templates/panels/aap_audience/status_task.html:76
-msgid "Рейтингование контактов запущено"
-msgstr "Рейтингування контактів запущено"
-
-#: templates/panels/aap_audience/status_task.html:88
-msgid "Провести повторное рейтингование"
-msgstr "Провести повторне рейтингування"
-
-#: templates/panels/aap_audience/status_task.html:94
-msgid "Присвоить рейтинг"
-msgstr "Присвоїти рейтинг"
-
-#: templates/panels/aap_audience/status_task.html:100
-msgid "+ 100"
-msgstr "+ 100"
-
-#: templates/panels/aap_audience/status_task.html:107
-msgid "+ 200"
-msgstr "+ 200"
-
-#: templates/panels/aap_audience/status_task.html:114
-msgid "+ 500"
-msgstr "+ 500"
-
-#: templates/panels/aap_audience/status_task.html:121
-msgid "+ 1 000"
-msgstr "+ 1 000"
-
-#: templates/panels/aap_audience/status_task.html:132
-msgid "Удалить все рейтинги"
-msgstr "Видалити всі рейтинги"
-
-#: templates/panels/aap_audience/status_task.html:184
-msgid "Контакты: все собранные"
-msgstr "Контакти: усі зібрані"
-
-#: templates/panels/aap_audience/status_task.html:209
-#: templates/panels/aap_audience/status_task.html:280
-#: templates/panels/aap_audience/status_task.html:327
-#: templates/panels/aap_audience/status_task.html:396
-#: templates/panels/aap_lists/contacts.html:127
-#: templates/panels/aap_lists/contacts.html:237
-#: templates/panels/aap_lists/lists_list.html:144
-#: templates/panels/aap_lists/lists_list.html:255
-msgid "Страницы"
-msgstr "Сторінки"
-
-#: templates/panels/aap_audience/status_task.html:254
-#: templates/panels/aap_audience/status_task.html:370
-#: templates/panels/aap_lists/contacts.html:214
-#: templates/panels/aap_lists/lists_list.html:233
-msgid "Больше"
-msgstr "Більше"
+#: templates/panels/aap_campaigns/_campaigns_table.html:118
+#: templates/panels/aap_campaigns/campaigns.html:466
+#: templates/panels/aap_campaigns/templates.html:187
+#: templates/panels/aap_lists/lists.html:171
+#: templates/panels/aap_settings/mail_servers.html:370
+msgid "Вы уверены?"
+msgstr "Ви впевнені?"
 
 #: templates/panels/aap_campaigns/campaigns.html:24
 msgid "Ваши кампании:"
 msgstr "Ваші кампанії:"
 
 #: templates/panels/aap_campaigns/campaigns.html:32
-#: templates/panels/overview.html:230
+#: templates/panels/overview.html:229
 msgid "Добавить кампанию"
 msgstr "Додати кампанію"
 
 #: templates/panels/aap_campaigns/campaigns.html:56
+#: templates/panels/aap_campaigns/campaigns_flow.html:24
 msgid "Название кампании"
 msgstr "Назва кампанії"
 
-#: templates/panels/aap_campaigns/campaigns.html:59
-#: templates/panels/aap_campaigns/campaigns.html:403
-#: templates/panels/aap_lists/contacts.html:26
-#: templates/panels/aap_lists/lists_list.html:17
-msgid "Список рассылки"
-msgstr "Список розсилки"
-
 #: templates/panels/aap_campaigns/campaigns.html:64
 #: templates/panels/aap_campaigns/campaigns.html:86
+#: templates/panels/aap_campaigns/flow_step_campaign.html:20
 msgid "— не выбран —"
 msgstr "— не вибрано —"
 
@@ -1710,12 +1816,9 @@ msgid "Отправка"
 msgstr "Надсилання"
 
 #: templates/panels/aap_campaigns/campaigns.html:75
+#: templates/panels/aap_campaigns/flow_step_campaign.html:30
 msgid "— не выбрано —"
 msgstr "— не вибрано —"
-
-#: templates/panels/aap_campaigns/campaigns.html:84
-msgid "Шаблон письма"
-msgstr "Шаблон листа"
 
 #: templates/panels/aap_campaigns/campaigns.html:97
 msgid "Дата начала кампании"
@@ -1726,19 +1829,20 @@ msgid "Дата конца компании"
 msgstr "Дата кінця компанії"
 
 #: templates/panels/aap_campaigns/campaigns.html:136
+#: templates/panels/aap_campaigns/flow_step_campaign.html:48
 msgid "Следуем за кампанией"
 msgstr "Слідкуємо за кампанією"
 
 #: templates/panels/aap_campaigns/campaigns.html:138
+#: templates/panels/aap_campaigns/flow_step_campaign.html:50
 msgid "Отправлять письма через (дней)"
 msgstr "Надсилати листи через (днів)"
 
-#: templates/panels/aap_campaigns/campaigns.html:150
-#: templates/panels/aap_lists/lists.html:68
-#: templates/panels/aap_lists/lists_list.html:32
-#: templates/panels/aap_settings/mail_servers.html:223
-msgid "Добавить"
-msgstr "Додати"
+#: templates/panels/aap_campaigns/campaigns.html:154
+#: templates/panels/aap_lists/lists.html:61
+#: templates/panels/aap_settings/mail_servers.html:172
+msgid "Сохранить изменения"
+msgstr "Зберегти зміни"
 
 #: templates/panels/aap_campaigns/campaigns.html:158
 #: templates/panels/aap_campaigns/campaigns.html:413
@@ -1747,103 +1851,69 @@ msgstr "Редагувати лист"
 
 #: templates/panels/aap_campaigns/campaigns.html:162
 #: templates/panels/aap_campaigns/campaigns.html:345
+#: templates/panels/aap_campaigns/flow_step_campaign.html:55
+#: templates/panels/aap_campaigns/flow_step_letter.html:80
 #: templates/panels/aap_campaigns/templates.html:146
 #: templates/panels/aap_settings/imap_server.html:134
-#: templates/panels/aap_settings/mail_servers.html:177
+#: templates/panels/aap_settings/mail_servers.html:175
 #: templates/panels/aap_settings/smtp_server.html:150
 #: templates/panels/modals/switch_user.html:7
 msgid "Закрыть"
 msgstr "Закрити"
 
 #: templates/panels/aap_campaigns/campaigns.html:175
+#: templates/panels/aap_campaigns/flow_step_campaign.html:68
 msgid "Использовать глобальные настройки окна отправки"
 msgstr "Використовувати глобальні налаштування вікна надсилання"
 
 #: templates/panels/aap_campaigns/campaigns.html:303
+#: templates/panels/aap_campaigns/flow_step_letter.html:42
+#: templates/panels/aap_campaigns/flow_step_template.html:61
 #: templates/panels/aap_campaigns/templates.html:64
 msgid "Экспертный режим"
 msgstr "Експертний режим"
 
-#: templates/panels/aap_campaigns/campaigns.html:306
-#: templates/panels/aap_campaigns/campaigns.html:317
-#: templates/panels/aap_campaigns/campaigns.html:410
-#: templates/panels/aap_campaigns/templates.html:67
-#: templates/panels/aap_campaigns/templates.html:128
-#: templates/panels/aap_campaigns/templates.html:198
-msgid "Предпросмотр"
-msgstr "Попередній перегляд"
-
 #: templates/panels/aap_campaigns/campaigns.html:314
+#: templates/panels/aap_campaigns/flow_step_letter.html:49
+#: templates/panels/aap_campaigns/flow_step_template.html:103
 #: templates/panels/aap_campaigns/templates.html:125
 msgid "Визуальный режим"
 msgstr "Візуальний режим"
 
 #: templates/panels/aap_campaigns/campaigns.html:322
+#: templates/panels/aap_campaigns/flow_step_letter.html:53
 msgid "Дополнительные заголовки JSON"
 msgstr "Додаткові заголовки JSON"
 
 #: templates/panels/aap_campaigns/campaigns.html:328
+#: templates/panels/aap_campaigns/flow_step_letter.html:58
 msgid "Тема письма 1 (ротация)"
 msgstr "Тема листа 1 (ротація)"
 
 #: templates/panels/aap_campaigns/campaigns.html:331
+#: templates/panels/aap_campaigns/flow_step_letter.html:61
 msgid "Тема письма 2 (ротация)"
 msgstr "Тема листа 2 (ротація)"
 
 #: templates/panels/aap_campaigns/campaigns.html:334
+#: templates/panels/aap_campaigns/flow_step_letter.html:64
 msgid "Тема письма 3 (ротация)"
 msgstr "Тема листа 3 (ротація)"
 
 #: templates/panels/aap_campaigns/campaigns.html:358
+#: templates/panels/aap_campaigns/flow_step_letter.html:70
 #: templates/panels/aap_settings/smtp_server.html:178
 msgid "Отправить тестовое письмо по адресу:"
 msgstr "Відправити тестовий лист на адресу:"
 
 #: templates/panels/aap_campaigns/campaigns.html:361
+#: templates/panels/aap_campaigns/flow_step_letter.html:73
 msgid "Отправить тестовое письмо"
 msgstr "Надіслати тестовий лист"
-
-#: templates/panels/aap_campaigns/campaigns.html:385
-#: templates/panels/overview.html:21 templates/panels/overview.html:129
-#: templates/panels/stats.html:22
-msgid "Кампания"
-msgstr "Кампанія"
-
-#: templates/panels/aap_campaigns/campaigns.html:386
-msgid "Письмо"
-msgstr "Лист"
-
-#: templates/panels/aap_campaigns/campaigns.html:388
-msgid "Состояние"
-msgstr "Стан"
-
-#: templates/panels/aap_campaigns/campaigns.html:398
-msgid "Активна с"
-msgstr "Активна з"
-
-#: templates/panels/aap_campaigns/campaigns.html:400
-msgid "по"
-msgstr "по"
 
 #: templates/panels/aap_campaigns/campaigns.html:405
 msgid "Шаблон письма:"
 msgstr "Шаблон листа:"
-
-#: templates/panels/aap_campaigns/campaigns.html:420
-msgid "Писем к отправке"
-msgstr "Листів до відправки"
-
-#: templates/panels/aap_campaigns/campaigns.html:423
-#: templates/panels/overview.html:58 templates/panels/overview.html:135
-#: templates/panels/stats_campaign.html:20
-#: templates/panels/stats_campaign.html:45
-msgid "Отправлено"
-msgstr "Надіслано"
-
-#: templates/panels/aap_campaigns/campaigns.html:426
-#: templates/panels/overview.html:59
-msgid "Осталось"
-msgstr "Залишилося"
 
 #: templates/panels/aap_campaigns/campaigns.html:434
 msgid "Кампания включена"
@@ -1857,16 +1927,101 @@ msgstr "Розсилка триває"
 msgid "Ждем окно отправки"
 msgstr "Чекаємо на вікно відправлення"
 
+#: templates/panels/aap_campaigns/campaigns.html:445
+msgid "Отключить"
+msgstr "Відключити"
+
 #: templates/panels/aap_campaigns/campaigns.html:449
 msgid "Кампания отключена"
 msgstr "Кампанія відключена"
 
-#: templates/panels/aap_campaigns/campaigns.html:466
-#: templates/panels/aap_campaigns/templates.html:187
-#: templates/panels/aap_lists/lists.html:171
-#: templates/panels/aap_settings/mail_servers.html:377
-msgid "Вы уверены?"
-msgstr "Ви впевнені?"
+#: templates/panels/aap_campaigns/campaigns.html:455
+#: templates/panels/aap_lists/lists_list.html:226
+msgid "Включить"
+msgstr "Увімкнути"
+
+#: templates/panels/aap_campaigns/campaigns_flow.html:38
+#| msgid "Закрыть / к спискам"
+msgid "Закрыть / к кампаниям"
+msgstr "Повернутися до списків"
+
+#: templates/panels/aap_campaigns/campaigns_flow.html:162
+#: templates/panels/aap_campaigns/templates.html:245
+msgid "Пожалуйста, заполните название шаблона"
+msgstr "Будь ласка, заповніть назву шаблону"
+
+#: templates/panels/aap_campaigns/campaigns_list.html:14
+#| msgid "Добавить кампанию"
+msgid "Создать кампанию"
+msgstr "Додати кампанію"
+
+#: templates/panels/aap_campaigns/flow_step_campaign.html:17
+#| msgid "Кампании и рассылки"
+msgid "Кампания по рассылке"
+msgstr "Кампанії та розсилки"
+
+#: templates/panels/aap_campaigns/flow_step_campaign.html:28
+#| msgid "Проверки SMTP сервера (отправка)"
+msgid "Почтовый сервер для отправки"
+msgstr "Перевірки SMTP-сервера (відправлення)"
+
+#: templates/panels/aap_campaigns/flow_step_campaign.html:38
+#| msgid "Ваши кампании:"
+msgid "Период кампании"
+msgstr "Ваші кампанії:"
+
+#: templates/panels/aap_campaigns/flow_step_campaign.html:40
+msgid "Начать с:"
+msgstr "Почати з:"
+
+#: templates/panels/aap_campaigns/flow_step_campaign.html:42
+#| msgid "Включить"
+msgid "Закончить в:"
+msgstr "Увімкнути"
+
+#: templates/panels/aap_campaigns/flow_step_campaign.html:99
+#: templates/panels/aap_campaigns/flow_step_template.html:70
+#: templates/panels/aap_campaigns/flow_step_template.html:72
+#: templates/panels/aap_campaigns/templates.html:79
+#: templates/panels/aap_campaigns/templates.html:83
+msgid "Шаблон"
+msgstr "Шаблон"
+
+#: templates/panels/aap_campaigns/flow_step_template.html:37
+msgid ""
+"Для рассылки используются шаблоны писем. Часто один и тот же шаблон удобно "
+"использовать для нескольких кампаний."
+msgstr "Для розсилки використовуються шаблони листів. Часто один і той самий шаблон зручно використовувати для кількох кампаній."
+
+#: templates/panels/aap_campaigns/flow_step_template.html:40
+msgid ""
+"Пожалуйста, выберите шаблон для этой кампании из сохранённых вами для "
+"использования в этой компании или создайте новый шаблон."
+msgstr "Будь ласка, виберіть шаблон для цієї кампанії зі збережених вами шаблонів для використання у цій компанії або створіть новий шаблон."
+
+#: templates/panels/aap_campaigns/flow_step_template.html:43
+msgid ""
+"При редактировании шаблона можно менять только шапку и футер письма. Текст в "
+"письме условный — при реальной рассылке он будет заменён на текст письма "
+"конкретной кампании. При редакции письма, наоборот, можно менять только "
+"текст писма, хедер и футер как часть шаблона менять нельзя."
+msgstr "Під час редагування шаблону можна змінювати лише шапку і футер листа. Текст у листі умовний — при реальній розсилці він буде замінений на текст листа конкретної кампанії. Під час редагування листа, навпаки, можна змінювати лише текст листа; шапку і футер як частину шаблону змінювати не можна."
+
+#: templates/panels/aap_campaigns/flow_step_template.html:57
+#: templates/panels/aap_campaigns/templates.html:36
+msgid "Ваш шаблон: название"
+msgstr "Ваш шаблон: назва"
+
+#: templates/panels/aap_campaigns/flow_step_template.html:146
+#: templates/panels/aap_campaigns/flow_step_template.html:149
+#| msgid "Добавить шаблон"
+msgid "Выбрать шаблон"
+msgstr "Додати шаблон"
+
+#: templates/panels/aap_campaigns/flow_step_template.html:151
+#| msgid "Глобальные шаблоны"
+msgid "Создать новый шаблон"
+msgstr "Глобальні шаблони"
 
 #: templates/panels/aap_campaigns/modal_full_preview.html:16
 #: templates/panels/aap_campaigns/modal_preview.html:16
@@ -1902,10 +2057,6 @@ msgstr "HTML-шаблон (зовнішній)"
 msgid "HTML EMAIL (no vars)"
 msgstr "HTML EMAIL (без змінних)"
 
-#: templates/panels/aap_campaigns/templates.html:36
-msgid "Ваш шаблон: название"
-msgstr "Ваш шаблон: назва"
-
 #: templates/panels/aap_campaigns/templates.html:51
 msgid "Ваши шаблоны:"
 msgstr "Ваші шаблони:"
@@ -1913,11 +2064,6 @@ msgstr "Ваші шаблони:"
 #: templates/panels/aap_campaigns/templates.html:72
 msgid "Глобальные шаблоны"
 msgstr "Глобальні шаблони"
-
-#: templates/panels/aap_campaigns/templates.html:79
-#: templates/panels/aap_campaigns/templates.html:83
-msgid "Шаблон"
-msgstr "Шаблон"
 
 #: templates/panels/aap_campaigns/templates.html:93
 msgid "Цвета"
@@ -1935,17 +2081,9 @@ msgstr "Додати шаблон"
 msgid "Список шаблонов:"
 msgstr "Список шаблонів:"
 
-#: templates/panels/aap_campaigns/templates.html:245
-msgid "Пожалуйста, заполните название шаблона"
-msgstr "Будь ласка, заповніть назву шаблону"
-
 #: templates/panels/aap_lists/contacts.html:20
 msgid "Контакты. Списки рассылок:"
 msgstr "Контакти. Списки розсилок:"
-
-#: templates/panels/aap_lists/contacts.html:26
-msgid "Контакты"
-msgstr "Контакти"
 
 #: templates/panels/aap_lists/contacts.html:32
 msgid "Список рассылки: Без списка, Контакты"
@@ -1955,24 +2093,28 @@ msgstr "Список розсилки: Без списку, Контакти"
 msgid "Неподписанные"
 msgstr "Непідписані"
 
-#: templates/panels/aap_lists/contacts.html:43
-msgid "Все контакты"
-msgstr "Всі контакти"
+#: templates/panels/aap_lists/contacts.html:76
+#: templates/panels/aap_lists/lists_list.html:70
+#: templates/panels/aap_lists/modal_lists_list.html:26
+msgid "Категория"
+msgstr "Категорія"
 
 #: templates/panels/aap_lists/contacts.html:81
 #: templates/panels/aap_lists/lists_list.html:75
 msgid "Адрес, город"
 msgstr "Адреса, місто"
 
-#: templates/panels/aap_lists/contacts.html:94
-#: templates/panels/aap_lists/lists_list.html:93
-msgid "Искать"
-msgstr "Шукати"
-
 #: templates/panels/aap_lists/contacts.html:99
 #: templates/panels/aap_lists/lists_list.html:97
 msgid "Очистить поиск"
 msgstr "Очистити пошук"
+
+#: templates/panels/aap_lists/contacts.html:127
+#: templates/panels/aap_lists/contacts.html:237
+#: templates/panels/aap_lists/lists_list.html:144
+#: templates/panels/aap_lists/lists_list.html:255
+msgid "Страницы"
+msgstr "Сторінки"
 
 #: templates/panels/aap_lists/contacts.html:176
 msgid "Списки рассылок: нет"
@@ -1996,18 +2138,42 @@ msgstr "Відписатися"
 msgid "Подписать"
 msgstr "Підписати"
 
+#: templates/panels/aap_lists/contacts.html:214
+#: templates/panels/aap_lists/lists_list.html:233
+msgid "Больше"
+msgstr "Більше"
+
 #: templates/panels/aap_lists/lists.html:21
 msgid "Редактирование списка"
 msgstr "Редагування списку"
 
-#: templates/panels/aap_lists/lists.html:25
-msgid "Новый список рассылки"
-msgstr "Новий список розсилки"
+#: templates/panels/aap_lists/lists.html:42
+msgid "Название"
+msgstr "Назва"
+
+#: templates/panels/aap_lists/lists.html:81
+msgid "Всего собрано контактов"
+msgstr "Усього зібрано контактів"
 
 #: templates/panels/aap_lists/lists.html:85
 #: templates/panels/aap_lists/lists.html:147 templates/panels/overview.html:196
 msgid "Отрейтинговано"
 msgstr "Оцінено"
+
+#: templates/panels/aap_lists/lists.html:90
+#: templates/panels/aap_lists/lists.html:152 templates/panels/overview.html:202
+msgid "Рейтинг 1-30"
+msgstr "Рейтинг 1-30"
+
+#: templates/panels/aap_lists/lists.html:94
+#: templates/panels/aap_lists/lists.html:156 templates/panels/overview.html:203
+msgid "Рейтинг 31-70"
+msgstr "Рейтинг 31-70"
+
+#: templates/panels/aap_lists/lists.html:98
+#: templates/panels/aap_lists/lists.html:160 templates/panels/overview.html:204
+msgid "Рейтинг 71-100"
+msgstr "Рейтинг 71–100"
 
 #: templates/panels/aap_lists/lists.html:116 templates/panels/overview.html:27
 msgid "Список"
@@ -2020,6 +2186,10 @@ msgstr "Контактів у списку"
 #: templates/panels/aap_lists/lists.html:141
 msgid "Всего собрано"
 msgstr "Всього зібрано"
+
+#: templates/panels/aap_lists/lists.html:181
+msgid "Управлять"
+msgstr "Керувати"
 
 #: templates/panels/aap_lists/lists_list.html:22
 msgid "Включено в список"
@@ -2054,6 +2224,14 @@ msgstr "Контакти - Список розсилки"
 msgid "Контакты - Аудитория"
 msgstr "Контакти - Аудиторія"
 
+#: templates/panels/aap_lists/lists_list.html:165
+msgid "Поиск"
+msgstr "Пошук"
+
+#: templates/panels/aap_lists/lists_list.html:166
+msgid "Клиент"
+msgstr "Клієнт"
+
 #: templates/panels/aap_lists/lists_list.html:192
 msgid "Отписан"
 msgstr "Відписано"
@@ -2085,6 +2263,80 @@ msgstr "Рейтинги: Пошук"
 #: templates/panels/aap_lists/modal_contacts.html:42
 msgid "нет"
 msgstr "ні"
+
+#: templates/panels/aap_lists/modal_contacts.html:46
+#: templates/panels/aap_lists/modal_lists_list.html:30
+msgid "Категории / отрасли:"
+msgstr "Категорії / галузі:"
+
+#: templates/panels/aap_lists/modal_contacts.html:51
+#: templates/panels/aap_lists/modal_lists_list.html:35
+msgid "Теги / направления деятельности:"
+msgstr "Теги / напрями діяльності:"
+
+#: templates/panels/aap_lists/modal_contacts.html:55
+#: templates/panels/aap_lists/modal_lists_list.html:39
+msgid "Адрес:"
+msgstr "Адреса:"
+
+#: templates/panels/aap_lists/modal_contacts.html:60
+#: templates/panels/aap_lists/modal_lists_list.html:44
+msgid "Телефон:"
+msgstr "Телефон:"
+
+#: templates/panels/aap_lists/modal_contacts.html:65
+#: templates/panels/aap_lists/modal_lists_list.html:49
+#: templates/public/login.html:29
+msgid "Email:"
+msgstr "Email:"
+
+#: templates/panels/aap_lists/modal_contacts.html:70
+#: templates/panels/aap_lists/modal_lists_list.html:54
+msgid "Web-site:"
+msgstr "Веб-сайт:"
+
+#: templates/panels/aap_lists/modal_contacts.html:75
+#: templates/panels/aap_lists/modal_lists_list.html:59
+msgid "Социальные сети:"
+msgstr "Соціальні мережі:"
+
+#: templates/panels/aap_lists/modal_contacts.html:80
+#: templates/panels/aap_lists/modal_lists_list.html:64
+msgid "Описание:"
+msgstr "Опис:"
+
+#: templates/panels/aap_lists/modal_contacts.html:85
+#: templates/panels/aap_lists/modal_lists_list.html:69
+msgid "Источник:"
+msgstr "Джерело:"
+
+#: templates/panels/aap_lists/modal_lists_list.html:19
+msgid "Рейтинг компании"
+msgstr "Рейтинг компанії"
+
+#: templates/panels/aap_lists/modal_lists_list.html:20
+msgid "Рейтинг не присвоен"
+msgstr "Рейтинг не присвоєно"
+
+#: templates/panels/aap_lists/modal_lists_list.html:24
+msgid "Рейтинг поиска"
+msgstr "Рейтинг пошуку"
+
+#: templates/panels/aap_lists/modal_lists_list.html:25
+msgid "Город"
+msgstr "Місто"
+
+#: templates/panels/aap_settings/domains.html:32
+msgid "Добавить домен"
+msgstr "Додати шаблон"
+
+#: templates/panels/aap_settings/domains.html:49
+msgid "Каталог"
+msgstr "Залишилося"
+
+#: templates/panels/aap_settings/domains.html:70
+msgid "Домены пока не добавлены."
+msgstr "Тут поки що немає даних"
 
 #: templates/panels/aap_settings/imap_server.html:32
 msgid "сервер (входящие)"
@@ -2181,13 +2433,12 @@ msgid "Последняя проверка"
 msgstr "Остання перевірка"
 
 #: templates/panels/aap_settings/imap_server.html:171
-#: templates/panels/aap_settings/mail_servers.html:66
-#: templates/panels/aap_settings/mail_servers.html:121
-#: templates/panels/aap_settings/mail_servers.html:163
-#: templates/panels/aap_settings/mail_servers.html:278
-#: templates/panels/aap_settings/mail_servers.html:295
-#: templates/panels/aap_settings/mail_servers.html:326
-#: templates/panels/aap_settings/mail_servers.html:367
+#: templates/panels/aap_settings/mail_servers.html:65
+#: templates/panels/aap_settings/mail_servers.html:119
+#: templates/panels/aap_settings/mail_servers.html:161
+#: templates/panels/aap_settings/mail_servers.html:275
+#: templates/panels/aap_settings/mail_servers.html:319
+#: templates/panels/aap_settings/mail_servers.html:360
 #: templates/panels/aap_settings/smtp_server.html:214
 msgid "Не проверено"
 msgstr "Не перевірено"
@@ -2196,71 +2447,66 @@ msgstr "Не перевірено"
 msgid "Электронная почта почтового сервиса"
 msgstr "Електронна пошта поштового сервісу"
 
-#: templates/panels/aap_settings/mail_servers.html:46
-#: templates/panels/aap_settings/mail_servers.html:242
-msgid "Домен"
-msgstr "Домен"
-
 #: templates/panels/aap_settings/mail_servers.html:49
-#: templates/panels/aap_settings/mail_servers.html:198
-#: templates/panels/aap_settings/mail_servers.html:261
+#: templates/panels/aap_settings/mail_servers.html:196
+#: templates/panels/aap_settings/mail_servers.html:259
 msgid "Публичный сервис-провайдер"
 msgstr "Публічний сервіс-провайдер"
 
 #: templates/panels/aap_settings/mail_servers.html:49
-#: templates/panels/aap_settings/mail_servers.html:198
-#: templates/panels/aap_settings/mail_servers.html:261
+#: templates/panels/aap_settings/mail_servers.html:196
+#: templates/panels/aap_settings/mail_servers.html:259
 msgid "Проверка домена не нужна"
 msgstr "Перевірка домену не потрібна"
 
-#: templates/panels/aap_settings/mail_servers.html:84
+#: templates/panels/aap_settings/mail_servers.html:81
 msgid "Домен не проверен"
 msgstr "Домен не підтверджений"
 
-#: templates/panels/aap_settings/mail_servers.html:90
-#: templates/panels/aap_settings/mail_servers.html:207
+#: templates/panels/aap_settings/mail_servers.html:87
+#: templates/panels/aap_settings/mail_servers.html:205
 msgid "Проверить домен"
 msgstr "Перевірити домен"
 
-#: templates/panels/aap_settings/mail_servers.html:98
-#: templates/panels/aap_settings/mail_servers.html:306
+#: templates/panels/aap_settings/mail_servers.html:96
+#: templates/panels/aap_settings/mail_servers.html:299
 msgid "Настроить SMTP сервер"
 msgstr "Налаштувати SMTP-сервер"
 
-#: templates/panels/aap_settings/mail_servers.html:101
-#: templates/panels/aap_settings/mail_servers.html:308
+#: templates/panels/aap_settings/mail_servers.html:99
+#: templates/panels/aap_settings/mail_servers.html:301
 msgid "SMTP не настроен"
 msgstr "SMTP не налаштовано"
 
-#: templates/panels/aap_settings/mail_servers.html:104
-#: templates/panels/aap_settings/mail_servers.html:311
+#: templates/panels/aap_settings/mail_servers.html:102
+#: templates/panels/aap_settings/mail_servers.html:304
 msgid "Изменить SMTP сервер"
 msgstr "Змінити SMTP сервер"
 
-#: templates/panels/aap_settings/mail_servers.html:142
-#: templates/panels/aap_settings/mail_servers.html:347
+#: templates/panels/aap_settings/mail_servers.html:140
+#: templates/panels/aap_settings/mail_servers.html:340
 msgid "Настроить IMAP сервер"
 msgstr "Налаштувати IMAP‑сервер"
 
-#: templates/panels/aap_settings/mail_servers.html:144
-#: templates/panels/aap_settings/mail_servers.html:349
+#: templates/panels/aap_settings/mail_servers.html:142
+#: templates/panels/aap_settings/mail_servers.html:342
 msgid "IMAP не настроен"
 msgstr "IMAP не налаштовано"
 
-#: templates/panels/aap_settings/mail_servers.html:147
-#: templates/panels/aap_settings/mail_servers.html:352
+#: templates/panels/aap_settings/mail_servers.html:145
+#: templates/panels/aap_settings/mail_servers.html:345
 msgid "Изменить IMAP сервер"
 msgstr "Змінити IMAP-сервер"
 
-#: templates/panels/aap_settings/mail_servers.html:185
+#: templates/panels/aap_settings/mail_servers.html:183
 msgid "Ваши почтовые сервисы (SMTP / IMAP серверы):"
 msgstr "Ваші поштові сервіси (SMTP / IMAP сервери):"
 
-#: templates/panels/aap_settings/mail_servers.html:220
+#: templates/panels/aap_settings/mail_servers.html:218
 msgid "Добавление почтового ящика"
 msgstr "Додавання поштової скриньки"
 
-#: templates/panels/aap_settings/mail_servers.html:299
+#: templates/panels/aap_settings/mail_servers.html:291
 msgid "Домен не протестирован"
 msgstr "Домен не протестований"
 
@@ -2271,15 +2517,6 @@ msgstr "Показати пароль?"
 #: templates/panels/aap_settings/partials/mail_secret_modal.html:15
 msgid "Пароль будет показан на экране."
 msgstr "Пароль буде показано на екрані."
-
-#: templates/panels/aap_settings/partials/mail_secret_modal.html:19
-#: templates/panels/modals/system/unsaved_changes.html:13
-#: templates/public/login.html:35
-#: templates/public/password_reset_confirm.html:53
-#: templates/public/password_reset_request.html:26
-#: templates/public/register.html:80 templates/public/register.html:82
-msgid "Отмена"
-msgstr "Скасувати"
 
 #: templates/panels/aap_settings/partials/mail_secret_modal.html:22
 msgid "Показать"
@@ -2424,13 +2661,61 @@ msgid ""
 msgstr ""
 "Параметр автоматично додається до посилання на ваш сайт у листах розсилки."
 
-#: templates/panels/base.html:86 templates/panels/modals/switch_user.html:6
+#: templates/panels/base.html:97 templates/panels/modals/switch_user.html:6
 msgid "Сменить пользователя"
 msgstr "Змінити користувача"
 
-#: templates/panels/base.html:157
+#: templates/panels/base.html:185
 msgid "Выйти"
 msgstr "Вийти"
+
+#: templates/panels/modals/contact_from_audience.html:18
+msgid "Адрес"
+msgstr "Адреса:"
+
+#: templates/panels/modals/contact_from_audience.html:26
+msgid "Телефоны"
+msgstr "Телефон:"
+
+#: templates/panels/modals/contact_from_audience.html:31
+msgid "Факс"
+msgstr "Факс"
+
+#: templates/panels/modals/contact_from_audience.html:37
+msgid "Сайты"
+msgstr "Сайти"
+
+#: templates/panels/modals/contact_from_audience.html:47
+msgid "Социальные сети"
+msgstr "Соціальні мережі:"
+
+#: templates/panels/modals/contact_from_audience.html:63
+msgid "Города (поиск)"
+msgstr "Міста: обробка"
+
+#: templates/panels/modals/contact_from_audience.html:67
+msgid "Категории (поиск)"
+msgstr "Категорії / галузі:"
+
+#: templates/panels/modals/contact_from_audience.html:71
+msgid "Категории справочников"
+msgstr "Категорії: обробка"
+
+#: templates/panels/modals/contact_from_audience.html:101
+msgid "Источники"
+msgstr "Джерело:"
+
+#: templates/panels/modals/contact_from_audience.html:120
+msgid "Все названия компании"
+msgstr "Назва компанії"
+
+#: templates/panels/modals/contact_from_audience.html:126
+msgid "Все email"
+msgstr "Всі email"
+
+#: templates/panels/modals/contact_from_audience.html:132
+msgid "Все адреса"
+msgstr "Всі контакти"
 
 #: templates/panels/modals/switch_user.html:11
 msgid "Недостаточно прав"
@@ -2441,8 +2726,8 @@ msgid "Имя Фамилия"
 msgstr "Ім'я Прізвище"
 
 #: templates/panels/modals/switch_user.html:20
-msgid "Роль"
-msgstr "Роль"
+msgid "Доступ"
+msgstr "Доступ"
 
 #: templates/panels/modals/switch_user.html:35 templates/public/login.html:35
 msgid "Войти"
@@ -2453,7 +2738,6 @@ msgid "Нет доступных пользователей"
 msgstr "Немає доступних користувачів"
 
 #: templates/panels/modals/system/unsaved_changes.html:8
-#| msgid "Сохранить изменения"
 msgid "Несохраненные изменения"
 msgstr "Зберегти зміни"
 
@@ -2509,10 +2793,6 @@ msgstr "Посилання"
 msgid "Добавить аудиторию"
 msgstr "Додати аудиторію"
 
-#: templates/panels/overview.html:229
-msgid "Добавить список рассылки"
-msgstr "Додати список розсилки"
-
 #: templates/panels/stats.html:20
 msgid "Первое посещение"
 msgstr "Перше відвідування"
@@ -2525,11 +2805,7 @@ msgstr "Переходів"
 msgid "Действие"
 msgstr "Дія"
 
-#: templates/panels/stats.html:38
-msgid "Показать компанию"
-msgstr "Показати компанію"
-
-#: templates/panels/stats_campaign.html:100
+#: templates/panels/stats_campaign.html:94
 msgid "Переходов нет"
 msgstr "Переходів немає"
 
@@ -2929,6 +3205,529 @@ msgstr ""
 msgid "Подтвердить email"
 msgstr "Підтвердити email"
 
+#~| msgid "Выполнено"
+#~ msgid "Наполнение"
+#~ msgstr "Виконано"
+
+#~ msgid "Пожалуйста, заполните все обязательные поля"
+#~ msgstr "Будь ласка, заповніть усі обов'язкові поля"
+
+#~ msgid "Некорректные значения формы"
+#~ msgstr "Некоректні значення форми"
+
+#~ msgid "Этот список рассылки уже используется в другой кампании"
+#~ msgstr "Цей список розсилки вже використовується у іншій кампанії"
+
+#~| msgid "Домен"
+#~ msgid "Домены"
+#~ msgstr "Домен"
+
+#~| msgid "Настройки : Почтовые серверы"
+#~ msgid "Настройки : Домены"
+#~ msgstr "Налаштування: Поштові сервери"
+
+#~ msgid "Задача была изменена."
+#~ msgstr "Пароль успішно змінено."
+
+#~ msgid "Наполнение - сбор контактов"
+#~ msgstr "Увімкнути збір контактів"
+
+#~| msgid "Сбор контактов включён"
+#~ msgid "Сбор контактов - включен - собрано контактов:"
+#~ msgstr "Збір контактів увімкнено"
+
+#~| msgid "Всего собрано контактов"
+#~ msgid "Сбор контактов - завершен - собрано контактов:"
+#~ msgstr "Усього зібрано контактів"
+
+#~| msgid "Забыть контакт? Он будет удалён из контактов workspace."
+#~ msgid "Сбор контактов - приостановлен - собрано контактов:"
+#~ msgstr "Забути контакт? Він буде видалений з контактів workspace."
+
+#~| msgid "Всего собрано контактов"
+#~ msgid "Последние 50 контактов"
+#~ msgstr "Усього зібрано контактів"
+
+#~| msgid "Социальные сети:"
+#~ msgid "Максимальный рейтинг:"
+#~ msgstr "Соціальні мережі:"
+
+#, python-format
+#~| msgid "В списке"
+#~ msgid "Весь рейтинг"
+#~ msgstr "Присвоїти рейтинг"
+
+#~| msgid "Перейти"
+#~ msgid "Без рейтинга"
+#~ msgstr "Перейти"
+
+#~ msgid "Тип аудитории"
+#~ msgstr "Аудиторії"
+
+#~ msgid "Название аудитории"
+#~ msgstr "Створення аудиторій"
+
+#~ msgid ""
+#~ "Ваш продукт / услуга. Что именно продаётся? Суть, бизнес-характеристики"
+#~ msgstr ""
+#~ "Ваш продукт / послуга. Що саме продається? Суть, бізнес-характеристики"
+
+#~ msgid ""
+#~ "Кратко опишите продукт / услугу. Что именно продаётся. Что получает "
+#~ "покупатель.."
+#~ msgstr ""
+#~ "Коротко опишіть продукт / послугу. Що саме продається. Що отримує "
+#~ "покупець.."
+
+#~ msgid ""
+#~ "Компания-продавец. Кто Вы? Направление деятельности, опыт, достижения, "
+#~ "репутация."
+#~ msgstr ""
+#~ "Компанія-продавець. Хто Ви? Напрям діяльності, досвід, досягнення, "
+#~ "репутація."
+
+#~ msgid ""
+#~ "Название компании, страна, адрес, юридическая форма, адрес сайта, размер "
+#~ "компании, специализация, сколько лет на рынке."
+#~ msgstr ""
+#~ "Назва компанії, країна, адреса, юридична форма, адреса сайту, розмір "
+#~ "компанії, спеціалізація, скільки років на ринку."
+
+#~ msgid ""
+#~ "География работы в Германии. Возможности и ограничения. Территория, "
+#~ "логистика."
+#~ msgstr ""
+#~ "Географія роботи в Німеччині. Можливості та обмеження. Територія, "
+#~ "логістика."
+
+#~ msgid ""
+#~ "Партнеры, дилеры, представители в Германии, их адреса. Логистика "
+#~ "поставок. Территория предоставления услуг. Где продукт применим в "
+#~ "Германии."
+#~ msgstr ""
+#~ "Партнери, дилери, представники в Німеччині, їх адреси. Логістика "
+#~ "поставок. Територія надання послуг. Де продукт застосовний у Німеччині."
+
+#~ msgid "Заполните хотя бы одно поле."
+#~ msgstr "Заповніть хоча б одне поле."
+
+#~ msgid ""
+#~ "Продукт / услуга. Что именно Вы приобретаете? Суть, бизнес-характеристики"
+#~ msgstr ""
+#~ "Продукт / послуга. Що саме Ви набуваєте? Суть, бізнес-характеристики"
+
+#~ msgid ""
+#~ "Компания-покупатель. Кто Вы? Направление деятельности, опыт, достижения, "
+#~ "репутация."
+#~ msgstr ""
+#~ "Компанія-покупець. Хто Ви? Напрям діяльності, досвід, досягнення, "
+#~ "репутація."
+
+#~ msgid "Название компании, сайт, страна и краткая информация о покупателе"
+#~ msgstr "Назва компанії, сайт, країна та коротка інформація про покупця"
+
+#~ msgid ""
+#~ "География покупки в Германии. Возможности и ограничения. Территория, "
+#~ "логистика."
+#~ msgstr ""
+#~ "Географія покупок у Німеччині. Можливості та обмеження. Територія, "
+#~ "логістика."
+
+#~ msgid ""
+#~ "Регионы Германии, допустимая логистика, требования к месту доставки / "
+#~ "месту оказания услуги."
+#~ msgstr ""
+#~ "Регіони Німеччини, допустима логістика, вимоги до місця доставки / місця "
+#~ "надання послуги."
+
+#~ msgid "Название задачи"
+#~ msgstr "Назва завдання"
+
+#~ msgid "КЛИЕНТ: Критерии для ранжирования клиентов"
+#~ msgstr "КЛІЄНТ: Критерії для ранжування клієнтів"
+
+#~ msgid "КАТЕГОРИИ: Критерии для ранжирования бизнес-категорий"
+#~ msgstr "КАТЕГОРІЇ: Критерії для ранжування бізнес-категорій"
+
+#~ msgid "ГЕОГРАФИЯ: Критерии для ранжирования городов (Германия)"
+#~ msgstr "ГЕОГРАФІЯ: Критерії для ранжування міст (Німеччина)"
+
+#~ msgid "Какая география подходит."
+#~ msgstr "Яка географія підходить?"
+
+#~ msgid "ПРОДАВЕЦ: Критерии для ранжирования продавцов"
+#~ msgstr "Продавець: Критерії для ранжування продавців"
+
+#~ msgid "Критерии для ранжирования продавцов."
+#~ msgstr "Критерії для ранжування продавців."
+
+#~ msgid "Какие типы компаний/специализаций подходят."
+#~ msgstr "Які типи компаній/спеціалізацій підходять."
+
+#~ msgid "Регионы Германии, логистика, удаленная/локальная работа."
+#~ msgstr "Регіони Німеччини, логістика, віддалена/локальна робота."
+
+#~ msgid "Задача"
+#~ msgstr "Завдання"
+
+#~ msgid "Опишите основную задачу."
+#~ msgstr "Опишіть основну задачу."
+
+#~ msgid "Задача. Что продаём и кого хотим привлечь"
+#~ msgstr "Завдання. Що продаємо і кого хочемо залучити"
+
+#~ msgid ""
+#~ "1–2 предложения: что продаёте (суть), кто целевой клиент в Германии и "
+#~ "какой результат нужен (лиды/встречи/заявки)."
+#~ msgstr ""
+#~ "1–2 речення: що продаєте (сутність), хто цільовий клієнт у Німеччині і "
+#~ "який результат потрібен (ліди/зустрічі/заявки)."
+
+#~ msgid "Нужно найти клиентов: "
+#~ msgstr "Потрібно знайти клієнтів:"
+
+#~ msgid "Задача. Что нужно купить и какой подрядчик подходит"
+#~ msgstr "Завдання. Що потрібно купити і який підрядник підходить"
+
+#~ msgid ""
+#~ "1–2 предложения: что нужно купить/заказать, ключевые требования и какой "
+#~ "поставщик/подрядчик нужен (тип, опыт, условия)."
+#~ msgstr ""
+#~ "1–2 речення: що потрібно купити/замовити, ключові вимоги і який "
+#~ "постачальник/підрядник потрібен (тип, досвід, умови)."
+
+#~ msgid "Нужно найти поставщиков / подрядчиков: "
+#~ msgstr "Потрібно знайти постачальників / підрядників:"
+
+#~ msgid "Создание аудиторий"
+#~ msgstr "Створення аудиторій"
+
+#~ msgid "Аудитории : создание"
+#~ msgstr "Аудиторії: створення"
+
+#~ msgid "Аудитории : Сбор контактов"
+#~ msgstr "Аудиторії: Збір контактів"
+
+#~| msgid "Название задачи"
+#~ msgid "Постановка задачи"
+#~ msgstr "Назва завдання"
+
+#~| msgid "Аудитории : создание"
+#~ msgid "Аудитории : Постановка задачи"
+#~ msgstr "Аудиторії: створення"
+
+#~ msgid "Управление списками"
+#~ msgstr "Управління списками"
+
+#~ msgid "Контакты : Списки рассылок"
+#~ msgstr "Контакти: Списки розсилок"
+
+#~ msgid "Все контакты списков"
+#~ msgstr "Всі контакти списків"
+
+#~ msgid "Поиск клиентов"
+#~ msgstr "Пошук клієнтів"
+
+#~ msgid "Категории и география не обрабатываются"
+#~ msgstr "Категорії та географія не обробляються"
+
+#~ msgid "Запустить обработку географии и категории"
+#~ msgstr "Запустити обробку географії та категорії"
+
+#~ msgid "Бизнес-категории: обрабатываются"
+#~ msgstr "Бізнес-категорії: обробляються"
+
+#~ msgid "Бизнес-категории: задача изменилась"
+#~ msgstr "Бізнес-категорії: завдання змінилося"
+
+#~ msgid "Обработать категории снова"
+#~ msgstr "Обробити категорії знову"
+
+#~ msgid "Бизнес-категории: не обработаны"
+#~ msgstr "Бізнес-категорії: не оброблені"
+
+#~ msgid "Обработать категории"
+#~ msgstr "Обробити категорії"
+
+#~ msgid "География: обрабатывается"
+#~ msgstr "Географія: обробляється"
+
+#~ msgid "География: обработана"
+#~ msgstr "Географія: оброблена"
+
+#~ msgid "Обработать географию снова"
+#~ msgstr "Обробити географію знову"
+
+#~ msgid "Начните вводить."
+#~ msgstr "Почніть вводити."
+
+#~ msgid "Города не обработаны"
+#~ msgstr "Міста не оброблені"
+
+#~ msgid "Критерии"
+#~ msgstr "Критерії"
+
+#~ msgid "Статус / Действия"
+#~ msgstr "Статус / Дії"
+
+#~ msgid "Поставщик"
+#~ msgstr "Постачальник"
+
+#~ msgid "Категории: обработаны"
+#~ msgstr "Категорії: оброблені"
+
+#~ msgid "Посмотреть категории"
+#~ msgstr "Переглянути категорії"
+
+#~ msgid "Города: обработаны"
+#~ msgstr "Міста: опрацьовано"
+
+#~ msgid "Посмотреть города"
+#~ msgstr "Переглянути міста"
+
+#~ msgid "Города: не обработаны"
+#~ msgstr "Міста: не оброблені"
+
+#~| msgid "На основании сформированной задачи система собирает"
+#~ msgid "Создание / редактирование задачи для сбора аудитории"
+#~ msgstr "На основі сформованого завдання система збирає"
+
+#~| msgid "Сохранить изменения"
+#~ msgid "Сохранить название"
+#~ msgstr "Зберегти зміни"
+
+#~ msgid "Закрыть / перейти к списку аудиторий"
+#~ msgstr "Закрити / перейти до списку аудиторій"
+
+#~ msgid ""
+#~ "Введите команду для работы с описанием компании-заказчика — что нужно "
+#~ "добавить, удалить или изменить. Указанная команда будет применена к "
+#~ "текущему описанию."
+#~ msgstr ""
+#~ "Введіть команду для роботи з описом компанії-замовника — що потрібно "
+#~ "додати, видалити або змінити. Указана команда буде застосована до "
+#~ "поточного опису."
+
+#~ msgid ""
+#~ "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над "
+#~ "описанием компании-заказчика. Ответ на вопрос будет дан отдельно и не "
+#~ "изменит текст описания."
+#~ msgstr ""
+#~ "Ви також можете задати питання ШІ-асистентові в контексті роботи над "
+#~ "описом компанії-замовника. Відповідь на питання буде надана окремо і не "
+#~ "змінить текст опису."
+
+#~ msgid ""
+#~ "Введите команду для работы с описанием географии поиска поставщиков и "
+#~ "подрядчиков — что нужно добавить, удалить или изменить. Указанная команда "
+#~ "будет применена к текущему описанию."
+#~ msgstr ""
+#~ "Введіть команду для роботи з описом географії пошуку постачальників і "
+#~ "підрядників — що потрібно додати, видалити або змінити. Зазначена команда "
+#~ "буде застосована до поточного опису."
+
+#~ msgid ""
+#~ "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над "
+#~ "описанием географии поиска поставщиков и подрядчиков. Ответ на вопрос "
+#~ "будет дан отдельно и не изменит текст описания."
+#~ msgstr ""
+#~ "Ви також можете поставити питання ШІ-асистенту в контексті роботи над "
+#~ "описом географії пошуку постачальників і підрядників. Відповідь на "
+#~ "питання буде надана окремо і не змінить текст опису."
+
+#~ msgid ""
+#~ "Введите команду для работы с описанием закупаемого продукта, услуги или "
+#~ "работ — что нужно добавить, удалить или изменить. Указанная команда будет "
+#~ "применена к текущему описанию."
+#~ msgstr ""
+#~ "Введіть команду для роботи з описом закуповуваного продукту, послуги або "
+#~ "робіт — що потрібно додати, видалити або змінити. Зазначена команда буде "
+#~ "застосована до поточного опису."
+
+#~ msgid ""
+#~ "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над "
+#~ "описанием закупаемого продукта, услуги или работ. Ответ на вопрос будет "
+#~ "дан отдельно и не изменит текст описания."
+#~ msgstr ""
+#~ "Ви також можете поставити запитання ШІ-асистенту в контексті роботи над "
+#~ "описом закуповуваного продукту, послуги або робіт. Відповідь на запитання "
+#~ "буде надана окремо і не змінить текст опису."
+
+#~ msgid "Продавец. Название, адрес, страна, размер, опыт, специальзация."
+#~ msgstr "Продавець. Назва, адреса, країна, розмір, досвід, спеціалізація."
+
+#~ msgid ""
+#~ "Введите команду для работы с описанием географии — что нужно добавить, "
+#~ "удалить или изменить. Указанная команда будет применена к текущему "
+#~ "описанию."
+#~ msgstr ""
+#~ "Введіть команду для роботи з описом географії — що потрібно додати, "
+#~ "видалити або змінити. Зазначена команда буде застосована до поточного "
+#~ "опису."
+
+#~ msgid ""
+#~ "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над "
+#~ "описанием географии. Ответ на вопрос будет дан отдельно и не изменит "
+#~ "текст описания."
+#~ msgstr ""
+#~ "Ви також можете поставити ШІ-асистентові питання в контексті роботи над "
+#~ "описом географії. Відповідь на питання буде надана окремо і не змінить "
+#~ "текст опису."
+
+#~ msgid ""
+#~ "Введите команду для работы с описанием продукта или услуги — что нужно "
+#~ "добавить, удалить или изменить. Указанная команда будет применена к "
+#~ "текущему описанию."
+#~ msgstr ""
+#~ "Введіть команду для роботи з описом продукту або послуги — що потрібно "
+#~ "додати, видалити або змінити. Вказана команда буде застосована до "
+#~ "поточного опису."
+
+#~ msgid ""
+#~ "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над "
+#~ "описанием продукта или услуги. Ответ на вопрос будет дан отдельно и не "
+#~ "изменит текст описания."
+#~ msgstr ""
+#~ "Ви також можете поставити питання ШІ‑асистенту в контексті роботи над "
+#~ "описом продукту або послуги. Відповідь на питання буде надана окремо й не "
+#~ "змінить текст опису."
+
+#~| msgid "Добавить аудиторию"
+#~ msgid "Создать аудиторию"
+#~ msgstr "Додати аудиторію"
+
+#~ msgid ""
+#~ "Предоставленная Вами информация является непубличной и не передаётся "
+#~ "третьим лицам."
+#~ msgstr ""
+#~ "Надана Вами інформація є непублічною і не передається третім особам."
+
+#~ msgid ""
+#~ "Она используется исключительно для оценки вероятности заключения сделки с "
+#~ "контрагентами."
+#~ msgstr ""
+#~ "Вона використовується виключно для оцінки ймовірності укладення угоди з "
+#~ "контрагентами."
+
+#~ msgid ""
+#~ "Недостоверные данные искажают результат и снижают эффективность подбора "
+#~ "контрагентов."
+#~ msgstr ""
+#~ "Недостовірні дані спотворюють результат і знижують ефективність підбору "
+#~ "контрагентів."
+
+#~ msgid ""
+#~ "Поэтому указывайте реальные факты, а не маркетинговые формулировки — это "
+#~ "в Ваших интересах."
+#~ msgstr ""
+#~ "Тому вказуйте реальні факти, а не маркетингові формулювання — це у Ваших "
+#~ "інтересах."
+
+#~ msgid ""
+#~ "Это вспомогательный ассистент для формулирования критериев отбора и "
+#~ "ранжирования контрагентов."
+#~ msgstr ""
+#~ "Це допоміжний асистент для формулювання критеріїв відбору та ранжування "
+#~ "контрагентів."
+
+#~ msgid ""
+#~ "Ответственность за сохранённые данные лежит на Вас: Вы должны исправлять "
+#~ "ошибки, удалять неверные предположения и добавлять корректные факты. "
+#~ "Недостоверная информация искажает оценку вероятности сделки."
+#~ msgstr ""
+#~ "Відповідальність за збережені дані лежить на Вас: Ви повинні виправляти "
+#~ "помилки, видаляти невірні припущення та додавати коректні факти. "
+#~ "Недостовірна інформація спотворює оцінку вірогідності угоди."
+
+#~ msgid ""
+#~ "Ассистент задаёт вопросы, чтобы подсказать, какую информацию ещё можно "
+#~ "добавить."
+#~ msgstr ""
+#~ "Асистент задає питання, щоб підказати, яку інформацію ще можна додати."
+
+#~ msgid ""
+#~ "Отвечать на них не обязательно. Если вопрос кажется лишним или у Вас нет "
+#~ "ответа, просто пропустите его. Вопросы будут появляться постоянно. Когда "
+#~ "результат Вас устроит, сохраните его."
+#~ msgstr ""
+#~ "Відповідати на них необов'язково. Якщо питання здається зайвим або у Вас "
+#~ "немає відповіді, просто пропустіть його. Питання будуть з'являтися "
+#~ "постійно. Коли результат Вас влаштує, збережіть його."
+
+#~ msgid ""
+#~ "«Обработать» — вызвать ассистента для корректировки и дополнения "
+#~ "введённой Вами информации."
+#~ msgstr ""
+#~ "«Обробити» — викликати асистента для корекції та доповнення введеної Вами "
+#~ "інформації."
+
+#~ msgid ""
+#~ "При сохранении формируются критерии выбора контрагентов, бизнес-категорий "
+#~ "и городов Германии. Вы сможете отредактировать эти данные. Сбор и "
+#~ "ранжирование контрагентов запускаются отдельно."
+#~ msgstr ""
+#~ "Після збереження формуються критерії відбору контрагентів, "
+#~ "бізнес‑категорій та міст Німеччини. Ви зможете відредагувати ці дані. "
+#~ "Збір і ранжування контрагентів запускаються окремо."
+
+#~ msgid "Указывайте интернет-адреса в виде ссылок (https://mysite.com)."
+#~ msgstr "Вказуйте інтернет-адреси у вигляді посилань (https://mysite.com)."
+
+#~ msgid ""
+#~ "Если сомневаетесь, скопируйте адрес из строки браузера. Иначе ассистент "
+#~ "не распознает, что это ссылка."
+#~ msgstr ""
+#~ "Якщо сумніваєтеся, скопіюйте адресу з адресного рядка браузера. Інакше "
+#~ "асистент не розпізнає, що це посилання."
+
+#~ msgid "Критерии выбора"
+#~ msgstr "Критерії вибору"
+
+#~ msgid "Действия / Статус"
+#~ msgstr "Дії / Статус"
+
+#~ msgid "Сбор контактов отключён"
+#~ msgstr "Збір контактів вимкнено"
+
+#~ msgid "Контакты: присвоен рейтинг"
+#~ msgstr "Контакти: присвоєно рейтинг"
+
+#~ msgid "Критерии оценки изменены"
+#~ msgstr "Критерії оцінки змінені"
+
+#~ msgid "Смотреть / управлять"
+#~ msgstr "Дивитися / керувати"
+
+#~ msgid "Контактов к рейтингованию"
+#~ msgstr "Контакти для рейтингування"
+
+#~ msgid "Вернуться к аудиториям"
+#~ msgstr "Повернутися до аудиторій"
+
+#~ msgid "Провести повторное рейтингование"
+#~ msgstr "Провести повторне рейтингування"
+
+#~ msgid "+ 100"
+#~ msgstr "+ 100"
+
+#~ msgid "+ 200"
+#~ msgstr "+ 200"
+
+#~ msgid "+ 500"
+#~ msgstr "+ 500"
+
+#~ msgid "+ 1 000"
+#~ msgstr "+ 1 000"
+
+#~ msgid "Контакты: все собранные"
+#~ msgstr "Контакти: усі зібрані"
+
+#~ msgid "Роль"
+#~ msgstr "Роль"
+
+#~ msgid "Показать компанию"
+#~ msgstr "Показати компанію"
+
 #~ msgid "Recent actions"
 #~ msgstr "Останні дії"
 
@@ -2958,9 +3757,6 @@ msgstr "Підтвердити email"
 
 #~ msgid "Необходимо приобрести: "
 #~ msgstr "Необхідно придбати:"
-
-#~ msgid "Покупатель:"
-#~ msgstr "Покупець:"
 
 #~ msgid "География:"
 #~ msgstr "Географія:"

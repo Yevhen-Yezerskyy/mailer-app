@@ -15,13 +15,41 @@
       {% endif %}
 
       <div class="YY-CARD_WHITE border border-[#71d0f4]">
-        {% for line in lines %}
+        {% if intro_line %}
+          <div class="YY-TEXT !mb-2">{{ intro_line }}</div>
+        {% endif %}
+
+        {% if limit_lines %}
+          <ul class="YY-TEXT !mb-2 list-disc pl-5 space-y-1">
+            {% for line in limit_lines %}
+              <li>{{ line }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+
+        {% for line in outro_lines %}
           <div class="YY-TEXT !mb-2">{{ line }}</div>
         {% endfor %}
+
+        {% if show_continue_button %}
+          <form method="post" action="{% url 'audience:create_pause_info_modal' %}" data-pause-info-continue-form="1" class="mt-4">
+            {% csrf_token %}
+            <input type="hidden" name="id" value="{{ task_id_token }}">
+            <input type="hidden" name="action" value="continue_collection">
+
+            <div class="hidden !mb-3" data-pause-info-error-wrap="1">
+              <div class="YY-TEXT !mb-0 text-[#8e0000]" data-pause-info-error="1"></div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <button type="submit" class="YY-BUTTON_MAIN_FULL">Продолжить сбор и рейтингование</button>
+              <button type="button" class="YY-BUTTON_MAIN_FULL" data-yy-modal-close>Отменить</button>
+            </div>
+          </form>
+        {% endif %}
       </div>
     {% else %}
       <div class="YY-STATUS_GRAY w-full">{% trans "Здесь пока нет данных" %}</div>
     {% endif %}
   </div>
 </div>
-

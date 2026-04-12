@@ -40,67 +40,65 @@
             </div>
 
             {% if state == "edit" and edit_obj %}
-              <div class="grid grid-cols-3 gap-3 mb-10 mt-4">
+              <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-10 mt-4">
 
                 <div>
                   <div class="YY-STATUS_BLUE mb-4 !text-sm">{% trans "Домен" %}: {{ edit_obj.domain_name }}</div>
-
-                  {% if edit_obj.domain_whitelisted %}
-                    <div class="YY-STATUS_GREEN !text-sm">{% trans "Публичный сервис-провайдер" %}<br>{% trans "Проверка домена не нужна" %}</div>
-                  {% elif edit_obj.domain_tested %}
+                  <div class="space-y-2">
+                    {% if edit_obj.domain_whitelisted %}
+                      <div class="YY-STATUS_GREEN !text-sm">{% trans "Публичный сервис-провайдер" %}<br>{% trans "Проверка домена не нужна" %}</div>
+                    {% elif edit_obj.domain_tested %}
                       {% if edit_obj.domain_tech %}
-                          {% if edit_obj.domain_tech.status == "GOOD" %} 
-                            <div class="YY-STATUS_GREEN !text-sm !mb-2">
-                          {% elif edit_obj.domain_tech.status == "NORMAL" %} 
-                            <div class="YY-STATUS_YELLOW !text-sm !mb-2">
-                          {% elif edit_obj.domain_tech.status == "BAD" %} 
-                            <div class="YY-STATUS_RED !text-sm !mb-2">
-                          {% else %} 
-                            <div class="YY-STATUS_GRAY !text-sm !mb-2">
-                          {% endif %}
+                        {% if edit_obj.domain_tech.status == "GOOD" %}
+                          <div class="YY-STATUS_GREEN !text-sm !mb-0">
+                        {% elif edit_obj.domain_tech.status == "NORMAL" %}
+                          <div class="YY-STATUS_YELLOW !text-sm !mb-0">
+                        {% elif edit_obj.domain_tech.status == "BAD" %}
+                          <div class="YY-STATUS_RED !text-sm !mb-0">
+                        {% else %}
+                          <div class="YY-STATUS_GRAY !text-sm !mb-0">
+                        {% endif %}
                           <div>{{ edit_obj.domain_tech.dt }}</div>
                           <div>{{ edit_obj.domain_tech.action }}: {{ edit_obj.domain_tech.status }}</div>
                         </div>
                       {% else %}
-                        <div class="YY-STATUS_YELLOW !text-sm !mb-2">
-                          {% trans "Не проверено" %}
-                        </div>
+                        <div class="YY-STATUS_YELLOW !text-sm !mb-0">{% trans "Не проверено" %}</div>
                       {% endif %}
-                    <div>
+
                       {% if edit_obj.domain_rep %}
-                          {% if edit_obj.domain_rep.status == "NORMAL" %} 
-                            <div class="YY-STATUS_GREEN !text-sm ">
-                          {% elif edit_obj.domain_rep.status == "QUESTIONABLE" %} 
-                            <div class="YY-STATUS_RED !text-sm ">
-                          {% else %} 
-                            <div class="YY-STATUS_GRAY !text-sm ">
-                          {% endif %}                      
+                        {% if edit_obj.domain_rep.status == "NORMAL" %}
+                          <div class="YY-STATUS_GREEN !text-sm !mb-0">
+                        {% elif edit_obj.domain_rep.status == "QUESTIONABLE" %}
+                          <div class="YY-STATUS_RED !text-sm !mb-0">
+                        {% else %}
+                          <div class="YY-STATUS_GRAY !text-sm !mb-0">
+                        {% endif %}
                           <div>{{ edit_obj.domain_rep.dt }}</div>
                           <div>{{ edit_obj.domain_rep.action }}: {{ edit_obj.domain_rep.status }}</div>
                         </div>
                       {% endif %}
-                    </div>
-                  {% else %}
-                    <div class="YY-STATUS_YELLOW mb-2 !text-sm">{% trans "Домен не проверен" %}</div>
-                    <button
-                      type="button"
-                      class="YY-BUTTON_TAB_MAIN !text-sm"
-                      onclick="document.getElementById('yyChkDomain')?.click();"
-                    >
-                      {% trans "Проверить домен" %}
-                    </button>
-                  {% endif %}
+                    {% else %}
+                      <div class="YY-STATUS_YELLOW !text-sm !mb-0">{% trans "Домен не проверен" %}</div>
+                      <button
+                        type="button"
+                        class="YY-BUTTON_TAB_MAIN !text-sm !w-full"
+                        onclick="document.getElementById('yyChkDomain')?.click();"
+                      >
+                        {% trans "Проверить домен" %}
+                      </button>
+                    {% endif %}
+                  </div>
                 </div>
 
                 <div>
                   {% if not edit_obj.smtp_configured %}
-                    <a href="{% url 'settings:mail_servers_smtp' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-5 !text-sm">
+                    <a href="{% url 'settings:mail_servers_smtp' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN !w-full mb-5 !text-sm">
                       {% trans "Настроить SMTP сервер" %}
                     </a>
 
                     <div class="YY-STATUS_YELLOW text-sm">{% trans "SMTP не настроен" %}</div>
                   {% else %}
-                    <a href="{% url 'settings:mail_servers_smtp' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-5 !text-sm">
+                    <a href="{% url 'settings:mail_servers_smtp' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN !w-full mb-5 !text-sm">
                       {% trans "Изменить SMTP сервер" %}
                     </a>
 
@@ -138,12 +136,12 @@
 
                 <div>
                   {% if not edit_obj.imap_configured %}
-                    <a href="{% url 'settings:mail_servers_imap' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-5 !text-sm">
+                    <a href="{% url 'settings:mail_servers_imap' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN !w-full mb-5 !text-sm">
                       {% trans "Настроить IMAP сервер" %}
                     </a>
                     <div class="YY-STATUS_YELLOW text-sm">{% trans "IMAP не настроен" %}</div>                    
                   {% else %}
-                    <a href="{% url 'settings:mail_servers_imap' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-5 !text-sm">
+                    <a href="{% url 'settings:mail_servers_imap' edit_obj.ui_id %}" class="YY-BUTTON_TAB_MAIN !w-full mb-5 !text-sm">
                       {% trans "Изменить IMAP сервер" %}
                     </a>
 
@@ -256,58 +254,53 @@
 
                   <td class="YY-TB_TD">
                     <div class="YY-STATUS_BLUE mb-2">{{ it.domain_name }}</div>
-
-                    {% if it.domain_whitelisted %}
-                      <div class="YY-STATUS_GREEN !text-sm">{% trans "Публичный сервис-провайдер" %}<br>{% trans "Проверка домена не нужна" %}</div>
-                    {% elif it.domain_tested %}
+                    <div class="space-y-2">
+                      {% if it.domain_whitelisted %}
+                        <div class="YY-STATUS_GREEN !text-sm !mb-0">{% trans "Публичный сервис-провайдер" %}<br>{% trans "Проверка домена не нужна" %}</div>
+                      {% elif it.domain_tested %}
                         {% if it.domain_tech %}
-                          {% if it.domain_tech.status == "GOOD" %} 
-                            <div class="YY-STATUS_GREEN !text-sm !mb-2">
-                          {% elif it.domain_tech.status == "NORMAL" %} 
-                            <div class="YY-STATUS_YELLOW !text-sm !mb-2">
-                          {% elif it.domain_tech.status == "BAD" %} 
-                            <div class="YY-STATUS_RED !text-sm !mb-2">
-                          {% else %} 
-                            <div class="YY-STATUS_GRAY !text-sm !mb-2">
+                          {% if it.domain_tech.status == "GOOD" %}
+                            <div class="YY-STATUS_GREEN !text-sm !mb-0">
+                          {% elif it.domain_tech.status == "NORMAL" %}
+                            <div class="YY-STATUS_YELLOW !text-sm !mb-0">
+                          {% elif it.domain_tech.status == "BAD" %}
+                            <div class="YY-STATUS_RED !text-sm !mb-0">
+                          {% else %}
+                            <div class="YY-STATUS_GRAY !text-sm !mb-0">
                           {% endif %}
-                          <div>{{ it.domain_tech.dt }}</div>
-                          <div>{{ it.domain_tech.action }}: {{ it.domain_tech.status }}</div>
-                        </div>
+                            <div>{{ it.domain_tech.dt }}</div>
+                            <div>{{ it.domain_tech.action }}: {{ it.domain_tech.status }}</div>
+                          </div>
                         {% else %}
-                        <div class="YY-STATUS_YELLOW !text-sm !mb-2">
-                          {% trans "Не проверено" %}
-                        </div>
+                          <div class="YY-STATUS_YELLOW !text-sm !mb-0">{% trans "Не проверено" %}</div>
                         {% endif %}
-                      </div>
+
                         {% if it.domain_rep %}
-                          {% if it.domain_rep.status == "NORMAL" %} 
-                            <div class="YY-STATUS_GREEN !text-sm ">
-                          {% elif it.domain_rep.status == "QUESTIONABLE" %} 
-                            <div class="YY-STATUS_RED !text-sm ">
-                          {% else %} 
-                            <div class="YY-STATUS_GRAY !text-sm ">
+                          {% if it.domain_rep.status == "NORMAL" %}
+                            <div class="YY-STATUS_GREEN !text-sm !mb-0">
+                          {% elif it.domain_rep.status == "QUESTIONABLE" %}
+                            <div class="YY-STATUS_RED !text-sm !mb-0">
+                          {% else %}
+                            <div class="YY-STATUS_GRAY !text-sm !mb-0">
                           {% endif %}
-                          <div>{{ it.domain_rep.dt }}</div>
-                          <div>{{ it.domain_rep.action }}: {{ it.domain_rep.status }}</div>
-                        </div>
-                    {% else %}
-                    <div class="YY-STATUS_YELLOW !text-sm ">
-                      {% trans "Не проверено" %}
+                            <div>{{ it.domain_rep.dt }}</div>
+                            <div>{{ it.domain_rep.action }}: {{ it.domain_rep.status }}</div>
+                          </div>
+                        {% endif %}
+                      {% else %}
+                        <div class="YY-STATUS_YELLOW !text-sm !mb-0">{% trans "Домен не протестирован" %}</div>
+                      {% endif %}
                     </div>
-                    {% endif %}
-                  {% else %}
-                    <div class="YY-STATUS_YELLOW !text-sm ">{% trans "Домен не протестирован" %}</div>
-                  {% endif %}
                   </td>
 
                   <td class="YY-TB_TD">
                     {% if not it.smtp_configured %}
-                      <a href="{% url 'settings:mail_servers_smtp' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-2 ">
+                      <a href="{% url 'settings:mail_servers_smtp' it.ui_id %}" class="YY-BUTTON_TAB_MAIN !w-full mb-2">
                         {% trans "Настроить SMTP сервер" %}
                       </a>
                       <div class="YY-STATUS_YELLOW !text-sm ">{% trans "SMTP не настроен" %}</div>
                     {% else %}
-                      <a href="{% url 'settings:mail_servers_smtp' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-2 ">
+                      <a href="{% url 'settings:mail_servers_smtp' it.ui_id %}" class="YY-BUTTON_TAB_MAIN !w-full mb-2">
                         {% trans "Изменить SMTP сервер" %}
                       </a>
                         {% if it.smtp_auth %}
@@ -343,12 +336,12 @@
 
                   <td class="YY-TB_TD">
                     {% if not it.imap_configured %}
-                      <a href="{% url 'settings:mail_servers_imap' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-2 ">
+                      <a href="{% url 'settings:mail_servers_imap' it.ui_id %}" class="YY-BUTTON_TAB_MAIN !w-full mb-2">
                         {% trans "Настроить IMAP сервер" %}
                       </a>
                       <div class="YY-STATUS_YELLOW !text-sm ">{% trans "IMAP не настроен" %}</div>
                     {% else %}
-                      <a href="{% url 'settings:mail_servers_imap' it.ui_id %}" class="YY-BUTTON_TAB_MAIN mb-2 ">
+                      <a href="{% url 'settings:mail_servers_imap' it.ui_id %}" class="YY-BUTTON_TAB_MAIN !w-full mb-2">
                         {% trans "Изменить IMAP сервер" %}
                       </a>
                         {% if it.imap_check %}

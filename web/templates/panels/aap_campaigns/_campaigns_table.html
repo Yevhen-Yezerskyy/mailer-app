@@ -1,0 +1,143 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_campaigns/_campaigns_table.html -->
+<!-- DATE: 2026-04-09 -->
+<!-- PURPOSE: Общая таблица списка кампаний. -->
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      {% if items %}
+        <div class="YY-MAIN_BOTTOM_DIV">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="YY-TH_TR">
+                <th class="YY-TH_TH w-[100%]">{% trans "Кампания" %}</th>
+                <th class="YY-TH_TH">{% trans "Письмо" %}</th>
+                <th class="YY-TH_TH">{% trans "Статус" %}</th>
+                <th class="YY-TH_TH">{% trans "Состояние" %}</th>
+                <th class="YY-TH_TH">&nbsp;</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for it in items %}
+                <tr class="YY-TB_TR align-top">
+                  <td class="YY-TB_TD">
+                    <p class="font-semibold">{{ it.title }}</p>
+                    <p class="mb-4">{% trans "Активна с" %} {{ it.start_at|date:"d.m.Y" }}
+                      {% if it.end_at %}
+                        {% trans "по" %} {{ it.end_at|date:"d.m.Y" }}
+                      {% endif %}
+                    </p>
+                  </td>
+                  <td class="YY-TB_TD">
+                    {% if it.letter and it.letter.ready_content %}
+                      <a href="#"
+                         class="YY-LINK flex items-center justify-between gap-1 whitespace-nowrap w-full mb-2"
+                         onclick="yyCampPreviewById('{{ it.ui_id }}'); return false;">
+                        <span>{% trans "Предпросмотр" %}</span>
+                        <svg class="size-[22px] shrink-0">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </a>
+                      <a href="{% url 'campaigns:campaigns_flow_letter_id' it.ui_id %}" class="YY-LINK flex items-center justify-between gap-1 whitespace-nowrap w-full">
+                        <span>{% trans "Изменить" %}</span>
+                        <svg class="size-[22px] shrink-0">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </a>
+                    {% else %}
+                      {% if it.letter and it.letter.template_id and it.letter.template and not it.letter.template.archived %}
+                        <a href="{% url 'campaigns:campaigns_flow_letter_id' it.ui_id %}" class="YY-LINK flex items-center justify-between gap-1 whitespace-nowrap w-full">
+                          <span>{% trans "Создать" %}</span>
+                          <svg class="size-[22px] shrink-0">
+                            <use href="#icon-arrow-circle"></use>
+                          </svg>
+                        </a>
+                      {% else %}
+                        <a href="{% url 'campaigns:campaigns_flow_template_id' it.ui_id %}" class="YY-LINK flex items-center justify-between gap-1 whitespace-nowrap w-full">
+                          <span>{% trans "Создать" %}</span>
+                          <svg class="size-[22px] shrink-0">
+                            <use href="#icon-arrow-circle"></use>
+                          </svg>
+                        </a>
+                      {% endif %}
+                    {% endif %}
+                  </td>
+
+                  <td class="YY-TB_TD">
+                    <div class="grid grid-cols-[250px_1fr] gap-x-2 gap-y-2">
+                      <div class="YY-STATUS_BLUE !py-1 !px-2">{% trans "Писем к отправке" %}:</div>
+                      <div class="YY-STATUS_BLUE !py-1 !px-2">{{ it.stat_total }}</div>
+
+                      <div class="YY-STATUS_GREEN !py-1 !px-2">{% trans "Отправлено" %}:</div>
+                      <div class="YY-STATUS_GREEN !py-1 !px-2">{{ it.stat_sent }}</div>
+
+                      <div class="YY-STATUS_YELLOW !py-1 !px-2">{% trans "Осталось" %}:</div>
+                      <div class="YY-STATUS_YELLOW !py-1 !px-2">{{ it.stat_left }}</div>
+                    </div>
+                  </td>
+
+                  <td class="YY-TB_TD">
+                    <form method="post" class="flex items-center gap-2">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="toggle_user_active">
+                      <input type="hidden" name="id" value="{{ it.ui_id }}">
+                      {% if it.user_active %}
+                        <span class="YY-STATUS_BLUE !mb-0 inline-flex !w-[26ch]">{% trans "Обработка включена" %}</span>
+                      {% else %}
+                        <span class="YY-STATUS_GRAY !mb-0 inline-flex !w-[26ch]">{% trans "Обработка отключена" %}</span>
+                      {% endif %}
+                      <button
+                        type="submit"
+                        class="inline-flex items-center justify-center !w-fit !mb-0 !p-0 !bg-transparent !border-0 shadow-none text-[#2f6fb0]"
+                        aria-label="{% if it.user_active %}{% trans 'Отключить обработку' %}{% else %}{% trans 'Включить обработку' %}{% endif %}"
+                        title="{% if it.user_active %}{% trans 'Отключить обработку' %}{% else %}{% trans 'Включить обработку' %}{% endif %}">
+                        {% if it.user_active %}
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          </svg>
+                        {% else %}
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />
+                          </svg>
+                        {% endif %}
+                      </button>
+                    </form>
+                  </td>
+
+                  <td class="YY-TB_TD">
+                    <a href="{% url 'campaigns:campaigns_flow_campaign_id' it.ui_id %}" class="YY-LINK flex items-center justify-between gap-1 whitespace-nowrap w-full mb-2">
+                      <span>{% trans "Изменить" %}</span>
+                      <svg class="size-[22px] shrink-0">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </a>
+
+                    <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="delete">
+                      <input type="hidden" name="id" value="{{ it.ui_id }}">
+                      <button type="submit" class="inline-flex items-center justify-between gap-1 !w-full !p-0 !m-0 bg-transparent border-0 text-[#8e0000] !font-normal underline">
+                        <span>{% trans "Удалить" %}</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859M12 3v8.25m0 0-3-3m3 3 3-3" />
+                        </svg>
+                      </button>
+                    </form>
+                  </td>
+
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="YY-CARD_WHITE mb-10">
+          {% trans "Здесь пока нет данных" %}
+        </div>
+      {% endif %}
+    </td>
+  </tr>
+</table>

@@ -167,6 +167,8 @@
   }
 
   function buildTinyConfig() {
+    const flowHeightRaw = Number(window.yyCampFlowEditorHeight || 0);
+    const flowHeight = Number.isFinite(flowHeightRaw) && flowHeightRaw > 240 ? Math.floor(flowHeightRaw) : 700;
     const insButtons = readInitButtons();
     const extraToolbar = insButtons.length ? " | " + insButtons.map((b) => b.id).join(" ") : "";
 
@@ -185,8 +187,8 @@
       newline_behavior: "linebreak",
       forced_root_block: "p",
 
-      height: 700,
-      min_height: 700,
+      height: flowHeight,
+      min_height: flowHeight,
       resize: false,
 
       content_css: false,

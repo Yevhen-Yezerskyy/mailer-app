@@ -34,23 +34,30 @@
               </div>
               <div>
                 {% if task and task.ready %}
-                  <form method="post" data-submit-role="nav">
+                  <form method="post" data-submit-role="nav" class="flex items-center gap-2">
                     {% csrf_token %}
+                    {% if task.user_active %}
+                      <span class="YY-STATUS_BLUE !mb-0 inline-flex !w-[24ch]">{% trans "Обработка включена" %}</span>
+                    {% else %}
+                      <span class="YY-STATUS_GRAY !mb-0 inline-flex !w-[24ch]">{% trans "Обработка отключена" %}</span>
+                    {% endif %}
                     <button
                       type="submit"
                       name="action"
                       value="toggle_user_active"
-                      class="YY-BUTTON_MAIN">
-                      <span class="flex items-center justify-center gap-1 w-full">
-                        {% if task.user_active %}
-                          <span>{% trans "Обработка включена. Отключить" %}</span>
-                        {% else %}
-                          <span>{% trans "Обработка отключена. Включить" %}</span>
-                        {% endif %}
-                        <svg class="size-4 shrink-0" aria-hidden="true">
-                          <use href="#icon-arrow-circle"></use>
+                      class="YY-BUTTON_MAIN !w-fit !mb-0"
+                      aria-label="{% if task.user_active %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}"
+                      title="{% if task.user_active %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}">
+                      {% if task.user_active %}
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                         </svg>
-                      </span>
+                      {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />
+                        </svg>
+                      {% endif %}
                     </button>
                   </form>
                 {% endif %}
@@ -79,7 +86,7 @@
                         disabled>
                         <span class="flex items-center justify-center gap-1 w-full">
                           <span>{{ step.label }}</span>
-                          <svg class="size-4 shrink-0" aria-hidden="true">
+                          <svg class="size-[22px] shrink-0" aria-hidden="true">
                             <use href="#icon-arrow-circle"></use>
                           </svg>
                         </span>
@@ -93,7 +100,7 @@
                         disabled>
                         <span class="flex items-center justify-center gap-1 w-full">
                           <span>{{ step.label }}</span>
-                          <svg class="size-4 shrink-0" aria-hidden="true">
+                          <svg class="size-[22px] shrink-0" aria-hidden="true">
                             <use href="#icon-arrow-circle"></use>
                           </svg>
                         </span>
@@ -109,7 +116,7 @@
                       data-dirty-nav-skip-required="1">
                       <span class="flex items-center justify-center gap-1 w-full">
                         <span>{{ step.label }}</span>
-                        <svg class="size-4 shrink-0" aria-hidden="true">
+                          <svg class="size-[22px] shrink-0" aria-hidden="true">
                           <use href="#icon-arrow-circle"></use>
                         </svg>
                       </span>
@@ -125,7 +132,7 @@
                       disabled>
                       <span class="flex items-center justify-center gap-1 w-full">
                         <span>{{ step.label }}</span>
-                        <svg class="size-4 shrink-0" aria-hidden="true">
+                        <svg class="size-[22px] shrink-0" aria-hidden="true">
                           <use href="#icon-arrow-circle"></use>
                         </svg>
                       </span>
@@ -146,5 +153,34 @@
 
 {{ flow_js_config|json_script:"yy-create-edit-flow-config" }}
 <script src="{% static 'js/aap_audience/create_edit_flow.js' %}"></script>
+{% if flow_gpt_unavailable_popup_text %}
+  <script>
+    (function () {
+      const message = "{{ flow_gpt_unavailable_popup_text|escapejs }}";
+      const openPopup = function () {
+        if (window.__yyGptUnavailablePopupShown) {
+          return;
+        }
+        window.__yyGptUnavailablePopupShown = true;
+        if (window.YYModal && typeof window.YYModal.open === "function") {
+          const html =
+            '<div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:560px;">' +
+            '<button type="button" class="YY-BUTTON_MAIN !w-fit" data-yy-modal-close style="position:absolute;top:10px;right:10px;">✕</button>' +
+            '<div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">' +
+            '<div class="YY-STATUS_RED w-full">' + message + "</div>" +
+            "</div></div>";
+          window.YYModal.open("text=" + html);
+          return;
+        }
+        window.alert(message);
+      };
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", openPopup, { once: true });
+        return;
+      }
+      openPopup();
+    })();
+  </script>
+{% endif %}
 
 {% endblock %}

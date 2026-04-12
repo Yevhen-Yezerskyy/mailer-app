@@ -41,6 +41,9 @@
     if (uR) uR.classList.remove("hidden");
 
     setMode("user");
+    if (typeof window.yyCampScheduleFlowHeightSync === "function") {
+      window.yyCampScheduleFlowHeightSync();
+    }
   }
 
   function showAdvancedMode() {
@@ -55,6 +58,9 @@
     if (aR) aR.classList.remove("hidden");
 
     setMode("advanced");
+    if (typeof window.yyCampScheduleFlowHeightSync === "function") {
+      window.yyCampScheduleFlowHeightSync();
+    }
   }
 
   function getCampaignId() {

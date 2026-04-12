@@ -12,10 +12,21 @@ document.addEventListener("DOMContentLoaded", () => {
      =============================== */
   const sidebar = document.getElementById("panel-sidebar");
   const btn = document.querySelector("[data-sidebar-toggle]");
+  const expandedIcon = btn ? btn.querySelector("[data-sidebar-icon-expanded]") : null;
+  const collapsedIcon = btn ? btn.querySelector("[data-sidebar-icon-collapsed]") : null;
+
+  function syncSidebarToggleIcon() {
+    if (!sidebar) return;
+    const isCollapsed = sidebar.classList.contains("hidden");
+    if (expandedIcon) expandedIcon.classList.toggle("hidden", isCollapsed);
+    if (collapsedIcon) collapsedIcon.classList.toggle("hidden", !isCollapsed);
+  }
 
   if (btn && sidebar) {
+    syncSidebarToggleIcon();
     btn.addEventListener("click", () => {
       sidebar.classList.toggle("hidden");
+      syncSidebarToggleIcon();
     });
   }
 

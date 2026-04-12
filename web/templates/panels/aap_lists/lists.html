@@ -57,14 +57,14 @@
 
     <div class="flex gap-3 mt-3">
       {% if state == "edit" and edit_obj %}
-        <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">
+        <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN !py-2">
           {% trans "Сохранить изменения" %}
         </button>
-        <button type="submit" name="action" value="cancel" class="YY-BUTTON_MAIN" formnovalidate>
+        <button type="submit" name="action" value="cancel" class="YY-BUTTON_MAIN !py-2" formnovalidate>
           {% trans "Отменить" %}
         </button>
       {% else %}
-        <button type="submit" name="action" value="add" class="YY-BUTTON_MAIN">
+        <button type="submit" name="action" value="add" class="YY-BUTTON_MAIN !py-2">
           {% trans "Добавить" %}
         </button>
       {% endif %}

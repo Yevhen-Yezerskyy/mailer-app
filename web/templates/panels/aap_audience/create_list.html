@@ -13,7 +13,7 @@
         <button
           type="button"
           onclick="location.href='{% url 'audience:create_edit_sell' %}'"
-          class="YY-BUTTON_GREEN_FULL">
+          class="YY-BUTTON_GREEN_FULL !py-2">
           {% trans "Создать список рассылки" %}<br>{% trans "поиск клиентов / покупателей" %}
         </button>
       </div>
@@ -24,7 +24,7 @@
         <button
           type="button"
           onclick="location.href='{% url 'audience:create_edit_buy' %}'"
-          class="YY-BUTTON_YELLOW_FULL">
+          class="YY-BUTTON_YELLOW_FULL !py-2">
           {% trans "Создать список рассылки" %}<br>{% trans "поиск поставщиков / подрядчиков" %}
         </button>
       </div>
@@ -40,50 +40,267 @@
           <table class="w-full text-left">
             <thead>
               <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[25%]">{% trans "Тип аудитории" %}</th>
-                <th class="YY-TH_TH w-[70%]">{% trans "Название аудитории" %}</th>
-                <th class="YY-TH_TH">&nbsp;</th>
+                {% if show_archive %}
+                  <th class="YY-TH_TH !w-[220px]">{% trans "Архив" %}</th>
+                {% else %}
+                  <th class="YY-TH_TH !w-[220px]">{% trans "Списки рассылок" %}</th>
+                {% endif %}
+                <th class="YY-TH_TH w-[70%]">&nbsp;</th>
+                <th class="YY-TH_TH text-right">
+                  {% if has_archived_tasks %}
+                    {% if show_archive %}
+                      <a href="{% url 'audience:create_list' %}" class="inline-flex items-center gap-1 text-[#8e0000] !font-normal underline">
+                        <span>{% trans "Активные" %}</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                        </svg>
+                      </a>
+                    {% else %}
+                      <a href="{% url 'audience:create_list' %}?show=archive" class="inline-flex items-center gap-1 text-[#8e0000] !font-normal underline">
+                        <span>{% trans "Архив" %}</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="m7.875 14.25 1.214 1.942a2.25 2.25 0 0 0 1.908 1.058h2.006c.776 0 1.497-.4 1.908-1.058l1.214-1.942M2.41 9h4.636a2.25 2.25 0 0 1 1.872 1.002l.164.246a2.25 2.25 0 0 0 1.872 1.002h2.092a2.25 2.25 0 0 0 1.872-1.002l.164-.246A2.25 2.25 0 0 1 16.954 9h4.636M2.41 9a2.25 2.25 0 0 0-.16.832V12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 12V9.832c0-.287-.055-.57-.16-.832M2.41 9a2.25 2.25 0 0 1 .382-.632l3.285-3.832a2.25 2.25 0 0 1 1.708-.786h8.43c.657 0 1.281.287 1.709.786l3.284 3.832c.163.19.291.404.382.632M4.5 20.25h15A2.25 2.25 0 0 0 21.75 18v-2.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125V18a2.25 2.25 0 0 0 2.25 2.25Z" />
+                        </svg>
+                      </a>
+                    {% endif %}
+                  {% endif %}
+                </th>
               </tr>
             </thead>
             <tbody>
               {% for t in tasks %}
                 <tr class="YY-TB_TR">
-                  <td class="YY-TB_TD">
+                  <td class="YY-TB_TD !w-[220px] !px-1 !py-4">
                     {% if t.type == "buy" %}
-                      <div class="YY-STATUS_YELLOW !mb-0">{% trans "Поиск поставщиков / подрядчиков" %}</div>
+                      <div class="YY-STATUS_YELLOW !bg-white !mb-0">{% trans "Поиск поставщиков / подрядчиков" %}</div>
                     {% else %}
-                      <div class="YY-STATUS_GREEN !mb-0">{% trans "Поиск клиентов / покупателей" %}</div>
+                      <div class="YY-STATUS_GREEN !bg-white !mb-0">{% trans "Поиск клиентов / покупателей" %}</div>
                     {% endif %}
-                  </td>
-                  <td class="YY-TB_TD">
-                    {% if t.type == "buy" %}
-                      <div class="YY-STATUS_YELLOW !w-fit">{{ t.title|default:""|linebreaksbr }}</div>
-                    {% else %}
-                      <div class="YY-STATUS_GREEN !w-fit">{{ t.title|default:""|linebreaksbr }}</div>
-                    {% endif %}
-                    <a href="#" class="YY-BUTTON_MAIN" data-yy-modal="url=/panel/audience/create/modal/?id={{ t.ui_id }}">
-                      {% trans "Подробнее" %}
-                    </a>
-                  </td>
-                  <td class="YY-TB_TD">
-                    <div class="flex flex-col gap-2">
-                      {% if t.type == "buy" %}
-                        <a href="{% url 'audience:create_edit_buy_id' t.ui_id %}" class="YY-BUTTON_MAIN_FULL">
-                          {% trans "Изменить" %}
-                        </a>
+                    <form method="post" class="flex items-center gap-2 mt-3">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="toggle_user_active">
+                      <input type="hidden" name="id" value="{{ t.ui_id }}">
+                      {% if t.user_active %}
+                        <span class="YY-STATUS_BLUE !mb-0 inline-flex !w-[26ch]">{% trans "Обработка включена" %}</span>
                       {% else %}
-                        <a href="{% url 'audience:create_edit_sell_id' t.ui_id %}" class="YY-BUTTON_MAIN_FULL">
-                          {% trans "Изменить" %}
-                        </a>
+                        <span class="YY-STATUS_GRAY !mb-0 inline-flex !w-[26ch]">{% trans "Обработка отключена" %}</span>
                       {% endif %}
-                      <form method="post" onsubmit="return confirm('{% trans "Удалить задачу?" %}')">
-                        {% csrf_token %}
-                        <input type="hidden" name="action" value="delete">
-                        <input type="hidden" name="id" value="{{ t.ui_id }}">
-                        <button type="submit" class="YY-BUTTON_RED_FULL">
-                          {% trans "Удалить" %}
-                        </button>
-                      </form>
+                      <button
+                        type="submit"
+                        class="inline-flex items-center justify-center !w-fit !mb-0 !p-0 !bg-transparent !border-0 shadow-none {% if t.type == 'buy' %}text-[#795b00]{% else %}text-[#097309]{% endif %}"
+                        {% if not t.ready %}disabled{% endif %}
+                        aria-label="{% if t.user_active %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}"
+                        title="{% if t.user_active %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}">
+                        {% if t.user_active %}
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          </svg>
+                        {% else %}
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />
+                          </svg>
+                        {% endif %}
+                      </button>
+                    </form>
+                  </td>
+                  <td
+                    class="YY-TB_TD !px-1 !py-4"
+                    data-create-flow-row="1"
+                    data-create-contacts-url="{% url 'audience:create_contacts_total' %}?flow_type={{ t.type|urlencode }}&id={{ t.ui_id|urlencode }}"
+                    data-create-mailing-url="{% url 'audience:create_mailing_status' %}?flow_type={{ t.type|urlencode }}&id={{ t.ui_id|urlencode }}">
+                    {% if t.type == "buy" %}
+                      <div class="YY-STATUS_YELLOW !bg-white !w-full !mb-0">
+                        <div class="w-full">
+                          <span class="min-w-0">{{ t.title|default:""|linebreaksbr }}</span>&nbsp;&nbsp;&nbsp;<a href="#" class="inline-flex items-center gap-1 shrink-0 !font-normal text-[#795b00]" data-yy-modal="url=/panel/audience/create/modal/?id={{ t.ui_id }}">
+                            <span>{% trans "Подробнее" %}</span>
+                            <svg class="size-[22px] shrink-0" aria-hidden="true">
+                              <use href="#icon-arrow-circle"></use>
+                            </svg>
+                          </a>
+                        </div>
+                      </div>
+                    {% else %}
+                      <div class="YY-STATUS_GREEN !bg-white !w-full !mb-0">
+                        <div class="w-full">
+                          <span class="min-w-0">{{ t.title|default:""|linebreaksbr }}</span>&nbsp;&nbsp;&nbsp;<a href="#" class="inline-flex items-center gap-1 shrink-0 !font-normal text-[#097309]" data-yy-modal="url=/panel/audience/create/modal/?id={{ t.ui_id }}">
+                            <span>{% trans "Подробнее" %}</span>
+                            <svg class="size-[22px] shrink-0" aria-hidden="true">
+                              <use href="#icon-arrow-circle"></use>
+                            </svg>
+                          </a>
+                        </div>
+                      </div>
+                    {% endif %}
+                    <div class="mt-3 flex items-stretch gap-2 w-full">
+                      <div class="basis-1/2 min-w-0" data-create-contacts-widget="1">
+                        <div
+                          data-create-contacts-state="active"
+                          class="flex items-center gap-1 flex-wrap"
+                          {% if not t.active %}style="display:none !important;"{% endif %}>
+                          <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-[31ch] !mb-0 !justify-between gap-1">
+                            <span>{% trans "Контакты собираются" %}</span>
+                            <span class="inline-block h-3.5 w-3.5 rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin align-[-0.125em] shrink-0" aria-hidden="true"></span>
+                          </span>
+                          <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-[21ch] !mb-0 !grid !grid-cols-[minmax(0,1fr)_auto] !items-center !gap-1">
+                            <span>{% trans "Собрано:" %}</span>
+                            <span data-create-contacts-total="1" class="text-right">0</span>
+                          </span>
+                          {% if t.type == "buy" %}
+                            <a href="{% url 'audience:create_edit_buy_contacts_id' t.ui_id %}" class="inline-flex items-center text-[#795b00] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Контакты' %}" title="{% trans 'Перейти в Контакты' %}">
+                              <svg class="size-[22px] shrink-0" aria-hidden="true">
+                                <use href="#icon-arrow-circle"></use>
+                              </svg>
+                            </a>
+                          {% else %}
+                            <a href="{% url 'audience:create_edit_sell_contacts_id' t.ui_id %}" class="inline-flex items-center text-[#097309] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Контакты' %}" title="{% trans 'Перейти в Контакты' %}">
+                              <svg class="size-[22px] shrink-0" aria-hidden="true">
+                                <use href="#icon-arrow-circle"></use>
+                              </svg>
+                            </a>
+                          {% endif %}
+                        </div>
+                        <div
+                          data-create-contacts-state="inactive"
+                          class="flex items-center gap-1 flex-wrap"
+                          {% if t.active %}style="display:none !important;"{% endif %}>
+                          <span class="YY-STATUS_GRAY !w-[31ch] !mb-0">
+                            {% trans "Сбор контактов приостановлен" %}
+                          </span>
+                          <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-[21ch] !mb-0 !grid !grid-cols-[minmax(0,1fr)_auto] !items-center !gap-1">
+                            <span>{% trans "Собрано:" %}</span>
+                            <span data-create-contacts-total="1" class="text-right">0</span>
+                          </span>
+                          {% if t.type == "buy" %}
+                            <a href="{% url 'audience:create_edit_buy_contacts_id' t.ui_id %}" class="inline-flex items-center text-[#795b00] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Контакты' %}" title="{% trans 'Перейти в Контакты' %}">
+                              <svg class="size-[22px] shrink-0" aria-hidden="true">
+                                <use href="#icon-arrow-circle"></use>
+                              </svg>
+                            </a>
+                          {% else %}
+                            <a href="{% url 'audience:create_edit_sell_contacts_id' t.ui_id %}" class="inline-flex items-center text-[#097309] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Контакты' %}" title="{% trans 'Перейти в Контакты' %}">
+                              <svg class="size-[22px] shrink-0" aria-hidden="true">
+                                <use href="#icon-arrow-circle"></use>
+                              </svg>
+                            </a>
+                          {% endif %}
+                        </div>
+                      </div>
+                      <div class="basis-1/2 min-w-0" data-create-rating-widget="1">
+                        <div
+                          data-create-rating-state="active"
+                          class="flex items-center gap-1 flex-wrap"
+                          {% if not t.active %}style="display:none !important;"{% endif %}>
+                          <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-[31ch] !mb-0 !justify-between gap-1">
+                            <span>{% trans "Рейтингование запущено" %}</span>
+                            <span class="inline-block h-3.5 w-3.5 rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin align-[-0.125em] shrink-0" aria-hidden="true"></span>
+                          </span>
+                          <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-[21ch] !mb-0 !grid !grid-cols-[minmax(0,1fr)_auto] !items-center !gap-1">
+                            <span class="inline-flex items-center !gap-0">
+                              <span>{% trans "Рейтинги" %}</span><span aria-hidden="true">&nbsp;</span>
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.25c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V2.75a.75.75 0 0 1 .75-.75 2.25 2.25 0 0 1 2.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282m0 0h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23H5.904m10.598-9.75H14.25M5.904 18.5c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 0 1-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h1.053c.472 0 .745.556.5.96a8.958 8.958 0 0 0-1.302 4.665c0 1.194.232 2.333.654 3.375Z" />
+                              </svg>
+                              <span>:</span>
+                            </span>
+                            <span data-create-rating-total="1" class="text-right">0</span>
+                          </span>
+                          {% if t.type == "buy" %}
+                            <a href="{% url 'audience:create_edit_buy_mailing_list_id' t.ui_id %}" class="inline-flex items-center text-[#795b00] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Рейтинг' %}" title="{% trans 'Перейти в Рейтинг' %}">
+                              <svg class="size-[22px] shrink-0" aria-hidden="true">
+                                <use href="#icon-arrow-circle"></use>
+                              </svg>
+                            </a>
+                          {% else %}
+                            <a href="{% url 'audience:create_edit_sell_mailing_list_id' t.ui_id %}" class="inline-flex items-center text-[#097309] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Рейтинг' %}" title="{% trans 'Перейти в Рейтинг' %}">
+                              <svg class="size-[22px] shrink-0" aria-hidden="true">
+                                <use href="#icon-arrow-circle"></use>
+                              </svg>
+                            </a>
+                          {% endif %}
+                        </div>
+                        <div
+                          data-create-rating-state="inactive"
+                          class="flex items-center gap-1 flex-wrap"
+                          {% if t.active %}style="display:none !important;"{% endif %}>
+                          <span class="YY-STATUS_GRAY !w-[31ch] !mb-0">
+                            {% trans "Рейтингование приостановлено" %}
+                          </span>
+                          <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-[21ch] !mb-0 !grid !grid-cols-[minmax(0,1fr)_auto] !items-center !gap-1">
+                            <span class="inline-flex items-center !gap-0">
+                              <span>{% trans "Рейтинги" %}</span><span aria-hidden="true">&nbsp;</span>
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.25c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V2.75a.75.75 0 0 1 .75-.75 2.25 2.25 0 0 1 2.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282m0 0h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23H5.904m10.598-9.75H14.25M5.904 18.5c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 0 1-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h1.053c.472 0 .745.556.5.96a8.958 8.958 0 0 0-1.302 4.665c0 1.194.232 2.333.654 3.375Z" />
+                              </svg>
+                              <span>:</span>
+                            </span>
+                            <span data-create-rating-total="1" class="text-right">0</span>
+                          </span>
+                          {% if t.type == "buy" %}
+                            <a href="{% url 'audience:create_edit_buy_mailing_list_id' t.ui_id %}" class="inline-flex items-center text-[#795b00] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Рейтинг' %}" title="{% trans 'Перейти в Рейтинг' %}">
+                              <svg class="size-[22px] shrink-0" aria-hidden="true">
+                                <use href="#icon-arrow-circle"></use>
+                              </svg>
+                            </a>
+                          {% else %}
+                            <a href="{% url 'audience:create_edit_sell_mailing_list_id' t.ui_id %}" class="inline-flex items-center text-[#097309] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Рейтинг' %}" title="{% trans 'Перейти в Рейтинг' %}">
+                              <svg class="size-[22px] shrink-0" aria-hidden="true">
+                                <use href="#icon-arrow-circle"></use>
+                              </svg>
+                            </a>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="YY-TB_TD !px-1 !py-4">
+                    <div class="flex flex-col gap-3">
+                      {% if show_archive %}
+                        <form method="post" onsubmit="return confirm('{% trans "Активировать задачу?" %}')">
+                          {% csrf_token %}
+                          <input type="hidden" name="action" value="activate">
+                          <input type="hidden" name="id" value="{{ t.ui_id }}">
+                          <div class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !bg-white !w-full !mb-0">
+                            <button type="submit" class="inline-flex items-center justify-between gap-1 !w-full !p-0 !m-0 bg-transparent border-0 text-[#8e0000] !font-normal underline">
+                              <span>{% trans "Активировать" %}</span>
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                              </svg>
+                            </button>
+                          </div>
+                        </form>
+                      {% else %}
+                        <div class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !bg-white !w-full !mb-0">
+                          {% if t.type == "buy" %}
+                            <a href="{% url 'audience:create_edit_buy_id' t.ui_id %}" class="inline-flex items-center justify-between gap-1 !w-full !font-normal underline">
+                              <span>{% trans "Изменить" %}</span>
+                              <svg class="size-[22px] shrink-0" aria-hidden="true">
+                                <use href="#icon-arrow-circle"></use>
+                              </svg>
+                            </a>
+                          {% else %}
+                            <a href="{% url 'audience:create_edit_sell_id' t.ui_id %}" class="inline-flex items-center justify-between gap-1 !w-full !font-normal underline">
+                              <span>{% trans "Изменить" %}</span>
+                              <svg class="size-[22px] shrink-0" aria-hidden="true">
+                                <use href="#icon-arrow-circle"></use>
+                              </svg>
+                            </a>
+                          {% endif %}
+                        </div>
+                        <form method="post" onsubmit="return confirm('{% trans "Архивировать задачу?" %}')">
+                          {% csrf_token %}
+                          <input type="hidden" name="action" value="delete">
+                          <input type="hidden" name="id" value="{{ t.ui_id }}">
+                          <div class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !bg-white !w-full !mb-0">
+                            <button type="submit" class="inline-flex items-center justify-between gap-1 !w-full !p-0 !m-0 bg-transparent border-0 text-[#8e0000] !font-normal underline">
+                              <span>{% trans "Архивировать" %}</span>
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859M12 3v8.25m0 0-3-3m3 3 3-3" />
+                              </svg>
+                            </button>
+                          </div>
+                        </form>
+                      {% endif %}
                     </div>
                   </td>
                 </tr>
@@ -99,5 +316,123 @@
     </td>
   </tr>
 </table>
+
+{% if tasks %}
+<script>
+  (function () {
+    const pollIntervalMs = 5000;
+    const formatter = new Intl.NumberFormat("ru-RU");
+    let inFlight = false;
+
+    function setVisible(node, visible) {
+      if (!node) return;
+      if (visible) {
+        node.removeAttribute("hidden");
+        node.style.removeProperty("display");
+        return;
+      }
+      node.setAttribute("hidden", "hidden");
+      node.style.setProperty("display", "none", "important");
+    }
+
+    function formatNumber(value) {
+      const number = Number(value || 0);
+      if (!Number.isFinite(number)) {
+        return "0";
+      }
+      return formatter.format(number);
+    }
+
+    function fetchJson(url) {
+      return window.fetch(url, {
+        credentials: "same-origin",
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      }).then(function (response) {
+        return response.json().catch(function () {
+          return { ok: false };
+        }).then(function (payload) {
+          return { response: response, payload: payload };
+        });
+      }).then(function (result) {
+        const payload = result.payload || {};
+        if (!result.response.ok || !payload.ok) return null;
+        return payload;
+      });
+    }
+
+    function applyContactsState(row, payload) {
+      const widget = row.querySelector("[data-create-contacts-widget='1']");
+      if (!widget || !payload) return;
+      const isActive = payload.is_active === true;
+      setVisible(widget.querySelector("[data-create-contacts-state='active']"), isActive);
+      setVisible(widget.querySelector("[data-create-contacts-state='inactive']"), !isActive);
+      const totalText = formatNumber(payload.contacts_total || 0);
+      widget.querySelectorAll("[data-create-contacts-total='1']").forEach(function (node) {
+        node.textContent = totalText;
+      });
+    }
+
+    function applyRatingState(row, payload) {
+      const widget = row.querySelector("[data-create-rating-widget='1']");
+      if (!widget || !payload) return;
+      const isRunning = payload.is_running === true;
+      setVisible(widget.querySelector("[data-create-rating-state='active']"), isRunning);
+      setVisible(widget.querySelector("[data-create-rating-state='inactive']"), !isRunning);
+      const ratedCount = Number(payload.rated_count || 0);
+      const outCount = Number(payload.out_count || 0);
+      const leRateLimit = Math.max(0, (Number.isFinite(ratedCount) ? ratedCount : 0) - (Number.isFinite(outCount) ? outCount : 0));
+      const ratedText = formatNumber(leRateLimit);
+      widget.querySelectorAll("[data-create-rating-total='1']").forEach(function (node) {
+        node.textContent = ratedText;
+      });
+    }
+
+    function refreshRow(row) {
+      const contactsUrl = String(row.getAttribute("data-create-contacts-url") || "").trim();
+      const mailingUrl = String(row.getAttribute("data-create-mailing-url") || "").trim();
+      const requests = [];
+
+      if (contactsUrl) {
+        requests.push(
+          fetchJson(contactsUrl).then(function (payload) {
+            if (!payload) return;
+            applyContactsState(row, payload);
+          }).catch(function () {
+          })
+        );
+      }
+
+      if (mailingUrl) {
+        requests.push(
+          fetchJson(mailingUrl).then(function (payload) {
+            if (!payload) return;
+            applyRatingState(row, payload);
+          }).catch(function () {
+          })
+        );
+      }
+
+      return Promise.all(requests);
+    }
+
+    function refreshAllRows() {
+      if (inFlight) return;
+      const rows = Array.from(document.querySelectorAll("[data-create-flow-row='1']"));
+      if (!rows.length) return;
+      inFlight = true;
+      Promise.all(rows.map(function (row) {
+        return refreshRow(row);
+      })).finally(function () {
+        inFlight = false;
+      });
+    }
+
+    refreshAllRows();
+    window.setInterval(refreshAllRows, pollIntervalMs);
+  })();
+</script>
+{% endif %}
 
 {% endblock %}

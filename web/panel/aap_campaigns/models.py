@@ -50,6 +50,15 @@ class Campaign(models.Model):
         "aap_lists.MailingList",
         on_delete=models.PROTECT,
         related_name="campaigns",
+        null=True,
+        blank=True,
+    )
+    sending_list = models.ForeignKey(
+        "aap_audience.AudienceTask",
+        on_delete=models.PROTECT,
+        related_name="campaigns",
+        null=True,
+        blank=True,
     )
 
     campaign_parent = models.ForeignKey(
@@ -65,6 +74,8 @@ class Campaign(models.Model):
     end_at = models.DateTimeField(null=True, blank=True)
 
     active = models.BooleanField(default=False)
+    user_active = models.BooleanField(default=True)
+    archived = models.BooleanField(default=False)
 
     window = models.JSONField(
         default=dict,

@@ -12,7 +12,16 @@
             <tr class="YY-TH_TR">
               <th class="YY-TH_TH w-[40%]">{% trans "Контакт" %}</th>
               <th class="YY-TH_TH w-[40%]">{% trans "Категория - Город" %}</th>
-              <th class="YY-TH_TH text-center whitespace-nowrap">{% trans "Pair-R" %}</th>
+              <th class="YY-TH_TH text-center whitespace-nowrap">
+                <button
+                  type="button"
+                  class="inline-flex items-center justify-center !p-0 !m-0 bg-transparent border-0 underline"
+                  data-pair-rate-help-open="1"
+                  aria-label="{% trans 'Рейтинг Pair-R' %}"
+                  title="{% trans 'Рейтинг Pair-R' %}">
+                  {% trans "Pair-R" %}
+                </button>
+              </th>
               <th class="YY-TH_TH whitespace-nowrap">{% trans "Добавлено" %}</th>
               <th class="YY-TH_TH">&nbsp;</th>
             </tr>
@@ -41,7 +50,7 @@
                      class="YY-LINK flex items-center gap-1 whitespace-nowrap"
                      data-yy-modal="url={{ row.contact_modal_url|escape }}">
                     <span>{% trans "Подробнее" %}</span>
-                    <svg class="size-4 shrink-0" aria-hidden="true">
+                    <svg class="size-[22px] shrink-0" aria-hidden="true">
                       <use href="#icon-arrow-circle"></use>
                     </svg>
                   </a>

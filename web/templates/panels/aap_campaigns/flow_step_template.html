@@ -1,0 +1,187 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_campaigns/flow_step_template.html -->
+<!-- DATE: 2026-04-09 -->
+<!-- PURPOSE: Шаг флоу "Шаблон": встроенный CRUD шаблонов писем. -->
+
+{% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}
+  <form method="post" id="yyTplForm">
+    {% csrf_token %}
+    {% if tpl_edit_obj %}
+      <input type="hidden" name="id" value="{{ tpl_edit_obj.ui_id }}">
+    {% endif %}
+
+    <input type="hidden" name="editor_mode" id="yyEditorMode" value="user">
+    <input type="hidden" name="editor_html" id="yyEditorHtml">
+    <input type="hidden" name="css_text" id="yyCssText">
+{% endif %}
+
+<table class="YY-MAIN_TABLE !mt-3 !mb-10" {% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}data-campaign-template-flow-root="1"{% endif %}>
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD {% if tpl_state == 'edit' and tpl_edit_obj or tpl_state == 'add' %}w-[70%]{% else %}w-[40%]{% endif %}">
+      <div class="YY-CARD_WHITE h-full min-h-0 flex flex-col" {% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}data-campaign-template-left-card="1"{% endif %}>
+        {% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}
+          {% if tpl_error_msg %}
+            <div class="YY-CARD_IN_FORM_ERROR">{{ tpl_error_msg }}</div>
+          {% endif %}
+
+          <div id="yyUserModeLeft" class="flex-1 min-h-0">
+            <textarea id="yyTinyEditor" class="border border-[#cbcbcb] bg-white w-full h-full" spellcheck="false"></textarea>
+          </div>
+
+          <div id="yyAdvancedModeLeft" class="hidden flex-1 min-h-0">
+            <textarea id="yyAdvHtml" class="w-full h-full" spellcheck="false"></textarea>
+          </div>
+        {% else %}
+          <div class="YY-STATUS_BLUE mb-3">{% trans "Шаблон письма" %}</div>
+          <div class="YY-TEXT !mb-4">
+            {% trans "Для рассылки используются шаблоны писем. Часто один и тот же шаблон удобно использовать для нескольких кампаний." %}
+          </div>
+          <div class="YY-TEXT !mb-4">
+            {% trans "Пожалуйста, выберите шаблон для этой кампании из сохранённых вами для использования в этой компании или создайте новый шаблон." %}
+          </div>
+          <div class="YY-TEXT !mb-0">
+            {% trans "При редактировании шаблона можно менять только шапку и футер письма. Текст в письме условный — при реальной рассылке он будет заменён на текст письма конкретной кампании. При редакции письма, наоборот, можно менять только текст писма, хедер и футер как часть шаблона менять нельзя." %}
+          </div>
+        {% endif %}
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD {% if tpl_state == 'edit' and tpl_edit_obj or tpl_state == 'add' %}w-[30%]{% else %}w-[60%]{% endif %}">
+      <div class="YY-CARD_WHITE h-full min-h-0 flex flex-col" {% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}data-campaign-template-right-card="1"{% endif %}>
+        {% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}
+          <div class="flex-1 min-h-0 flex flex-col">
+            <textarea
+              name="template_name"
+              rows="2"
+              class="YY-TEXTAREA !mb-3 !min-h-0"
+              placeholder="{% trans "Ваш шаблон: название" %}">{% if tpl_edit_obj %}{{ tpl_edit_obj.template_name }}{% else %}{{ flow_tpl_name_input|default:'' }}{% endif %}</textarea>
+
+            <div id="yyUserModeRight" class="flex-1 min-h-0 overflow-y-auto pr-1">
+              <div class="grid grid-cols-2 gap-3 mb-10">
+                <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToAdvanced()">{% trans "Экспертный режим" %}</button>
+                <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplPreviewCurrent()">{% trans "Предпросмотр" %}</button>
+              </div>
+
+              {% if global_tpl_items %}
+                <div class="grid grid-cols-2 gap-3 mb-10">
+                  {% for gt in global_tpl_items %}
+                    <div>
+                      {% if gt.is_current %}
+                        <button type="button" class="YY-BUTTON_GREEN yy-tpl-global-btn w-full" data-gid="{{ gt.id }}">{% trans "Шаблон" %} - {{ gt.template_name }}</button>
+                      {% else %}
+                        <button type="button" class="YY-BUTTON_MAIN yy-tpl-global-btn w-full" data-gid="{{ gt.id }}">{% trans "Шаблон" %} - {{ gt.template_name }}</button>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+
+              <div class="grid grid-cols-2 gap-3 mb-10">
+                <div>
+                  {% if global_style_gid and global_colors %}
+                    <div class="flex flex-col gap-2 mb-5">
+                      {% for k in global_colors %}
+                        <button type="button" class="YY-BUTTON_TAB_MAIN yy-tpl-overlay-btn w-full py-1" data-gid="{{ global_style_gid }}" data-type="colors" data-name="{{ k }}">{{ k }}</button>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+                <div>
+                  {% if global_style_gid and global_fonts %}
+                    <div class="flex flex-col gap-2">
+                      {% for k in global_fonts %}
+                        <button type="button" class="YY-BUTTON_TAB_MAIN yy-tpl-overlay-btn w-full py-1" data-gid="{{ global_style_gid }}" data-type="fonts" data-name="{{ k }}">{{ k }}</button>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div id="yyAdvancedModeRight" class="hidden flex-1 min-h-0 overflow-y-auto pr-1">
+              <div class="grid grid-cols-2 gap-3 mb-5">
+                <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToUser()">{% trans "Визуальный режим" %}</button>
+                <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplPreviewCurrent()">{% trans "Предпросмотр" %}</button>
+              </div>
+
+              <textarea id="yyAdvCss" class="YY-TEXTAREA w-full h-full" spellcheck="false"></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 mt-auto pt-5">
+              <button type="submit" name="action" value="{% if tpl_state == 'edit' %}tpl_save{% else %}tpl_add{% endif %}" class="YY-BUTTON_MAIN">{% trans "Сохранить" %}</button>
+              <button
+                type="submit"
+                name="action"
+                value="tpl_to_letter"
+                class="{% if tpl_state == 'edit' and tpl_edit_obj %}YY-BUTTON_MAIN{% else %}YY-BUTTON_GRAY{% endif %} gap-2"
+                formnovalidate
+                {% if tpl_state != 'edit' or not tpl_edit_obj %}disabled{% endif %}>
+                <span>{% trans "Письмо кампании" %}</span>
+                <svg class="size-[22px] shrink-0" aria-hidden="true">
+                  <use href="#icon-arrow-circle"></use>
+                </svg>
+              </button>
+            </div>
+          </div>
+        {% else %}
+          <form method="post" class="h-full min-h-0 flex flex-col">
+            {% csrf_token %}
+            {% if tpl_items %}
+              <div class="space-y-2 mb-2 max-h-[530px] overflow-auto pr-1">
+                {% for it in tpl_items %}
+                  <div class="YY-CARD_IN_FORM_BLANK !mb-0 !py-1 min-h-[30px] flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <input class="m-0 align-middle" type="radio" name="template" value="{{ it.ui_id }}" id="yyTplRadio{{ forloop.counter }}" {% if flow_selected_template_ui and flow_selected_template_ui == it.ui_id %}checked{% endif %}>
+                      <span class="text-sm leading-none truncate">{{ it.template_name }}</span>
+                    </div>
+                    <button type="button" class="YY-LINK !mb-0 whitespace-nowrap items-center text-sm leading-none" onclick="yyTplPreviewById('{{ it.ui_id }}')">
+                      <span>{% trans "Предпросмотр" %}</span>
+                      <svg class="size-[22px] shrink-0 ml-1" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </button>
+                  </div>
+                {% endfor %}
+              </div>
+              <button id="yyTplChooseBtn" type="submit" name="action" value="tpl_choose" class="{% if flow_selected_template_ui %}YY-BUTTON_MAIN_FULL{% else %}YY-BUTTON_GRAY_FULL{% endif %} mb-8" {% if not flow_selected_template_ui %}disabled{% endif %}>{% trans "Выбрать шаблон" %}</button>
+            {% else %}
+              <div class="YY-STATUS_BLUE mb-3">{% trans "Здесь пока нет данных" %}</div>
+              <button type="button" class="YY-BUTTON_GRAY_FULL mb-8" disabled>{% trans "Выбрать шаблон" %}</button>
+            {% endif %}
+            <a href="{{ flow_template_add_url }}" class="YY-BUTTON_MAIN_FULL text-center mt-auto">{% trans "Создать новый шаблон" %}</a>
+          </form>
+          {% if tpl_items %}
+            <script>
+              (function () {
+                const form = document.currentScript && document.currentScript.previousElementSibling;
+                if (!form) return;
+                const chooseBtn = form.querySelector("#yyTplChooseBtn");
+                if (!chooseBtn) return;
+
+                function mappedButtonClass(key) {
+                  const classMap = window.yyClassMap || (document.documentElement && document.documentElement.yyClassMap) || {};
+                  const mapped = String(classMap[key] || "").trim();
+                  return mapped ? (key + " " + mapped) : key;
+                }
+
+                function syncChooseState() {
+                  const checked = form.querySelector('input[name="template"]:checked');
+                  const enabled = !!checked;
+                  chooseBtn.disabled = !enabled;
+                  chooseBtn.setAttribute("class", mappedButtonClass(enabled ? "YY-BUTTON_MAIN_FULL" : "YY-BUTTON_GRAY_FULL") + " mb-8");
+                }
+
+                form.addEventListener("change", syncChooseState);
+                syncChooseState();
+              })();
+            </script>
+          {% endif %}
+        {% endif %}
+      </div>
+    </td>
+  </tr>
+</table>
+
+{% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}
+  </form>
+{% endif %}

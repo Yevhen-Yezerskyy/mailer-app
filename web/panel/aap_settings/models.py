@@ -13,6 +13,19 @@ AUTH_TYPE_CHOICES = [(k, k) for k in SMTP_CREDENTIALS_FORMAT.keys()]
 AUTH_TYPE_DEFAULT = "LOGIN"
 
 
+def default_global_global_window_json() -> dict:
+    return {
+        "mon": [],
+        "tue": [{"from": "08:30", "to": "12:30"}],
+        "wed": [{"from": "08:30", "to": "12:30"}],
+        "thu": [{"from": "08:30", "to": "12:30"}],
+        "fri": [],
+        "sat": [],
+        "sun": [],
+        "hol": [],
+    }
+
+
 class Mailbox(models.Model):
     workspace_id = models.UUIDField(db_index=True)
     email = models.EmailField(max_length=254)
@@ -164,6 +177,18 @@ class SendingSettings(models.Model):
     class Meta:
         app_label = "aap_settings"
         db_table = "aap_settings_sending_settings"
+
+
+class GlobalSendingSettings(models.Model):
+    singleton_key = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
+    global_global_window = models.JSONField(default=default_global_global_window_json, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = "aap_settings"
+        db_table = "aap_settings_global_sending_settings"
 
 
 class WorkspaceDomain(models.Model):

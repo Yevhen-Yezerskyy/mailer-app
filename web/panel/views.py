@@ -39,9 +39,8 @@ def dashboard(request):
 
     recent_campaigns = list(
         Campaign.objects.filter(workspace_id=ws_id)
-        .select_related("mailing_list")
-        .prefetch_related("mailing_list__audience_tasks")
-        .only("id", "title", "active", "created_at", "end_at", "mailing_list__title", "mailing_list_id", "window")
+        .select_related("sending_list")
+        .only("id", "title", "active", "created_at", "end_at", "sending_list__title", "sending_list_id", "window")
         .order_by("-created_at")
     )[:3]
     camp_ids = [int(x.id) for x in recent_campaigns]
@@ -163,11 +162,11 @@ def dashboard(request):
         with connection.cursor() as cur:
             cur.execute(
                 """
-                SELECT c.id, COUNT(lc.id) AS total_cnt
+                SELECT c.id, COUNT(*) AS total_cnt
                 FROM public.campaigns_campaigns c
-                JOIN public.lists_contacts lc
-                  ON lc.list_id = c.mailing_list_id
-                 AND lc.active = true
+                JOIN public.sending_lists lc
+                  ON lc.task_id = c.sending_list_id
+                 AND COALESCE(lc.removed, false) = false
                 WHERE c.id = ANY(%s)
                 GROUP BY c.id
                 """,
@@ -473,13 +472,11 @@ def dashboard(request):
                 "title": (camp.title or "").strip() or f"#{cid}",
                 "audience": ", ".join(
                     [
-                        (t.title or "").strip()
-                        for t in (getattr(getattr(camp, "mailing_list", None), "audience_tasks", []).all() if getattr(camp, "mailing_list", None) else [])
-                        if (t.title or "").strip()
+                        (getattr(getattr(camp, "sending_list", None), "title", "") or "").strip()
                     ]
                 )
                 or "-",
-                "mailing_list": (getattr(camp, "mailing_list", None).title if getattr(camp, "mailing_list", None) else "") or "-",
+                "mailing_list": (getattr(camp, "sending_list", None).title if getattr(camp, "sending_list", None) else "") or "-",
                 "start_at": campaign_first_sent.get(cid),
                 "end_at": camp.end_at,
                 "is_active": bool(camp.active),

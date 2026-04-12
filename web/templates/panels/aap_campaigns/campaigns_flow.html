@@ -1,0 +1,208 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+{% load static %}
+<!-- FILE: web/templates/panels/aap_campaigns/campaigns_flow.html -->
+<!-- DATE: 2026-04-09 -->
+<!-- PURPOSE: Флоу редактирования кампании: шаги Кампания / Шаблон / Письмо. -->
+
+{% block content %}
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_TD">
+      <div class="flex flex-col gap-3">
+        <div class="YY-CARD_WHITE">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex items-center gap-3 w-[60%]">
+              <input
+                type="text"
+                id="yyCampaignTitleInput"
+                name="title"
+                form="{{ flow_header_form_id }}"
+                class="YY-INPUT !mb-0 min-w-0 flex-1 {% if flow_error_title %}!border-red-500{% endif %}"
+                value="{{ flow_campaign_title_input|default:'' }}"
+                placeholder="{% trans 'Название кампании' %}">
+              {% if flow_header_form_id and flow_header_save_action %}
+                <button
+                  id="yyTopSaveBtn"
+                  type="submit"
+                  form="{{ flow_header_form_id }}"
+                  name="action"
+                  value="{{ flow_header_save_action }}"
+                  class="YY-BUTTON_MAIN !w-fit !mb-0">
+                  {% trans "Изменить" %}
+                </button>
+              {% endif %}
+            </div>
+            <div class="shrink-0">
+              <a href="{{ flow_close_url }}" class="YY-BUTTON_MAIN">{% trans "Закрыть / к кампаниям" %}</a>
+            </div>
+          </div>
+        </div>
+
+        {% if flow_campaign_ui_id %}
+          <form method="post" id="yyFlowTitleForm" class="hidden">
+            {% csrf_token %}
+            <input type="hidden" name="id" value="{{ flow_campaign_ui_id }}">
+            <input type="hidden" name="action" value="rename_campaign_title">
+          </form>
+        {% endif %}
+
+        <div class="YY-CARD_WHITE">
+          <div class="flex items-center gap-4">
+            {% for step in flow_step_states %}
+              <div class="min-w-0 flex-1">
+                {% if step.is_current %}
+                  <button type="button" class="YY-BUTTON_GREEN_FULL" disabled>
+                    <span class="flex items-center justify-center gap-1 w-full">
+                      <span>{{ step.label }}</span>
+                      <svg class="size-[22px] shrink-0" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </span>
+                  </button>
+                {% elif step.is_clickable %}
+                  <a href="{{ step.url }}" class="YY-BUTTON_MAIN_FULL">
+                    <span class="flex items-center justify-center gap-1 w-full">
+                      <span>{{ step.label }}</span>
+                      <svg class="size-[22px] shrink-0" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </span>
+                  </a>
+                {% else %}
+                  <button type="button" class="YY-BUTTON_GRAY_FULL" disabled>
+                    <span class="flex items-center justify-center gap-1 w-full">
+                      <span>{{ step.label }}</span>
+                      <svg class="size-[22px] shrink-0" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </span>
+                  </button>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+{% if step_template %}
+  {% include step_template %}
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  {% if flow_current_step == "campaign" %}
+    <script>
+      (function () {
+        const form = document.getElementById("yyCampaignForm");
+        const titleInput = document.getElementById("yyCampaignTitleInput");
+        if (!form || !titleInput) return;
+
+        const sendingList = form.querySelector('select[name="sending_list"]');
+        const mailbox = form.querySelector('select[name="mailbox"]');
+        let lastGenerated = "";
+
+        function selectedText(selectEl) {
+          if (!selectEl) return "";
+          const opt = selectEl.options[selectEl.selectedIndex];
+          if (!opt) return "";
+          const val = String(opt.value || "").trim();
+          if (!val) return "";
+          return String(opt.textContent || "").trim();
+        }
+
+        function buildGeneratedTitle() {
+          const p1 = selectedText(mailbox);
+          const p2 = selectedText(sendingList);
+          if (!p1 && !p2) return "";
+          if (p1 && p2) return `${p1} - ${p2}`;
+          return p1 || p2;
+        }
+
+        function applyGeneratedIfAllowed() {
+          const generated = buildGeneratedTitle();
+          const current = String(titleInput.value || "").trim();
+          if (!generated) return;
+          if (!current || current === lastGenerated) {
+            titleInput.value = generated;
+            lastGenerated = generated;
+          }
+        }
+
+        if (mailbox) mailbox.addEventListener("change", applyGeneratedIfAllowed);
+        if (sendingList) sendingList.addEventListener("change", applyGeneratedIfAllowed);
+        applyGeneratedIfAllowed();
+      })();
+    </script>
+    <script src="/static/js/aap_settings/sending_campaign.js"></script>
+  {% endif %}
+
+  {% if flow_current_step == "template" %}
+  <script>
+    (function () {
+      const form = document.getElementById("yyTplForm");
+      if (!form) return;
+
+      form.addEventListener("submit", function (e) {
+        const btn = e.submitter || document.activeElement;
+        const action = btn && btn.value ? String(btn.value).trim() : "";
+
+        if (action === "tpl_close" || action === "tpl_delete" || action === "tpl_to_letter") return;
+
+        if (action === "tpl_add" || action === "tpl_save") {
+          const inp = form.querySelector('[name="template_name"]');
+          const name = (inp && inp.value ? inp.value : "").trim();
+          if (!name) {
+            alert("{% trans "Пожалуйста, заполните название шаблона" %}");
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        }
+      });
+    })();
+  </script>
+    <script src="/static/js/campaign_templates/modal_preview.js"></script>
+    <link rel="stylesheet" href="/static/vendor/codemirror/codemirror.css">
+    <link rel="stylesheet" href="/static/vendor/codemirror/theme/material-darker.css">
+    <script src="/static/vendor/codemirror/codemirror.js"></script>
+    <script src="/static/vendor/codemirror/mode/xml/xml.js"></script>
+    <script src="/static/vendor/codemirror/mode/javascript/javascript.js"></script>
+    <script src="/static/vendor/codemirror/mode/css/css.js"></script>
+    <script src="/static/vendor/codemirror/mode/htmlmixed/htmlmixed.js"></script>
+    <script src="/static/vendor/tinymce/tinymce.min.js"></script>
+    <script src="/static/js/campaign_templates/tinymce_config.js"></script>
+    <script src="/static/js/campaign_templates/state.js"></script>
+    <script src="/static/js/campaign_templates/tinymce.js"></script>
+    <script src="/static/js/campaign_templates/codemirror.js"></script>
+    <script src="/static/js/campaign_templates/mode_switch.js"></script>
+    <script src="/static/js/campaign_templates/preview.js"></script>
+    <script src="/static/js/campaign_templates/submit.js"></script>
+    <script src="/static/js/campaign_templates/main.js"></script>
+  {% endif %}
+
+  {% if flow_current_step == "letter" %}
+    <script src="/static/js/campaign_templates/modal_preview.js"></script>
+    <link rel="stylesheet" href="/static/vendor/codemirror/codemirror.css">
+    <link rel="stylesheet" href="/static/vendor/codemirror/theme/material-darker.css">
+    <script src="/static/vendor/codemirror/codemirror.js"></script>
+    <script src="/static/vendor/codemirror/mode/xml/xml.js"></script>
+    <script src="/static/vendor/codemirror/mode/javascript/javascript.js"></script>
+    <script src="/static/vendor/codemirror/mode/css/css.js"></script>
+    <script src="/static/vendor/codemirror/mode/htmlmixed/htmlmixed.js"></script>
+    <script src="/static/vendor/tinymce/tinymce.min.js"></script>
+    <script src="/static/js/campaign_templates/campaign_letters/tinymce_config.js"></script>
+    <script src="/static/js/campaign_templates/campaign_letters/tinymce.js"></script>
+    <script src="/static/js/campaign_templates/campaign_letters/codemirror.js"></script>
+    <script src="/static/js/campaign_templates/campaign_letters/mode_switch.js"></script>
+    <script src="/static/js/campaign_templates/campaign_letters/subjects.js"></script>
+    <script src="/static/js/campaign_templates/campaign_letters/preview.js"></script>
+    <script src="/static/js/campaign_templates/campaign_letters/submit.js"></script>
+  {% endif %}
+{% endblock %}

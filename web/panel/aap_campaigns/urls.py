@@ -9,7 +9,12 @@ from __future__ import annotations
 
 from django.urls import path
 
-from panel.aap_campaigns.views.campaigns import campaigns_view
+from panel.aap_campaigns.views.campaigns import (
+    campaigns_flow_campaign_view,
+    campaigns_flow_letter_view,
+    campaigns_flow_template_view,
+    campaigns_view,
+)
 from panel.aap_campaigns.views.campaigns_api import (
     campaigns__letter_extract_content_view,
     campaigns__letter_buttons_by_template_view,
@@ -32,6 +37,13 @@ app_name = "campaigns"
 
 urlpatterns = [
     path("campaigns/", campaigns_view, name="campaigns"),
+    path("campaigns/flow/", campaigns_flow_campaign_view, name="campaigns_flow"),
+    path("campaigns/flow/campaign/", campaigns_flow_campaign_view, name="campaigns_flow_campaign"),
+    path("campaigns/flow/campaign/<str:item_id>/", campaigns_flow_campaign_view, name="campaigns_flow_campaign_id"),
+    path("campaigns/flow/template/", campaigns_flow_template_view, name="campaigns_flow_template"),
+    path("campaigns/flow/template/<str:item_id>/", campaigns_flow_template_view, name="campaigns_flow_template_id"),
+    path("campaigns/flow/letter/", campaigns_flow_letter_view, name="campaigns_flow_letter"),
+    path("campaigns/flow/letter/<str:item_id>/", campaigns_flow_letter_view, name="campaigns_flow_letter_id"),
     path("campaigns/preview/modal/", campaigns__preview_modal_by_id_view, name="campaigns__preview_modal_by_id"),
     path(
         "campaigns/preview/modal-from-editor/",

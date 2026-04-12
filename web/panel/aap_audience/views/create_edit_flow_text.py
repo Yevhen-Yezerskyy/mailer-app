@@ -12,17 +12,20 @@ from django.shortcuts import redirect, render
 from engine.common.gpt import GPTClient
 from mailer_web.access import encode_id
 
-from .create_edit_flow_status import build_flow_step_states
 from .create_edit_flow_shared import (
+    FLOW_GPT_UNAVAILABLE_TEXT,
     TEXT_STEP_KEYS,
     TASK_CREATION_STEP_KEYS,
     build_current_step_context,
     build_edit_url,
     build_flow_render_context,
     build_step_definitions,
+    clear_dialog_state,
     create_task,
     get_flow_config,
     has_insertable_company_tasks,
+    is_gpt_ok,
+    mark_flow_gpt_unavailable,
     parse_ai_json,
     prompt_instructions,
     reset_section_dialog,
@@ -32,7 +35,81 @@ from .create_edit_flow_shared import (
 )
 
 
-def _run_section_dialog(request, *, flow_type: str, step_def: Mapping[str, Any], item_id: str, value: str, command: str):
+def _text_draft_session_key(request, *, flow_type: str, item_id: str) -> str:
+    return session_key(request, flow_type, item_id, "text_draft")
+
+
+def _read_text_draft(request, *, flow_type: str, item_id: str) -> tuple[dict[str, str], dict[str, str], dict[str, str], dict[str, str]]:
+    key = _text_draft_session_key(request, flow_type=flow_type, item_id=item_id)
+    payload = request.session.get(key, {}) or {}
+    if not isinstance(payload, dict):
+        payload = {}
+    payload_working_values = payload.get("working_values") if isinstance(payload.get("working_values"), dict) else {}
+    payload_ai_command_display_map = (
+        payload.get("ai_command_display_map") if isinstance(payload.get("ai_command_display_map"), dict) else {}
+    )
+    payload_ai_advice_map = payload.get("ai_advice_map") if isinstance(payload.get("ai_advice_map"), dict) else {}
+    payload_ai_question_map = payload.get("ai_question_map") if isinstance(payload.get("ai_question_map"), dict) else {}
+
+    working_values = {
+        "source_product": str(payload_working_values.get("source_product") or ""),
+        "source_company": str(payload_working_values.get("source_company") or ""),
+        "source_geo": str(payload_working_values.get("source_geo") or ""),
+    }
+    ai_command_display_map = {
+        key_name: str(payload_ai_command_display_map.get(key_name) or "")
+        for key_name in TEXT_STEP_KEYS
+    }
+    ai_advice_map = {
+        key_name: str(payload_ai_advice_map.get(key_name) or "")
+        for key_name in TEXT_STEP_KEYS
+    }
+    ai_question_map = {
+        key_name: str(payload_ai_question_map.get(key_name) or "")
+        for key_name in TEXT_STEP_KEYS
+    }
+    return working_values, ai_command_display_map, ai_advice_map, ai_question_map
+
+
+def _write_text_draft(
+    request,
+    *,
+    flow_type: str,
+    item_id: str,
+    working_values: Mapping[str, str],
+    ai_command_display_map: Mapping[str, str],
+    ai_advice_map: Mapping[str, str],
+    ai_question_map: Mapping[str, str],
+) -> None:
+    key = _text_draft_session_key(request, flow_type=flow_type, item_id=item_id)
+    request.session[key] = {
+        "working_values": {
+            "source_product": str(working_values.get("source_product") or ""),
+            "source_company": str(working_values.get("source_company") or ""),
+            "source_geo": str(working_values.get("source_geo") or ""),
+        },
+        "ai_command_display_map": {k: str(ai_command_display_map.get(k) or "") for k in TEXT_STEP_KEYS},
+        "ai_advice_map": {k: str(ai_advice_map.get(k) or "") for k in TEXT_STEP_KEYS},
+        "ai_question_map": {k: str(ai_question_map.get(k) or "") for k in TEXT_STEP_KEYS},
+    }
+    request.session.modified = True
+
+
+def _clear_text_draft(request, *, flow_type: str, item_id: str) -> None:
+    key = _text_draft_session_key(request, flow_type=flow_type, item_id=item_id)
+    request.session.pop(key, None)
+    request.session.modified = True
+
+
+def _run_section_dialog(
+    request,
+    *,
+    flow_type: str,
+    step_def: Mapping[str, Any],
+    item_id: str,
+    value: str,
+    command: str,
+) -> tuple[str, str, str, bool]:
     state_key = session_key(request, flow_type, item_id, str(step_def["json_key"]))
     state = request.session.get(state_key, {}) or {}
     if step_def["json_key"] == "geo":
@@ -50,15 +127,36 @@ def _run_section_dialog(request, *, flow_type: str, step_def: Mapping[str, Any],
         payload = f"{step_def['input_label']}:\n{value}\n\nКОМАНДА:\n{command}"
 
     resp = GPTClient().ask_dialog(
-        model="gpt-5.4",
+        model="standard",
         instructions=prompt_instructions(request, step_def["prompt_key"]),
         input=payload,
         conversation=str(state.get("conversation_id") or ""),
         previous_response_id=str(state.get("response_id") or ""),
         user_id=step_def["user_id"],
         service_tier="flex",
+        web_search=True,
     )
+    if not is_gpt_ok(resp):
+        clear_dialog_state(state)
+        request.session[state_key] = state
+        request.session.modified = True
+        mark_flow_gpt_unavailable(request)
+        return "", "", "", True
     new_value, new_advice, new_question = parse_ai_json(resp.content or "", str(step_def["json_key"]))
+    error_marker = str(FLOW_GPT_UNAVAILABLE_TEXT or "").strip().casefold()
+    combined_text = "\n".join(
+        (
+            str(new_value or ""),
+            str(new_advice or ""),
+            str(new_question or ""),
+        )
+    ).casefold()
+    if error_marker and error_marker in combined_text:
+        clear_dialog_state(state)
+        request.session[state_key] = state
+        request.session.modified = True
+        mark_flow_gpt_unavailable(request)
+        return "", "", "", True
 
     raw = resp.raw if isinstance(resp.raw, dict) else {}
     response_id = str(raw.get("id") or "").strip()
@@ -74,7 +172,7 @@ def _run_section_dialog(request, *, flow_type: str, step_def: Mapping[str, Any],
         "response_id": response_id or str(state.get("response_id") or ""),
     }
     request.session.modified = True
-    return new_value, new_advice, new_question
+    return new_value, new_advice, new_question, False
 
 
 def _handle_text_step_action(
@@ -89,6 +187,7 @@ def _handle_text_step_action(
     ai_command_display_map: dict[str, str],
     ai_advice_map: dict[str, str],
     ai_question_map: dict[str, str],
+    saved_values: Mapping[str, Any],
 ):
     for step_key in TEXT_STEP_KEYS:
         step_def = step_definitions[step_key]
@@ -97,7 +196,7 @@ def _handle_text_step_action(
 
         if action == step_def["process_action"]:
             try:
-                new_value, new_advice, new_question = _run_section_dialog(
+                new_value, new_advice, new_question, gpt_failed = _run_section_dialog(
                     request,
                     flow_type=flow_type,
                     step_def=step_def,
@@ -105,25 +204,35 @@ def _handle_text_step_action(
                     value=field_value,
                     command=ai_command_display_map[step_key],
                 )
+                if gpt_failed:
+                    working_values[field_name] = str(saved_values.get(field_name) or "")
+                    ai_command_display_map[step_key] = ""
+                    ai_advice_map[step_key] = ""
+                    ai_question_map[step_key] = ""
+                    return task, None, True, False
                 if new_value:
                     working_values[field_name] = new_value
                 ai_advice_map[step_key] = new_advice
                 ai_question_map[step_key] = new_question
             except Exception:
-                pass
-            return task, None, True
+                working_values[field_name] = str(saved_values.get(field_name) or "")
+                ai_command_display_map[step_key] = ""
+                ai_advice_map[step_key] = ""
+                ai_question_map[step_key] = ""
+                return task, None, True, False
+            return task, None, True, True
 
         if action == step_def["save_action"] and field_value:
             if task:
                 setattr(task, field_name, field_value)
                 task.save(update_fields=[field_name, "updated_at"])
                 ai_command_display_map[step_key] = ""
-                ai_advice_map[step_key] = "__saved__"
+                ai_advice_map[step_key] = ""
                 ai_question_map[step_key] = ""
-                return task, None, True
+                return task, None, True, False
 
             if step_key not in TASK_CREATION_STEP_KEYS:
-                return task, None, True
+                return task, None, True, False
 
             task = create_task(
                 request,
@@ -131,17 +240,17 @@ def _handle_text_step_action(
                 title="",
                 **{field_name: field_value},
             )
-            return task, redirect(build_edit_url(flow_type, encode_id(int(task.id)), step_key)), True
+            return task, redirect(build_edit_url(flow_type, encode_id(int(task.id)), step_key)), True, False
 
         if action == step_def["reset_action"]:
             reset_section_dialog(request, flow_type=flow_type, item_id=item_id, step_key=step_key)
-            working_values[field_name] = ""
+            working_values[field_name] = str(saved_values.get(field_name) or "")
             ai_command_display_map[step_key] = ""
             ai_advice_map[step_key] = ""
             ai_question_map[step_key] = ""
-            return task, None, True
+            return task, None, True, False
 
-    return task, None, False
+    return task, None, False, False
 
 
 def handle_text_step_view(
@@ -177,9 +286,10 @@ def handle_text_step_view(
             ai_command_display_map[step_key] = (request.POST.get(command_field) or "").strip()
 
         if action == "close":
+            _clear_text_draft(request, flow_type=flow_type, item_id=item_id)
             return redirect("audience:create_list")
 
-        task, redirect_response, handled = _handle_text_step_action(
+        task, redirect_response, handled, keep_draft = _handle_text_step_action(
             request=request,
             flow_type=flow_type,
             item_id=item_id,
@@ -190,22 +300,38 @@ def handle_text_step_view(
             ai_command_display_map=ai_command_display_map,
             ai_advice_map=ai_advice_map,
             ai_question_map=ai_question_map,
+            saved_values=saved_values,
         )
         if redirect_response is not None:
+            _clear_text_draft(request, flow_type=flow_type, item_id=item_id)
             return redirect_response
-        if not handled:
-            task = resolve_task(request, flow_type, item_id) if item_id else task
+        if handled and keep_draft:
+            _write_text_draft(
+                request,
+                flow_type=flow_type,
+                item_id=item_id,
+                working_values=working_values,
+                ai_command_display_map=ai_command_display_map,
+                ai_advice_map=ai_advice_map,
+                ai_question_map=ai_question_map,
+            )
+        else:
+            _clear_text_draft(request, flow_type=flow_type, item_id=item_id)
+        return redirect(request.get_full_path())
 
-        task = resolve_task(request, flow_type, item_id) if item_id else task
-        saved_values = task_saved_values(task)
-        flow_status = build_flow_step_states(
-            step_order=tuple(step_definitions.keys()),
-            step_definitions=step_definitions,
-            requested_step_key=current_step_key,
-            saved_values=saved_values,
-            url_builder=lambda step_key: build_edit_url(flow_type, item_id, step_key),
-        )
-        current_step_key = str(flow_status["current_step_key"] or "product")
+    draft_working_values, draft_ai_command_display_map, draft_ai_advice_map, draft_ai_question_map = _read_text_draft(
+        request,
+        flow_type=flow_type,
+        item_id=item_id,
+    )
+    for field_name in ("source_product", "source_company", "source_geo"):
+        draft_value = str(draft_working_values.get(field_name) or "")
+        if draft_value:
+            working_values[field_name] = draft_value
+    for step_key in TEXT_STEP_KEYS:
+        ai_command_display_map[step_key] = str(draft_ai_command_display_map.get(step_key) or "")
+        ai_advice_map[step_key] = str(draft_ai_advice_map.get(step_key) or "")
+        ai_question_map[step_key] = str(draft_ai_question_map.get(step_key) or "")
 
     has_company_insert = has_insertable_company_tasks(request, task) if current_step_key == "company" else False
     current_step = build_current_step_context(
@@ -226,6 +352,7 @@ def handle_text_step_view(
         request,
         flow_conf["template_name"],
         build_flow_render_context(
+            request=request,
             flow_type=flow_type,
             item_id=item_id,
             task=task,

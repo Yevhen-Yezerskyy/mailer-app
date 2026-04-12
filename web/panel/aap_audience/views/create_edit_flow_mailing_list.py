@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from urllib.parse import urlencode
 from typing import Any, Mapping
 
 from django.db import connection
@@ -101,10 +102,44 @@ def _build_mailing_section_urls(flow_type: str, item_id: str) -> dict[str, str]:
     }
 
 
+def _build_mailing_nav_partial_url(flow_type: str, item_id: str, *, section: str) -> str:
+    if not item_id:
+        return ""
+    params = urlencode(
+        {
+            "flow_type": flow_type,
+            "id": item_id,
+            "mailing_section": _normalize_mailing_section(section),
+        }
+    )
+    return reverse("audience:create_mailing_nav_partial") + f"?{params}"
+
+
+def _build_mailing_section_partial_url(
+    flow_type: str,
+    item_id: str,
+    *,
+    section: str,
+    page: int,
+    query: str,
+) -> str:
+    if not item_id:
+        return ""
+    params: dict[str, Any] = {
+        "flow_type": flow_type,
+        "id": item_id,
+        "mailing_section": _normalize_mailing_section(section),
+        "page": int(page),
+    }
+    if str(query or "").strip():
+        params["q"] = str(query or "").strip()
+    return reverse("audience:create_mailing_section_partial") + f"?{urlencode(params)}"
+
+
 def _mailing_filter_sql(section: str) -> str:
     section_key = _normalize_mailing_section(section)
     if section_key == MAILING_SECTION_IN:
-        return "AND sl.rate IS NOT NULL AND sl.rate < %s"
+        return "AND sl.rate IS NOT NULL AND sl.rate <= %s"
     if section_key == MAILING_SECTION_OUT:
         return "AND sl.rate IS NOT NULL AND sl.rate > %s"
     if section_key == MAILING_SECTION_RATED:
@@ -142,15 +177,21 @@ def _fetch_mailing_status(task) -> dict[str, Any]:
             "total_count": 0,
             "rated_count": 0,
             "unrated_count": 0,
+            "in_count": 0,
+            "out_count": 0,
             "percent": 0,
             "max_rating": None,
             "max_rating_display": "-",
             "total_count_display": _format_total(0),
             "rated_count_display": _format_total(0),
+            "unrated_count_display": _format_total(0),
+            "in_count_display": _format_total(0),
+            "out_count_display": _format_total(0),
             "rate_limit": 0,
             "rate_limit_display": "0",
         }
 
+    rate_limit = int(task.rate_limit or 0)
     with connection.cursor() as cur:
         cur.execute(
             """
@@ -158,25 +199,27 @@ def _fetch_mailing_status(task) -> dict[str, Any]:
                 COUNT(*)::int AS total_count,
                 COUNT(*) FILTER (WHERE sl.rate IS NOT NULL)::int AS rated_count,
                 COUNT(*) FILTER (WHERE sl.rate IS NULL)::int AS unrated_count,
+                COUNT(*) FILTER (WHERE sl.rate IS NOT NULL AND sl.rate <= %s)::int AS in_count,
+                COUNT(*) FILTER (WHERE sl.rate IS NOT NULL AND sl.rate > %s)::int AS out_count,
                 MAX(sl.rate)::int AS max_rating
             FROM public.sending_lists sl
             WHERE sl.task_id = %s
               AND COALESCE(sl.removed, false) = false
             """,
-            [int(task.id)],
+            [rate_limit, rate_limit, int(task.id)],
         )
-        row = cur.fetchone() or [0, 0, 0, None]
+        row = cur.fetchone() or [0, 0, 0, 0, 0, None]
 
     total_count = int(row[0] or 0)
     rated_count = int(row[1] or 0)
     unrated_count = int(row[2] or 0)
-    max_rating = int(row[3]) if row[3] is not None else None
-    has_unrated = total_count > 0 and unrated_count > 0
+    in_count = int(row[3] or 0)
+    out_count = int(row[4] or 0)
+    max_rating = int(row[5]) if row[5] is not None else None
     is_task_active = bool(task.active and not task.archived)
-    is_running = bool(has_unrated and is_task_active)
-    is_paused = bool(has_unrated and not is_task_active)
+    is_running = bool(is_task_active)
+    is_paused = bool(not is_task_active)
     percent = int((rated_count * 100) / total_count) if total_count else 0
-    rate_limit = int(task.rate_limit or 0)
 
     return {
         "is_running": is_running,
@@ -184,11 +227,16 @@ def _fetch_mailing_status(task) -> dict[str, Any]:
         "total_count": total_count,
         "rated_count": rated_count,
         "unrated_count": unrated_count,
+        "in_count": in_count,
+        "out_count": out_count,
         "percent": percent,
         "max_rating": max_rating,
         "max_rating_display": str(max_rating) if max_rating is not None else "-",
         "total_count_display": _format_total(total_count),
         "rated_count_display": _format_total(rated_count),
+        "unrated_count_display": _format_total(unrated_count),
+        "in_count_display": _format_total(in_count),
+        "out_count_display": _format_total(out_count),
         "rate_limit": rate_limit,
         "rate_limit_display": str(rate_limit),
     }
@@ -329,6 +377,110 @@ def _fetch_mailing_rows(
     }
 
 
+def _resolve_mailing_partial_task(request):
+    flow_type = str(request.GET.get("flow_type") or "").strip().lower()
+    item_id = str(request.GET.get("id") or "").strip()
+    if flow_type not in {"buy", "sell"}:
+        return flow_type, item_id, None, 400
+    task = resolve_task(request, flow_type, item_id)
+    if not task:
+        return flow_type, item_id, None, 404
+    return flow_type, item_id, task, 200
+
+
+def _build_mailing_nav_context(*, flow_type: str, item_id: str, task, active_section: str) -> dict[str, Any]:
+    mailing_status = _fetch_mailing_status(task)
+    return {
+        "type": flow_type,
+        "mailing_step": {
+            **mailing_status,
+            "section_urls": _build_mailing_section_urls(flow_type, item_id),
+            "active_section": _normalize_mailing_section(active_section),
+        },
+    }
+
+
+def _build_mailing_section_context(
+    request,
+    *,
+    flow_type: str,
+    item_id: str,
+    task,
+    active_section: str,
+    page: int,
+    query: str,
+) -> dict[str, Any]:
+    section_key = _normalize_mailing_section(active_section)
+    search_query = str(query or "").strip()
+    if section_key != MAILING_SECTION_ALL:
+        search_query = ""
+    mailing_rows_ctx = _fetch_mailing_rows(
+        request,
+        task=task,
+        section=section_key,
+        page=int(page),
+        query=search_query,
+    )
+    mailing_status = _fetch_mailing_status(task)
+    return {
+        "type": flow_type,
+        "mailing_step": {
+            **mailing_status,
+            **mailing_rows_ctx,
+            "base_url": _build_mailing_base_url(flow_type, item_id),
+            "active_section": section_key,
+            "rate_limit_modal_url": (
+                reverse("audience:create_rate_limit_modal") + f"?id={item_id}"
+                if item_id
+                else ""
+            ),
+        },
+    }
+
+
+def mailing_nav_partial_view(request):
+    flow_type, item_id, task, status_code = _resolve_mailing_partial_task(request)
+    active_section = _normalize_mailing_section(str(request.GET.get("mailing_section") or ""))
+    context: dict[str, Any] = {}
+    if flow_type in {"buy", "sell"}:
+        context = _build_mailing_nav_context(
+            flow_type=flow_type,
+            item_id=item_id,
+            task=task,
+            active_section=active_section,
+        )
+    return render(
+        request,
+        "panels/aap_audience/create/_mailing_nav_inner.html",
+        context,
+        status=status_code,
+    )
+
+
+def mailing_section_partial_view(request):
+    flow_type, item_id, task, status_code = _resolve_mailing_partial_task(request)
+    active_section = _normalize_mailing_section(str(request.GET.get("mailing_section") or ""))
+    page = _get_page_value(str(request.GET.get("page") or "1"))
+    query = str(request.GET.get("q") or "").strip()
+    context: dict[str, Any] = {}
+    if flow_type in {"buy", "sell"}:
+        context = _build_mailing_section_context(
+            request,
+            flow_type=flow_type,
+            item_id=item_id,
+            task=task,
+            active_section=active_section,
+            page=page,
+            query=query,
+        )
+    return render(
+        request,
+        "panels/aap_audience/create/_mailing_section_inner.html",
+        context,
+        status=status_code,
+    )
+
+
 def mailing_status_view(request):
     flow_type = str(request.GET.get("flow_type") or "").strip().lower()
     item_id = str(request.GET.get("id") or "").strip()
@@ -358,6 +510,8 @@ def handle_mailing_list_step_view(
 
     active_section = _normalize_mailing_section(str(request.GET.get("mailing_section") or ""))
     query = str(request.GET.get("q") or "").strip()
+    if active_section != MAILING_SECTION_ALL:
+        query = ""
     page = _get_page_value(str(request.GET.get("page") or "1"))
 
     mailing_rows_ctx = _fetch_mailing_rows(
@@ -387,11 +541,24 @@ def handle_mailing_list_step_view(
         if item_id
         else ""
     )
+    nav_partial_url = _build_mailing_nav_partial_url(
+        flow_type,
+        item_id,
+        section=active_section,
+    )
+    section_partial_url = _build_mailing_section_partial_url(
+        flow_type,
+        item_id,
+        section=active_section,
+        page=page,
+        query=query,
+    )
 
     return render(
         request,
         flow_conf["template_name"],
         build_flow_render_context(
+            request=request,
             flow_type=flow_type,
             item_id=item_id,
             task=task,
@@ -410,6 +577,8 @@ def handle_mailing_list_step_view(
                     "status_url": status_url,
                     "rate_limit_modal_url": rate_limit_modal_url,
                     "pause_info_modal_url": pause_info_modal_url,
+                    "nav_partial_url": nav_partial_url,
+                    "section_partial_url": section_partial_url,
                 },
             },
         ),

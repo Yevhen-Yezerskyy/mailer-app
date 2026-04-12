@@ -43,7 +43,19 @@
             {% endif %}
 
             {% if branches_cities_step.city_hash_changed and not branches_cities_step.city_rating_running %}
-              <div class="YY-STATUS_RED !mb-3">{% trans "Задача была изменена." %}</div>
+              <div class="YY-STATUS_RED !mb-3 !justify-between gap-2">
+                <span>{% trans "Информация о продукте / компании / географии изменилась" %}</span>
+                <button
+                  type="button"
+                  class="inline-flex shrink-0"
+                  aria-label="{% trans 'Информация о продукте / компании / географии изменилась' %}"
+                  title="{% trans 'Информация о продукте / компании / географии изменилась' %}"
+                  data-cities-hash-help-open="1">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                  </svg>
+                </button>
+              </div>
               <div class="grid grid-cols-3 gap-4 !mb-6">
                 <button type="submit" name="action" value="cities_recalc_ratings" class="YY-BUTTON_MAIN_FULL">
                   {% trans "Обнулить рейтинги" %}
@@ -107,13 +119,49 @@
             data-city-rating-partial-url="{{ branches_cities_step.city_partial_url|escape }}">
             <div class="flex h-full min-h-0 flex-col">
             {% if type == "buy" %}
-              <div class="YY-STATUS_YELLOW !mb-3">{% trans "Города и населенные пункты" %}</div>
+              <div class="YY-STATUS_YELLOW !mb-3 !justify-between gap-2">
+                <span>{% trans "Города и населенные пункты" %}</span>
+                <button
+                  type="button"
+                  class="inline-flex shrink-0"
+                  aria-label="{% trans 'Города и населенные пункты' %}"
+                  title="{% trans 'Города и населенные пункты' %}"
+                  data-step-help-open="1">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                  </svg>
+                </button>
+              </div>
             {% else %}
-              <div class="YY-STATUS_GREEN !mb-3">{% trans "Города и населенные пункты" %}</div>
+              <div class="YY-STATUS_GREEN !mb-3 !justify-between gap-2">
+                <span>{% trans "Города и населенные пункты" %}</span>
+                <button
+                  type="button"
+                  class="inline-flex shrink-0"
+                  aria-label="{% trans 'Города и населенные пункты' %}"
+                  title="{% trans 'Города и населенные пункты' %}"
+                  data-step-help-open="1">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                  </svg>
+                </button>
+              </div>
             {% endif %}
 
             {% if branches_cities_step.city_hash_changed and not branches_cities_step.city_rating_running %}
-              <div class="YY-STATUS_RED !mb-3">{% trans "Задача была изменена." %}</div>
+              <div class="YY-STATUS_RED !mb-3 !justify-between gap-2">
+                <span>{% trans "Информация о продукте / компании / географии изменилась" %}</span>
+                <button
+                  type="button"
+                  class="inline-flex shrink-0"
+                  aria-label="{% trans 'Информация о продукте / компании / географии изменилась' %}"
+                  title="{% trans 'Информация о продукте / компании / географии изменилась' %}"
+                  data-cities-hash-help-open="1">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                  </svg>
+                </button>
+              </div>
               <div class="grid grid-cols-3 gap-4 !mb-6">
                 <button type="submit" name="action" value="cities_recalc_ratings" class="YY-BUTTON_MAIN_FULL">
                   {% trans "Обнулить рейтинги" %}
@@ -218,7 +266,7 @@
           <div class="YY-STATUS_GREEN !mb-3">{% trans "Ретингование городов и населенных пунктов" %}</div>
         {% endif %}
         <div class="YY-TEXT !mb-0">
-          {% trans "Производится рейтингование городов. Рейтинг присваивается от 1 до 100, где 1 — наилучший. Он указан справа от названия города." %}<br><br>
+          {% trans "Производится рейтингование городов. Рейтинг присваивается от 1 до 100, где 1 — наилучший. Он указан слева от названия города." %}<br><br>
           {% trans "На основании рейтинга определяется порядок сбора контактов. Рейтинг кликабелен и может быть изменён — таким образом вы меняете порядок сбора контактов." %}<br><br>
           {% trans "Вы также можете удалить города, которые считаете ненужными. Это повысит вероятность сбора контактов из приоритетных городов." %}
         </div>
@@ -232,8 +280,8 @@
                   data-cities-ready-target="contacts"
                   data-dirty-nav="{{ step.url }}">
                   <span class="flex items-center justify-center gap-1 w-full">
-                    <span>{% trans "Наполнение - сбор контактов" %}</span>
-                    <svg class="size-4 shrink-0" aria-hidden="true">
+                    <span>{% trans "Контакты - сбор контактов" %}</span>
+                    <svg class="size-[22px] shrink-0" aria-hidden="true">
                       <use href="#icon-arrow-circle"></use>
                     </svg>
                   </span>
@@ -246,8 +294,8 @@
                   data-dirty-nav="{{ step.url }}"
                   disabled>
                   <span class="flex items-center justify-center gap-1 w-full">
-                    <span>{% trans "Наполнение - сбор контактов" %}</span>
-                    <svg class="size-4 shrink-0" aria-hidden="true">
+                    <span>{% trans "Контакты - сбор контактов" %}</span>
+                    <svg class="size-[22px] shrink-0" aria-hidden="true">
                       <use href="#icon-arrow-circle"></use>
                     </svg>
                   </span>
@@ -260,6 +308,51 @@
     </td>
   </tr>
 </table>
+
+<template id="yy-cities-hash-help-template">
+  <div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:650px;">
+    <button
+      type="button"
+      class="YY-BUTTON_MAIN !w-fit"
+      data-yy-modal-close
+      style="position:absolute;top:10px;right:10px;">✕</button>
+    <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
+      <div class="YY-STATUS_RED !w-fit !mb-3">{% trans "Информация о продукте / компании / географии изменилась" %}</div>
+      <div class="YY-TEXT !mb-0">
+        {% trans "Вы изменили информацию о продукте, компании или географии. Подбор городов и населенных пунктов, их рейтингование осуществляется на основании информации о продукте, компании географии, был выполнен до внесённых изменений. Поэтому подбор городов и их рейтинг могут стать некорректными." %}<br><br>
+        {% trans "Если информация о компании/продукте/географии изменилась несущественно и не влияет на выбор городов и их рейтинг, проигнорируйте это несоответствие. Кнопка «Игнорировать» справа." %}<br><br>
+        {% trans "Если изменения достаточно существенны и требуется пересчитать рейтинги городов, проведите только пересчёт рейтингов. Кнопка «Пересчитать рейтинги» слева." %}<br><br>
+        {% trans "Если изменения кардинально меняют логику выбора городов, требуется произвести набор городов заново. Все подобранные города будут удалены, и вы начнёте их подбор сначала. Кнопка «Очистить / наполнить» посередине." %}
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="yy-step-help-template">
+  <div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:650px;">
+    <button
+      type="button"
+      class="YY-BUTTON_MAIN !w-fit"
+      data-yy-modal-close
+      style="position:absolute;top:10px;right:10px;">✕</button>
+    <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
+      {% if type == "buy" %}
+        <div class="YY-STATUS_YELLOW !w-fit !mb-3">{% trans "Города и населенные пункты" %}</div>
+      {% else %}
+        <div class="YY-STATUS_GREEN !w-fit !mb-3">{% trans "Города и населенные пункты" %}</div>
+      {% endif %}
+      <div class="YY-TEXT !mb-0">
+        {% trans "Необходимо подобрать города и населённые пункты Германии для поиска контактов в бизнес-справочниках. Обрабатываются города с населением более 12 000 человек." %}<br><br>
+        {% trans "Подбор выполняется с помощью ассистента ИИ. Если заданы ограничения по географии (территория, радиус, расстояние, конкретные города или федеральные земли), они учитываются при подборе." %}<br><br>
+        {% trans "Если ограничений нет, используется полный список из 1 326 городов и населённых пунктов." %}<br><br>
+        {% trans "Для изменения результата измените географические критерии. Это можно сделать в разделе \"География\"." %}<br><br>
+        {% trans "Производится рейтингование городов. Рейтинг присваивается от 1 до 100, где 1 — наилучший. Он указан слева от названия города." %}<br><br>
+        {% trans "На основании рейтинга определяется порядок сбора контактов. Рейтинг кликабелен и может быть изменён — таким образом вы меняете порядок сбора контактов." %}<br><br>
+        {% trans "Вы также можете удалить города, которые считаете ненужными. Это повысит вероятность сбора контактов из приоритетных городов." %}
+      </div>
+    </div>
+  </div>
+</template>
 
 {% if task and task_id_token %}
 <script>

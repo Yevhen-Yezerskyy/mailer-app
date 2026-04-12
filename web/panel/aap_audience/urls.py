@@ -21,6 +21,8 @@ from .views.create_edit_flow_contacts import (
     contacts_total_view,
 )
 from .views.create_edit_flow_mailing_list import mailing_status_view
+from .views.create_edit_flow_mailing_list import mailing_nav_partial_view
+from .views.create_edit_flow_mailing_list import mailing_section_partial_view
 from .views.create_edit_buy import (
     create_edit_buy_view,
     create_edit_buy_product_view,
@@ -63,6 +65,8 @@ urlpatterns = [
     path("create/contacts-total/", contacts_total_view, name="create_contacts_total"),
     path("create/contacts-ready/", contacts_ready_view, name="create_contacts_ready"),
     path("create/mailing-status/", mailing_status_view, name="create_mailing_status"),
+    path("create/mailing-nav/", mailing_nav_partial_view, name="create_mailing_nav_partial"),
+    path("create/mailing-section/", mailing_section_partial_view, name="create_mailing_section_partial"),
     path("create/contacts-collect/", contacts_collect_partial_view, name="create_contacts_collect_partial"),
     path("create/contacts-all/", contacts_all_partial_view, name="create_contacts_all_partial"),
     path(
