@@ -334,7 +334,8 @@ def _needs_printf_guard(e: PoEntry, src: str) -> bool:
 
 
 def _needs_brace_guard(e: PoEntry, src: str) -> bool:
-    return _has_python_brace_format_flag(e)
+    specs = _extract_brace_specs(src)
+    return _has_python_brace_format_flag(e) or bool(specs)
 
 
 def _needs_guard(e: PoEntry, src: str) -> bool:
@@ -798,12 +799,13 @@ def _heal_po_for_compile(lang: str) -> Tuple[int, int]:
     fixed_newline = 0
 
     for e in entries:
-        msgid = _field_text(e.msgid_lines, "msgid ").strip()
-        if not msgid or msgid == "":
+        msgid = _field_text(e.msgid_lines, "msgid ")
+        if not (msgid or "").strip():
             continue
 
         if e.msgid_plural_lines:
-            plural = _field_text(e.msgid_plural_lines, "msgid_plural ").strip() or msgid
+            plural_raw = _field_text(e.msgid_plural_lines, "msgid_plural ")
+            plural = plural_raw if (plural_raw or "").strip() else msgid
             for k in range(nplurals):
                 src = msgid if k == 0 else plural
                 kw = f"msgstr[{k}] "

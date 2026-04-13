@@ -76,20 +76,14 @@ msgstr "Mailingliste"
 msgid ""
 "Введите команду для работы с {subject} — что нужно добавить, удалить или "
 "изменить. Указанная команда будет применена к текущему описанию."
-msgstr ""
-"Geben Sie einen Befehl zur Bearbeitung der Firmenbeschreibung ein — was "
-"hinzugefügt, entfernt oder geändert werden soll. Der angegebene Befehl wird "
-"auf die aktuelle Beschreibung angewendet."
+msgstr "Введите команду для работы с {subject} — что нужно добавить, удалить или изменить. Указанная команда будет применена к текущему описанию."
 
 #: panel/aap_audience/views/create_edit_flow_shared.py:161
 #, python-brace-format
 msgid ""
 "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над "
 "{subject}. Ответ на вопрос будет дан отдельно и не изменит текст описания."
-msgstr ""
-"Sie können dem KI-Assistenten außerdem eine Frage im Kontext der Arbeit an "
-"der Unternehmensbeschreibung stellen. Die Antwort auf die Frage wird separat "
-"gegeben und ändert den Beschreibungstext nicht."
+msgstr "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над {subject}. Ответ на вопрос будет дан отдельно и не изменит текст описания."
 
 #: panel/aap_audience/views/create_edit_flow_shared.py:201
 #: templates/panels/aap_audience/create_list.html:77
@@ -1443,7 +1437,7 @@ msgid ""
 "                        Рейтингование запущено: %(percent)s%% (%(rated)s / "
 "%(total)s)\n"
 "                      "
-msgstr "Bewertung gestartet: %(percent)s%% (%(rated)s / %(total)s)"
+msgstr "\nBewertung gestartet: %(percent)s%% (%(rated)s / %(total)s)"
 
 #: templates/panels/aap_audience/create/step_cities.html:264
 #: templates/panels/aap_audience/create/step_cities.html:266
