@@ -666,7 +666,25 @@ class BrowserSessionRouter:
         duration_sec = int(QUARANTINE_STEP_LADDER_SEC[next_level])
         return next_level, duration_sec
 
-    def _mute_slot(self, cfg: SiteSessionConfig, slot_name: str, reason: str) -> None:
+    @staticmethod
+    def _session_fingerprint_snapshot(session: BrowserSession | None) -> str:
+        if session is None:
+            return "fp=none"
+        profile = session.profile
+        return (
+            "fp="
+            f"profile={profile.name};"
+            f"session_id={session.session_id};"
+            f"ua={profile.user_agent};"
+            f"accept_language={profile.accept_language};"
+            f"platform={profile.platform};"
+            f"locale={profile.locale};"
+            f"timezone={profile.timezone_id};"
+            f"viewport={profile.viewport_width}x{profile.viewport_height};"
+            f"screen={profile.screen_width}x{profile.screen_height}"
+        )
+
+    def _mute_slot(self, cfg: SiteSessionConfig, slot_name: str, reason: str, session: BrowserSession | None = None) -> None:
         if not slot_name:
             return
         state = self._load_quarantine(cfg)
@@ -714,7 +732,8 @@ class BrowserSessionRouter:
             folder=LOG_FOLDER,
             message=(
                 f"slot_quarantine site={cfg.site} tunnel={slot_name} reason={reason} "
-                f"level={int(level) + 1} duration_sec={int(duration_sec)} until_ts={int(until)}"
+                f"level={int(level) + 1} duration_sec={int(duration_sec)} until_ts={int(until)} "
+                f"{self._session_fingerprint_snapshot(session)}"
             ),
         )
 
@@ -2158,10 +2177,10 @@ class BrowserSessionRouter:
             warm = self._warm_session(session, cfg, task_id, cb_id)
             if warm.status != 200:
                 if self._should_quarantine_response(cfg, warm.status, warm.title, warm.html):
-                    self._mute_slot(cfg, slot["name"], f"home:{warm.status}")
+                    self._mute_slot(cfg, slot["name"], f"home:{warm.status}", session=session)
                 raise RuntimeError(f"WARM BLOCKED {warm.status}")
             if self._should_quarantine_response(cfg, warm.status, warm.title, warm.html):
-                self._mute_slot(cfg, slot["name"], f"home:{warm.status}")
+                self._mute_slot(cfg, slot["name"], f"home:{warm.status}", session=session)
                 raise RuntimeError(f"WARM BLOCKED {warm.status}")
 
         result, current_log_file = self._run_mode_fetch(
@@ -2179,7 +2198,7 @@ class BrowserSessionRouter:
         )
         if self._should_quarantine_response(cfg, result.status, result.title, result.html):
             if self._should_quarantine_response(cfg, result.status, result.title, result.html):
-                self._mute_slot(cfg, slot["name"], f"{kind}:{result.status}")
+                self._mute_slot(cfg, slot["name"], f"{kind}:{result.status}", session=session)
             raise RuntimeError(f"BLOCKED {result.status}")
         return result, current_log_file
 
