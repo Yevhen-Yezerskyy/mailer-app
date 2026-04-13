@@ -35,7 +35,7 @@ def _domain_from_mailbox(mb: Mailbox) -> str:
 
 def _fmt_dt(dt) -> str:
     try:
-        return dt.astimezone(ZoneInfo("Europe/Berlin")).strftime("%d.%m.%Y %H:%M:%S")
+        return dt.astimezone(ZoneInfo("Europe/Berlin")).strftime("%d.%m.%y %H:%M") + "\u00A0\u00A0"
     except Exception:
         return "—"
 
@@ -52,12 +52,15 @@ def mail_servers_view(request):
     if not ws_id:
         return redirect("/")
 
+    show_archive = str(request.GET.get("show") or "").strip().lower() == "archive"
     state = (request.GET.get("state") or "").strip().lower()
     if state not in ("add", "edit"):
         state = ""
+    if show_archive:
+        state = ""
 
     items = list(
-        Mailbox.objects.filter(workspace_id=ws_id, archived=False).order_by("email")
+        Mailbox.objects.filter(workspace_id=ws_id, archived=show_archive).order_by("email")
     )
     mb_ids = [int(m.id) for m in items]
 
@@ -133,9 +136,7 @@ def mail_servers_view(request):
         except Exception:
             return redirect(reverse("settings:mail_servers"))
 
-        edit_obj = Mailbox.objects.filter(
-            id=int(mailbox_id), workspace_id=ws_id, archived=False
-        ).first()
+        edit_obj = Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id, archived=False).first()
         if not edit_obj:
             return redirect(reverse("settings:mail_servers"))
 
@@ -147,7 +148,7 @@ def mail_servers_view(request):
         if action == "close":
             return redirect(reverse("settings:mail_servers"))
 
-        if action == "delete":
+        if action in ("delete", "archive"):
             token = (request.POST.get("id") or "").strip()
             try:
                 mailbox_id = int(decode_id(token))
@@ -155,6 +156,16 @@ def mail_servers_view(request):
                 return redirect(reverse("settings:mail_servers"))
 
             Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).update(archived=True)
+            return redirect(reverse("settings:mail_servers"))
+
+        if action == "unarchive":
+            token = (request.POST.get("id") or "").strip()
+            try:
+                mailbox_id = int(decode_id(token))
+            except Exception:
+                return redirect(reverse("settings:mail_servers"))
+
+            Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).update(archived=False)
             return redirect(reverse("settings:mail_servers"))
 
         # domain checks должны ездить только через AJAX API — тут ничего не выполняем
@@ -192,6 +203,8 @@ def mail_servers_view(request):
     else:
         form = MailboxAddForm(initial={"email": ""}, workspace_id=ws_id)
 
+    has_archived_mailboxes = Mailbox.objects.filter(workspace_id=ws_id, archived=True).exists()
+
     return render(
         request,
         "panels/aap_settings/mail_servers.html",
@@ -200,5 +213,7 @@ def mail_servers_view(request):
             "form": form,
             "items": items,
             "edit_obj": edit_obj,
+            "show_archive": show_archive,
+            "has_archived_mailboxes": has_archived_mailboxes,
         },
     )

@@ -28,6 +28,10 @@ def panel_context(request):
     for section in PANEL_MENU:
         sec = dict(section)
         sec["open"] = _starts_with(path, sec.get("open_prefixes", []))
+        if sec.get("url"):
+            sec["url"] = sec["url"]
+        elif sec.get("url_name"):
+            sec["url"] = _safe_reverse(sec["url_name"])
 
         items = []
         for item in sec["items"]:

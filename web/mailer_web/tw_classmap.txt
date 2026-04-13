@@ -22,6 +22,7 @@ YY-STATUS_GREEN: min-h-[30px] px-3 text-sm leading-none flex items-center rounde
 YY-STATUS_YELLOW: min-h-[30px] px-3 text-sm leading-none flex items-center rounded-md bg-[#FFF7E0] text-[#795b00] font-semibold whitespace-nowrap max-[1350px]:whitespace-normal w-[100%] border border-[#FFF7E0]
 YY-STATUS_GRAY: min-h-[30px] px-3 text-sm leading-none flex items-center rounded-md bg-[#f4f4f4] text-[#636363] font-semibold whitespace-nowrap max-[1350px]:whitespace-normal w-[100%] border border-[#f4f4f4]
 YY-STATUS_RED: min-h-[30px] px-3 text-sm leading-none flex items-center rounded-md bg-[#fff8f8] text-[#8e0000] font-semibold whitespace-nowrap max-[1350px]:whitespace-normal w-[100%] border border-[#fff8f8]
+YY-STATUS_WHITE: min-h-[30px] px-3 text-sm leading-none flex items-center rounded-md text-[#006991] font-normal whitespace-nowrap max-[1350px]:whitespace-normal w-[100%]
 
 YY-MAIN_BOTTOM_DIV: border rounded-md bg-[#ffffff] border border-[#71d0f4] overflow-hidden
 

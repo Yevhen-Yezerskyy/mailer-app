@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from django.core.validators import MaxValueValidator
 from django.db import models
 
 from engine.common.mail.types import IMAP_CREDENTIALS_FORMAT, SMTP_CREDENTIALS_FORMAT
@@ -32,6 +33,8 @@ class Mailbox(models.Model):
     domain = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
     archived = models.BooleanField(default=False)
+    limit_hour = models.PositiveIntegerField(default=60, validators=[MaxValueValidator(120)])
+    limit_day = models.PositiveIntegerField(default=500, validators=[MaxValueValidator(1000)])
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -73,8 +76,6 @@ class SmtpMailbox(models.Model):
 
     sender_name = models.CharField(max_length=255, blank=True, default="")
     from_email = models.EmailField()
-
-    limit_hour_sent = models.PositiveIntegerField(default=50)
     extra_headers_json = models.JSONField(default=dict, blank=True)
 
     is_active = models.BooleanField(default=True)

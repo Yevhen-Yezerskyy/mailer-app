@@ -62,19 +62,20 @@ PANEL_MENU = [
     {
         # SETTINGS
         "title": _("Настройки"),
+        "url_name": "settings:mail_servers",
         "open_prefixes": ["/panel/settings/"],
         "items": [
-            {
-                "title": _("'Окна' отправки"),
-                "page_title": _("Настройки : 'Окна' отправки"),
-                "url_name": "settings:sending",
-                "active_prefixes": ["/panel/settings/sending/"],
-            },
             {
                 "title": _("Почтовые серверы"),
                 "page_title": _("Настройки : Почтовые серверы"),
                 "url_name": "settings:mail_servers",
                 "active_prefixes": ["/panel/settings/mail-servers/"],
+            },
+            {
+                "title": _("'Окна' отправки"),
+                "page_title": _("Настройки : 'Окна' отправки"),
+                "url_name": "settings:sending",
+                "active_prefixes": ["/panel/settings/sending/"],
             },
             {
                 "title": _("Учет переходов"),

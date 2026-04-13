@@ -75,7 +75,13 @@
       {% for sec in panel_menu %}
       <details {% if sec.open %}open{% endif %} class="YY-MENU-CARD-BLUE">
         <summary class="YY-MENU-SUMMARY">
-          {{ sec.title }}
+          {% if sec.url %}
+            <a href="{{ sec.url }}" style="color: inherit; text-decoration: none;" onclick="event.stopPropagation();">
+              {{ sec.title }}
+            </a>
+          {% else %}
+            {{ sec.title }}
+          {% endif %}
         </summary>
 
         <div class="px-0">

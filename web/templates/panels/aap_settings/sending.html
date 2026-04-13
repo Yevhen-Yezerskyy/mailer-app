@@ -20,6 +20,7 @@
           {% csrf_token %}
 
           <textarea name="value_json" id="yyValueJson" class="hidden">{{ value_json_str }}</textarea>
+          <textarea id="yyGlobalValueJson" class="hidden">{{ global_value_json_str }}</textarea>
 
           <table class="w-full text-left">
             <tbody id="yySendingBody">
@@ -77,13 +78,25 @@
             </tbody>
           </table>
 
-          <div class="flex gap-3 mt-6">
-            <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN">
-              {% trans "Сохранить" %}
-            </button>
+          <div class="flex gap-2 mt-6 w-full">
+            {% if has_custom_settings %}
+              <button
+                type="button"
+                class="YY-BUTTON_MAIN_FULL w-1/2"
+                data-yy-modal="url={% url 'settings:sending_reset_modal' %}">
+                {% trans "Значения по умолчанию" %}
+              </button>
+            {% else %}
+              <button
+                type="button"
+                class="YY-BUTTON_GRAY_FULL w-1/2"
+                disabled>
+                {% trans "Значения по умолчанию" %}
+              </button>
+            {% endif %}
 
-            <button type="button" class="YY-BUTTON_MAIN" onclick="location.reload()">
-              {% trans "Отменить" %}
+            <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN_FULL w-1/2">
+              {% trans "Сохранить" %}
             </button>
           </div>
 
@@ -97,7 +110,7 @@
         <div class="YY-STATUS_BLUE mb-3">{% trans "Окна для отправки писем - глобальная настройка" %}</div>
         <div>
            <p class="YY-TEXT">{% trans "Отправка писем не всегда одинаково эффективна. Если отправить письмо в субботу утром, до понедельника оно будет перекрыто другими письмами. Вероятность того, что его прочтут и обратят внимание, снижается." %}</p>
-           <p class="YY-TEXT">{% trans "По опыту рассылок, самое эффективное время для рассылки - с 09:00 по 12:00 со вторника по четверг. В пятницу в то же время эффективность существенно снижается, а понедельник еще ниже. В праздники и выходные дни обычно эффективность составляет 5-10% от возможной." %}</p>
+           <p class="YY-TEXT">{% trans "По опыту рассылок, самое эффективное время для рассылки - с 08:30 по 12:30 со вторника по четверг. В пятницу в то же время эффективность существенно снижается, а понедельник еще ниже. В праздники и выходные дни обычно эффективность составляет 5-10% от возможной." %}</p>
            <p class="YY-TEXT">{% trans "Мы рекомендуем учитывать это при настройке окон для отправки." %}</p>
            <p class="YY-TEXT">{% trans "Эти настройки - глобальные для Вашей учетной записи. Для конкретной кампании это может быть переопределено. Тогда глобальные настройки на настройки отправки кампании больше не влияют." %}</p>
            <p class="YY-TEXT">{% trans "Окна - это отрезки времени, когда письма отправляться будут. Вне окон рассылка не осуществляется. Время (часовой пояс) - Берлин, Германия" %}</p>

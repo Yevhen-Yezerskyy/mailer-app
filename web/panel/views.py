@@ -336,14 +336,14 @@ def dashboard(request):
         with connection.cursor() as cur:
             cur.execute(
                 """
-                SELECT mailbox_id, limit_hour_sent
-                FROM public.aap_settings_smtp_mailboxes
-                WHERE mailbox_id = ANY(%s)
+                SELECT id AS mailbox_id, limit_hour
+                FROM public.aap_settings_mailboxes
+                WHERE id = ANY(%s)
                 """,
                 [mailbox_ids],
             )
-            for mb_id, limit_hour_sent in cur.fetchall() or []:
-                mailbox_limit_hour[int(mb_id)] = int(limit_hour_sent or 0)
+            for mb_id, limit_hour in cur.fetchall() or []:
+                mailbox_limit_hour[int(mb_id)] = int(limit_hour or 0)
 
     today_de = timezone.localtime().date()
     active_for_today = list(

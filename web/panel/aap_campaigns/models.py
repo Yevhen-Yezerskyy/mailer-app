@@ -76,6 +76,9 @@ class Campaign(models.Model):
     active = models.BooleanField(default=False)
     user_active = models.BooleanField(default=True)
     archived = models.BooleanField(default=False)
+    sending_interval = models.IntegerField(null=True, blank=True)
+    sent_num = models.IntegerField(null=True, blank=True)
+    to_send_num = models.IntegerField(null=True, blank=True)
 
     window = models.JSONField(
         default=dict,

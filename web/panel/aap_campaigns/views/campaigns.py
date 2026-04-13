@@ -745,8 +745,8 @@ def campaigns_view(request):
             if pk > 0:
                 camp = Campaign.objects.filter(id=pk, workspace_id=ws_id).first()
                 if camp:
-                    camp.active = action == "activate"
-                    camp.save(update_fields=["active", "updated_at"])
+                    camp.user_active = action == "activate"
+                    camp.save(update_fields=["user_active", "updated_at"])
             return redirect("campaigns:campaigns")
 
         if action == "delete":

@@ -13,6 +13,7 @@ app_name = "settings"
 urlpatterns = [
     path("", RedirectView.as_view(url="mail-servers/", permanent=False)),
     path("sending/", sending.sending_settings_view, name="sending"),
+    path("sending/reset/modal/", sending.sending_reset_modal_view, name="sending_reset_modal"),
     path("mail-servers/", mail_servers.mail_servers_view, name="mail_servers"),
     path("mail-servers/api/", mail_servers_api.mail_servers_api_view, name="mail_servers_api"),
     path("mail-servers/<str:id>/smtp/", smtp_server.smtp_server_view, name="mail_servers_smtp"),
