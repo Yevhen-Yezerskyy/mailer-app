@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import re
+import string
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -300,12 +301,56 @@ def _has_python_format_flag(e: PoEntry) -> bool:
     return False
 
 
-def _needs_guard(e: PoEntry, src: str) -> bool:
+def _has_python_brace_format_flag(e: PoEntry) -> bool:
+    for ln in e.prefix_lines:
+        if ln.startswith("#,") and "python-brace-format" in ln:
+            return True
+    return False
+
+
+def _extract_brace_specs(s: str) -> Optional[List[str]]:
+    fmt = string.Formatter()
+    out: List[str] = []
+    try:
+        for _lit, field_name, _format_spec, _conversion in fmt.parse(s or ""):
+            if field_name is None:
+                continue
+            out.append(str(field_name))
+    except Exception:
+        return None
+    return out
+
+
+def _brace_specs_match(src: str, dst: str) -> bool:
+    src_specs = _extract_brace_specs(src)
+    dst_specs = _extract_brace_specs(dst)
+    if src_specs is None or dst_specs is None:
+        return False
+    return src_specs == dst_specs
+
+
+def _needs_printf_guard(e: PoEntry, src: str) -> bool:
     return _has_python_format_flag(e) or bool(_extract_specs(src))
+
+
+def _needs_brace_guard(e: PoEntry, src: str) -> bool:
+    return _has_python_brace_format_flag(e)
+
+
+def _needs_guard(e: PoEntry, src: str) -> bool:
+    return _needs_printf_guard(e, src) or _needs_brace_guard(e, src)
 
 
 def _specs_match(src: str, dst: str) -> bool:
     return _extract_specs(src) == _extract_specs(dst)
+
+
+def _format_tokens_match(e: PoEntry, src: str, dst: str) -> bool:
+    if _needs_printf_guard(e, src) and not _specs_match(src, dst):
+        return False
+    if _needs_brace_guard(e, src) and not _brace_specs_match(src, dst):
+        return False
+    return True
 
 
 def _entry_key(e: PoEntry) -> Tuple[str, str, str]:
@@ -341,12 +386,12 @@ def _is_broken_format(e: PoEntry, nplurals: int) -> bool:
             src = msgid if k == 0 else plural
             kw = f"msgstr[{k}] "
             dst = _field_text(e.msgstrn_lines.get(k, []), kw)
-            if (dst or "").strip() and not _specs_match(src, dst):
+            if (dst or "").strip() and not _format_tokens_match(e, src, dst):
                 return True
         return False
 
     dst = _field_text(e.msgstr_lines, "msgstr ")
-    if (dst or "").strip() and not _specs_match(msgid, dst):
+    if (dst or "").strip() and not _format_tokens_match(e, msgid, dst):
         return True
     return False
 
@@ -435,9 +480,9 @@ def _gpt_translate(client: GPTClient, src: str, lang: str, *, use_local_cache: b
 
 def _translate_safe(
     client: GPTClient,
+    entry: PoEntry,
     src: str,
     lang: str,
-    guard: bool,
     *,
     use_local_cache: bool,
     attempts: int = 2,
@@ -450,7 +495,9 @@ def _translate_safe(
     if not src0:
         return ("", "gpt_empty")
 
-    if not guard:
+    guard_printf = _needs_printf_guard(entry, src0)
+    guard_brace = _needs_brace_guard(entry, src0)
+    if not guard_printf and not guard_brace:
         tr0 = _gpt_translate(client, src0, lang, use_local_cache=use_local_cache)
         if not tr0:
             return ("", "gpt_empty")
@@ -458,7 +505,10 @@ def _translate_safe(
             return ("", "bad_token")
         return (tr0, "ok")
 
-    frozen, specs = _freeze_specs(src0)
+    frozen = src0
+    specs: List[str] = []
+    if guard_printf:
+        frozen, specs = _freeze_specs(src0)
 
     last_reason = "gpt_empty"
     for _ in range(max(1, int(attempts))):
@@ -467,16 +517,17 @@ def _translate_safe(
             last_reason = "gpt_empty"
             continue
 
-        tr = _restore_specs(tr, specs)
+        if guard_printf:
+            tr = _restore_specs(tr, specs)
 
         if _BAD_TOKEN_RE.search(tr):
             last_reason = "bad_token"
             continue
 
-        if _specs_match(src0, tr):
+        if _format_tokens_match(entry, src0, tr):
             return (tr, "ok")
 
-        last_reason = "specs_mismatch"
+        last_reason = "format_mismatch"
 
     return ("", last_reason)
 
@@ -488,7 +539,7 @@ def _translate_safe(
 class LeftoverIssue:
     lang: str
     key: Tuple[str, str, str]  # (msgctxt, msgid, msgid_plural)
-    problem: str  # empty | bad_token | specs_mismatch | gpt_empty
+    problem: str  # empty | bad_token | format_mismatch | gpt_empty
     plural_index: Optional[int] = None
     current_msgstr: str = ""
     src_specs: List[str] = field(default_factory=list)
@@ -559,7 +610,7 @@ def _translate_lang_once(lang: str, *, pass_no: int, use_local_cache: bool) -> T
 
                 suspicious = (
                     not (cur or "").strip()
-                    or (guard and not _specs_match(src, cur))
+                    or (guard and not _format_tokens_match(e, src, cur))
                     or bool(_BAD_TOKEN_RE.search(cur or ""))
                 )
                 if not suspicious:
@@ -568,9 +619,9 @@ def _translate_lang_once(lang: str, *, pass_no: int, use_local_cache: bool) -> T
                 total += 1
                 tr, reason = _translate_safe(
                     client,
+                    e,
                     src,
                     lang,
-                    guard,
                     use_local_cache=use_local_cache,
                     attempts=2 if pass_no == 1 else 4,
                 )
@@ -600,7 +651,7 @@ def _translate_lang_once(lang: str, *, pass_no: int, use_local_cache: bool) -> T
         cur = _field_text(e.msgstr_lines, "msgstr ")
         suspicious = (
             not (cur or "").strip()
-            or (guard and not _specs_match(msgid, cur))
+            or (guard and not _format_tokens_match(e, msgid, cur))
             or bool(_BAD_TOKEN_RE.search(cur or ""))
         )
         if not suspicious:
@@ -609,9 +660,9 @@ def _translate_lang_once(lang: str, *, pass_no: int, use_local_cache: bool) -> T
         total += 1
         tr, reason = _translate_safe(
             client,
+            e,
             msgid,
             lang,
-            guard,
             use_local_cache=use_local_cache,
             attempts=2 if pass_no == 1 else 4,
         )
@@ -645,7 +696,7 @@ def _translate_lang_once(lang: str, *, pass_no: int, use_local_cache: bool) -> T
 
 def _final_scan_leftovers(lang: str) -> List[LeftoverIssue]:
     """
-    Scan final .po and report any empty or broken-format msgstr (only printf-guarded).
+    Scan final .po and report any empty or broken-format msgstr.
     """
     p = po_path(lang)
     if not p.exists():
@@ -681,12 +732,12 @@ def _final_scan_leftovers(lang: str) -> List[LeftoverIssue]:
                         )
                     )
                     continue
-                if guard and not _specs_match(src, cur):
+                if guard and not _format_tokens_match(e, src, cur):
                     out.append(
                         LeftoverIssue(
                             lang=lang,
                             key=key,
-                            problem="specs_mismatch",
+                            problem="format_mismatch",
                             plural_index=k,
                             current_msgstr=(cur or "").strip(),
                             src_specs=_extract_specs(src),
@@ -709,12 +760,12 @@ def _final_scan_leftovers(lang: str) -> List[LeftoverIssue]:
                 )
             )
             continue
-        if guard and not _specs_match(msgid, cur):
+        if guard and not _format_tokens_match(e, msgid, cur):
             out.append(
                 LeftoverIssue(
                     lang=lang,
                     key=key,
-                    problem="specs_mismatch",
+                    problem="format_mismatch",
                     plural_index=None,
                     current_msgstr=(cur or "").strip(),
                     src_specs=_extract_specs(msgid),
@@ -722,6 +773,82 @@ def _final_scan_leftovers(lang: str) -> List[LeftoverIssue]:
                 )
             )
     return out
+
+
+def _align_leading_newline(src: str, dst: str) -> str:
+    src_has = str(src or "").startswith("\n")
+    dst_has = str(dst or "").startswith("\n")
+    if src_has == dst_has:
+        return str(dst or "")
+    if src_has:
+        return "\n" + str(dst or "").lstrip("\n")
+    return str(dst or "").lstrip("\n")
+
+
+def _heal_po_for_compile(lang: str) -> Tuple[int, int]:
+    p = po_path(lang)
+    if not p.exists():
+        return (0, 0)
+
+    header, entries = parse_po(p.read_text(encoding="utf-8"))
+    nplurals = _get_nplurals_from_header(header)
+
+    changed = False
+    fixed_format = 0
+    fixed_newline = 0
+
+    for e in entries:
+        msgid = _field_text(e.msgid_lines, "msgid ").strip()
+        if not msgid or msgid == "":
+            continue
+
+        if e.msgid_plural_lines:
+            plural = _field_text(e.msgid_plural_lines, "msgid_plural ").strip() or msgid
+            for k in range(nplurals):
+                src = msgid if k == 0 else plural
+                kw = f"msgstr[{k}] "
+                cur = _field_text(e.msgstrn_lines.get(k, []), kw)
+                if not (cur or "").strip():
+                    continue
+
+                fixed = str(cur)
+                if not _format_tokens_match(e, src, fixed):
+                    fixed = str(src)
+                    fixed_format += 1
+
+                aligned = _align_leading_newline(src, fixed)
+                if aligned != fixed:
+                    fixed = aligned
+                    fixed_newline += 1
+
+                if fixed != cur:
+                    e.msgstrn_lines[k] = [f"msgstr[{k}] {_quote_po(fixed)}\n"]
+                    e.msgstr_lines = []
+                    changed = True
+            continue
+
+        cur = _field_text(e.msgstr_lines, "msgstr ")
+        if not (cur or "").strip():
+            continue
+
+        fixed = str(cur)
+        if not _format_tokens_match(e, msgid, fixed):
+            fixed = str(msgid)
+            fixed_format += 1
+
+        aligned = _align_leading_newline(msgid, fixed)
+        if aligned != fixed:
+            fixed = aligned
+            fixed_newline += 1
+
+        if fixed != cur:
+            e.msgstr_lines = [f"msgstr {_quote_po(fixed)}\n"]
+            e.msgstrn_lines.clear()
+            changed = True
+
+    if changed:
+        p.write_text(serialize_po(header, entries), encoding="utf-8")
+    return (fixed_format, fixed_newline)
 
 
 # ---------------- main ----------------
@@ -761,6 +888,11 @@ def main() -> None:
             print(f"    - {lang}: candidates={total} translated={ok} left={left}")
             # NOTE: keep issues only for visibility; final scan below is the source of truth.
             leftovers_all.extend(issues)
+
+    print("[4.5/6] heal format/newline mismatches before compile")
+    for lang in TARGET_LANGS:
+        fixed_format, fixed_newline = _heal_po_for_compile(lang)
+        print(f"    - {lang}: fixed_format={fixed_format} fixed_newline={fixed_newline}")
 
     print("[5/6] compilemessages (always)")
     run_compilemessages()

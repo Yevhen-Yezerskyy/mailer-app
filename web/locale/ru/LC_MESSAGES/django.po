@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-10 16:00+0200\n"
+"POT-Creation-Date: 2026-04-13 07:33+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -19,7 +19,7 @@ msgstr ""
 "n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || "
 "(n%100>=11 && n%100<=14)? 2 : 3);\n"
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:44
+#: panel/aap_audience/views/create_edit_flow_shared.py:48
 msgid ""
 "В процессе обработки ИИ будет задавать вопросы и давать подсказки для "
 "уточнения описания. Поскольку основные варианты уже указаны в начальном "
@@ -27,38 +27,38 @@ msgid ""
 "добавьте информацию в описание или в команду для ассистента ИИ."
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:51
-#: panel/aap_audience/views/create_edit_flow_shared.py:52
-#: panel/aap_audience/views/create_edit_flow_shared.py:53
+#: panel/aap_audience/views/create_edit_flow_shared.py:55
+#: panel/aap_audience/views/create_edit_flow_shared.py:56
+#: panel/aap_audience/views/create_edit_flow_shared.py:57
 #: templates/panels/aap_lists/contacts.html:147
 #: templates/panels/aap_lists/lists_list.html:164
 msgid "Категории"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:56
-#: panel/aap_audience/views/create_edit_flow_shared.py:57
-#: panel/aap_audience/views/create_edit_flow_shared.py:58
+#: panel/aap_audience/views/create_edit_flow_shared.py:60
+#: panel/aap_audience/views/create_edit_flow_shared.py:61
+#: panel/aap_audience/views/create_edit_flow_shared.py:62
 msgid "Города"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:61
+#: panel/aap_audience/views/create_edit_flow_shared.py:65
 #: templates/panels/aap_lists/contacts.html:26
 msgid "Контакты"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:62
-#: panel/aap_audience/views/create_edit_flow_shared.py:63
+#: panel/aap_audience/views/create_edit_flow_shared.py:66
+#: panel/aap_audience/views/create_edit_flow_shared.py:67
 msgid "Сбор контактов"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:66
+#: panel/aap_audience/views/create_edit_flow_shared.py:70
 msgid "Рейтинг"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:67
-#: panel/aap_audience/views/create_edit_flow_shared.py:68
-#: panel/aap_audience/views/create_edit_flow_shared.py:503
-#: panel/aap_audience/views/modal_edit_title.py:64
+#: panel/aap_audience/views/create_edit_flow_shared.py:71
+#: panel/aap_audience/views/create_edit_flow_shared.py:72
+#: panel/aap_audience/views/create_edit_flow_shared.py:560
+#: panel/aap_audience/views/modal_edit_title.py:66
 #: panel/aap_audience/views/modal_insert_company.py:38
 #: templates/panels/aap_campaigns/campaigns.html:59
 #: templates/panels/aap_campaigns/campaigns.html:403
@@ -68,49 +68,49 @@ msgstr ""
 msgid "Список рассылки"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:150
+#: panel/aap_audience/views/create_edit_flow_shared.py:154
 #, python-brace-format
 msgid ""
 "Введите команду для работы с {subject} — что нужно добавить, удалить или "
 "изменить. Указанная команда будет применена к текущему описанию."
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:157
+#: panel/aap_audience/views/create_edit_flow_shared.py:161
 #, python-brace-format
 msgid ""
 "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над "
 "{subject}. Ответ на вопрос будет дан отдельно и не изменит текст описания."
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:197
+#: panel/aap_audience/views/create_edit_flow_shared.py:201
 #: templates/panels/aap_audience/create_list.html:77
 #: templates/panels/aap_audience/modal_create_task.html:14
 #: templates/panels/aap_audience/modal_insert_company.html:19
 msgid "Поиск клиентов / покупателей"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:198
+#: panel/aap_audience/views/create_edit_flow_shared.py:202
 msgid "Список рассылки: поиск клиентов / покупателей"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:203
-#: panel/aap_audience/views/create_edit_flow_shared.py:284
+#: panel/aap_audience/views/create_edit_flow_shared.py:207
+#: panel/aap_audience/views/create_edit_flow_shared.py:288
 msgid "Продукт"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:204
-#: panel/aap_audience/views/create_edit_flow_shared.py:205
-#: panel/aap_audience/views/create_edit_flow_shared.py:285
-#: panel/aap_audience/views/create_edit_flow_shared.py:286
+#: panel/aap_audience/views/create_edit_flow_shared.py:208
+#: panel/aap_audience/views/create_edit_flow_shared.py:209
+#: panel/aap_audience/views/create_edit_flow_shared.py:289
+#: panel/aap_audience/views/create_edit_flow_shared.py:290
 #: templates/panels/aap_audience/modal_create_task.html:26
 msgid "Продукт / услуга"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:206
+#: panel/aap_audience/views/create_edit_flow_shared.py:210
 msgid "Продукт / услуга. Что продаётся? Где применяется? Кто покупатель?"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:208
+#: panel/aap_audience/views/create_edit_flow_shared.py:212
 msgid ""
 "Для корректного выбора бизнес-категорий и рейтингования потенциальных "
 "клиентов необходимо сформировать описание продукта или услуги. Введите "
@@ -129,13 +129,13 @@ msgid ""
 "использования."
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:220
+#: panel/aap_audience/views/create_edit_flow_shared.py:224
 msgid "описанием продукта или услуги"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:225
-#: panel/aap_audience/views/create_edit_flow_shared.py:227
-#: panel/aap_audience/views/create_edit_flow_shared.py:309
+#: panel/aap_audience/views/create_edit_flow_shared.py:229
+#: panel/aap_audience/views/create_edit_flow_shared.py:231
+#: panel/aap_audience/views/create_edit_flow_shared.py:313
 #: templates/panels/aap_audience/modal_create_task.html:37
 #: templates/panels/aap_lists/contacts.html:71
 #: templates/panels/aap_lists/contacts.html:146
@@ -147,16 +147,16 @@ msgstr ""
 msgid "Компания"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:226
+#: panel/aap_audience/views/create_edit_flow_shared.py:230
 msgid "Компания - продавец"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:228
+#: panel/aap_audience/views/create_edit_flow_shared.py:232
 msgid ""
 "Компания - продавец. Название, адрес, страна, размер, опыт, специализация."
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:230
+#: panel/aap_audience/views/create_edit_flow_shared.py:234
 msgid ""
 "Для корректного выбора бизнес-категорий и рейтингования потенциальных "
 "клиентов необходимо сформировать описание компании-продавца. Укажите "
@@ -177,26 +177,26 @@ msgid ""
 "использования."
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:243
+#: panel/aap_audience/views/create_edit_flow_shared.py:247
 msgid "описанием компании"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:248
-#: panel/aap_audience/views/create_edit_flow_shared.py:250
-#: panel/aap_audience/views/create_edit_flow_shared.py:332
-#: panel/aap_audience/views/create_edit_flow_shared.py:334
+#: panel/aap_audience/views/create_edit_flow_shared.py:252
+#: panel/aap_audience/views/create_edit_flow_shared.py:254
+#: panel/aap_audience/views/create_edit_flow_shared.py:336
+#: panel/aap_audience/views/create_edit_flow_shared.py:338
 #: templates/panels/aap_audience/modal_create_task.html:44
 msgid "География"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:249
-#: panel/aap_audience/views/create_edit_flow_shared.py:251
-#: panel/aap_audience/views/create_edit_flow_shared.py:333
-#: panel/aap_audience/views/create_edit_flow_shared.py:335
+#: panel/aap_audience/views/create_edit_flow_shared.py:253
+#: panel/aap_audience/views/create_edit_flow_shared.py:255
+#: panel/aap_audience/views/create_edit_flow_shared.py:337
+#: panel/aap_audience/views/create_edit_flow_shared.py:339
 msgid "География. Ограничения, предпочтения, приоритеты."
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:253
+#: panel/aap_audience/views/create_edit_flow_shared.py:257
 msgid ""
 "Для корректного отбора и приоритезации городов необходимо сформировать "
 "географические критерии.\n"
@@ -218,28 +218,28 @@ msgid ""
 "дальнейшего использования."
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:266
+#: panel/aap_audience/views/create_edit_flow_shared.py:270
 msgid "описанием географии"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:278
+#: panel/aap_audience/views/create_edit_flow_shared.py:282
 #: templates/panels/aap_audience/create_list.html:75
 #: templates/panels/aap_audience/modal_create_task.html:12
 #: templates/panels/aap_audience/modal_insert_company.html:17
 msgid "Поиск поставщиков / подрядчиков"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:279
+#: panel/aap_audience/views/create_edit_flow_shared.py:283
 msgid "Список рассылки: поиск поставщиков / подрядчиков"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:288
+#: panel/aap_audience/views/create_edit_flow_shared.py:292
 msgid ""
 "Продукт / услуга. Что нужно купить / заказать? Кто поставляет / выполняет "
 "работы?"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:291
+#: panel/aap_audience/views/create_edit_flow_shared.py:295
 msgid ""
 "Для корректного выбора бизнес-категорий и рейтингования потенциальных "
 "поставщиков и подрядчиков необходимо сформировать описание закупаемого "
@@ -259,22 +259,22 @@ msgid ""
 "использования."
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:304
+#: panel/aap_audience/views/create_edit_flow_shared.py:308
 msgid "описанием закупаемого продукта, услуги или работ"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:310
-#: panel/aap_audience/views/create_edit_flow_shared.py:311
+#: panel/aap_audience/views/create_edit_flow_shared.py:314
+#: panel/aap_audience/views/create_edit_flow_shared.py:315
 #: templates/panels/aap_audience/modal_create_task.html:35
 msgid "Компания-заказчик"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:312
+#: panel/aap_audience/views/create_edit_flow_shared.py:316
 msgid ""
 "Компания-заказчик. Название, адрес, страна, размер, опыт, специализация."
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:314
+#: panel/aap_audience/views/create_edit_flow_shared.py:318
 msgid ""
 "Для корректного выбора бизнес-категорий и рейтингования потенциальных "
 "поставщиков и подрядчиков необходимо сформировать описание компании-"
@@ -295,11 +295,11 @@ msgid ""
 "использования."
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:327
+#: panel/aap_audience/views/create_edit_flow_shared.py:331
 msgid "описанием компании-заказчика"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:337
+#: panel/aap_audience/views/create_edit_flow_shared.py:341
 msgid ""
 "Для корректного отбора и приоритезации городов необходимо сформировать "
 "географические критерии поиска поставщиков и подрядчиков.\n"
@@ -321,19 +321,19 @@ msgid ""
 "дальнейшего использования."
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:351
+#: panel/aap_audience/views/create_edit_flow_shared.py:355
 msgid "описанием географии поиска поставщиков и подрядчиков"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:625
+#: panel/aap_audience/views/create_edit_flow_shared.py:684
 msgid "Не заполнены обязательные разделы"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:626
+#: panel/aap_audience/views/create_edit_flow_shared.py:685
 msgid "Не заполнены или не сохранены разделы:"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:627
+#: panel/aap_audience/views/create_edit_flow_shared.py:686
 #: templates/panels/aap_audience/create/step_branches.html:161
 #: templates/panels/aap_audience/create/step_cities.html:247
 #: templates/panels/aap_lists/lists.html:64
@@ -341,7 +341,7 @@ msgstr ""
 msgid "Отменить"
 msgstr ""
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:650
+#: panel/aap_audience/views/create_edit_flow_shared.py:713
 #: templates/panels/aap_lists/lists.html:25
 msgid "Новый список рассылки"
 msgstr ""
@@ -349,7 +349,7 @@ msgstr ""
 #: panel/aap_audience/views/modal_edit_branch_rate.py:58
 #: panel/aap_audience/views/modal_edit_city_rate.py:57
 #: panel/aap_audience/views/modal_edit_rate_limit.py:38
-#: panel/aap_audience/views/modal_edit_title.py:73
+#: panel/aap_audience/views/modal_edit_title.py:75
 msgid "Запись не найдена."
 msgstr ""
 
@@ -376,19 +376,19 @@ msgstr ""
 msgid "Введите лимит от 20 до 60."
 msgstr ""
 
-#: panel/aap_audience/views/modal_edit_title.py:82
+#: panel/aap_audience/views/modal_edit_title.py:84
 msgid "Для предложения названия нужно сохранить продукт и компанию."
 msgstr ""
 
-#: panel/aap_audience/views/modal_edit_title.py:98
+#: panel/aap_audience/views/modal_edit_title.py:111
 msgid "Не удалось предложить название."
 msgstr ""
 
-#: panel/aap_audience/views/modal_edit_title.py:107
+#: panel/aap_audience/views/modal_edit_title.py:120
 msgid "Введите название списка рассылки."
 msgstr ""
 
-#: panel/aap_audience/views/modal_edit_title.py:114
+#: panel/aap_audience/views/modal_edit_title.py:127
 msgid "Неизвестное действие."
 msgstr ""
 
