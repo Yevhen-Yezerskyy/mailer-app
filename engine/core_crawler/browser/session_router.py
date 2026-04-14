@@ -38,6 +38,10 @@ from engine.core_crawler.browser.http_fetch import (
 from engine.core_crawler.browser.session_config import (
     BROWSER_PROFILES,
     LOG_FOLDER,
+    ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC,
+    ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC,
+    ONE_ONE_EIGHTY_WINDOW_MAX_SEC,
+    ONE_ONE_EIGHTY_WINDOW_MIN_SEC,
     SITE_CONFIGS,
     BrowserProfile,
     SiteSessionConfig,
@@ -71,6 +75,8 @@ ONE_ONE_EIGHTY_QUARANTINE_LEVEL_RANGES_SEC = (
 )
 ONE_ONE_EIGHTY_GLOBAL_WARMUP_LOCK_MIN_SEC = 2 * 60
 ONE_ONE_EIGHTY_GLOBAL_WARMUP_LOCK_MAX_SEC = 4 * 60
+WINDOW_STATE_LOCK_TTL_SEC = 3.0
+WINDOW_STATE_WAIT_SEC = 2.0
 
 
 @dataclass
@@ -422,6 +428,20 @@ class BrowserSessionRouter:
         return f"core_crawler:global_warmup_lock:{site_name}"
 
     @staticmethod
+    def _window_key(site: str) -> str:
+        site_name = str(site or "").strip()
+        if not site_name:
+            raise ValueError("window key requires site")
+        return f"core_crawler:slot_window:{site_name}"
+
+    @staticmethod
+    def _window_lock_key(site: str) -> str:
+        site_name = str(site or "").strip()
+        if not site_name:
+            raise ValueError("window lock key requires site")
+        return f"core_crawler:slot_window_lock:{site_name}"
+
+    @staticmethod
     def _dispatch_gate_key(site: str, slot_name: str, slot_idx: int) -> str:
         site_name = str(site or "").strip()
         tunnel_name = str(slot_name or "").strip()
@@ -622,6 +642,55 @@ class BrowserSessionRouter:
             return 0.0
         return until
 
+    def _activate_slot_window_from_warmup(self, cfg: SiteSessionConfig, slot_name: str) -> None:
+        if cfg.site != "11880" or not str(slot_name or "").strip():
+            return
+        lock_key = self._window_lock_key(cfg.site)
+        owner = f"{cfg.site}:warmup:{uuid4().hex}"
+        token = self._lock_until(lock_key, WINDOW_STATE_LOCK_TTL_SEC, owner, WINDOW_STATE_WAIT_SEC)
+        if not token:
+            return
+        try:
+            raw = self._cache_get_obj(self._window_key(cfg.site)) or {}
+            state = dict(raw) if isinstance(raw, dict) else {}
+            row = dict(state.get(slot_name) or {})
+            now = time.time()
+            active_until = float(row.get("active_until") or 0.0)
+            if active_until > now:
+                row["reserved"] = False
+                state[str(slot_name)] = row
+                self._cache_set_obj(self._window_key(cfg.site), state)
+                return
+            state[str(slot_name)] = {
+                "active_until": now + random.uniform(ONE_ONE_EIGHTY_WINDOW_MIN_SEC, ONE_ONE_EIGHTY_WINDOW_MAX_SEC),
+                "cool_until": now + random.uniform(
+                    ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC,
+                    ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC,
+                ),
+                "reserved": False,
+            }
+            self._cache_set_obj(self._window_key(cfg.site), state)
+        finally:
+            self._release_lock(lock_key, token)
+
+    def _clear_slot_window_state(self, cfg: SiteSessionConfig, slot_name: str) -> None:
+        if cfg.site != "11880" or not str(slot_name or "").strip():
+            return
+        lock_key = self._window_lock_key(cfg.site)
+        owner = f"{cfg.site}:window-clear:{uuid4().hex}"
+        token = self._lock_until(lock_key, WINDOW_STATE_LOCK_TTL_SEC, owner, WINDOW_STATE_WAIT_SEC)
+        if not token:
+            return
+        try:
+            raw = self._cache_get_obj(self._window_key(cfg.site)) or {}
+            if not isinstance(raw, dict) or slot_name not in raw:
+                return
+            state = dict(raw)
+            state.pop(str(slot_name), None)
+            self._cache_set_obj(self._window_key(cfg.site), state)
+        finally:
+            self._release_lock(lock_key, token)
+
     def _load_quarantine_backoff(self, cfg: SiteSessionConfig) -> dict[str, dict[str, float | int]]:
         raw = self._cache_get_obj(self._quarantine_backoff_key(cfg.site)) or {}
         if not isinstance(raw, dict):
@@ -724,6 +793,7 @@ class BrowserSessionRouter:
                 },
                 ttl_sec=warmup_lock_sec + 60,
             )
+            self._clear_slot_window_state(cfg, slot_name)
             self._clear_cache_obj("core_crawler:route_plan")
         self._drop_egress_session_state(cfg, slot_name)
         self._clear_cache_obj(self._slot_profile_key(cfg.site, slot_name))
@@ -2182,6 +2252,7 @@ class BrowserSessionRouter:
             if self._should_quarantine_response(cfg, warm.status, warm.title, warm.html):
                 self._mute_slot(cfg, slot["name"], f"home:{warm.status}", session=session)
                 raise RuntimeError(f"WARM BLOCKED {warm.status}")
+            self._activate_slot_window_from_warmup(cfg, slot["name"])
 
         result, current_log_file = self._run_mode_fetch(
             session,

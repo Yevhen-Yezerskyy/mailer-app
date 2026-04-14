@@ -324,15 +324,19 @@ def _load_window_state(site: str, active_names: list[str]) -> dict[str, dict[str
         try:
             active_until = float(row.get("active_until") or 0.0)
             cool_until = float(row.get("cool_until") or 0.0)
+            reserved = bool(row.get("reserved"))
         except Exception:
             continue
         if active_until <= now:
             active_until = 0.0
         if cool_until <= now and active_until <= 0.0:
             cool_until = 0.0
+        if active_until > 0.0 or cool_until > 0.0:
+            reserved = False
         out[name] = {
             "active_until": active_until,
             "cool_until": cool_until,
+            "reserved": bool(reserved),
         }
     return out
 
@@ -344,6 +348,26 @@ def _active_window_names(site: str, available: list[str]) -> list[str]:
         name
         for name in available
         if float((state.get(name) or {}).get("active_until") or 0.0) > now
+    ]
+
+
+def _reserved_window_names(site: str, available: list[str]) -> list[str]:
+    state = _load_window_state(site, available)
+    return [
+        name
+        for name in available
+        if bool((state.get(name) or {}).get("reserved"))
+        and float((state.get(name) or {}).get("active_until") or 0.0) <= 0.0
+    ]
+
+
+def _engaged_window_names(site: str, available: list[str]) -> list[str]:
+    state = _load_window_state(site, available)
+    return [
+        name
+        for name in available
+        if float((state.get(name) or {}).get("active_until") or 0.0) > time.time()
+        or bool((state.get(name) or {}).get("reserved"))
     ]
 
 
@@ -382,27 +406,34 @@ def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
     owner = f"{site}:window:{uuid4().hex}"
     lock_token = _lock_until(lock_key, ROUTE_STATE_LOCK_TTL_SEC, owner, ROUTE_STATE_WAIT_SEC)
     if not lock_token:
-        return _active_window_names(site, available)
+        return _engaged_window_names(site, available)
     try:
         now = time.time()
         state = _load_window_state(site, available)
         active_names = _active_window_names(site, available)
+        reserved_names = _reserved_window_names(site, available)
+        engaged_set = set(active_names) | set(reserved_names)
+        engaged_names = [name for name in available if name in engaged_set]
         target_count = _11880_target_active_count(len(available))
         warmup_lock_until = _global_warmup_lock_until(site)
-        if len(active_names) > target_count:
-            keep_names = set(active_names[:target_count])
+        if len(engaged_names) > target_count:
+            keep_names = set(engaged_names[:target_count])
             for name in available:
                 if name not in keep_names and name in state:
                     state[name]["active_until"] = 0.0
+                    state[name]["cool_until"] = float((state.get(name) or {}).get("cool_until") or 0.0)
+                    state[name]["reserved"] = False
             active_names = [name for name in active_names if name in keep_names]
+            reserved_names = [name for name in reserved_names if name in keep_names]
+            engaged_names = [name for name in engaged_names if name in keep_names]
         if warmup_lock_until > now:
             _cache_set_obj(_window_key(site), state)
-            return [name for name in available if name in active_names]
-        if len(active_names) < target_count:
+            return list(engaged_names)
+        if len(engaged_names) < target_count:
             eligible_names = [
                 name
                 for name in available
-                if name not in active_names
+                if name not in engaged_set
                 and float((state.get(name) or {}).get("cool_until") or 0.0) <= now
             ]
             if eligible_names:
@@ -412,20 +443,19 @@ def _activate_11880_windows(site: str, available: list[str]) -> list[str]:
                 rotated_names = eligible_names[start_idx:] + eligible_names[:start_idx]
                 advanced = 0
                 for name in rotated_names:
-                    if len(active_names) >= target_count:
+                    if len(engaged_names) >= target_count:
                         break
                     advanced += 1
                     state[name] = {
-                        "active_until": now + random.uniform(ONE_ONE_EIGHTY_WINDOW_MIN_SEC, ONE_ONE_EIGHTY_WINDOW_MAX_SEC),
-                        "cool_until": now + random.uniform(
-                            ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MIN_SEC,
-                            ONE_ONE_EIGHTY_WINDOW_COOLDOWN_MAX_SEC,
-                        ),
+                        "active_until": 0.0,
+                        "cool_until": 0.0,
+                        "reserved": True,
                     }
-                    active_names.append(name)
+                    engaged_names.append(name)
+                    engaged_set.add(name)
                 _cache_set_obj(_rr_key(site), {"pos": rr_pos + max(1, advanced)})
         _cache_set_obj(_window_key(site), state)
-        return [name for name in available if name in active_names]
+        return [name for name in available if name in engaged_set]
     finally:
         _release_lock(lock_key, lock_token)
 
