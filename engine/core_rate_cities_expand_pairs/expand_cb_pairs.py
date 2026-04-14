@@ -370,7 +370,18 @@ def _pick_active_task() -> Tuple[Optional[Dict[str, Any]], Optional[str], int]:
             """
             SELECT t.id, t.ready, t.active, t.archived, t.rating_city_hash, t.rating_branch_hash
             FROM public.aap_audience_audiencetask t
-            WHERE t.active = true
+            WHERE COALESCE(t.archived, false) = false
+              AND (
+                  COALESCE(t.active, false) = true
+                  OR (
+                      COALESCE(t.ready, false) = false
+                      AND EXISTS (
+                          SELECT 1
+                          FROM public.task_cb_ratings tcr
+                          WHERE tcr.task_id = t.id
+                      )
+                  )
+              )
             ORDER BY random()
             LIMIT 1
             """
@@ -393,10 +404,6 @@ def _pick_active_task() -> Tuple[Optional[Dict[str, Any]], Optional[str], int]:
         "rating_city_hash": int(row[4]) if row[4] is not None else None,
         "rating_branch_hash": int(row[5]) if row[5] is not None else None,
     }
-    if not task["active"]:
-        _release_task_lock(task_id, token)
-        return None, None, sql_pick_ms
-
     return task, token, sql_pick_ms
 
 
