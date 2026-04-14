@@ -35,6 +35,16 @@ def main() -> None:
         priority=10,
     )
 
+    w.register(
+        name="campaign_status_run_once",
+        fn=status.run_campaign_status_once,
+        every_sec=10,
+        timeout_sec=TASK_TIMEOUT_SEC,
+        singleton=True,
+        heavy=False,
+        priority=15,
+    )
+
     w.run_forever()
 
 
