@@ -9,6 +9,7 @@ import os
 import random
 import time
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlsplit
 
 from psycopg.types.json import Json
 
@@ -190,6 +191,200 @@ def _merge_text_list(norm: Dict[str, Any], key: str, values: Any) -> None:
         norm.pop(key, None)
 
 
+def _website_base_host(host: str) -> str:
+    return host[4:] if host.startswith("www.") else host
+
+
+def _parse_website_item(value: Any, order: int) -> Optional[Dict[str, Any]]:
+    text = _trim_str(value).lower()
+    if not text:
+        return None
+
+    has_scheme = text.startswith("http://") or text.startswith("https://")
+    parse_input = text if has_scheme else f"//{text}"
+    try:
+        parts = urlsplit(parse_input)
+    except Exception:
+        return {
+            "kind": "literal",
+            "literal": text,
+            "order": int(order),
+        }
+
+    host = _trim_str(parts.hostname).lower()
+    if not host:
+        return {
+            "kind": "literal",
+            "literal": text,
+            "order": int(order),
+        }
+
+    scheme = parts.scheme if has_scheme else ""
+    if scheme not in ("http", "https"):
+        scheme = ""
+    path = parts.path or ""
+    query = parts.query or ""
+    fragment = parts.fragment or ""
+
+    is_root = (path == "" or path == "/") and not query and not fragment
+    if is_root:
+        tail = "/"
+    else:
+        tail = path
+        if query:
+            tail = f"{tail}?{query}" if tail else f"?{query}"
+        if fragment:
+            tail = f"{tail}#{fragment}" if tail else f"#{fragment}"
+        if not tail:
+            tail = "/"
+
+    return {
+        "kind": "host",
+        "host": host,
+        "base_host": _website_base_host(host),
+        "scheme": scheme,
+        "tail": tail,
+        "is_root": bool(is_root),
+        "order": int(order),
+    }
+
+
+def _render_website(host: str, scheme: str, tail: str) -> str:
+    prefix = f"{scheme}://" if scheme else ""
+    if tail == "/":
+        return f"{prefix}{host}/"
+    if tail.startswith("/") or tail.startswith("?") or tail.startswith("#"):
+        return f"{prefix}{host}{tail}"
+    return f"{prefix}{host}/{tail}"
+
+
+def _merge_website_list(values: Any) -> List[str]:
+    parsed: List[Dict[str, Any]] = []
+    for idx, item in enumerate(_safe_list(values)):
+        parsed_item = _parse_website_item(item, idx)
+        if parsed_item:
+            parsed.append(parsed_item)
+    if not parsed:
+        return []
+
+    host_flags: Dict[str, Dict[str, bool]] = {}
+    for item in parsed:
+        if item.get("kind") != "host":
+            continue
+        base = str(item.get("base_host") or "")
+        if not base:
+            continue
+        flags = host_flags.setdefault(base, {"has_www": False, "has_plain": False})
+        host = str(item.get("host") or "")
+        if host.startswith("www."):
+            flags["has_www"] = True
+        else:
+            flags["has_plain"] = True
+
+    host_items: Dict[tuple[str, str], Dict[str, Any]] = {}
+    literal_items: Dict[str, Dict[str, Any]] = {}
+
+    for item in parsed:
+        kind = str(item.get("kind") or "")
+        order = int(item.get("order") or 0)
+        if kind == "literal":
+            literal = _trim_str(item.get("literal")).lower()
+            if not literal:
+                continue
+            existing_literal = literal_items.get(literal)
+            if existing_literal is None:
+                literal_items[literal] = {"kind": "literal", "literal": literal, "order": order}
+            elif order < int(existing_literal.get("order") or 0):
+                existing_literal["order"] = order
+            continue
+
+        if kind != "host":
+            continue
+        host = str(item.get("host") or "")
+        base = str(item.get("base_host") or "")
+        tail = str(item.get("tail") or "/")
+        is_root = bool(item.get("is_root"))
+        scheme = str(item.get("scheme") or "")
+
+        flags = host_flags.get(base, {"has_www": False, "has_plain": False})
+        if flags.get("has_www") and flags.get("has_plain") and base:
+            host = f"www.{base}"
+
+        key = (host, tail)
+        scheme_score = 2 if scheme == "https" else 1 if scheme == "http" else 0
+        existing = host_items.get(key)
+        if existing is None:
+            host_items[key] = {
+                "kind": "host",
+                "host": host,
+                "tail": tail,
+                "is_root": is_root,
+                "scheme": scheme,
+                "scheme_score": scheme_score,
+                "order": order,
+            }
+            continue
+
+        if order < int(existing.get("order") or 0):
+            existing["order"] = order
+        if is_root:
+            existing["is_root"] = True
+        if scheme_score > int(existing.get("scheme_score") or 0):
+            existing["scheme_score"] = scheme_score
+            existing["scheme"] = scheme
+
+    ordered_items: List[Dict[str, Any]] = list(host_items.values()) + list(literal_items.values())
+    ordered_items.sort(key=lambda it: int(it.get("order") or 0))
+
+    host_sequence: List[str] = []
+    for item in ordered_items:
+        if item.get("kind") != "host":
+            continue
+        host = str(item.get("host") or "")
+        if host and host not in host_sequence:
+            host_sequence.append(host)
+
+    for host in host_sequence:
+        first_idx: Optional[int] = None
+        root_idx: Optional[int] = None
+        for idx, item in enumerate(ordered_items):
+            if item.get("kind") != "host" or str(item.get("host") or "") != host:
+                continue
+            if first_idx is None:
+                first_idx = idx
+            if bool(item.get("is_root")):
+                root_idx = idx
+                break
+        if first_idx is None or root_idx is None or root_idx <= first_idx:
+            continue
+        root_item = ordered_items.pop(root_idx)
+        ordered_items.insert(first_idx, root_item)
+
+    websites: List[str] = []
+    for item in ordered_items:
+        if item.get("kind") == "literal":
+            literal = _trim_str(item.get("literal")).lower()
+            if literal:
+                websites.append(literal)
+            continue
+        host = str(item.get("host") or "")
+        tail = str(item.get("tail") or "/")
+        scheme = str(item.get("scheme") or "")
+        if host:
+            websites.append(_render_website(host=host, scheme=scheme, tail=tail))
+
+    return _uniq_keep_order(websites)
+
+
+def _merge_websites(norm: Dict[str, Any], values: Any) -> None:
+    existing = _safe_list(norm.get("websites"))
+    merged = _merge_website_list(existing + _safe_list(values))
+    if merged:
+        norm["websites"] = merged
+    else:
+        norm.pop("websites", None)
+
+
 def _merge_description(norm: Dict[str, Any], value: Any) -> None:
     text = _trim_str(value)
     if not text:
@@ -319,7 +514,7 @@ def _apply_card_to_norm(
     )
 
     category_values = _text_list(card.get("categories_gs")) + _text_list(card.get("categories_11880"))
-    website_values = _text_list(_safe_list(card.get("website")) + _safe_list(card.get("websites")))
+    website_values = _safe_list(card.get("website")) + _safe_list(card.get("websites"))
     email_values = [primary_email] + _email_list(card.get("emails"))
 
     _merge_single_plural(norm, single_key="company_name", plural_key="company_names", values=[company_name])
@@ -332,7 +527,7 @@ def _apply_card_to_norm(
     _merge_text_list(norm, "categories", category_values)
     _merge_text_list(norm, "phones", card.get("phones"))
     _merge_text_list(norm, "fax", card.get("fax"))
-    _merge_text_list(norm, "websites", website_values)
+    _merge_websites(norm, website_values)
     _merge_text_list(norm, "socials", card.get("socials"))
     _merge_text_list(norm, "statuses_11880", card.get("statuses_11880"))
     _merge_text_list(norm, "keywords_11880", card.get("keywords_11880"))
