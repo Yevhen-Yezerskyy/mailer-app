@@ -144,17 +144,49 @@ def _is_now_in_send_window(now_de: datetime, window_obj: object) -> bool:
     return False
 
 
-def _pick_window_minutes(now_de: datetime, window_obj: object, lookahead_days: int = 14) -> int:
+def _pick_window_day(now_de: datetime, window_obj: object, lookahead_days: int = 14) -> Tuple[Optional[date], int]:
     today_minutes = _sum_window_minutes_for_date(window_obj, now_de.date())
     if today_minutes > 0:
-        return int(today_minutes)
+        return (now_de.date(), int(today_minutes))
 
     for offset in range(1, int(lookahead_days) + 1):
         day_value = now_de.date() + timedelta(days=int(offset))
         day_minutes = _sum_window_minutes_for_date(window_obj, day_value)
         if day_minutes > 0:
-            return int(day_minutes)
-    return 0
+            return (day_value, int(day_minutes))
+    return (None, 0)
+
+
+def _remaining_window_minutes_today(now_de: datetime, window_obj: object) -> int:
+    if not isinstance(window_obj, dict):
+        return 0
+    key = _day_key_for_date(now_de.date())
+    cur = int(now_de.hour * 60 + now_de.minute)
+    total = 0
+    for a_str, b_str in _iter_slots(window_obj.get(key, [])):
+        a = _parse_hhmm_to_minutes(a_str)
+        b = _parse_hhmm_to_minutes(b_str)
+        if a is None or b is None:
+            continue
+        if b <= a:
+            continue
+        if cur >= b:
+            continue
+        start = max(int(a), cur)
+        if b > start:
+            total += int(b - start)
+    return int(total)
+
+
+def _first_future_window_day(now_de: datetime, window_obj: object, lookahead_days: int = 14) -> Tuple[Optional[date], int]:
+    if not isinstance(window_obj, dict):
+        return (None, 0)
+    for offset in range(1, int(lookahead_days) + 1):
+        day_value = now_de.date() + timedelta(days=int(offset))
+        day_minutes = _sum_window_minutes_for_date(window_obj, day_value)
+        if day_minutes > 0:
+            return (day_value, int(day_minutes))
+    return (None, 0)
 
 
 def _effective_window(campaign_window: object, workspace_window: object, global_window: object) -> dict[str, Any]:
@@ -165,18 +197,6 @@ def _effective_window(campaign_window: object, workspace_window: object, global_
     if _window_is_nonempty(global_window):
         return global_window if isinstance(global_window, dict) else {}
     return {}
-
-
-def _compute_interval_ms(window_minutes: int, limit_hour: int, limit_day: int) -> Optional[int]:
-    if int(window_minutes) <= 0:
-        return None
-    if int(limit_hour) <= 0 or int(limit_day) <= 0:
-        return None
-
-    window_ms = int(window_minutes) * 60_000.0
-    interval_day_ms = window_ms / float(limit_day)
-    interval_hour_ms = 3_600_000.0 / float(limit_hour)
-    return int(math.ceil(max(interval_day_ms, interval_hour_ms)))
 
 
 def _load_global_window() -> dict[str, Any]:
@@ -438,12 +458,12 @@ def run_campaign_status_once() -> dict[str, int | str]:
     mailbox_limits = _load_mailbox_limits(int(row[2]) for row in rows if row[2] is not None)
     global_window = _load_global_window()
 
-    campaign_ids: list[int] = []
-    active_values: list[bool] = []
-    interval_values: list[Optional[int]] = []
+    campaign_rows: list[dict[str, Any]] = []
+
+    mailbox_day_total_minutes: dict[tuple[int, date], int] = {}
+    mailbox_day_campaign_count: dict[tuple[int, date], int] = {}
 
     active_true_cnt = 0
-    interval_nonnull_cnt = 0
 
     for campaign_id, workspace_id, mailbox_id, user_active, archived, campaign_window in rows:
         cid = int(campaign_id)
@@ -452,46 +472,117 @@ def run_campaign_status_once() -> dict[str, int | str]:
         camp_window = campaign_window if isinstance(campaign_window, dict) else {}
         ws_window = ws_windows.get(ws_id, {})
         effective_window = _effective_window(camp_window, ws_window, global_window)
+        is_pool_eligible = bool(user_active) and (not bool(archived))
 
-        is_active_now = bool(user_active) and (not bool(archived)) and _is_now_in_send_window(now_de, effective_window)
+        is_active_now = bool(is_pool_eligible) and _is_now_in_send_window(now_de, effective_window)
 
-        day_window_minutes = _pick_window_minutes(now_de, effective_window)
-        limit_hour, limit_day = mailbox_limits.get(mid, (0, 0))
-        interval_ms = _compute_interval_ms(day_window_minutes, int(limit_hour), int(limit_day))
+        interval_day, interval_day_minutes = _pick_window_day(now_de, effective_window)
+        remaining_today_minutes = _remaining_window_minutes_today(now_de, effective_window)
+        future_day, future_minutes = _first_future_window_day(now_de, effective_window)
 
-        campaign_ids.append(cid)
-        active_values.append(bool(is_active_now))
-        interval_values.append(interval_ms)
+        # Aggregate by mailbox+day (full-day window minutes) for shared limit distribution.
+        day_slots: dict[date, int] = {}
+        if interval_day is not None and int(interval_day_minutes) > 0:
+            day_slots[interval_day] = int(interval_day_minutes)
+        if future_day is not None and int(future_minutes) > 0 and future_day not in day_slots:
+            day_slots[future_day] = int(future_minutes)
+        if is_pool_eligible:
+            for day_value, minutes_value in day_slots.items():
+                key = (int(mid), day_value)
+                mailbox_day_total_minutes[key] = int(mailbox_day_total_minutes.get(key, 0)) + int(minutes_value)
+                mailbox_day_campaign_count[key] = int(mailbox_day_campaign_count.get(key, 0)) + 1
 
         if is_active_now:
             active_true_cnt += 1
+
+        campaign_rows.append(
+            {
+                "campaign_id": int(cid),
+                "mailbox_id": int(mid),
+                "is_pool_eligible": bool(is_pool_eligible),
+                "is_active_now": bool(is_active_now),
+                "interval_day": interval_day,
+                "interval_day_minutes": int(interval_day_minutes),
+                "remaining_today_minutes": int(remaining_today_minutes),
+                "future_day": future_day,
+                "future_minutes": int(future_minutes),
+            }
+        )
+
+    campaign_ids: list[int] = []
+    active_values: list[bool] = []
+    interval_values: list[Optional[int]] = []
+    to_send_values: list[Optional[int]] = []
+    interval_nonnull_cnt = 0
+    to_send_nonnull_cnt = 0
+
+    for row_obj in campaign_rows:
+        cid = int(row_obj["campaign_id"])
+        mid = int(row_obj["mailbox_id"])
+        limit_hour, limit_day = mailbox_limits.get(mid, (0, 0))
+        is_pool_eligible = bool(row_obj["is_pool_eligible"])
+
+        interval_day = row_obj["interval_day"]
+        interval_day_minutes = int(row_obj["interval_day_minutes"])
+
+        interval_ms: Optional[int] = None
+        if (
+            is_pool_eligible
+            and interval_day is not None
+            and interval_day_minutes > 0
+            and int(limit_hour) > 0
+            and int(limit_day) > 0
+        ):
+            key = (mid, interval_day)
+            total_minutes_day = int(mailbox_day_total_minutes.get(key, 0))
+            total_campaigns_day = int(mailbox_day_campaign_count.get(key, 0))
+            if total_minutes_day > 0 and total_campaigns_day > 0:
+                interval_day_ms = (float(total_minutes_day) * 60_000.0) / float(limit_day)
+                interval_hour_ms = (3_600_000.0 * float(total_campaigns_day)) / float(limit_hour)
+                interval_ms = int(math.ceil(max(interval_day_ms, interval_hour_ms)))
+
+        to_send_num: Optional[int] = None
+        if is_pool_eligible and interval_ms is not None and int(interval_ms) > 0:
+            own_total_minutes = int(row_obj["remaining_today_minutes"]) + int(row_obj["future_minutes"])
+            own_total_ms = int(own_total_minutes) * 60_000
+            to_send_num = int(own_total_ms // int(interval_ms))
+
+        campaign_ids.append(cid)
+        active_values.append(bool(row_obj["is_active_now"]))
+        interval_values.append(interval_ms)
+        to_send_values.append(to_send_num)
+
         if interval_ms is not None:
             interval_nonnull_cnt += 1
+        if to_send_num is not None:
+            to_send_nonnull_cnt += 1
 
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            WITH data(campaign_id, active_value, sending_interval_value) AS (
+            WITH data(campaign_id, active_value, sending_interval_value, to_send_value) AS (
                 SELECT *
-                FROM unnest(%s::bigint[], %s::boolean[], %s::integer[])
+                FROM unnest(%s::bigint[], %s::boolean[], %s::integer[], %s::integer[])
             ),
             upd AS (
                 UPDATE public.campaigns_campaigns c
                 SET active = data.active_value,
                     sending_interval = data.sending_interval_value,
+                    to_send_num = data.to_send_value,
                     updated_at = now()
                 FROM data
                 WHERE c.id = data.campaign_id
                   AND (
                       c.active IS DISTINCT FROM data.active_value
                       OR c.sending_interval IS DISTINCT FROM data.sending_interval_value
+                      OR c.to_send_num IS DISTINCT FROM data.to_send_value
                   )
                 RETURNING c.id
             )
             SELECT COUNT(*)::int
             FROM upd
             """,
-            [campaign_ids, active_values, interval_values],
+            [campaign_ids, active_values, interval_values, to_send_values],
         )
         updated_cnt = int((cur.fetchone() or [0])[0] or 0)
         conn.commit()
@@ -504,4 +595,5 @@ def run_campaign_status_once() -> dict[str, int | str]:
         "active_true_cnt": int(active_true_cnt),
         "active_false_cnt": int(active_false_cnt),
         "interval_nonnull_cnt": int(interval_nonnull_cnt),
+        "to_send_nonnull_cnt": int(to_send_nonnull_cnt),
     }
