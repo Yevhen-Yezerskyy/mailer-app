@@ -15,10 +15,10 @@ from engine.common.db import fetch_all, fetch_one
 LIMIT_TEST_CONTACTS_RATED = 60
 LIMIT_TEST_CONTACTS_RATED_GOOD = 20
 
-LIMIT_FULL_CONTACTS_GATHERED = 100
 LIMIT_FULL_CONTACTS_RATED = 100
 LIMIT_FULL_GOOD_BAD_RATED_RATIIO = 0.25
 LIMIT_FULL_BAD_RATED_STEP = 3000
+
 CACHE_TTL_SEC = 7 * 24 * 60 * 60
 TEST_MORE_NEEDED_CACHE_TTL_MIN_SEC = 60 * 60
 TEST_MORE_NEEDED_CACHE_TTL_MAX_SEC = 3 * 60 * 60
@@ -92,18 +92,6 @@ def _count_rated(task_id: int) -> int:
         FROM public.sending_lists sl
         WHERE sl.task_id = %s
           AND sl.rate IS NOT NULL
-        """,
-        [int(task_id)],
-    )
-    return int((row or [0])[0] or 0)
-
-
-def _count_gathered(task_id: int) -> int:
-    row = fetch_one(
-        """
-        SELECT COUNT(*)::int
-        FROM public.sending_lists sl
-        WHERE sl.task_id = %s
         """,
         [int(task_id)],
     )
@@ -292,8 +280,6 @@ def _is_full_needed_by_campaigns(task_id: int, rate_limit: int) -> tuple[bool, i
     campaigns = _load_active_campaign_demands(int(task_id))
     if not campaigns:
         if _count_rated(int(task_id)) >= LIMIT_FULL_CONTACTS_RATED:
-            return (False, int(LIMIT_FULL_CONTACTS_RATED))
-        if _count_gathered(int(task_id)) >= LIMIT_FULL_CONTACTS_GATHERED:
             return (False, int(LIMIT_FULL_CONTACTS_RATED))
         return (True, int(LIMIT_FULL_CONTACTS_RATED))
 
