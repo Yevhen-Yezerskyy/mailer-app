@@ -279,6 +279,42 @@ class SMTPConn:
         finally:
             self.close()
 
+    def last_send_code(self, to_email: Optional[str] = None) -> Optional[int]:
+        last = next((item for item in reversed(self.trace) if item.get("action") == "SEND"), None)
+        if not isinstance(last, dict):
+            return None
+
+        data = last.get("data")
+        if not isinstance(data, dict):
+            return None
+        refused = data.get("refused")
+        if not isinstance(refused, dict):
+            return None
+
+        target = None
+        key = str(to_email or "").strip()
+        if key and key in refused:
+            candidate = refused.get(key)
+            if isinstance(candidate, dict):
+                target = candidate
+
+        if target is None and refused:
+            try:
+                candidate = next(iter(refused.values()))
+                if isinstance(candidate, dict):
+                    target = candidate
+            except Exception:
+                target = None
+
+        if not isinstance(target, dict):
+            return None
+
+        code_raw = target.get("code")
+        try:
+            return int(code_raw) if code_raw is not None else None
+        except Exception:
+            return None
+
     # -------------------------
     # Internal: DB
     # -------------------------

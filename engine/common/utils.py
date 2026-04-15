@@ -79,6 +79,10 @@ def parse_json_object(value: Any, *, field_name: str = "json") -> dict[str, Any]
     return parsed
 
 
+def safe_dict(value: Any) -> dict[str, Any]:
+    return dict(value) if isinstance(value, dict) else {}
+
+
 def load_email_domains_allowlist() -> Set[str]:
     try:
         with open(_EMAIL_DOMAINS_JSON_PATH, "r", encoding="utf-8") as f:

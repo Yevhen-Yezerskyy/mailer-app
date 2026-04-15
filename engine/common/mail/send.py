@@ -1,552 +1,390 @@
 # FILE: engine/common/mail/send.py
 # PATH: engine/common/mail/send.py
-# DATE: 2026-01-30
+# DATE: 2026-04-14
 # SUMMARY:
-# - list_contact_id = lists_contacts.id
-# - lists_contacts.rate_contact_id = rate_contacts.id (FK)
-# - mailbox_sent.rate_contact_id хранит rate_contacts.id (а НЕ raw_contacts_aggr.id)
-# - VarsContext(rate_contact_id) трактуется как rate_contacts.id (правильно)
+# - send_one is the single sender orchestrator: render/template, smrel, SMTP send, sending_log write, status accounting
+# - no campaign/contact lookup queries inside; caller passes full campaign/contact payload
 
 from __future__ import annotations
 
-import html as _html
-import json  # <-- ДОБАВЬ ВВЕРХУ ФАЙЛА
+import json
 import random
-import re
-import textwrap
-from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, List, Tuple
-
-from dateutil.relativedelta import relativedelta
-from zoneinfo import ZoneInfo
+from typing import Any, Dict, List, Optional
 
 from engine.common import db
+from engine.common.cache.client import CLIENT
+from engine.common.email_template import DEFAULT_VARS, build_send_bodies, build_send_vars_from_contact
 from engine.common.mail.logs import log_mail_event
 from engine.common.mail.smtp import SMTPConn
+from engine.common.utils import safe_dict
 
-# ============================================================
-# const / regex
-# ============================================================
-_TZ = ZoneInfo("Europe/Berlin")
-
-_RE_VAR = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
-_RE_A_HREF = re.compile(r'(<a\b[^>]*\bhref\s*=\s*)(["\'])([^"\']*)(\2)', re.IGNORECASE)
-_RE_HAS_SMREL = re.compile(r"(^|[?&])smrel=", re.IGNORECASE)
-
-_RE_TAG = re.compile(r"<[^>]+>")
-_RE_BR = re.compile(r"<\s*br\s*/?\s*>", re.IGNORECASE)
-_RE_BLOCK_END = re.compile(
-    r"</\s*(p|div|tr|table|ul|ol|li|h1|h2|h3|h4|h5|h6)\s*>",
-    re.IGNORECASE,
-)
-_RE_A_TAG = re.compile(
-    r'<a\b[^>]*\bhref\s*=\s*(["\'])([^"\']*)\1[^>]*>(.*?)</a\s*>',
-    re.IGNORECASE | re.DOTALL,
-)
-_RE_WS = re.compile(r"[ \t]+")
-
-# ============================================================
-# defaults (ONLY for UI preview when rate_contact_id is None)
-# ============================================================
-DEFAULT_VARS: Dict[str, str] = {
-    "company_name": "Unternehmen Adressat GmbH",
-    "company_address": "Adressatenstraße 12, 40213 Düsseldorf, Nordrhein-Westfalen",
-    "city": "Düsseldorf",
-    "land": "Nordrhein-Westfalen",
-    "city_land": "Düsseldorf, Nordrhein-Westfalen",
-    "branch": "Adressat Geschäftskategorie",
-    "date_time": "12:00 21.01.2028",
-    "date": "21.01.2028",
-    "date_plus_1m": "21.02.2028",
-    "date_plus_3m": "21.04.2028",
-    "company_email": "adressat@unternehmen.de",
-    "UTM": "smrel=0",
-}
+_SENDING_LOG_SEQ_NAME: Optional[str] = None
+_SMTP_451_STATE_TTL_SEC = 7 * 24 * 60 * 60
+_SMTP_451_MAX_FAILS_PER_EMAIL = 3
+_SMTP_451_EMAIL_WRONG_REASON = "451 TMP"
+_BAD_ID_SENTINEL = 0
 
 
-def _aggr_contact_id_by_rate_contact(rate_contact_id: Optional[int]) -> Optional[int]:
-    if rate_contact_id is None:
-        return None
+def _sending_log_seq_name() -> str:
+    global _SENDING_LOG_SEQ_NAME
+    if _SENDING_LOG_SEQ_NAME:
+        return _SENDING_LOG_SEQ_NAME
+
     row = db.fetch_one(
         """
-        SELECT contact_id
-        FROM public.rate_contacts
-        WHERE id = %s
+        SELECT substring(
+            c.column_default
+            FROM $$nextval\\('([^']+)'::regclass\\)$$
+        )
+        FROM information_schema.columns c
+        WHERE c.table_schema = 'public'
+          AND c.table_name = 'sending_log'
+          AND c.column_name = 'id'
         LIMIT 1
         """,
-        [int(rate_contact_id)],
+        [],
+    )
+    if not row or not row[0]:
+        raise RuntimeError("SENDING_LOG_SEQUENCE_NOT_FOUND")
+
+    _SENDING_LOG_SEQ_NAME = str(row[0])
+    return _SENDING_LOG_SEQ_NAME
+
+
+def _next_sending_log_id() -> int:
+    row = db.fetch_one(
+        "SELECT nextval(%s::regclass)",
+        [str(_sending_log_seq_name())],
     )
     if not row or row[0] is None:
-        return None
+        raise RuntimeError("SENDING_LOG_NEXTVAL_FAILED")
     return int(row[0])
 
 
-def _blocked_recipient_info(aggr_contact_id: Optional[int]) -> Optional[Tuple[Optional[int], str]]:
-    if aggr_contact_id is None:
-        return None
-    row = db.fetch_one(
+def _insert_sending_log_row(
+    *,
+    log_id: int,
+    campaign_id: int,
+    sending_list_id: int,
+    status: str,
+    payload: Dict[str, Any],
+    processed: bool = True,
+) -> None:
+    db.fetch_one(
         """
-        SELECT mailbox_sent_id, reason_code
-        FROM public.mail_blocked_recipients
-        WHERE aggr_contact_id = %s
-          AND active = true
-        LIMIT 1
+        WITH ins AS (
+            INSERT INTO public.sending_log (
+                id,
+                campaign_id,
+                sending_list_id,
+                processed,
+                status,
+                data,
+                processed_at
+            )
+            VALUES (
+                %s,
+                %s,
+                %s,
+                %s,
+                %s,
+                %s::jsonb,
+                CASE WHEN %s THEN now() ELSE NULL END
+            )
+            ON CONFLICT DO NOTHING
+            RETURNING campaign_id, processed
+        ),
+        upd AS (
+            UPDATE public.campaigns_campaigns c
+            SET sent_num = COALESCE(c.sent_num, 0) + 1,
+                updated_at = now()
+            FROM ins
+            WHERE c.id = ins.campaign_id
+              AND ins.processed = true
+            RETURNING c.id
+        )
+        SELECT COUNT(*)::int
+        FROM ins
         """,
-        [int(aggr_contact_id)],
+        (
+            int(log_id),
+            int(campaign_id),
+            int(sending_list_id),
+            bool(processed),
+            str(status),
+            json.dumps(payload, ensure_ascii=False),
+            bool(processed),
+        ),
     )
-    if not row:
+
+
+def _as_pos_int(value: Any) -> Optional[int]:
+    try:
+        out = int(value)
+    except Exception:
         return None
-    mailbox_sent_id = int(row[0]) if row[0] is not None else None
-    reason_code = str(row[1] or "").strip() or "BLOCKED"
-    return mailbox_sent_id, reason_code
+    return out if out > 0 else None
 
 
-# ============================================================
-# VarsContext (shared for UI + send)
-# ============================================================
-@dataclass
-class VarsContext:
-    # rate_contact_id == rate_contacts.id
-    rate_contact_id: Optional[int]
-    utm_value: Optional[str]
-
-    def build(self) -> Dict[str, str]:
-        # --- UI preview path ---
-        if self.rate_contact_id is None:
-            out = dict(DEFAULT_VARS)
-            if self.utm_value is not None:
-                out["UTM"] = str(self.utm_value)
-            return out
-
-        # --- send path ---
-        rcid = int(self.rate_contact_id)
-
-        row = db.fetch_one(
-            """
-            SELECT
-              rc.task_id,
-              rc.contact_id,
-              rc.rate_cb,
-              ag.company_name,
-              ag.email,
-              ag.address_list,
-              ag.plz_list,
-              ag.cb_crawler_ids
-            FROM public.rate_contacts rc
-            JOIN public.raw_contacts_aggr ag
-              ON ag.id = rc.contact_id
-            WHERE rc.id = %s
-            LIMIT 1
-            """,
-            [rcid],
-        )
-        if not row:
-            raise RuntimeError("RATE_CONTACT_NOT_FOUND")
-
-        task_id, aggr_id, rate_cb, company_name, company_email, address_list, plz_list, cb_ids = row
-
-        if not company_email:
-            raise RuntimeError("COMPANY_EMAIL_EMPTY")
-        if not cb_ids:
-            raise RuntimeError("CB_IDS_EMPTY")
-
-        cb_rows = db.fetch_all(
-            """
-            SELECT id, city_id, branch_id, plz
-            FROM public.cb_crawler
-            WHERE id = ANY(%s)
-            """,
-            [cb_ids],
-        )
-        if not cb_rows:
-            raise RuntimeError("CB_ROWS_EMPTY")
-
-        city_rate = {
-            int(vid): int(r)
-            for vid, r in db.fetch_all(
-                """
-                SELECT value_id::int, MIN(rate)::int
-                FROM public.crawl_tasks
-                WHERE task_id=%s AND type='city'
-                GROUP BY value_id
-                """,
-                [task_id],
-            )
-        }
-        branch_rate = {
-            int(vid): int(r)
-            for vid, r in db.fetch_all(
-                """
-                SELECT value_id::int, MIN(rate)::int
-                FROM public.crawl_tasks
-                WHERE task_id=%s AND type='branch'
-                GROUP BY value_id
-                """,
-                [task_id],
-            )
-        }
-
-        best: Optional[Tuple[int, int]] = None  # (score, cb_id)
-        for cb_id, city_id, branch_id, _plz in cb_rows:
-            city_id = int(city_id)
-            branch_id = int(branch_id)
-            if city_id not in city_rate or branch_id not in branch_rate:
-                continue
-            score = int(city_rate[city_id]) * int(branch_rate[branch_id])
-            if rate_cb is not None and int(score) == int(rate_cb):
-                best = (score, int(cb_id))
-                break
-            if best is None or score < best[0]:
-                best = (score, int(cb_id))
-
-        if not best:
-            raise RuntimeError("CHOSEN_CB_NOT_FOUND")
-
-        chosen_cb_id = int(best[1])
-
-        row = db.fetch_one(
-            "SELECT city_id, branch_id, plz FROM public.cb_crawler WHERE id=%s LIMIT 1",
-            [chosen_cb_id],
-        )
-        if not row:
-            raise RuntimeError("CB_ROW_MISSING")
-        city_id, branch_id, cb_plz = row
-
-        row = db.fetch_one(
-            "SELECT name, state_name FROM public.cities_sys WHERE id=%s LIMIT 1",
-            [int(city_id)],
-        )
-        if not row:
-            raise RuntimeError("CITY_NOT_FOUND")
-        city, land = row
-
-        row = db.fetch_one(
-            "SELECT name FROM public.gb_branches WHERE id=%s LIMIT 1",
-            [int(branch_id)],
-        )
-        if not row:
-            raise RuntimeError("BRANCH_NOT_FOUND")
-        branch = row[0]
-
-        addr = ""
-        if address_list and plz_list:
-            for a, p in zip(address_list, plz_list):
-                if p == cb_plz:
-                    addr = a
-                    break
-        if not addr and address_list:
-            addr = address_list[0]
-        if not addr:
-            raise RuntimeError("ADDRESS_EMPTY")
-
-        now = datetime.now(tz=_TZ)
-        d0 = now.date()
-
-        return {
-            "company_name": (company_name or "").strip(),
-            "company_email": (company_email or "").strip(),
-            "city": (city or "").strip(),
-            "land": (land or "").strip(),
-            "city_land": f"{(city or '').strip()}, {(land or '').strip()}",
-            "branch": (branch or "").strip(),
-            "company_address": f"{(addr or '').strip()}, {cb_plz} {(city or '').strip()}, {(land or '').strip()}",
-            "date_time": now.strftime("%H:%M %d.%m.%Y"),
-            "date": now.strftime("%d.%m.%Y"),
-            "date_plus_1m": (d0 + relativedelta(months=+1)).strftime("%d.%m.%Y"),
-            "date_plus_3m": (d0 + relativedelta(months=+3)).strftime("%d.%m.%Y"),
-            "UTM": str(self.utm_value) if self.utm_value is not None else "smrel=0",
-        }
+def _status_from_smtp_code(code: Optional[int]) -> str:
+    if code is None:
+        return "OTHER"
+    if 500 <= int(code) <= 599:
+        if int(code) in (550, 551, 553):
+            return "BAD_ADDRESS"
+        if int(code) == 554:
+            return "REPUTATION"
+    return "OTHER"
 
 
-# ============================================================
-# public API (USED BY TEMPLATE-EDITOR)
-# ============================================================
-def apply_vars(html: str, rate_contact_id: Optional[int] = None, *, utm_value: Optional[str] = None) -> str:
-    s = str(html or "")
-    vars_map = VarsContext(rate_contact_id, utm_value).build()
-
-    def rep(m: re.Match) -> str:
-        k = m.group(1)
-        return str(vars_map.get(k, m.group(0)))
-
-    return _RE_VAR.sub(rep, s)
+def _smtp_451_count_key(aggr_contact_id: Optional[int], email: str) -> Optional[str]:
+    if aggr_contact_id is not None and int(aggr_contact_id) > 0:
+        return f"send_one:smtp451:count:aggr:{int(aggr_contact_id)}"
+    email_s = str(email or "").strip().lower()
+    if email_s:
+        return f"send_one:smtp451:count:email:{email_s}"
+    return None
 
 
-def unapply_vars(html: str, vars_map: Dict[str, str]) -> str:
-    s = str(html or "")
-    items = [(k, v) for k, v in (vars_map or {}).items() if k and v]
-    items.sort(key=lambda x: len(str(x[1])), reverse=True)
-    for k, v in items:
-        s = re.sub(re.escape(str(v)), f"{{{{ {k} }}}}", s)
-    return s
+def _smtp_451_get_count(aggr_contact_id: Optional[int], email: str) -> int:
+    key = _smtp_451_count_key(aggr_contact_id, email)
+    if not key:
+        return 0
+    raw = CLIENT.get(key, ttl_sec=1)
+    if raw is None:
+        return 0
+    try:
+        return max(0, int(bytes(raw).decode("utf-8", errors="replace").strip() or "0"))
+    except Exception:
+        return 0
 
 
-# ============================================================
-# send_one
-# ============================================================
-# FILE: engine/common/mail/send.py
-# PATH: engine/common/mail/send.py
-# DATE: 2026-01-30
-# SUMMARY:
-# - send_one: add to_email_override + record_sent (default True); tests can send without consuming contact / mailbox_sent row
+def _smtp_451_inc_count(aggr_contact_id: Optional[int], email: str) -> int:
+    key = _smtp_451_count_key(aggr_contact_id, email)
+    if not key:
+        return 0
+    value = _smtp_451_get_count(aggr_contact_id, email) + 1
+    CLIENT.set(key, str(value).encode("utf-8"), ttl_sec=_SMTP_451_STATE_TTL_SEC)
+    return value
+
+
+def _smtp_451_clear_count(aggr_contact_id: Optional[int], email: str) -> None:
+    key = _smtp_451_count_key(aggr_contact_id, email)
+    if key:
+        CLIENT.delete_many([key])
+
+
+def _mark_aggr_email_wrong(aggr_contact_id: Optional[int], reason: str) -> None:
+    if aggr_contact_id is None:
+        return
+    db.execute(
+        """
+        UPDATE public.aggr_contacts_cb
+        SET wrong_email = true,
+            wrong_email_reason = %s,
+            updated_at = now()
+        WHERE id = %s
+        """,
+        [str(reason or "").strip() or _SMTP_451_EMAIL_WRONG_REASON, int(aggr_contact_id)],
+    )
+
 
 def send_one(
-    campaign_id: int,
-    list_contact_id: int,
     *,
+    campaign: Dict[str, Any],
+    contact: Optional[Dict[str, Any]] = None,
+    sending_list_id: Optional[int] = None,
     to_email_override: Optional[str] = None,
     record_sent: bool = True,
-) -> None:
-    now = datetime.now(tz=_TZ)
+) -> bool:
+    campaign_obj = safe_dict(campaign)
+    campaign_id = _as_pos_int(campaign_obj.get("id"))
+    mailbox_id = _as_pos_int(campaign_obj.get("mailbox_id"))
+    sending_list_id_int = _as_pos_int(sending_list_id)
 
-    row = db.fetch_one(
-        """
-        SELECT c.mailbox_id, l.ready_content, l.subjects, l.headers
-        FROM public.campaigns_campaigns c
-        JOIN public.campaigns_letters l ON l.campaign_id = c.id
-        WHERE c.id = %s
-        LIMIT 1
-        """,
-        [int(campaign_id)],
-    )
-    if not row:
-        raise RuntimeError("CAMPAIGN_OR_LETTER_NOT_FOUND")
+    ready_html = campaign_obj.get("ready_content")
+    subjects = campaign_obj.get("subjects")
+    letter_headers = campaign_obj.get("headers")
+    html_tpl = str(ready_html or "").strip()
+    contact_obj = safe_dict(contact)
 
-    mailbox_id, ready_html, subjects, letter_headers = row
-    mailbox_id = int(mailbox_id)
-
-    html_tpl = (ready_html or "").strip()
-    if not html_tpl:
-        raise RuntimeError("READY_CONTENT_EMPTY")
-
-    if list_contact_id is None:
-        if record_sent or not (to_email_override or "").strip():
-            raise RuntimeError("LIST_CONTACT_ID_REQUIRED")
-        rate_contact_id: Optional[int] = None
+    if not bool(record_sent):
+        if campaign_id is None:
+            raise RuntimeError("CAMPAIGN_ID_REQUIRED")
+        if mailbox_id is None:
+            raise RuntimeError("MAILBOX_ID_REQUIRED")
+        if not html_tpl:
+            raise RuntimeError("READY_CONTENT_EMPTY")
+        if not isinstance(subjects, list):
+            raise RuntimeError("SUBJECTS_BAD")
+        subject_pool = [str(item).strip() for item in subjects if str(item or "").strip()]
+        if not subject_pool:
+            raise RuntimeError("SUBJECTS_EMPTY")
+        to_email = str(to_email_override or "").strip()
+        if not to_email:
+            raise RuntimeError("TEST_EMAIL_REQUIRED")
+        subj = random.choice(subject_pool[:3] if len(subject_pool) >= 3 else subject_pool)
+        log_id = 0
+        utm = "smrel=0"
     else:
-        row = db.fetch_one(
-            """
-            SELECT rate_contact_id
-            FROM public.lists_contacts
-            WHERE id=%s AND active=true
-            LIMIT 1
-            """,
-            [int(list_contact_id)],
-        )
-        if not row:
-            raise RuntimeError("LIST_CONTACT_NOT_FOUND_OR_INACTIVE")
-        if row[0] is None:
-            raise RuntimeError("LIST_CONTACT_RATE_CONTACT_ID_NULL")
-        rate_contact_id = int(row[0])
-    aggr_contact_id = _aggr_contact_id_by_rate_contact(rate_contact_id)
+        bad_campaign_reason = ""
+        if campaign_id is None:
+            bad_campaign_reason = "CAMPAIGN_ID_MISSING_OR_INVALID"
+        elif sending_list_id_int is None:
+            bad_campaign_reason = "SENDING_LIST_ID_MISSING_OR_INVALID"
+        elif mailbox_id is None:
+            bad_campaign_reason = "MAILBOX_ID_MISSING_OR_INVALID"
+        elif not html_tpl:
+            bad_campaign_reason = "READY_CONTENT_EMPTY"
+        elif not isinstance(subjects, list):
+            bad_campaign_reason = "SUBJECTS_BAD"
+        else:
+            subject_pool = [str(item).strip() for item in subjects if str(item or "").strip()]
+            if not subject_pool:
+                bad_campaign_reason = "SUBJECTS_EMPTY"
 
-    rows = db.fetch_all(
-        """
-        SELECT action, status, created_at
-        FROM public.mailbox_events
-        WHERE mailbox_id=%s
-          AND action IN ('SMTP_AUTH_CHECK','SMTP_SEND_CHECK')
-        ORDER BY created_at DESC
-        LIMIT 50
-        """,
-        [mailbox_id],
-    )
-
-    def blocked(action: str, status: str, span: timedelta, cooldown: timedelta) -> bool:
-        seq: List[datetime] = []
-        for a, s, ts in rows:
-            if a != action:
-                continue
-            if s == status:
-                seq.append(ts)
-                if len(seq) == 3:
-                    if seq[0] - seq[2] <= span:
-                        return now < seq[0] + cooldown
-                    return False
-            else:
-                break
-        return False
-
-    if blocked("SMTP_AUTH_CHECK", "FAIL", timedelta(minutes=5), timedelta(minutes=30)):
-        return
-    if blocked("SMTP_SEND_CHECK", "FAIL_TMP", timedelta(minutes=5), timedelta(minutes=30)):
-        return
-    if blocked("SMTP_SEND_CHECK", "FAIL", timedelta(minutes=5), timedelta(minutes=60)):
-        return
-
-    r = db.fetch_one("SELECT nextval('mailbox_sent_id_seq')", [])
-    if not r or r[0] is None:
-        raise RuntimeError("MAILBOX_SENT_NEXTVAL_FAILED")
-    smrel_id = int(r[0])
-    utm = f"smrel={smrel_id}"
-
-    vars_map = VarsContext(rate_contact_id, utm).build()
-
-    to_email = (to_email_override or "").strip() or (vars_map.get("company_email") or "").strip()
-    if not to_email:
-        raise RuntimeError("TO_EMAIL_EMPTY")
-
-    html1 = apply_vars(html_tpl, rate_contact_id, utm_value=utm)
-
-    def add_smrel(s: str) -> str:
-        def rep(m: re.Match) -> str:
-            url = m.group(3)
-            if not url.startswith("http"):
-                return m.group(0)
-            if _RE_HAS_SMREL.search(url):
-                return m.group(0)
-            sep = "&" if "?" in url else "?"
-            return f"{m.group(1)}{m.group(2)}{url}{sep}{utm}{m.group(2)}"
-
-        return _RE_A_HREF.sub(rep, s)
-
-    html2 = add_smrel(html1)
-
-    def html_to_text(s: str) -> str:
-        def a_rep(m: re.Match) -> str:
-            inner = _RE_TAG.sub("", m.group(3) or "")
-            inner = _html.unescape(inner).strip()
-            url = _html.unescape(m.group(2) or "")
-            return f"{inner} ({url})" if inner and url else inner or url
-
-        s = _RE_A_TAG.sub(a_rep, s)
-        s = _RE_BR.sub("\n", s)
-        s = _RE_BLOCK_END.sub("\n\n", s)
-        s = _RE_TAG.sub("", s)
-        s = _html.unescape(s)
-        s = _RE_WS.sub(" ", s)
-        return textwrap.fill(s.strip(), width=78)
-
-    body_text = html_to_text(html2)
-
-    if not isinstance(subjects, list) or len(subjects) < 3:
-        raise RuntimeError("SUBJECTS_BAD")
-    subj = random.choice([str(x).strip() for x in subjects if x][:3])
-
-    blocked_info = _blocked_recipient_info(aggr_contact_id)
-    if blocked_info is not None:
-        if not record_sent:
-            return
-        blocked_mailbox_sent_id, blocked_reason_code = blocked_info
-        payload = {
-            "mailbox_id": mailbox_id,
-            "to": to_email,
-            "subject": subj,
-            "utm": utm,
-            "blocked": True,
-            "blocked_aggr_contact_id": aggr_contact_id,
-            "blocked_mailbox_sent_id": blocked_mailbox_sent_id,
-            "blocked_reason_code": blocked_reason_code,
-        }
-        db.execute(
-            """
-            INSERT INTO public.mailbox_sent (
-              id, campaign_id, list_contact_id, rate_contact_id,
-              processed, status, data, processed_at
+        if bad_campaign_reason:
+            log_id = _next_sending_log_id()
+            _insert_sending_log_row(
+                log_id=int(log_id),
+                campaign_id=int(campaign_id or _BAD_ID_SENTINEL),
+                sending_list_id=int(sending_list_id_int or _BAD_ID_SENTINEL),
+                status="BAD_CAMPAIGN_DATA",
+                payload={
+                    "reason": bad_campaign_reason,
+                    "smtp_trace": [],
+                    "smtp_code": None,
+                },
+                processed=False,
             )
-            VALUES (%s,%s,%s,%s,true,'BAD_ADDRESS',%s::jsonb,now())
-            """,
-            (
-                smrel_id,
-                int(campaign_id),
-                int(list_contact_id),
-                int(rate_contact_id),
-                json.dumps(payload, ensure_ascii=False),
-            ),
-        )
-        return
+            return False
+
+        subj = random.choice(subject_pool[:3] if len(subject_pool) >= 3 else subject_pool)
+        to_email = str(to_email_override or "").strip() or str(contact_obj.get("email") or "").strip()
+        if not to_email:
+            aggr_contact_id = _as_pos_int(contact_obj.get("aggr_contact_id"))
+            log_id = _next_sending_log_id()
+            _insert_sending_log_row(
+                log_id=int(log_id),
+                campaign_id=int(campaign_id),
+                sending_list_id=int(sending_list_id_int),
+                status="BAD_CONTACT_IN_DATABASE",
+                payload={
+                    "reason": "EMAIL_MISSING_OR_EMPTY",
+                    "aggr_contact_id": int(aggr_contact_id or _BAD_ID_SENTINEL),
+                    "smtp_trace": [],
+                    "smtp_code": None,
+                },
+                processed=True,
+            )
+            return False
+
+        log_id = _next_sending_log_id()
+        utm = f"smrel={int(log_id)}"
+
+    if contact_obj:
+        vars_map = build_send_vars_from_contact(contact=contact_obj, utm=utm)
+    else:
+        vars_map = dict(DEFAULT_VARS)
+        vars_map["UTM"] = utm
+    vars_map["company_email"] = to_email
+
+    body_html, body_text = build_send_bodies(html_tpl, vars_map, utm)
 
     headers: Dict[str, str] = {}
-    if isinstance(letter_headers, dict):
-        for k, v in letter_headers.items():
-            if k and v:
-                headers[str(k)] = str(v)
-    headers["X-Mailer-Id"] = str(smrel_id)
+    for k, v in (safe_dict(letter_headers)).items():
+        kk = str(k or "").strip()
+        vv = str(v or "").strip()
+        if kk and vv:
+            headers[kk] = vv
+    headers["X-Mailer-Id"] = str(log_id if bool(record_sent) else 0)
 
-    smtp = SMTPConn(mailbox_id)
+    aggr_contact_id_raw = contact_obj.get("aggr_contact_id")
+    aggr_contact_id = _as_pos_int(aggr_contact_id_raw)
+    is_blocked = bool(contact_obj.get("blocked"))
+    is_wrong_email = bool(contact_obj.get("wrong_email"))
+
+    payload_base: Dict[str, Any] = {
+        "smtp_trace": [],
+        "smtp_code": None,
+    }
+
+    if record_sent and (is_blocked or is_wrong_email):
+        _insert_sending_log_row(
+            log_id=int(log_id),
+            campaign_id=int(campaign_id),
+            sending_list_id=int(sending_list_id_int),
+            status="BAD_CONTACT_IN_DATABASE",
+            payload={
+                "reason": "CONTACT_BLOCKED_OR_WRONG_EMAIL",
+                "aggr_contact_id": int(aggr_contact_id or _BAD_ID_SENTINEL),
+                **payload_base,
+            },
+        )
+        return False
+
+    smtp = SMTPConn(int(mailbox_id))
     ok = smtp.send_mail(
         to_email,
         subj,
         body_text=body_text,
-        body_html=html2,
+        body_html=body_html,
         headers=headers,
     )
 
-    # NOTE: test-send path should not write mailbox_sent (and must not consume contact via uniq(campaign_id, rate_contact_id))
-    if not record_sent:
-        return
+    trace = list(smtp.trace or [])
+    code = smtp.last_send_code(to_email)
+
+    payload = dict(payload_base)
+    payload["smtp_trace"] = trace
+    payload["smtp_code"] = code
 
     if ok:
-        payload = {
-            "mailbox_id": mailbox_id,
-            "to": to_email,
-            "subject": subj,
-            "utm": utm,
-            "smtp_trace": smtp.trace,
-        }
-        db.execute(
-            """
-            INSERT INTO public.mailbox_sent (
-              id, campaign_id, list_contact_id, rate_contact_id,
-              processed, status, data, processed_at
+        _smtp_451_clear_count(aggr_contact_id, to_email)
+        if record_sent:
+            _insert_sending_log_row(
+                log_id=int(log_id),
+                campaign_id=int(campaign_id),
+                sending_list_id=int(sending_list_id_int),
+                status="SEND",
+                payload=payload,
             )
-            VALUES (%s,%s,%s,%s,true,'SEND',%s::jsonb,now())
-            """,
-            (
-                smrel_id,
-                int(campaign_id),
-                int(list_contact_id),
-                int(rate_contact_id),
-                json.dumps(payload, ensure_ascii=False),
-            ),
+        return True
+
+    if code is not None and 400 <= int(code) <= 499:
+        log_mail_event(
+            mailbox_id=int(mailbox_id),
+            action="SMTP_SEND_CHECK",
+            status="FAIL_TMP",
+            payload_json={"code": int(code), "smtp_trace": trace},
         )
-        return
+        if int(code) == 451 and bool(record_sent):
+            fail_count = _smtp_451_inc_count(aggr_contact_id, to_email)
+            if fail_count >= _SMTP_451_MAX_FAILS_PER_EMAIL:
+                _mark_aggr_email_wrong(aggr_contact_id, _SMTP_451_EMAIL_WRONG_REASON)
+                _smtp_451_clear_count(aggr_contact_id, to_email)
+                _insert_sending_log_row(
+                    log_id=int(log_id),
+                    campaign_id=int(campaign_id),
+                    sending_list_id=int(sending_list_id_int),
+                    status="BAD_ADDRESS",
+                    payload={
+                        "reason": "SMTP_451_LIMIT_REACHED",
+                        "aggr_contact_id": int(aggr_contact_id or _BAD_ID_SENTINEL),
+                        **payload,
+                    },
+                )
+        return False
 
-    trace = smtp.trace or []
-    last = next((r for r in reversed(trace) if r.get("action") == "SEND"), None)
-    if last and isinstance(last.get("data"), dict):
-        refused = last["data"].get("refused")
-        if isinstance(refused, dict):
-            rr = refused.get(to_email) or next(iter(refused.values()), {}) or {}
-            code = rr.get("code")
-            if code:
-                code = int(code)
-                if 400 <= code <= 499:
-                    log_mail_event(
-                        mailbox_id=mailbox_id,
-                        action="SMTP_SEND_CHECK",
-                        status="FAIL_TMP",
-                        payload_json={"code": code, "smtp_trace": trace},
-                    )
-                    return
-                if 500 <= code <= 599:
-                    status = "BAD_ADDRESS" if code in (550, 551, 553) else "REPUTATION" if code == 554 else "OTHER"
-                    payload = {
-                        "mailbox_id": mailbox_id,
-                        "to": to_email,
-                        "subject": subj,
-                        "utm": utm,
-                        "smtp_trace": trace,
-                        "smtp_code": code,
-                    }
-                    db.execute(
-                        """
-                        INSERT INTO public.mailbox_sent (
-                          id, campaign_id, list_contact_id, rate_contact_id,
-                          processed, status, data, processed_at
-                        )
-                        VALUES (%s,%s,%s,%s,true,%s,%s::jsonb,now())
-                        """,
-                        (
-                            smrel_id,
-                            int(campaign_id),
-                            int(list_contact_id),
-                            int(rate_contact_id),
-                            status,
-                            json.dumps(payload, ensure_ascii=False),
-                        ),
-                    )
-                    return
-
-    return
+    status = _status_from_smtp_code(code)
+    if status == "BAD_ADDRESS" and bool(record_sent):
+        _mark_aggr_email_wrong(aggr_contact_id, f"smtp_{int(code)}" if code is not None else "smtp_bad_address")
+    if record_sent:
+        _insert_sending_log_row(
+            log_id=int(log_id),
+            campaign_id=int(campaign_id),
+            sending_list_id=int(sending_list_id_int),
+            status=status,
+            payload=payload,
+        )
+    return False

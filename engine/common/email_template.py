@@ -4,12 +4,17 @@
 
 from __future__ import annotations
 
+import html as _html
 import json
 import re
+import textwrap
 from datetime import date
+from datetime import datetime
 from typing import Any, Dict, Optional, Union
 
 import holidays  # если пакета нет — пусть валится нах
+from dateutil.relativedelta import relativedelta
+from zoneinfo import ZoneInfo
 
 StylesJSON = Union[str, Dict[str, Dict[str, Any]], None]
 
@@ -18,6 +23,7 @@ StylesJSON = Union[str, Dict[str, Dict[str, Any]], None]
 # -------------------------
 
 _HOL_DE_CACHE: Dict[int, set[date]] = {}
+_TZ = ZoneInfo("Europe/Berlin")
 
 
 def _get_de_wide_holidays_for_year(y: int) -> set[date]:
@@ -58,6 +64,166 @@ ALLOWED_ATTRS = {
 # ---- placeholder ----
 
 PLACEHOLDER = "{{ ..content.. }}"
+
+# ---- vars/tools for message construction ----
+
+DEFAULT_VARS: Dict[str, str] = {
+    "company_name": "Unternehmen Adressat GmbH",
+    "company_address": "Adressatenstraße 12, 40213 Düsseldorf, Nordrhein-Westfalen",
+    "city": "Düsseldorf",
+    "land": "Nordrhein-Westfalen",
+    "city_land": "Düsseldorf, Nordrhein-Westfalen",
+    "date_time": "12:00 21.01.2028",
+    "date": "21.01.2028",
+    "date_plus_1m": "21.02.2028",
+    "date_plus_3m": "21.04.2028",
+    "company_email": "adressat@unternehmen.de",
+    "UTM": "smrel=0",
+}
+
+_RE_VAR = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
+_RE_A_HREF = re.compile(r'(<a\b[^>]*\bhref\s*=\s*)(["\'])([^"\']*)(\2)', re.IGNORECASE)
+_RE_HAS_SMREL = re.compile(r"(^|[?&])smrel=", re.IGNORECASE)
+_RE_TEXT_TAG = re.compile(r"<[^>]+>")
+_RE_TEXT_BR = re.compile(r"<\s*br\s*/?\s*>", re.IGNORECASE)
+_RE_TEXT_BLOCK_END = re.compile(
+    r"</\s*(p|div|tr|table|ul|ol|li|h1|h2|h3|h4|h5|h6)\s*>",
+    re.IGNORECASE,
+)
+_RE_TEXT_A = re.compile(
+    r'<a\b[^>]*\bhref\s*=\s*(["\'])([^"\']*)\1[^>]*>(.*?)</a\s*>',
+    re.IGNORECASE | re.DOTALL,
+)
+_RE_TEXT_WS = re.compile(r"[ \t]+")
+
+
+def _safe_text(v: Any) -> str:
+    return str(v or "").strip()
+
+
+def _preview_vars(utm_value: Optional[str] = None) -> Dict[str, str]:
+    out = dict(DEFAULT_VARS)
+    if utm_value is not None:
+        out["UTM"] = str(utm_value)
+    return out
+
+
+def build_send_vars(
+    *,
+    company_name: Any,
+    company_email: Any,
+    city: Any,
+    land: Any,
+    company_address: Any,
+    utm: str,
+    now: Optional[datetime] = None,
+) -> Dict[str, str]:
+    now_dt = now or datetime.now(tz=_TZ)
+    d0 = now_dt.date()
+    city_s = _safe_text(city)
+    land_s = _safe_text(land)
+    city_land = ", ".join([part for part in [city_s, land_s] if part]).strip()
+    return {
+        "company_name": _safe_text(company_name),
+        "company_email": _safe_text(company_email),
+        "city": city_s,
+        "land": land_s,
+        "city_land": city_land,
+        "company_address": _safe_text(company_address),
+        "date_time": now_dt.strftime("%H:%M %d.%m.%Y"),
+        "date": now_dt.strftime("%d.%m.%Y"),
+        "date_plus_1m": (d0 + relativedelta(months=+1)).strftime("%d.%m.%Y"),
+        "date_plus_3m": (d0 + relativedelta(months=+3)).strftime("%d.%m.%Y"),
+        "UTM": str(utm),
+    }
+
+
+def build_send_vars_from_contact(
+    *,
+    contact: Dict[str, Any],
+    utm: str,
+    now: Optional[datetime] = None,
+) -> Dict[str, str]:
+    data = contact if isinstance(contact, dict) else {}
+    norm = data.get("norm")
+    norm_obj = norm if isinstance(norm, dict) else {}
+    return build_send_vars(
+        company_name=data.get("company_name"),
+        company_email=data.get("email"),
+        city=norm_obj.get("city"),
+        land=norm_obj.get("land"),
+        company_address=norm_obj.get("address"),
+        utm=utm,
+        now=now,
+    )
+
+
+def apply_vars(
+    html: str,
+    rate_contact_id: Optional[int] = None,
+    *,
+    utm_value: Optional[str] = None,
+    vars_map: Optional[Dict[str, Any]] = None,
+) -> str:
+    _ = rate_contact_id
+    s = str(html or "")
+    if vars_map is None:
+        local_vars = _preview_vars(utm_value=utm_value)
+    else:
+        local_vars = {str(k): _safe_text(v) for k, v in vars_map.items() if str(k or "").strip()}
+        if utm_value is not None:
+            local_vars["UTM"] = str(utm_value)
+
+    def rep(m: re.Match) -> str:
+        key = m.group(1)
+        return str(local_vars.get(key, m.group(0)))
+
+    return _RE_VAR.sub(rep, s)
+
+
+def unapply_vars(html: str, vars_map: Dict[str, str]) -> str:
+    s = str(html or "")
+    items = [(k, v) for k, v in (vars_map or {}).items() if k and v]
+    items.sort(key=lambda x: len(str(x[1])), reverse=True)
+    for k, v in items:
+        s = re.sub(re.escape(str(v)), f"{{{{ {k} }}}}", s)
+    return s
+
+
+def add_smrel_to_links(html: str, utm: str) -> str:
+    def rep(m: re.Match) -> str:
+        url = m.group(3)
+        if not url.startswith("http"):
+            return m.group(0)
+        if _RE_HAS_SMREL.search(url):
+            return m.group(0)
+        sep = "&" if "?" in url else "?"
+        return f"{m.group(1)}{m.group(2)}{url}{sep}{utm}{m.group(2)}"
+
+    return _RE_A_HREF.sub(rep, str(html or ""))
+
+
+def html_to_text(s: str) -> str:
+    def a_rep(m: re.Match) -> str:
+        inner = _RE_TEXT_TAG.sub("", m.group(3) or "")
+        inner = _html.unescape(inner).strip()
+        url = _html.unescape(m.group(2) or "")
+        return f"{inner} ({url})" if inner and url else inner or url
+
+    s1 = _RE_TEXT_A.sub(a_rep, str(s or ""))
+    s1 = _RE_TEXT_BR.sub("\n", s1)
+    s1 = _RE_TEXT_BLOCK_END.sub("\n\n", s1)
+    s1 = _RE_TEXT_TAG.sub("", s1)
+    s1 = _html.unescape(s1)
+    s1 = _RE_TEXT_WS.sub(" ", s1)
+    return textwrap.fill(s1.strip(), width=78)
+
+
+def build_send_bodies(html_template: str, vars_map: Dict[str, Any], utm: str) -> tuple[str, str]:
+    html1 = apply_vars(str(html_template or ""), vars_map=vars_map)
+    html2 = add_smrel_to_links(html1, str(utm or "").strip())
+    text = html_to_text(html2)
+    return html2, text
 
 # ---- styles ----
 

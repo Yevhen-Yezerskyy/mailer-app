@@ -2,6 +2,9 @@
 # DATE: 2026-03-26
 # PURPOSE: Builds sorted PLZ-branch pair windows for ready audience tasks, upserts
 # them into cb_crawl_pairs/task_cb_ratings, and tracks source snapshot hashes on the task.
+# TODO: This expander currently relies on random task picking as a temporary workaround.
+# TODO: Rework the scheduler/selection strategy to deterministic, priority-aware picking.
+# TODO: Current random-selection mechanics are not suitable as a long-term production design.
 
 from __future__ import annotations
 
@@ -364,47 +367,61 @@ def _pick_initial_task() -> Tuple[Optional[Dict[str, Any]], Optional[str], int]:
 
 def _pick_active_task() -> Tuple[Optional[Dict[str, Any]], Optional[str], int]:
     owner = f"{os.getpid()}:{int(time.time())}"
-    started_at = time.perf_counter()
-    with get_connection() as conn, conn.cursor() as cur:
-        cur.execute(
-            """
-            SELECT t.id, t.ready, t.active, t.archived, t.rating_city_hash, t.rating_branch_hash
-            FROM public.aap_audience_audiencetask t
-            WHERE COALESCE(t.archived, false) = false
-              AND (
-                  COALESCE(t.active, false) = true
-                  OR (
-                      COALESCE(t.ready, false) = false
-                      AND EXISTS (
-                          SELECT 1
-                          FROM public.task_cb_ratings tcr
-                          WHERE tcr.task_id = t.id
-                      )
+    sql_pick_ms_total = 0
+
+    for _ in range(5):
+        started_at = time.perf_counter()
+        with get_connection() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT t.id, t.ready, t.active, t.archived, t.rating_city_hash, t.rating_branch_hash
+                FROM public.aap_audience_audiencetask t
+                WHERE COALESCE(t.archived, false) = false
+                  AND (
+                      COALESCE(t.active, false) = true
+                      OR COALESCE(t.ready, false) = false
                   )
-              )
-            ORDER BY random()
-            LIMIT 1
-            """
-        )
-        row = cur.fetchone()
-    sql_pick_ms = int((time.perf_counter() - started_at) * 1000)
-    if not row:
-        return None, None, sql_pick_ms
+                ORDER BY random()
+                LIMIT 1
+                """
+            )
+            row = cur.fetchone()
+        sql_pick_ms_total += int((time.perf_counter() - started_at) * 1000)
+        if not row:
+            return None, None, int(sql_pick_ms_total)
 
-    task_id = int(row[0])
-    token = _try_lock_task(task_id, owner)
-    if not token:
-        return None, None, sql_pick_ms
+        task_id = int(row[0])
+        token = _try_lock_task(task_id, owner)
+        if not token:
+            continue
 
-    task = {
-        "task_id": task_id,
-        "ready": bool(row[1]),
-        "active": bool(row[2]),
-        "archived": bool(row[3]),
-        "rating_city_hash": int(row[4]) if row[4] is not None else None,
-        "rating_branch_hash": int(row[5]) if row[5] is not None else None,
-    }
-    return task, token, sql_pick_ms
+        task = {
+            "task_id": task_id,
+            "ready": bool(row[1]),
+            "active": bool(row[2]),
+            "archived": bool(row[3]),
+            "rating_city_hash": int(row[4]) if row[4] is not None else None,
+            "rating_branch_hash": int(row[5]) if row[5] is not None else None,
+        }
+        if (not bool(task["active"])) and bool(task["ready"]) is False:
+            with get_connection() as conn, conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT 1
+                    FROM public.task_cb_ratings tcr
+                    WHERE tcr.task_id = %s
+                    LIMIT 1
+                    """,
+                    (int(task_id),),
+                )
+                has_pairs = cur.fetchone() is not None
+            if not has_pairs:
+                _release_task_lock(task_id, token)
+                continue
+
+        return task, token, int(sql_pick_ms_total)
+
+    return None, None, int(sql_pick_ms_total)
 
 
 def _probe_task_rows(task_id: int, offset: int, *, only_positive: bool = False) -> list[tuple[int]]:

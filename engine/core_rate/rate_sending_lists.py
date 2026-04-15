@@ -20,7 +20,11 @@ from engine.common.gpt import GPTClient
 from engine.common.logs import log
 from engine.common.translate import get_prompt, translate_text
 from engine.common.utils import h64_text, parse_json_object, parse_json_response
-from engine.core_status.is_active import is_more_needed
+from engine.core_status.is_active import (
+    invalidate_is_more_needed_cache,
+    is_more_needed,
+    register_full_continue_progress,
+)
 
 WEBSITE_HTTP_TIMEOUT_SEC = 4
 WEBSITE_CONTACT_BUDGET_SEC = 12
@@ -375,6 +379,7 @@ def run_once() -> Dict[str, Any]:
                                 website_text_parts.append(main_page_text)
 
                     description_web = ""
+                    website_gpt_exception = False
                     website_input = "\n\n".join(part for part in website_text_parts if part.strip()).strip()
                     if website_input:
                         if len(website_input) > MAX_WEBSITE_INPUT_LEN:
@@ -407,26 +412,41 @@ def run_once() -> Dict[str, Any]:
                                 return result
                             description_web = str(website_resp.content or "").strip()
                         except Exception:
-                            description_web = ""
+                            website_gpt_exception = True
 
                     if description_web:
                         norm["description_web"] = description_web
                         result["website_description_cnt"] = int(result["website_description_cnt"]) + 1
+                    else:
+                        norm.pop("description_web", None)
 
                     company_data["norm"] = norm
-                    cur.execute(
-                        """
-                        UPDATE public.aggr_contacts_cb
-                        SET company_data = %s,
-                            website_processed = true,
-                            updated_at = now()
-                        WHERE id = %s
-                        """,
-                        (Json(company_data), int(contact_id)),
-                    )
+                    if website_gpt_exception:
+                        cur.execute(
+                            """
+                            UPDATE public.aggr_contacts_cb
+                            SET company_data = %s,
+                                website_processed = false,
+                                updated_at = now()
+                            WHERE id = %s
+                            """,
+                            (Json(company_data), int(contact_id)),
+                        )
+                    else:
+                        cur.execute(
+                            """
+                            UPDATE public.aggr_contacts_cb
+                            SET company_data = %s,
+                                website_processed = true,
+                                updated_at = now()
+                            WHERE id = %s
+                            """,
+                            (Json(company_data), int(contact_id)),
+                        )
                     conn.commit()
-                    website_processed = True
-                    result["website_processed_cnt"] = int(result["website_processed_cnt"]) + 1
+                    if not website_gpt_exception:
+                        website_processed = True
+                        result["website_processed_cnt"] = int(result["website_processed_cnt"]) + 1
 
                 items.append(
                     {
@@ -533,6 +553,9 @@ def run_once() -> Dict[str, Any]:
             )
             conn.commit()
 
+        if write_rows:
+            invalidate_is_more_needed_cache(int(task_id))
+            register_full_continue_progress(int(task_id), int(len(write_rows)))
         is_more_needed(int(task_id), update=True)
         result["written_cnt"] = len(write_rows)
         result["status"] = "ok"
