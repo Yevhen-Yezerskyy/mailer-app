@@ -506,6 +506,10 @@ def _start_item_timeout_watchdog(
         except Exception:
             pass
         try:
+            _release_item_lock(item)
+        except Exception:
+            pass
+        try:
             close_all_fetch_routers()
         except Exception:
             pass
