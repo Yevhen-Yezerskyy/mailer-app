@@ -12,7 +12,6 @@ from engine.common.cache.client import CLIENT
 from engine.common.db import fetch_all, fetch_one
 
 
-LIMIT_TEST_CONTACTS_GATHERED = 60
 LIMIT_TEST_CONTACTS_RATED = 60
 LIMIT_TEST_CONTACTS_RATED_GOOD = 20
 
@@ -396,8 +395,6 @@ def is_more_needed(task_id: int, update: bool = False) -> bool:
         if _count_rated_good(int(task_id_i), int(rate_limit)) >= LIMIT_TEST_CONTACTS_RATED_GOOD:
             needed = False
         elif _count_rated(int(task_id_i)) >= LIMIT_TEST_CONTACTS_RATED:
-            needed = False
-        elif _count_gathered(int(task_id_i)) >= LIMIT_TEST_CONTACTS_GATHERED:
             needed = False
 
         _set_test_more_needed(int(task_id_i), bool(needed))
