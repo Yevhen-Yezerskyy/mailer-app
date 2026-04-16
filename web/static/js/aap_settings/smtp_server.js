@@ -6,23 +6,19 @@
   function byId(id) { return document.getElementById(id); }
   function qByName(name) { return document.querySelector('[name="' + name + '"]'); }
 
-  const ACTIVE = {
-    bg: "#d6fdda",
-    text: "#016b09",
-    border: "#71d0f4",
-  };
+  function mappedButtonClass(key, extra) {
+    const classMap = window.yyClassMap || (document.documentElement && document.documentElement.yyClassMap) || {};
+    const mapped = String(classMap[key] || "").trim();
+    const tail = String(extra || "").trim();
+    if (mapped) return [key, mapped, tail].filter(Boolean).join(" ");
+    return [key, tail].filter(Boolean).join(" ");
+  }
 
-  function setBtnActiveStyle(btn, active) {
+  function setBtnStateClass(btn, active) {
     if (!btn) return;
-    if (active) {
-      btn.style.backgroundColor = ACTIVE.bg;
-      btn.style.color = ACTIVE.text;
-      btn.style.borderColor = ACTIVE.border;
-      return;
-    }
-    btn.style.backgroundColor = "";
-    btn.style.color = "";
-    btn.style.borderColor = "";
+    const extra = btn.getAttribute("data-base-extra") || "";
+    const key = active ? "YY-BUTTON_GREEN" : "YY-BUTTON_MAIN";
+    btn.setAttribute("class", mappedButtonClass(key, extra));
   }
 
   function show(el, yes) {
@@ -132,10 +128,10 @@
       title.textContent = isRelay ? "RELAY NOAUTH" : "ЛОГИН (Стандарт)";
     }
 
-    setBtnActiveStyle(btnL, isLogin);
-    setBtnActiveStyle(btnR, isRelay);
-    setBtnActiveStyle(btnG, isG);
-    setBtnActiveStyle(btnM, isM);
+    setBtnStateClass(btnL, isLogin);
+    setBtnStateClass(btnR, isRelay);
+    setBtnStateClass(btnG, isG);
+    setBtnStateClass(btnM, isM);
 
     if (isManual) refillPresetOptions(v);
 

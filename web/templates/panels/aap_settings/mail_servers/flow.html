@@ -1,0 +1,20 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+{% load static %}
+
+{% block content %}
+{% include "panels/aap_settings/mail_servers/_flow_nav.html" %}
+{% include flow_body_template %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/aap_settings/mail_servers_checks.js' %}"></script>
+<script src="{% static 'js/aap_settings/mail_servers_flow.js' %}"></script>
+{% if flow_step_key == "smtp" %}
+<script src="{% static 'js/aap_settings/smtp_server.js' %}"></script>
+<script src="{% static 'js/aap_settings/mail_servers_secret.js' %}"></script>
+{% elif flow_step_key == "imap" %}
+<script src="{% static 'js/aap_settings/mail_servers_presets.js' %}"></script>
+<script src="{% static 'js/aap_settings/mail_servers_secret.js' %}"></script>
+{% endif %}
+{% endblock %}

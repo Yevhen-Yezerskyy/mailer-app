@@ -1,0 +1,53 @@
+{% load i18n %}
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_TD">
+      <div class="YY-CARD_WHITE">
+        <div class="grid grid-cols-[max-content_1fr_max-content] items-start gap-3">
+          <div class="shrink-0 justify-self-start">
+            <div class="YY-STATUS_BLUE !mb-0">{{ flow_title }}</div>
+          </div>
+          <div class="min-w-0 flex justify-center">
+            <div class="flex items-center gap-4" data-mail-flow-steps>
+              {% for step in flow_step_states %}
+                <div class="shrink-0">
+                  {% if step.is_current %}
+                    <button type="button" class="YY-BUTTON_GREEN_FULL !w-[250px]" data-mail-flow-step-btn disabled>
+                      <span class="inline-flex items-center justify-center gap-1 whitespace-nowrap">
+                        <span>{{ step.label }}</span>
+                        <svg class="size-[22px] shrink-0" aria-hidden="true">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </span>
+                    </button>
+                  {% elif step.is_clickable %}
+                    <a href="{{ step.url }}" class="YY-BUTTON_MAIN_FULL !w-[250px]" data-mail-flow-step-btn>
+                      <span class="inline-flex items-center justify-center gap-1 whitespace-nowrap">
+                        <span>{{ step.label }}</span>
+                        <svg class="size-[22px] shrink-0" aria-hidden="true">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </span>
+                    </a>
+                  {% else %}
+                    <button type="button" class="YY-BUTTON_GRAY_FULL !w-[250px]" data-mail-flow-step-btn disabled>
+                      <span class="inline-flex items-center justify-center gap-1 whitespace-nowrap">
+                        <span>{{ step.label }}</span>
+                        <svg class="size-[22px] shrink-0" aria-hidden="true">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </span>
+                    </button>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="shrink-0 justify-self-end">
+            <a href="{{ flow_close_url }}" class="YY-BUTTON_MAIN">{% trans "Закрыть / к списку" %}</a>
+          </div>
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>

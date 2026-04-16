@@ -13,6 +13,7 @@ from engine.common.mail.domain_whitelist import is_domain_whitelisted
 from mailer_web.access import decode_id, encode_id
 from panel.aap_settings.forms import MailboxAddForm
 from panel.aap_settings.models import ImapMailbox, Mailbox, SmtpMailbox
+from panel.aap_settings.views.mail_servers_flow import build_mail_servers_flow_step_states
 
 
 def _guard(request):
@@ -142,6 +143,20 @@ def mail_servers_view(request):
 
         _apply_ui_fields(edit_obj)
 
+    flow_mode = state in ("add", "edit")
+    flow_mailbox_ui_id = edit_obj.ui_id if edit_obj else ""
+    flow_title = edit_obj.email if edit_obj else "Новый почтовый сервер"
+    flow_step_states = build_mail_servers_flow_step_states(
+        current_step="identity",
+        mailbox_ui_id=flow_mailbox_ui_id,
+        saved=bool(edit_obj),
+    )
+    flow_close_url = reverse("settings:mail_servers")
+
+    list_template = "panels/aap_settings/mail_servers/index_list.html"
+    flow_template = "panels/aap_settings/mail_servers/flow.html"
+    active_template = flow_template if flow_mode else list_template
+
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
 
@@ -176,38 +191,68 @@ def mail_servers_view(request):
         form = MailboxAddForm(request.POST, workspace_id=ws_id, mailbox_id=mailbox_id)
 
         if not form.is_valid():
+            has_archived_mailboxes = Mailbox.objects.filter(workspace_id=ws_id, archived=True).exists()
             return render(
                 request,
-                "panels/aap_settings/mail_servers.html",
+                active_template,
                 {
                     "state": state or "add",
                     "form": form,
                     "items": items,
                     "edit_obj": edit_obj,
+                    "show_archive": show_archive,
+                    "has_archived_mailboxes": has_archived_mailboxes,
+                    "flow_mode": flow_mode,
+                    "flow_title": flow_title,
+                    "flow_step_states": flow_step_states,
+                    "flow_close_url": flow_close_url,
+                    "flow_body_template": "panels/aap_settings/mail_servers/_mail_limits.html",
+                    "flow_step_key": "identity",
                 },
             )
 
         email = (form.cleaned_data["email"] or "").strip().lower()
         domain = (email.split("@", 1)[1] if "@" in email else "").strip().lower()
+        limit_hour = int(form.cleaned_data["limit_hour"])
+        limit_day = int(form.cleaned_data["limit_day"])
 
         if mailbox_id is not None:
-            Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).update(email=email, domain=domain)
+            Mailbox.objects.filter(id=int(mailbox_id), workspace_id=ws_id).update(
+                email=email,
+                domain=domain,
+                limit_hour=limit_hour,
+                limit_day=limit_day,
+            )
             tok = encode_id(int(mailbox_id))
             return redirect(reverse("settings:mail_servers") + f"?state=edit&id={tok}")
 
-        mb = Mailbox.objects.create(workspace_id=ws_id, email=email, domain=domain)
+        mb = Mailbox.objects.create(
+            workspace_id=ws_id,
+            email=email,
+            domain=domain,
+            limit_hour=limit_hour,
+            limit_day=limit_day,
+        )
         return redirect(reverse("settings:mail_servers") + f"?state=edit&id={encode_id(int(mb.id))}")
 
     if state == "edit" and edit_obj:
-        form = MailboxAddForm(initial={"email": edit_obj.email}, workspace_id=ws_id, mailbox_id=int(edit_obj.id))
+        form = MailboxAddForm(
+            initial={
+                "email": edit_obj.email,
+                "limit_hour": edit_obj.limit_hour,
+                "limit_day": edit_obj.limit_day,
+            },
+            workspace_id=ws_id,
+            mailbox_id=int(edit_obj.id),
+        )
     else:
-        form = MailboxAddForm(initial={"email": ""}, workspace_id=ws_id)
+        form = MailboxAddForm(initial={"email": "", "limit_hour": 60, "limit_day": 500}, workspace_id=ws_id)
 
     has_archived_mailboxes = Mailbox.objects.filter(workspace_id=ws_id, archived=True).exists()
 
     return render(
         request,
-        "panels/aap_settings/mail_servers.html",
+        active_template,
         {
             "state": state,
             "form": form,
@@ -215,5 +260,91 @@ def mail_servers_view(request):
             "edit_obj": edit_obj,
             "show_archive": show_archive,
             "has_archived_mailboxes": has_archived_mailboxes,
+            "flow_mode": flow_mode,
+            "flow_title": flow_title,
+            "flow_step_states": flow_step_states,
+            "flow_close_url": flow_close_url,
+            "flow_body_template": "panels/aap_settings/mail_servers/_mail_limits.html",
+            "flow_step_key": "identity",
+        },
+    )
+
+
+def mail_servers_archive_modal_view(request):
+    ws_id = _guard(request)
+    if not ws_id:
+        return render(
+            request,
+            "panels/aap_settings/mail_servers/_modal_archive.html",
+            {"status": "error"},
+        )
+
+    token = (request.GET.get("id") or "").strip()
+    mailbox = None
+    if token:
+        try:
+            mailbox_id = int(decode_id(token))
+            mailbox = Mailbox.objects.filter(
+                id=mailbox_id,
+                workspace_id=ws_id,
+                archived=False,
+            ).only("id", "email").first()
+        except Exception:
+            mailbox = None
+
+    if not mailbox:
+        return render(
+            request,
+            "panels/aap_settings/mail_servers/_modal_archive.html",
+            {"status": "error"},
+        )
+
+    return render(
+        request,
+        "panels/aap_settings/mail_servers/_modal_archive.html",
+        {
+            "status": "ok",
+            "ui_id": token,
+            "email": mailbox.email,
+        },
+    )
+
+
+def mail_servers_activate_modal_view(request):
+    ws_id = _guard(request)
+    if not ws_id:
+        return render(
+            request,
+            "panels/aap_settings/mail_servers/_modal_activate.html",
+            {"status": "error"},
+        )
+
+    token = (request.GET.get("id") or "").strip()
+    mailbox = None
+    if token:
+        try:
+            mailbox_id = int(decode_id(token))
+            mailbox = Mailbox.objects.filter(
+                id=mailbox_id,
+                workspace_id=ws_id,
+                archived=True,
+            ).only("id", "email").first()
+        except Exception:
+            mailbox = None
+
+    if not mailbox:
+        return render(
+            request,
+            "panels/aap_settings/mail_servers/_modal_activate.html",
+            {"status": "error"},
+        )
+
+    return render(
+        request,
+        "panels/aap_settings/mail_servers/_modal_activate.html",
+        {
+            "status": "ok",
+            "ui_id": token,
+            "email": mailbox.email,
         },
     )

@@ -23,6 +23,8 @@
   let contactsSectionPollInFlight = false;
   let contactsSectionRefreshQueued = false;
   let contactsQueuedSectionUrl = "";
+  let flowToggleReadyPollTimer = 0;
+  let flowToggleReadyPollInFlight = false;
   const CONTACTS_POLL_INTERVAL_MS = 5000;
   const geoTitleAutogenPending = !!config.geoTitleAutogenPending;
 
@@ -871,6 +873,80 @@
     node.style.setProperty("display", "none", "important");
   }
 
+  function flowToggleReadyRoot() {
+    return document.querySelector("[data-flow-toggle-ready-root='1']");
+  }
+
+  function applyFlowToggleState(ready, userActive) {
+    const rootNode = flowToggleReadyRoot();
+    if (!rootNode) return;
+
+    const isReady = !!ready;
+    setNodeForceVisible(rootNode, isReady);
+    if (!isReady) return;
+
+    const isActive = !!userActive;
+    setNodeForceVisible(rootNode.querySelector("[data-flow-toggle-state='on']"), isActive);
+    setNodeForceVisible(rootNode.querySelector("[data-flow-toggle-state='off']"), !isActive);
+    setNodeForceVisible(rootNode.querySelector("[data-flow-toggle-icon='pause']"), isActive);
+    setNodeForceVisible(rootNode.querySelector("[data-flow-toggle-icon='play']"), !isActive);
+
+    const button = rootNode.querySelector("[data-flow-toggle-button='1']");
+    if (!button) return;
+    const titleOn = String(button.getAttribute("data-toggle-title-on") || "").trim();
+    const titleOff = String(button.getAttribute("data-toggle-title-off") || "").trim();
+    const label = isActive ? titleOn : titleOff;
+    if (!label) return;
+    button.setAttribute("title", label);
+    button.setAttribute("aria-label", label);
+  }
+
+  function stopFlowToggleReadyPolling() {
+    if (!flowToggleReadyPollTimer) return;
+    window.clearInterval(flowToggleReadyPollTimer);
+    flowToggleReadyPollTimer = 0;
+  }
+
+  function refreshFlowToggleReadyState() {
+    const rootNode = flowToggleReadyRoot();
+    if (!rootNode || flowToggleReadyPollInFlight) return;
+    const url = String(rootNode.getAttribute("data-ready-url") || "").trim();
+    if (!url) return;
+
+    flowToggleReadyPollInFlight = true;
+    window.fetch(url, {
+      credentials: "same-origin",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+      },
+    }).then(function (response) {
+      return response.json().catch(function () {
+        return { ok: false };
+      }).then(function (payload) {
+        return { response: response, payload: payload };
+      });
+    }).then(function (result) {
+      const payload = result.payload || {};
+      if (!result.response.ok || !payload.ok) {
+        return;
+      }
+      applyFlowToggleState(payload.ready === true, payload.user_active === true);
+    }).catch(function () {
+    }).finally(function () {
+      flowToggleReadyPollInFlight = false;
+    });
+  }
+
+  function startFlowToggleReadyPolling() {
+    stopFlowToggleReadyPolling();
+    const rootNode = flowToggleReadyRoot();
+    if (!rootNode) return;
+    const url = String(rootNode.getAttribute("data-ready-url") || "").trim();
+    if (!url) return;
+    refreshFlowToggleReadyState();
+    flowToggleReadyPollTimer = window.setInterval(refreshFlowToggleReadyState, 3000);
+  }
+
   function syncContactsTopState(isActive) {
     const active = !!isActive;
     const activeNode = contactsTopStateNode("active");
@@ -1637,4 +1713,5 @@
   syncContactsTopState(contactsFlowActive());
   startCityRatingPolling();
   startContactsPolling();
+  startFlowToggleReadyPolling();
 })();

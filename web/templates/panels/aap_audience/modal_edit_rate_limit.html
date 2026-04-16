@@ -13,16 +13,16 @@
         <input type="hidden" name="id" value="{{ task_id_token }}">
 
         {% if type == "buy" %}
-          <div class="YY-STATUS_YELLOW !mb-2">{% trans "Лимит для списка рассылки" %}</div>
+          <div class="YY-STATUS_YELLOW !mb-2">{% trans "Изменение рейтинга отсечения" %}</div>
         {% else %}
-          <div class="YY-STATUS_GREEN !mb-2">{% trans "Лимит для списка рассылки" %}</div>
+          <div class="YY-STATUS_GREEN !mb-2">{% trans "Изменение рейтинга отсечения" %}</div>
         {% endif %}
 
         <div class="grid items-start gap-4 mt-6" style="grid-template-columns: 40% 9ch 1fr 1fr;">
           {% if type == "buy" %}
-            <div class="YY-STATUS_YELLOW !mb-0 self-center">{% trans "Rate-Limit:" %}</div>
+            <div class="YY-STATUS_YELLOW !mb-0 self-center">{% trans "Рейтинг отсечения:" %}</div>
           {% else %}
-            <div class="YY-STATUS_GREEN !mb-0 self-center">{% trans "Rate-Limit:" %}</div>
+            <div class="YY-STATUS_GREEN !mb-0 self-center">{% trans "Рейтинг отсечения:" %}</div>
           {% endif %}
 
           <input

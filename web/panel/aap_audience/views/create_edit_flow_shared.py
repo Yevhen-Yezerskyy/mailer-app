@@ -8,6 +8,7 @@ import json
 from urllib.parse import urlsplit
 from typing import Any, Mapping
 
+from django.db import connection
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.text import format_lazy
@@ -15,7 +16,9 @@ from django.utils.translation import gettext_lazy as _
 
 from engine.common.gpt import GPTClient
 from engine.common.translate import get_prompt
+from engine.common.utils import h64_text
 from mailer_web.access import decode_id
+from panel.aap_campaigns.models import Campaign
 from panel.aap_audience.models import AudienceTask
 
 
@@ -129,20 +132,16 @@ BASE_STEP_DEFINITIONS = {
         "depends_on": ("product", "company", "geo"),
     },
     "contacts": {
-        "completion_type": "truthy",
-        "completion_field": "ready",
+        "completion_type": "never",
         "visible": True,
         "implemented": True,
         "depends_on": ("product", "company", "geo"),
-        "available_when_complete": True,
     },
     "mailing_list": {
-        "completion_type": "truthy",
-        "completion_field": "ready",
+        "completion_type": "never",
         "visible": True,
         "implemented": True,
         "depends_on": ("product", "company", "geo"),
-        "available_when_complete": True,
     },
 }
 
@@ -527,21 +526,21 @@ def parse_ai_json(text: str, main_key: str) -> tuple[str, str, str]:
     return main_value, advice_legacy, ""
 
 
-def resolve_task(request, flow_type: str, item_id: str):
+def resolve_task(request, flow_type: str, item_id: str, *, include_archived: bool = False):
     if not item_id:
         return None
     try:
         pk = int(decode_id(item_id))
     except Exception:
         return None
-    return (
-        AudienceTask.objects.filter(
-            id=pk,
-            workspace_id=request.workspace_id,
-            archived=False,
-            type=flow_type,
-        ).first()
+    query = AudienceTask.objects.filter(
+        id=pk,
+        workspace_id=request.workspace_id,
+        type=flow_type,
     )
+    if not include_archived:
+        query = query.filter(archived=False)
+    return query.first()
 
 
 def reset_section_dialog(request, *, flow_type: str, item_id: str, step_key: str):
@@ -571,6 +570,62 @@ def task_saved_values(task) -> dict[str, Any]:
         "source_geo": (task.source_geo or "") if task else "",
         "ready": bool(task.ready) if task else False,
         "user_active": bool(task.user_active) if task else False,
+    }
+
+
+def current_contact_rating_hash(task) -> int:
+    if not task:
+        return 0
+    task_type = str(task.type or "").strip().lower()
+    return int(
+        h64_text(
+            task_type
+            + str(task.source_product or "")
+            + str(task.source_company or "")
+            + str(task.source_geo or "")
+        )
+    )
+
+
+def build_contact_rating_hash_alert_context(task) -> dict[str, Any]:
+    if not task or bool(task.archived):
+        return {
+            "show": False,
+            "rated_count": 0,
+            "task_hash": 0,
+            "has_hash_mismatch": False,
+            "is_used_in_campaign": False,
+        }
+
+    task_hash = current_contact_rating_hash(task)
+    is_used_in_campaign = Campaign.objects.filter(
+        workspace_id=task.workspace_id,
+        sending_list_id=int(task.id),
+        archived=False,
+    ).exists()
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                COUNT(*) FILTER (WHERE sl.rate IS NOT NULL)::int AS rated_count,
+                BOOL_OR(sl.rate IS NOT NULL AND sl.rating_hash IS DISTINCT FROM %s) AS has_hash_mismatch
+            FROM public.sending_lists sl
+            WHERE sl.task_id = %s
+              AND COALESCE(sl.removed, false) = false
+            """,
+            [int(task_hash), int(task.id)],
+        )
+        row = cur.fetchone() or [0, False]
+
+    rated_count = int((row or [0])[0] or 0)
+    has_hash_mismatch = bool((row or [0, False])[1])
+    show = (not is_used_in_campaign) and rated_count <= 500 and has_hash_mismatch
+    return {
+        "show": bool(show),
+        "rated_count": int(rated_count),
+        "task_hash": int(task_hash),
+        "has_hash_mismatch": bool(has_hash_mismatch),
+        "is_used_in_campaign": bool(is_used_in_campaign),
     }
 
 
@@ -704,6 +759,10 @@ def build_flow_render_context(
     flow_conf = get_flow_config(flow_type)
     gpt_unavailable_popup_text = pop_flow_gpt_unavailable_text(request)
     geo_title_autogen_pending = bool(task and has_technical_title(task))
+    is_archived_task = bool(task and bool(getattr(task, "archived", False)))
+    close_url = reverse("audience:create_list")
+    if is_archived_task:
+        close_url = f"{close_url}?show=archive"
     context = {
         "type": flow_type,
         "status": current_step_key,
@@ -714,7 +773,7 @@ def build_flow_render_context(
         "flow_mode_class": flow_conf["mode_class"],
         "flow_mode_label": flow_conf["mode_label"],
         "page_title": flow_conf["page_title"],
-        "flow_close_url": reverse("audience:create_list"),
+        "flow_close_url": close_url,
         "flow_step_states": flow_status["step_states"],
         "flow_current_step_key": current_step_key,
         "summary_items": build_summary_items(step_definitions, saved_values),

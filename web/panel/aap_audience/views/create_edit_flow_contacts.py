@@ -702,7 +702,7 @@ def _resolve_contacts_partial_task(request):
     item_id = str(request.GET.get("id") or "").strip()
     if flow_type not in {"buy", "sell"}:
         return flow_type, item_id, None, 400
-    task = resolve_task(request, flow_type, item_id)
+    task = resolve_task(request, flow_type, item_id, include_archived=True)
     if not task:
         return flow_type, item_id, None, 404
     return flow_type, item_id, task, 200
@@ -734,7 +734,7 @@ def contacts_total_view(request):
     if flow_type not in {"buy", "sell"}:
         return JsonResponse({"ok": False, "error": "invalid_flow_type"}, status=400)
 
-    task = resolve_task(request, flow_type, item_id)
+    task = resolve_task(request, flow_type, item_id, include_archived=True)
     if not task:
         return JsonResponse({"ok": False, "error": "task_not_found"}, status=404)
 
@@ -761,6 +761,7 @@ def contacts_ready_view(request):
         {
             "ok": True,
             "ready": bool(task.ready),
+            "user_active": bool(task.user_active),
         }
     )
 
@@ -811,6 +812,7 @@ def handle_contacts_step_view(
     saved_values: Mapping[str, Any],
     flow_status: Mapping[str, Any],
     contacts_section: str,
+    rating_hash_alert: Mapping[str, Any],
 ):
     flow_conf = get_flow_config(flow_type)
     step_definitions = build_step_definitions(flow_type)
@@ -836,6 +838,7 @@ def handle_contacts_step_view(
             extra_context={
                 "contacts_step": _build_contacts_step_context(task),
                 "pause_info_modal_url": pause_info_modal_url,
+                "rating_hash_alert": dict(rating_hash_alert or {}),
                 **_build_active_contacts_context(
                     request=request,
                     task=task,

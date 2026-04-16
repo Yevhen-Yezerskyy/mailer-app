@@ -23,6 +23,7 @@ from engine.common.mail.types import IMAP_CREDENTIALS_FORMAT
 from mailer_web.access import decode_id, encode_id
 from panel.aap_settings.forms import ImapConnForm
 from panel.aap_settings.models import ImapMailbox, Mailbox, ProviderPreset
+from panel.aap_settings.views.mail_servers_flow import build_mail_servers_flow_step_states
 
 SECRET_MASK = "********"
 
@@ -206,6 +207,12 @@ def imap_server_view(request, id: str):
 
     if not require_password:
         initial["password"] = SECRET_MASK
+    mailbox_ui_id = encode_id(mb.id)
+    flow_step_states = build_mail_servers_flow_step_states(
+        current_step="imap",
+        mailbox_ui_id=mailbox_ui_id,
+        saved=True,
+    )
 
     # -------------------------
     # POST
@@ -223,16 +230,21 @@ def imap_server_view(request, id: str):
         if not form.is_valid():
             return render(
                 request,
-                "panels/aap_settings/imap_server.html",
+                "panels/aap_settings/mail_servers/flow.html",
                 {
                     "state": state,
                     "mailbox": mb,
-                    "mailbox_ui_id": encode_id(mb.id),
+                    "mailbox_ui_id": mailbox_ui_id,
                     "form": form,
                     "preset_choices": preset_choices,
                     "presets_json": json.dumps(presets_map, ensure_ascii=False),
                     "last_check_status": last_check_status,
                     "last_check_dt": last_check_dt,
+                    "flow_title": mb.email,
+                    "flow_step_states": flow_step_states,
+                    "flow_close_url": reverse("settings:mail_servers"),
+                    "flow_body_template": "panels/aap_settings/mail_servers/_imap_server.html",
+                    "flow_step_key": "imap",
                 },
             )
 
@@ -252,16 +264,21 @@ def imap_server_view(request, id: str):
                     form.add_error("password", "Пароль обязателен.")
                     return render(
                         request,
-                        "panels/aap_settings/imap_server.html",
+                        "panels/aap_settings/mail_servers/flow.html",
                         {
                             "state": state,
                             "mailbox": mb,
-                            "mailbox_ui_id": encode_id(mb.id),
+                            "mailbox_ui_id": mailbox_ui_id,
                             "form": form,
                             "preset_choices": preset_choices,
                             "presets_json": json.dumps(presets_map, ensure_ascii=False),
                             "last_check_status": last_check_status,
                             "last_check_dt": last_check_dt,
+                            "flow_title": mb.email,
+                            "flow_step_states": flow_step_states,
+                            "flow_close_url": reverse("settings:mail_servers"),
+                            "flow_body_template": "panels/aap_settings/mail_servers/_imap_server.html",
+                            "flow_step_key": "imap",
                         },
                     )
                 creds_plain[k] = v
@@ -290,15 +307,20 @@ def imap_server_view(request, id: str):
 
     return render(
         request,
-        "panels/aap_settings/imap_server.html",
+        "panels/aap_settings/mail_servers/flow.html",
         {
             "state": state,
             "mailbox": mb,
-            "mailbox_ui_id": encode_id(mb.id),
+            "mailbox_ui_id": mailbox_ui_id,
             "form": form,
             "preset_choices": preset_choices,
             "presets_json": json.dumps(presets_map, ensure_ascii=False),
             "last_check_status": last_check_status,
             "last_check_dt": last_check_dt,
+            "flow_title": mb.email,
+            "flow_step_states": flow_step_states,
+            "flow_close_url": reverse("settings:mail_servers"),
+            "flow_body_template": "panels/aap_settings/mail_servers/_imap_server.html",
+            "flow_step_key": "imap",
         },
     )

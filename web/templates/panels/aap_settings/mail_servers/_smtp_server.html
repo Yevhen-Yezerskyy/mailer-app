@@ -1,17 +1,4 @@
-{% extends "panels/base.html" %}
 {% load i18n %}
-{% load static %}
-<!-- FILE: web/templates/panels/aap_settings/smtp_server.html -->
-<!-- DATE: 2026-01-25 -->
-<!-- PURPOSE: Settings → SMTP server (отправка): UI под PU, где payload собирается строго по engine.common.mail.types. -->
-<!-- CHANGE:
-- Добавлен монохромный “глаз” внутри password-инпута.
-- add: глаз делает только toggle password/text.
-- edit: при masked — модалка → OK → reveal через /smtp/secret/.
-- Подключены mail_secret_modal + mail_servers_secret.js.
-- Ничего больше в структуре страницы не ломали. -->
-
-{% block content %}
 
 <script type="application/json" id="yyLoginPresets">{{ login_presets_json|safe }}</script>
 <script type="application/json" id="yyRelayPresets">{{ relay_presets_json|safe }}</script>
@@ -19,13 +6,14 @@
 <table class="YY-MAIN_TABLE">
   <tr>
     <td class="YY-MAIN_TOP_LEFT_TD w-[65%]">
-      <div class="YY-CARD_WHITE">
+      <div class="YY-CARD_WHITE h-full flex flex-col">
         <form
           id="yySmtpForm"
           method="post"
           data-api-url="{% url 'settings:mail_servers_api' %}"
           data-secret-url="{% url 'settings:mail_servers_smtp_secret' id=mailbox_ui_id %}"
           data-state="{{ state }}"
+          class="h-full min-h-0 flex-1 flex flex-col"
         >
           {% csrf_token %}
 
@@ -34,7 +22,7 @@
 
           <div class="YY-STATUS_BLUE mb-8">SMTP {% trans "сервер (отправка)" %}</div>
 
-          <div class="grid grid-cols-[2fr_2fr_1fr] gap-6 mb-8">
+          <div class="grid grid-cols-2 gap-6 mb-8">
             <div>
               <label class="YY-LABEL">{% trans "Отправитель" %}:</label>
               {{ form.sender_name }}
@@ -46,19 +34,13 @@
               {{ form.email }}
               {% if form.email.errors %}<div class="YY-FORM_ERROR mt-1">{{ form.email.errors }}</div>{% endif %}
             </div>
-
-            <div>
-              <label class="YY-LABEL">{% trans "Лимит / час" %}:</label>
-              {{ form.limit_hour_sent }}
-              {% if form.limit_hour_sent.errors %}<div class="YY-FORM_ERROR mt-1">{{ form.limit_hour_sent.errors }}</div>{% endif %}
-            </div>
           </div>
 
-          <div class="flex items-center gap-6 mb-12">
-            <button type="button" id="yyAuthBtnLogin" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "ЛОГИН (Стандарт)" %}</button>
-            <button type="button" id="yyAuthBtnRelay" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "RELAY NOAUTH" %}</button>
-            <button type="button" id="yyAuthBtnGoogle" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "Google OAuth 2.0" %}</button>
-            <button type="button" id="yyAuthBtnMicrosoft" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "Microsoft OAuth 2.0" %}</button>
+          <div class="flex items-center gap-4 mt-5 mb-6">
+            <button type="button" id="yyAuthBtnLogin" data-base-extra="!py-2 !px-3 !w-[180px]" class="YY-BUTTON_MAIN !py-2 !px-3 !w-[180px]">{% trans "ЛОГИН (Стандарт)" %}</button>
+            <button type="button" id="yyAuthBtnRelay" data-base-extra="!py-2 !px-3 !w-[180px]" class="YY-BUTTON_MAIN !py-2 !px-3 !w-[180px]">{% trans "RELAY NOAUTH" %}</button>
+            <button type="button" id="yyAuthBtnGoogle" data-base-extra="!py-2 !px-3 !w-[180px]" class="YY-BUTTON_MAIN !py-2 !px-3 !w-[180px]">{% trans "Google OAuth 2.0" %}</button>
+            <button type="button" id="yyAuthBtnMicrosoft" data-base-extra="!py-2 !px-3 !w-[180px]" class="YY-BUTTON_MAIN !py-2 !px-3 !w-[180px]">{% trans "Microsoft OAuth 2.0" %}</button>
           </div>
 
           <div id="yyLoginBlock">
@@ -101,7 +83,7 @@
                   {{ form.password }}
                   <button
                     type="button"
-                    class="absolute right-3 top-12 -translate-y-1/2 text-[#006991] hover:text-gray-800"
+                    class="absolute right-3 top-12 -translate-y-1/2 -mt-[8px] text-[#006991] hover:text-gray-800"
                     onclick="yyTogglePasswordOrReveal('smtp','yySecret')"
                     aria-label="password"
                   >
@@ -115,12 +97,12 @@
               </div>
           </div>
 
-   
+
           <div id="yyOauthGoogleBlock" class="hidden">
             <div class="YY-STATUS_GREEN mb-8">Google OAuth 2.0</div>
             <div class="YY-STATUS_YELLOW !mb-12 !py-12">
               {% trans "Автоматически пока не реализовано." %}<br>
-              {% trans "Реализация автоматики до 1 апреля 2026 г." %}<br>
+              {% trans "Реализация автоматики до 1 июня 2026 г." %}<br>
               {% trans "Обратитесь к менеджеру для подключения вручную." %}
             </div>
 
@@ -130,7 +112,7 @@
             <div class="YY-STATUS_GREEN mb-8">Microsoft OAuth 2.0</div>
             <div class="YY-STATUS_YELLOW !mb-12 !py-12">
               {% trans "Автоматически пока не реализовано." %}<br>
-              {% trans "Реализация автоматики до 1 апреля 2026 г." %}<br>
+              {% trans "Реализация автоматики до 1 июня 2026 г." %}<br>
               {% trans "Обратитесь к менеджеру для подключения вручную." %}
             </div>
           </div>
@@ -139,16 +121,21 @@
             <div class="YY-CARD_IN_FORM_ERROR mt-4">{{ form.non_field_errors }}</div>
           {% endif %}
 
-          <div class="flex gap-3 mt-6">
+          <div class="flex gap-3 mt-auto pt-4">
             <div id="yySaveWrap" class="w-full">
               <button type="submit" name="action" value="save" class="YY-BUTTON_MAIN w-full">
                 {% trans "Сохранить" %}
               </button>
             </div>
 
-            <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN w-full" formnovalidate>
-              {% trans "Закрыть" %}
-            </button>
+            <a href="{% url 'settings:mail_servers_imap' mailbox_ui_id %}" class="YY-BUTTON_MAIN w-full">
+              <span class="inline-flex items-center justify-center gap-1 w-full">
+                <span>{% trans "IMAP сервер" %}</span>
+                <svg class="size-[22px] shrink-0" aria-hidden="true">
+                  <use href="#icon-arrow-circle"></use>
+                </svg>
+              </span>
+            </a>
           </div>
 
         </form>
@@ -157,65 +144,61 @@
 
     <td class="YY-MAIN_TOP_RIGHT_TD w-[35%]">
       <div class="YY-CARD_WHITE">
+        <button
+          id="yyCheckSmtpBtn"
+          type="button"
+          class="{% if state == 'add' %}YY-BUTTON_GRAY{% else %}YY-BUTTON_MAIN{% endif %} mb-4 w-full"
+          onclick="yyMailServersCheck('check_smtp','yyCheckSmtpBtn')"
+          {% if state == "add" %}disabled{% endif %}
+        >
+          {% trans "Проверить SMTP авторизацию" %}
+        </button>
 
-        {% if state == "add" %}
-          <div class="YY-STATUS_BLUE">{% trans "Добавление SMTP сервера" %}</div>
-        {% else %}
-          <button
-            id="yyCheckSmtpBtn"
-            type="button"
-            class="YY-BUTTON_MAIN mb-4 w-full"
-            onclick="yyMailServersCheck('check_smtp','yyCheckSmtpBtn')"
-          >
-            {% trans "Проверить SMTP авторизацию" %}
-          </button>
+        <textarea
+          id="yyMailChecksOut"
+          class="YY-TEXTAREA !min-h-[180px] !font-mono"
+          placeholder="{% trans 'Результат проверки' %}"
+        ></textarea>
+        <label class="YY-LABEL">{% trans "Отправить тестовое письмо по адресу:" %}</label>
+           <input
+              id="yyTestMailTo"
+              type="email"
+              class="YY-INPUT !mb-4"
+              placeholder="test@example.com"
+              {% if state == "add" %}disabled{% endif %}
+            >
+            <button
+              id="yySendTestMailBtn"
+              type="button"
+              class="{% if state == 'add' %}YY-BUTTON_GRAY{% else %}YY-BUTTON_MAIN{% endif %} w-full !mb-4"
+              data-output-id="yyTestMailOut"
+              onclick="yySendTestMail('yySendTestMailBtn')"
+              {% if state == "add" %}disabled{% endif %}
+            >
+              {% trans "Отправить письмо" %}
+            </button>
 
-          <textarea
-            id="yyMailChecksOut"
-            class="YY-TEXTAREA !min-h-[180px] !font-mono"
-            placeholder="{% trans 'Результат проверки' %}"
-          ></textarea>
-          <label class="YY-LABEL">{% trans "Отправить тестовое письмо по адресу:" %}</label>
-             <input
-                id="yyTestMailTo"
-                type="email"
-                class="YY-INPUT !mb-4"
-                placeholder="test@example.com"
-              >
-              <button
-                id="yySendTestMailBtn"
-                type="button"
-                class="YY-BUTTON_MAIN w-full !mb-4"
-                data-output-id="yyTestMailOut"
-                onclick="yySendTestMail('yySendTestMailBtn')"
-              >
-                {% trans "Отправить письмо" %}
-              </button>
+        <textarea
+          id="yyTestMailOut"
+          class="YY-TEXTAREA !min-h-[180px] !font-mono"
+          placeholder="{% trans 'Результат отправки' %}"
+        ></textarea>
 
-          <textarea
-            id="yyTestMailOut"
-            class="YY-TEXTAREA !min-h-[180px] !font-mono"
-            placeholder="{% trans 'Результат отправки' %}"
-          ></textarea>          
-        
-          <label class="YY-LABEL mb-4">{% trans "Проверки SMTP сервера (отправка)" %}</label>
+        <label class="YY-LABEL mb-4">{% trans "Проверки SMTP сервера (отправка)" %}</label>
 
-          {% if last_checks %}
-            <div class="YY-INPUT grid grid-cols-[130px_1fr_100px] gap-3 py-3 text-[10px] leading-tight">
-              {% for c in last_checks %}
-              
-              <div>{{ c.dt }}</div>
-              <div><b>{{ c.action }}</b></div>
-              <div><b>{{ c.status }}</b></div> 
+        {% if last_checks %}
+          <div class="YY-INPUT grid grid-cols-[130px_1fr_100px] gap-3 py-3 text-[10px] leading-tight">
+            {% for c in last_checks %}
 
-            {% endfor %}
-          </div>
+            <div>{{ c.dt }}</div>
+            <div><b>{{ c.action }}</b></div>
+            <div><b>{{ c.status }}</b></div>
+
+          {% endfor %}
+        </div>
         {% else %}
           <div class="YY-STATUS_YELLOW mt-2">{% trans "Не проверено" %}</div>
         {% endif %}
-
-        {% endif %}
-
       </div>
     </td>
   </tr>
@@ -223,19 +206,11 @@
 
 {% include "panels/aap_settings/partials/mail_secret_modal.html" %}
 
-<script src="{% static 'js/aap_settings/smtp_server.js' %}"></script>
-<script src="{% static 'js/aap_settings/mail_servers_checks.js' %}"></script>
-<script src="{% static 'js/aap_settings/mail_servers_secret.js' %}"></script>
-
 <script>
-  // Приводим password к контракту JS: id=yySecret + место под кнопку справа
   (function () {
     const el = document.querySelector('input[name="password"]');
     if (!el) return;
     el.id = "yySecret";
-    // резервируем место под кнопку глаза
     try { el.style.paddingRight = "2.75rem"; } catch (e) {}
   })();
 </script>
-
-{% endblock %}

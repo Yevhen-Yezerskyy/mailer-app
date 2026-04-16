@@ -35,40 +35,39 @@
 <table class="YY-MAIN_TABLE">
   <tr>
     <td class="YY-MAIN_BOTTOM_TD">
-      {% if tasks %}
-        <div class="YY-MAIN_BOTTOM_DIV">
-          <table class="w-full text-left">
-            <thead>
-              <tr class="YY-TH_TR">
-                {% if show_archive %}
-                  <th class="YY-TH_TH !w-[220px]">{% trans "Архив" %}</th>
-                {% else %}
-                  <th class="YY-TH_TH !w-[220px]">{% trans "Списки рассылок" %}</th>
-                {% endif %}
-                <th class="YY-TH_TH w-[70%]">&nbsp;</th>
-                <th class="YY-TH_TH text-right">
-                  {% if has_archived_tasks %}
-                    {% if show_archive %}
-                      <a href="{% url 'audience:create_list' %}" class="inline-flex items-center gap-1 text-[#8e0000] !font-normal underline">
-                        <span>{% trans "Активные" %}</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-                        </svg>
-                      </a>
-                    {% else %}
-                      <a href="{% url 'audience:create_list' %}?show=archive" class="inline-flex items-center gap-1 text-[#8e0000] !font-normal underline">
-                        <span>{% trans "Архив" %}</span>
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="m7.875 14.25 1.214 1.942a2.25 2.25 0 0 0 1.908 1.058h2.006c.776 0 1.497-.4 1.908-1.058l1.214-1.942M2.41 9h4.636a2.25 2.25 0 0 1 1.872 1.002l.164.246a2.25 2.25 0 0 0 1.872 1.002h2.092a2.25 2.25 0 0 0 1.872-1.002l.164-.246A2.25 2.25 0 0 1 16.954 9h4.636M2.41 9a2.25 2.25 0 0 0-.16.832V12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 12V9.832c0-.287-.055-.57-.16-.832M2.41 9a2.25 2.25 0 0 1 .382-.632l3.285-3.832a2.25 2.25 0 0 1 1.708-.786h8.43c.657 0 1.281.287 1.709.786l3.284 3.832c.163.19.291.404.382.632M4.5 20.25h15A2.25 2.25 0 0 0 21.75 18v-2.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125V18a2.25 2.25 0 0 0 2.25 2.25Z" />
-                        </svg>
-                      </a>
-                    {% endif %}
+      <div class="YY-MAIN_BOTTOM_DIV">
+        <table class="w-full text-left">
+          <thead>
+            <tr class="YY-TH_TR">
+              {% if show_archive %}
+                <th class="YY-TH_TH !w-[220px]">{% trans "Архив" %}</th>
+              {% else %}
+                <th class="YY-TH_TH !w-[220px]">{% trans "Списки рассылок" %}</th>
+              {% endif %}
+              <th class="YY-TH_TH w-[70%]">&nbsp;</th>
+              <th class="YY-TH_TH text-right">
+                {% if has_archived_tasks %}
+                  {% if show_archive %}
+                    <a href="{% url 'audience:create_list' %}" class="inline-flex items-center gap-1 text-[#8e0000] !font-normal underline">
+                      <span>{% trans "Активные" %}</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                      </svg>
+                    </a>
+                  {% else %}
+                    <a href="{% url 'audience:create_list' %}?show=archive" class="inline-flex items-center gap-1 text-[#8e0000] !font-normal underline">
+                      <span>{% trans "Архив" %}</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m7.875 14.25 1.214 1.942a2.25 2.25 0 0 0 1.908 1.058h2.006c.776 0 1.497-.4 1.908-1.058l1.214-1.942M2.41 9h4.636a2.25 2.25 0 0 1 1.872 1.002l.164.246a2.25 2.25 0 0 0 1.872 1.002h2.092a2.25 2.25 0 0 0 1.872-1.002l.164-.246A2.25 2.25 0 0 1 16.954 9h4.636M2.41 9a2.25 2.25 0 0 0-.16.832V12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 12V9.832c0-.287-.055-.57-.16-.832M2.41 9a2.25 2.25 0 0 1 .382-.632l3.285-3.832a2.25 2.25 0 0 1 1.708-.786h8.43c.657 0 1.281.287 1.709.786l3.284 3.832c.163.19.291.404.382.632M4.5 20.25h15A2.25 2.25 0 0 0 21.75 18v-2.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125V18a2.25 2.25 0 0 0 2.25 2.25Z" />
+                      </svg>
+                    </a>
                   {% endif %}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for t in tasks %}
+                {% endif %}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tasks %}
                 <tr class="YY-TB_TR">
                   <td class="YY-TB_TD !w-[220px] !px-1 !py-4">
                     {% if t.type == "buy" %}
@@ -85,23 +84,24 @@
                       {% else %}
                         <span class="YY-STATUS_GRAY !mb-0 inline-flex !w-[26ch]">{% trans "Обработка отключена" %}</span>
                       {% endif %}
-                      <button
-                        type="submit"
-                        class="inline-flex items-center justify-center !w-fit !mb-0 !p-0 !bg-transparent !border-0 shadow-none {% if t.type == 'buy' %}text-[#795b00]{% else %}text-[#097309]{% endif %}"
-                        {% if not t.ready %}disabled{% endif %}
-                        aria-label="{% if t.user_active %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}"
-                        title="{% if t.user_active %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}">
-                        {% if t.user_active %}
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                          </svg>
-                        {% else %}
-                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />
-                          </svg>
-                        {% endif %}
-                      </button>
+                      {% if not show_archive and t.ready %}
+                        <button
+                          type="submit"
+                          class="inline-flex items-center justify-center !w-fit !mb-0 !p-0 !bg-transparent !border-0 shadow-none {% if t.type == 'buy' %}text-[#795b00]{% else %}text-[#097309]{% endif %}"
+                          aria-label="{% if t.user_active %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}"
+                          title="{% if t.user_active %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}">
+                          {% if t.user_active %}
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                          {% else %}
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />
+                            </svg>
+                          {% endif %}
+                        </button>
+                      {% endif %}
                     </form>
                   </td>
                   <td
@@ -256,19 +256,17 @@
                   <td class="YY-TB_TD !px-1 !py-4">
                     <div class="flex flex-col gap-3">
                       {% if show_archive %}
-                        <form method="post" onsubmit="return confirm('{% trans "Активировать задачу?" %}')">
-                          {% csrf_token %}
-                          <input type="hidden" name="action" value="activate">
-                          <input type="hidden" name="id" value="{{ t.ui_id }}">
-                          <div class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !bg-white !w-full !mb-0">
-                            <button type="submit" class="inline-flex items-center justify-between gap-1 !w-full !p-0 !m-0 bg-transparent border-0 text-[#8e0000] !font-normal underline">
-                              <span>{% trans "Активировать" %}</span>
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
-                              </svg>
-                            </button>
-                          </div>
-                        </form>
+                        <div class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !bg-white !w-full !mb-0">
+                          <button
+                            type="button"
+                            class="inline-flex items-center justify-between gap-1 !w-full !p-0 !m-0 bg-transparent border-0 text-[#8e0000] !font-normal underline"
+                            data-yy-modal="url={% url 'audience:create_activate_modal' %}?id={{ t.ui_id|urlencode }}">
+                            <span>{% trans "Активировать" %}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                            </svg>
+                          </button>
+                        </div>
                       {% else %}
                         <div class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !bg-white !w-full !mb-0">
                           {% if t.type == "buy" %}
@@ -287,32 +285,38 @@
                             </a>
                           {% endif %}
                         </div>
-                        <form method="post" onsubmit="return confirm('{% trans "Архивировать задачу?" %}')">
-                          {% csrf_token %}
-                          <input type="hidden" name="action" value="delete">
-                          <input type="hidden" name="id" value="{{ t.ui_id }}">
-                          <div class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !bg-white !w-full !mb-0">
-                            <button type="submit" class="inline-flex items-center justify-between gap-1 !w-full !p-0 !m-0 bg-transparent border-0 text-[#8e0000] !font-normal underline">
-                              <span>{% trans "Архивировать" %}</span>
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859M12 3v8.25m0 0-3-3m3 3 3-3" />
-                              </svg>
-                            </button>
-                          </div>
-                        </form>
+                        <div class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !bg-white !w-full !mb-0">
+                          <button
+                            type="button"
+                            class="inline-flex items-center justify-between gap-1 !w-full !p-0 !m-0 bg-transparent border-0 text-[#8e0000] !font-normal underline"
+                            data-yy-modal="url={% url 'audience:create_archive_modal' %}?id={{ t.ui_id|urlencode }}">
+                            <span>{% trans "Архивировать" %}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859M12 3v8.25m0 0-3-3m3 3 3-3" />
+                            </svg>
+                          </button>
+                        </div>
                       {% endif %}
                     </div>
                   </td>
                 </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        <div class="YY-CARD_WHITE mb-10">
-          {% trans "Здесь пока нет данных" %}
-        </div>
-      {% endif %}
+            {% empty %}
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD !px-1 !py-4" colspan="3">
+                  <div class="flex flex-col gap-2">
+                    <div class="YY-STATUS_BLUE !mb-0">
+                      {% trans "Пока не создано ни одного списка рассылки." %}
+                    </div>
+                    <div class="YY-STATUS_WHITE !mb-0">
+                      {% trans "Создайте новый список, задайте для него цель (продукт / компания / география) и запустите сбор контактов под эту задачу." %}
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </td>
   </tr>
 </table>

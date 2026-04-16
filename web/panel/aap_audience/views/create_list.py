@@ -82,3 +82,71 @@ def create_list_view(request):
             "has_archived_tasks": has_archived_tasks,
         },
     )
+
+
+def create_archive_modal_view(request):
+    ws_id = request.workspace_id
+    user = request.user
+    token = (request.GET.get("id") or "").strip()
+    task = None
+    if ws_id and getattr(user, "is_authenticated", False) and token:
+        try:
+            pk = int(decode_id(token))
+            task = AudienceTask.objects.filter(
+                id=pk,
+                workspace_id=ws_id,
+                archived=False,
+            ).only("id", "title").first()
+        except Exception:
+            task = None
+
+    if not task:
+        return render(
+            request,
+            "panels/aap_audience/modal_create_archive.html",
+            {"status": "error"},
+        )
+
+    return render(
+        request,
+        "panels/aap_audience/modal_create_archive.html",
+        {
+            "status": "ok",
+            "ui_id": token,
+            "title": task.title or "",
+        },
+    )
+
+
+def create_activate_modal_view(request):
+    ws_id = request.workspace_id
+    user = request.user
+    token = (request.GET.get("id") or "").strip()
+    task = None
+    if ws_id and getattr(user, "is_authenticated", False) and token:
+        try:
+            pk = int(decode_id(token))
+            task = AudienceTask.objects.filter(
+                id=pk,
+                workspace_id=ws_id,
+                archived=True,
+            ).only("id", "title").first()
+        except Exception:
+            task = None
+
+    if not task:
+        return render(
+            request,
+            "panels/aap_audience/modal_create_activate.html",
+            {"status": "error"},
+        )
+
+    return render(
+        request,
+        "panels/aap_audience/modal_create_activate.html",
+        {
+            "status": "ok",
+            "ui_id": token,
+            "title": task.title or "",
+        },
+    )

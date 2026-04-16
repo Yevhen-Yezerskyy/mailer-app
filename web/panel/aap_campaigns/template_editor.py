@@ -4,7 +4,7 @@
 # PURPOSE: Единый центр HTML-операций для editors (Templates + Letters).
 # CHANGE:
 # - FIX: unapply_vars() вызывается правильно: (html, vars_map), без rate_contact_id
-# - Подстановки переменных: apply_vars/unapply_vars + DEFAULT_VARS только из engine.common.mail.send (без локальных дублей)
+# - Подстановки переменных: apply_vars/unapply_vars + DEFAULT_VARS только из engine.common.email_template (без локальных дублей)
 
 from __future__ import annotations
 
@@ -12,10 +12,10 @@ import json
 import re
 from typing import Any, Dict, Optional, Tuple
 
+from engine.common.email_template import DEFAULT_VARS as _SEND_DEFAULT_VARS
 from engine.common.email_template import PLACEHOLDER, StylesJSON, sanitize
-from engine.common.mail.send import DEFAULT_VARS as _SEND_DEFAULT_VARS
-from engine.common.mail.send import apply_vars as _send_apply_vars
-from engine.common.mail.send import unapply_vars as _send_unapply_vars
+from engine.common.email_template import apply_vars as _send_apply_vars
+from engine.common.email_template import unapply_vars as _send_unapply_vars
 from panel.models import GlobalTemplate
 
 # ---- Wrapper (Tiny-safe) ----
@@ -24,7 +24,7 @@ _EDITOR_WRAP_CLASS = "yy_content_wrap"
 
 
 def default_template_vars() -> Dict[str, str]:
-    # полный набор переменных — как в send.DEFAULT_VARS
+    # полный набор переменных — как в email_template.DEFAULT_VARS
     return dict(_SEND_DEFAULT_VARS)
 
 

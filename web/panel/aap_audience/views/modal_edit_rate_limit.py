@@ -8,7 +8,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.utils.translation import gettext as _
 
-from engine.core_status.is_active import is_more_needed
+from engine.core_status.is_active import clear_is_more_needed_full_cache, is_more_needed
 from mailer_web.access import decode_id
 from panel.aap_audience.models import AudienceTask
 
@@ -48,6 +48,7 @@ def modal_edit_rate_limit_view(request):
         task.rate_limit = int(rate_limit)
         task.save(update_fields=["rate_limit", "updated_at"])
         try:
+            clear_is_more_needed_full_cache(int(task.id))
             is_more_needed(int(task.id), update=True)
         except Exception:
             pass

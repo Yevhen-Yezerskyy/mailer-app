@@ -124,7 +124,7 @@
             </div>
           </div>
         {% else %}
-          <form method="post" class="h-full min-h-0 flex flex-col">
+          <form method="post" id="yyTplPickForm" class="h-full min-h-0 flex flex-col">
             {% csrf_token %}
             {% if tpl_items %}
               <div class="space-y-2 mb-2 max-h-[530px] overflow-auto pr-1">
@@ -143,20 +143,35 @@
                   </div>
                 {% endfor %}
               </div>
-              <button id="yyTplChooseBtn" type="submit" name="action" value="tpl_choose" class="{% if flow_selected_template_ui %}YY-BUTTON_MAIN_FULL{% else %}YY-BUTTON_GRAY_FULL{% endif %} mb-8" {% if not flow_selected_template_ui %}disabled{% endif %}>{% trans "Выбрать шаблон" %}</button>
+              <button id="yyTplChooseBtn" type="submit" name="action" value="tpl_choose" class="YY-BUTTON_GRAY_FULL mb-8" disabled>{% trans "Выбрать шаблон" %}</button>
             {% else %}
-              <div class="YY-STATUS_BLUE mb-3">{% trans "Здесь пока нет данных" %}</div>
-              <button type="button" class="YY-BUTTON_GRAY_FULL mb-8" disabled>{% trans "Выбрать шаблон" %}</button>
+              <div class="YY-STATUS_BLUE mb-3">{% trans "Шаблоны писем не созданы." %}</div>
             {% endif %}
-            <a href="{{ flow_template_add_url }}" class="YY-BUTTON_MAIN_FULL text-center mt-auto">{% trans "Создать новый шаблон" %}</a>
+            <div class="grid grid-cols-2 gap-3 mt-auto">
+              <button type="submit" name="action" value="tpl_to_add" class="YY-BUTTON_MAIN_FULL text-center">{% trans "Создать новый шаблон" %}</button>
+              <button
+                id="yyTplToLetterBtn"
+                type="button"
+                class="{% if flow_selected_template_ui %}YY-BUTTON_MAIN_FULL{% else %}YY-BUTTON_GRAY_FULL{% endif %} gap-2"
+                data-url="{{ flow_letter_step_url|default:'' }}"
+                {% if not flow_selected_template_ui %}disabled{% endif %}>
+                <span class="flex items-center justify-center gap-1 w-full">
+                  <span>{% trans "Письмо кампании" %}</span>
+                  <svg class="size-[22px] shrink-0" aria-hidden="true">
+                    <use href="#icon-arrow-circle"></use>
+                  </svg>
+                </span>
+              </button>
+            </div>
           </form>
           {% if tpl_items %}
             <script>
               (function () {
-                const form = document.currentScript && document.currentScript.previousElementSibling;
+                const form = document.getElementById("yyTplPickForm");
                 if (!form) return;
                 const chooseBtn = form.querySelector("#yyTplChooseBtn");
-                if (!chooseBtn) return;
+                const toLetterBtn = form.querySelector("#yyTplToLetterBtn");
+                if (!chooseBtn && !toLetterBtn) return;
 
                 function mappedButtonClass(key) {
                   const classMap = window.yyClassMap || (document.documentElement && document.documentElement.yyClassMap) || {};
@@ -164,18 +179,106 @@
                   return mapped ? (key + " " + mapped) : key;
                 }
 
+                function setButtonState(btn, enabled, extraClass) {
+                  if (!btn) return;
+                  btn.disabled = !enabled;
+                  btn.setAttribute(
+                    "class",
+                    mappedButtonClass(enabled ? "YY-BUTTON_MAIN_FULL" : "YY-BUTTON_GRAY_FULL") + (extraClass ? (" " + extraClass) : "")
+                  );
+                }
+
                 function syncChooseState() {
                   const checked = form.querySelector('input[name="template"]:checked');
-                  const enabled = !!checked;
-                  chooseBtn.disabled = !enabled;
-                  chooseBtn.setAttribute("class", mappedButtonClass(enabled ? "YY-BUTTON_MAIN_FULL" : "YY-BUTTON_GRAY_FULL") + " mb-8");
+                  const selectedUi = String((checked && checked.value) || "").trim();
+                  const savedTemplateUi = String("{{ flow_selected_template_ui|default:''|escapejs }}").trim();
+                  const chooseEnabled = !!selectedUi && selectedUi !== savedTemplateUi;
+                  const toLetterEnabled = !!selectedUi;
+                  setButtonState(chooseBtn, chooseEnabled, "mb-8");
+                  setButtonState(toLetterBtn, toLetterEnabled, "gap-2");
                 }
 
                 form.addEventListener("change", syncChooseState);
+                if (toLetterBtn) {
+                  toLetterBtn.addEventListener("click", function () {
+                    if (toLetterBtn.disabled) return;
+                    const url = String(toLetterBtn.dataset.url || "").trim();
+                    if (!url) return;
+                    window.location.href = url;
+                  });
+                }
                 syncChooseState();
               })();
             </script>
           {% endif %}
+          <script>
+            (function () {
+              const form = document.getElementById("yyTplPickForm");
+              if (!form) return;
+              const hasReadyLetter = {% if flow_has_ready_letter %}true{% else %}false{% endif %};
+              if (!hasReadyLetter) return;
+
+              let pendingSubmitter = null;
+
+              function openWarningModal() {
+                const html =
+                  '<div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:760px;">' +
+                  '<button type="button" class="YY-BUTTON_MAIN !w-fit" data-yy-modal-close style="position:absolute;top:10px;right:10px;">✕</button>' +
+                  '<div class="overflow-auto mt-10 mb-1 max-h-[calc(85vh-5rem)]">' +
+                  '<div class="YY-STATUS_RED !mb-3">Текущее письмо будет удалено!</div>' +
+                  '<div class="YY-CARD_WHITE border border-[#71d0f4]">' +
+                  '<div class="YY-TEXT !mb-2">Вы собираетесь сменить шаблон письма для этой компании. При смене шаблона текущее письмо будет удалено, и его нужно будет создать заново.</div>' +
+                  '<div class="YY-TEXT !mb-2">Текущая версия письма не будет сохранена. Возврат к текущему шаблону не восстановит письмо. Восстановить текущее письмо будет нельзя.</div>' +
+                  '<div class="YY-TEXT !mb-4">Мы рекомендуем заранее сохранить текст письма отдельно, чтобы можно было использовать его при создании нового письма.</div>' +
+                  '<div class="grid grid-cols-2 gap-4">' +
+                  '<button type="button" class="YY-BUTTON_MAIN_FULL" data-yy-tpl-remove-approve="1">Подтвердить</button>' +
+                  '<button type="button" class="YY-BUTTON_MAIN_FULL" data-yy-modal-close>Отмена</button>' +
+                  '</div>' +
+                  '</div>' +
+                  '</div>' +
+                  '</div>';
+                if (window.YYModal && typeof window.YYModal.open === "function") {
+                  window.YYModal.open("text=" + html);
+                }
+              }
+
+              form.addEventListener("submit", function (e) {
+                if (form.dataset.yyTplDeleteBypass === "1") {
+                  delete form.dataset.yyTplDeleteBypass;
+                  return;
+                }
+
+                const submitter = e.submitter || document.activeElement;
+                const action = String((submitter && submitter.value) || "").trim();
+                if (action !== "tpl_choose" && action !== "tpl_to_add") return;
+
+                e.preventDefault();
+                e.stopPropagation();
+                pendingSubmitter = submitter;
+                openWarningModal();
+              });
+
+              document.addEventListener("click", function (e) {
+                const approveBtn = e.target.closest("[data-yy-tpl-remove-approve]");
+                if (!approveBtn) return;
+                e.preventDefault();
+
+                const submitter = pendingSubmitter;
+                pendingSubmitter = null;
+
+                if (window.YYModal && typeof window.YYModal.close === "function") {
+                  window.YYModal.close();
+                }
+
+                form.dataset.yyTplDeleteBypass = "1";
+                if (submitter && typeof form.requestSubmit === "function") {
+                  form.requestSubmit(submitter);
+                  return;
+                }
+                HTMLFormElement.prototype.submit.call(form);
+              });
+            })();
+          </script>
         {% endif %}
       </div>
     </td>

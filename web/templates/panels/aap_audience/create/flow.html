@@ -23,7 +23,7 @@
                     <span class="YY-STATUS_GREEN !mb-0 inline-flex">{% trans "Продажа" %}:&nbsp;<span data-audience-title="1">{{ display_title }}</span></span>
                   {% endif %}
                 </div>
-                {% if task %}
+                {% if task and not task.archived %}
                   <button
                     type="button"
                     class="YY-BUTTON_MAIN !w-fit !mb-0"
@@ -33,33 +33,66 @@
                 {% endif %}
               </div>
               <div>
-                {% if task and task.ready %}
-                  <form method="post" data-submit-role="nav" class="flex items-center gap-2">
+                {% if task and not task.archived %}
+                  <form
+                    method="post"
+                    data-submit-role="nav"
+                    data-flow-toggle-ready-root="1"
+                    data-ready-url="{% url 'audience:create_contacts_ready' %}?flow_type={{ type|urlencode }}&id={{ task_id_token|urlencode }}"
+                    class="flex items-center gap-2"
+                    {% if not task.ready %}style="display:none !important;"{% endif %}>
                     {% csrf_token %}
-                    {% if task.user_active %}
-                      <span class="YY-STATUS_BLUE !mb-0 inline-flex !w-[24ch]">{% trans "Обработка включена" %}</span>
-                    {% else %}
-                      <span class="YY-STATUS_GRAY !mb-0 inline-flex !w-[24ch]">{% trans "Обработка отключена" %}</span>
-                    {% endif %}
+                    <span
+                      data-flow-toggle-state="on"
+                      class="YY-STATUS_BLUE !mb-0 inline-flex !w-[24ch]"
+                      {% if not task.user_active %}style="display:none !important;"{% endif %}>
+                      {% trans "Обработка включена" %}
+                    </span>
+                    <span
+                      data-flow-toggle-state="off"
+                      class="YY-STATUS_GRAY !mb-0 inline-flex !w-[24ch]"
+                      {% if task.user_active %}style="display:none !important;"{% endif %}>
+                      {% trans "Обработка отключена" %}
+                    </span>
                     <button
                       type="submit"
                       name="action"
                       value="toggle_user_active"
                       class="YY-BUTTON_MAIN !w-fit !mb-0"
+                      data-flow-toggle-button="1"
+                      data-toggle-title-on="{% trans 'Остановить сбор' %}"
+                      data-toggle-title-off="{% trans 'Включить сбор' %}"
                       aria-label="{% if task.user_active %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}"
                       title="{% if task.user_active %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}">
-                      {% if task.user_active %}
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                        </svg>
-                      {% else %}
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                          <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />
-                        </svg>
-                      {% endif %}
+                      <svg
+                        data-flow-toggle-icon="pause"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke-width="1.5"
+                        stroke="currentColor"
+                        class="size-[22px]"
+                        aria-hidden="true"
+                        {% if not task.user_active %}style="display:none !important;"{% endif %}>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                      <svg
+                        data-flow-toggle-icon="play"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke-width="1.5"
+                        stroke="currentColor"
+                        class="size-[22px]"
+                        aria-hidden="true"
+                        {% if task.user_active %}style="display:none !important;"{% endif %}>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />
+                      </svg>
                     </button>
                   </form>
+                {% elif task and task.archived %}
+                  <span class="YY-STATUS_RED !mb-0 inline-flex !w-[24ch]">{% trans "Кампания в архиве" %}</span>
                 {% endif %}
               </div>
               <div>

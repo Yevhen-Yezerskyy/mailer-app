@@ -36,7 +36,7 @@
                 <span>{% trans "Собрано контактов:" %}&nbsp;</span>
                 <span data-contacts-total-value="1">{{ contacts_step.contacts_total_display }}</span>
               </span>
-              {% if pause_info_modal_url %}
+              {% if pause_info_modal_url and task and not task.archived %}
                 <button
                   type="button"
                   class="{{ flow_mode_class }} !w-fit !mb-0 !px-2 inline-flex items-center justify-center shrink-0"
@@ -103,6 +103,34 @@
     </td>
   </tr>
 </table>
+
+{% if rating_hash_alert.show %}
+<table class="YY-MAIN_TABLE !mt-3">
+  <tr>
+    <td class="YY-MAIN_TOP_TD">
+      <div class="YY-CARD_WHITE">
+        <form method="post">
+          {% csrf_token %}
+          <div class="YY-STATUS_RED !mb-3">
+            Задача на рейтингование и сбор контактов была изменена.
+          </div>
+          <div class="grid grid-cols-3 gap-4">
+            <button type="submit" name="action" value="contacts_rating_recalc" class="YY-BUTTON_MAIN_FULL">
+              Пересчитать рейтинги
+            </button>
+            <button type="submit" name="action" value="contacts_rating_restart" class="YY-BUTTON_MAIN_FULL">
+              Начать сбор контактов заново
+            </button>
+            <button type="submit" name="action" value="contacts_rating_ignore_hash" class="YY-BUTTON_MAIN_FULL">
+              Игнорировать
+            </button>
+          </div>
+        </form>
+      </div>
+    </td>
+  </tr>
+</table>
+{% endif %}
 
 <template id="yy-pair-rate-help-template">
   <div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:650px;">

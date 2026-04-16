@@ -11,9 +11,10 @@ from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 
 from engine.common.cache.client import CLIENT
-from engine.core_status.is_active import CACHE_TTL_SEC, is_more_needed
+from engine.core_status.is_active import CACHE_TTL_SEC, is_more_needed, start_full_continue_window
 from engine.core_status.status import is_active as core_status_is_active
 from mailer_web.access import decode_id
+from panel.aap_campaigns.models import Campaign
 from panel.aap_audience.models import AudienceTask
 
 CONTINUE_STATE = "Continue"
@@ -51,11 +52,7 @@ def _read_state_value(task_id: int) -> str:
 
 
 def _write_continue_state(task_id: int) -> None:
-    CLIENT.set(
-        _state_cache_key(int(task_id)),
-        CONTINUE_STATE.encode("utf-8"),
-        ttl_sec=CACHE_TTL_SEC,
-    )
+    start_full_continue_window(int(task_id))
 
 
 def _safe_int_or_none(value):
@@ -114,6 +111,15 @@ def _refresh_task_active(task) -> None:
         pass
 
 
+def _is_task_used_in_campaigns(task) -> bool:
+    if not task:
+        return False
+    return Campaign.objects.filter(
+        workspace_id=task.workspace_id,
+        sending_list_id=int(task.id),
+    ).exists()
+
+
 @csrf_exempt
 def modal_pause_info_view(request):
     token = (request.POST.get("id") or request.GET.get("id") or "").strip()
@@ -163,6 +169,21 @@ def modal_pause_info_view(request):
             "Для нормальной работы, пожалуйста, свяжитесь с нами и приобретите подписку.",
             "Пишите нам: sales@serenity-mail.de",
         ]
+    elif ws_access_type == "full" and not _is_task_used_in_campaigns(task):
+        title = "Сбор контактов тестируется"
+        outro_lines = [
+            "Этот список рассылки не задействован ни в одной кампании. "
+            "Пока список рассылки не задействован, рейтингование контактов ограничено.",
+            "Ограничение на рейтингование для незадействованного списка — до 100 контактов.",
+            "Пока список не задействован, вы можете пересчитывать рейтинги и начинать сбор контактов заново. "
+            "Для этого необходимо изменить задачу (продукт, компания, география).",
+            "После изменения задачи вам будет предложено начать сбор контактов заново или произвести пересчёт "
+            "рейтинга для уже собранных контактов по изменённой задаче.",
+            "После того как список рассылки задействован в кампании и прорейтинговано значительно более 100 "
+            "контактов, а также этим контактам отправлены письма, повторное рейтингование для собранных "
+            "контактов не проводится. Однако, если вы изменили задачу, новые собранные контакты будут "
+            "рейтинговаться по новой задаче.",
+        ]
     elif not bool(task.user_active):
         title = "Обработка списка отключена"
         outro_lines = [
@@ -171,16 +192,18 @@ def modal_pause_info_view(request):
         ]
     else:
         state_value = _read_state_value(int(task.id))
-        if (not state_value) or (state_value == CONTINUE_STATE):
+        payload = _parse_state_payload(state_value)
+        mode = str(payload.get("mode") or "")
+        if (not state_value) or (state_value == CONTINUE_STATE) or (mode == "continue_window"):
             title = "Собрано и отрейтинговано достаточно контактов"
             outro_lines = [
-                "В настоящий момент собрано достаточно контактов с успешным рейтингом для обеспечения рассылки на сегодняшний и следующий день.",
-                "Сбор контактов и их рейтингование производится по мере осуществления рассылки.",
-                "Это сделано для возможности оперативного управления рейтингованием, а также для соответствия европейскому законодательству.",
-                "Действует ограничение на рейтингование контактов — не более 50 000 контактов в месяц, вне зависимости от успешности рейтингования. Также действует ограничение на отправку — не более 1 000 писем в день.",
+                "В настоящий момент собрано достаточно контактов с успешным рейтингом для обеспечения рассылок.",
+                "Сбор контактов и их рейтингование производится автоматически по мере осуществления рассылок.",
+                "Только контакты с рейтингом лучше (меньше), чем рейтинг отсечения, попадают в рассылку.",
+                "Это сделано для возможности оперативного управления рейтингованием.",
+                "Действует ограничение на рейтингование контактов — не более 50 000 контактов в месяц, вне зависимости от успешности рейтингования. Также действует ограничение на отправку через один почтовый сервер — не более 1 000 писем в день.",
             ]
         else:
-            payload = _parse_state_payload(state_value)
             total_cnt = _safe_text_or_placeholder(payload.get("total_cnt"))
             good_cnt = _safe_text_or_placeholder(payload.get("good_cnt"))
             bad_cnt = _safe_text_or_placeholder(payload.get("bad_cnt"))

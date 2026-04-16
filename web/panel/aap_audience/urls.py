@@ -11,7 +11,7 @@ from .views.modal_edit_title import modal_edit_title_view
 from .views.modal_edit_rate_limit import modal_edit_rate_limit_view
 from .views.modal_pause_info import modal_pause_info_view
 from .views.modal_insert_company import modal_insert_company_view
-from .views.create_list import create_list_view
+from .views.create_list import create_activate_modal_view, create_archive_modal_view, create_list_view
 from .views.create_edit_flow_contacts import (
     contacts_all_partial_view,
     contacts_branch_city_partial_view,
@@ -56,6 +56,8 @@ urlpatterns = [
     path("", lambda r: redirect("audience:create_list"), name="index"),
 
     path("create/modal/", modal_create_task_view, name="create_modal"),
+    path("create/archive/modal/", create_archive_modal_view, name="create_archive_modal"),
+    path("create/activate/modal/", create_activate_modal_view, name="create_activate_modal"),
     path("create/branch-rate/modal/", modal_edit_branch_rate_view, name="create_branch_rate_modal"),
     path("create/city-rate/modal/", modal_edit_city_rate_view, name="create_city_rate_modal"),
     path("create/title/modal/", modal_edit_title_view, name="create_title_modal"),

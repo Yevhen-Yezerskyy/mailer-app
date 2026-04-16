@@ -1,15 +1,4 @@
-{% extends "panels/base.html" %}
 {% load i18n %}
-{% load static %}
-<!-- FILE: web/templates/panels/aap_settings/imap_server.html -->
-<!-- DATE: 2026-01-26 -->
-<!-- PURPOSE: Settings → IMAP server (чтение): PU, проверка через API (check_imap), показ последней проверки (дата+статус). -->
-<!-- CHANGE:
-- Добавлена кнопка проверки IMAP (AJAX).
-- Показываем last_check_dt + last_check_status.
-- Нет отправки тестового письма, нет history (пока). -->
-
-{% block content %}
 
 <script type="application/json" id="yyPresets">{{ presets_json|safe }}</script>
 
@@ -31,10 +20,10 @@
 
           <div class="YY-STATUS_BLUE mb-8">IMAP {% trans "сервер (входящие)" %}</div>
 
-          <div class="flex items-center gap-6 mb-12">
-            <button type="button" id="yyAuthBtnLogin" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "ЛОГИН (Стандарт)" %}</button>
-            <button type="button" id="yyAuthBtnGoogle" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "Google OAuth 2.0" %}</button>
-            <button type="button" id="yyAuthBtnMicrosoft" class="YY-BUTTON_TAB_MAIN !py-2 !px-3">{% trans "Microsoft OAuth 2.0" %}</button>
+          <div class="flex items-center gap-4 mt-5 mb-6">
+            <button type="button" id="yyAuthBtnLogin" data-base-extra="!py-2 !px-3 !w-[180px]" class="YY-BUTTON_MAIN !py-2 !px-3 !w-[180px]">{% trans "ЛОГИН (Стандарт)" %}</button>
+            <button type="button" id="yyAuthBtnGoogle" data-base-extra="!py-2 !px-3 !w-[180px]" class="YY-BUTTON_MAIN !py-2 !px-3 !w-[180px]">{% trans "Google OAuth 2.0" %}</button>
+            <button type="button" id="yyAuthBtnMicrosoft" data-base-extra="!py-2 !px-3 !w-[180px]" class="YY-BUTTON_MAIN !py-2 !px-3 !w-[180px]">{% trans "Microsoft OAuth 2.0" %}</button>
           </div>
 
           <div id="yyLoginBlock">
@@ -87,7 +76,7 @@
 
                 <button
                   type="button"
-                  class="absolute right-3 top-12 -translate-y-1/2 text-[#006991] hover:text-gray-800"
+                  class="absolute right-3 top-12 -translate-y-1/2 -mt-[8px] text-[#006991] hover:text-gray-800"
                   onclick="yyTogglePasswordOrReveal('imap','yySecret')"
                   aria-label="password"
                 >
@@ -105,7 +94,7 @@
             <div class="YY-STATUS_GREEN mb-8">Google OAuth 2.0</div>
             <div class="YY-STATUS_YELLOW !mb-12 !py-12">
               {% trans "Автоматически пока не реализовано." %}<br>
-              {% trans "Реализация автоматики до 1 апреля 2026 г." %}<br>
+              {% trans "Реализация автоматики до 1 июня 2026 г." %}<br>
               {% trans "Обратитесь к менеджеру для подключения вручную." %}
             </div>
           </div>
@@ -114,7 +103,7 @@
             <div class="YY-STATUS_GREEN mb-8">Microsoft OAuth 2.0</div>
             <div class="YY-STATUS_YELLOW !mb-12 !py-12">
               {% trans "Автоматически пока не реализовано." %}<br>
-              {% trans "Реализация автоматики до 1 апреля 2026 г." %}<br>
+              {% trans "Реализация автоматики до 1 июня 2026 г." %}<br>
               {% trans "Обратитесь к менеджеру для подключения вручную." %}
             </div>
           </div>
@@ -180,10 +169,6 @@
 
 {% include "panels/aap_settings/partials/mail_secret_modal.html" %}
 
-<script src="{% static 'js/aap_settings/mail_servers_presets.js' %}"></script>
-<script src="{% static 'js/aap_settings/mail_servers_checks.js' %}"></script>
-<script src="{% static 'js/aap_settings/mail_servers_secret.js' %}"></script>
-
 <script>
   (function () {
     const el = document.querySelector('input[name="password"]');
@@ -192,5 +177,3 @@
     try { el.style.paddingRight = "2.75rem"; } catch (e) {}
   })();
 </script>
-
-{% endblock %}

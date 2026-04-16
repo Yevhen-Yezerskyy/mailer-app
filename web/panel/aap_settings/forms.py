@@ -86,7 +86,39 @@ class MailboxAddForm(forms.Form):
     email = forms.EmailField(
         label=_("Email"),
         required=True,
-        widget=forms.TextInput(attrs={"class": "YY-INPUT", "placeholder": "name@domain.tld"}),
+        widget=forms.TextInput(attrs={"class": "YY-INPUT !w-full !mb-0", "placeholder": "name@domain.tld"}),
+    )
+    limit_hour = forms.IntegerField(
+        label=_("Лимит отправки в час"),
+        required=True,
+        initial=60,
+        widget=forms.NumberInput(
+            attrs={
+                "class": "YY-INPUT !w-full !mb-0",
+                "inputmode": "numeric",
+                "pattern": r"[0-9]*",
+                "maxlength": "3",
+                "min": "1",
+                "max": "120",
+                "autocomplete": "off",
+            }
+        ),
+    )
+    limit_day = forms.IntegerField(
+        label=_("Лимит отправки в сутки"),
+        required=True,
+        initial=500,
+        widget=forms.NumberInput(
+            attrs={
+                "class": "YY-INPUT !w-full !mb-0",
+                "inputmode": "numeric",
+                "pattern": r"[0-9]*",
+                "maxlength": "4",
+                "min": "1",
+                "max": "1000",
+                "autocomplete": "off",
+            }
+        ),
     )
 
     def __init__(self, *args, workspace_id=None, mailbox_id: int | None = None, **kwargs):
@@ -98,15 +130,13 @@ class MailboxAddForm(forms.Form):
         cleaned = super().clean()
         email = (cleaned.get("email") or "").strip().lower()
         if not email:
-            self.add_error(None, _("Заполните Email."))
             return cleaned
 
-        q = Mailbox.objects.filter(email=email)
+        q = Mailbox.objects.filter(workspace_id=self.workspace_id, email=email)
         if self.mailbox_id is not None:
             q = q.exclude(id=self.mailbox_id)
         if q.exists():
-            self.add_error(None, _("Этот Email уже используется."))
-            return cleaned
+            self.add_error("email", _("Этот Email уже используется."))
 
         return cleaned
 
@@ -320,23 +350,6 @@ class SmtpServerForm(forms.Form, _LoginFieldsFromTypesMixin):
         widget=forms.EmailInput(attrs={"class": "YY-INPUT", "autocomplete": "off"}),
     )
 
-    limit_hour_sent = forms.IntegerField(
-        label=_("Лимит/час"),
-        required=True,
-        initial=50,
-        widget=forms.TextInput(
-            attrs={
-                "class": "YY-INPUT",
-                "inputmode": "numeric",
-                "pattern": r"[0-9]*",
-                "maxlength": "3",
-                "min": "1",
-                "max": "300",
-                "autocomplete": "off",
-            }
-        ),
-    )
-
     def __init__(self, *args, require_password: bool = True, **kwargs):
         super().__init__(*args, **kwargs)
         self.require_password = bool(require_password)
@@ -358,17 +371,6 @@ class SmtpServerForm(forms.Form, _LoginFieldsFromTypesMixin):
 
     def clean(self):
         cleaned = super().clean()
-
-        try:
-            lim = int(cleaned.get("limit_hour_sent") or 0)
-        except Exception:
-            lim = 0
-        if lim < 1:
-            self.add_error(None, _("Лимит должен быть не меньше 1 письма в час."))
-            return cleaned
-        if lim > 300:
-            self.add_error(None, _("Максимум 300 писем в час."))
-            return cleaned
 
         auth_type = (cleaned.get("auth_type") or "LOGIN").strip().upper()
 

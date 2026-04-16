@@ -446,6 +446,10 @@
     return true;
   }
 
+  function isSendingListRequired() {
+    return !!form.querySelector('select[name="sending_list"]');
+  }
+
   function validateStartDate() {
     if (!startDateInput) return true;
     const v = String(startDateInput.value || "").trim();
@@ -513,7 +517,9 @@
 
     let ok = true;
     ok = validateRequiredText("title") && ok;
-    ok = validateRequiredSelect("sending_list") && ok;
+    if (isSendingListRequired()) {
+      ok = validateRequiredSelect("sending_list") && ok;
+    }
     ok = validateRequiredSelect("mailbox") && ok;
 
     ok = validateWindowsAndSerialize() && ok;
@@ -560,7 +566,8 @@
     if (titleInput && titleVal) titleInput.classList.remove("!border-red-500");
     if (sendingEl && sendingVal) sendingEl.classList.remove("!border-red-500");
     if (mailboxEl && mailboxVal) mailboxEl.classList.remove("!border-red-500");
-    return !!(titleVal && sendingVal && mailboxVal);
+    const sendingOk = sendingEl ? !!sendingVal : true;
+    return !!(titleVal && sendingOk && mailboxVal);
   }
 
   const initialSnapshot = readFormSnapshot();

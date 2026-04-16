@@ -24,6 +24,7 @@ from engine.common.mail.types import SMTP_CREDENTIALS_FORMAT
 from mailer_web.access import decode_id, encode_id
 from panel.aap_settings.forms import SmtpServerForm
 from panel.aap_settings.models import Mailbox, ProviderPreset, ProviderPresetNoAuth, SmtpMailbox
+from panel.aap_settings.views.mail_servers_flow import build_mail_servers_flow_step_states
 
 SECRET_MASK = "********"
 
@@ -259,7 +260,6 @@ def smtp_server_view(request, id: str):
         "auth_type": stored_auth_type,
         "sender_name": smtp.sender_name if smtp else "",
         "email": (smtp.from_email if smtp else mb.email or "").strip(),
-        "limit_hour_sent": smtp.limit_hour_sent if smtp else 50,
     }
 
     if stored_auth_type in SMTP_AUTH_TYPES and isinstance(stored_creds_enc, dict):
@@ -276,15 +276,27 @@ def smtp_server_view(request, id: str):
     if stored_auth_type == "LOGIN" and not require_password:
         initial["password"] = SECRET_MASK
 
+    mailbox_ui_id = encode_id(mb.id)
+    flow_step_states = build_mail_servers_flow_step_states(
+        current_step="smtp",
+        mailbox_ui_id=mailbox_ui_id,
+        saved=True,
+    )
+
     def _ctx(form_obj: SmtpServerForm) -> Dict[str, Any]:
         return {
             "state": state,
             "mailbox": mb,
-            "mailbox_ui_id": encode_id(mb.id),
+            "mailbox_ui_id": mailbox_ui_id,
             "form": form_obj,
             "login_presets_json": json.dumps(login_presets_map, ensure_ascii=False),
             "relay_presets_json": json.dumps(relay_presets_map, ensure_ascii=False),
             "last_checks": last_checks,
+            "flow_title": mb.email,
+            "flow_step_states": flow_step_states,
+            "flow_close_url": reverse("settings:mail_servers"),
+            "flow_body_template": "panels/aap_settings/mail_servers/_smtp_server.html",
+            "flow_step_key": "smtp",
         }
 
     # -------------------------
@@ -302,7 +314,7 @@ def smtp_server_view(request, id: str):
         if not form.is_valid():
             return render(
                 request,
-                "panels/aap_settings/smtp_server.html",
+                "panels/aap_settings/mail_servers/flow.html",
                 _ctx(form),
             )
 
@@ -321,7 +333,7 @@ def smtp_server_view(request, id: str):
                     form.add_error("password", "Пароль обязателен.")
                     return render(
                         request,
-                        "panels/aap_settings/smtp_server.html",
+                        "panels/aap_settings/mail_servers/flow.html",
                         _ctx(form),
                     )
                 creds_plain[k] = v
@@ -334,7 +346,6 @@ def smtp_server_view(request, id: str):
             smtp.auth_type = auth_type
             smtp.sender_name = form.cleaned_data["sender_name"]
             smtp.from_email = form.cleaned_data["email"]
-            smtp.limit_hour_sent = form.cleaned_data["limit_hour_sent"]
             smtp.credentials_json = creds_enc
             smtp.save()
         else:
@@ -343,11 +354,10 @@ def smtp_server_view(request, id: str):
                 auth_type=auth_type,
                 sender_name=form.cleaned_data["sender_name"],
                 from_email=form.cleaned_data["email"],
-                limit_hour_sent=form.cleaned_data["limit_hour_sent"],
                 credentials_json=creds_enc,
             )
 
-        return redirect(reverse("settings:mail_servers_smtp", kwargs={"id": encode_id(mb.id)}))
+        return redirect(reverse("settings:mail_servers_smtp", kwargs={"id": mailbox_ui_id}))
 
     form = SmtpServerForm(initial=initial, require_password=require_password)
     if stored_auth_type == "LOGIN" and not require_password:
@@ -355,6 +365,6 @@ def smtp_server_view(request, id: str):
 
     return render(
         request,
-        "panels/aap_settings/smtp_server.html",
+        "panels/aap_settings/mail_servers/flow.html",
         _ctx(form),
     )

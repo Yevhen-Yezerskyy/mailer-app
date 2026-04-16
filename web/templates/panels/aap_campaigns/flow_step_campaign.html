@@ -16,14 +16,20 @@
           <div class="h-full min-h-0 flex flex-col">
           <div class="YY-STATUS_BLUE !w-full !mb-0">{% trans "Кампания по рассылке" %}</div>
           <label class="YY-LABEL mt-5">{% trans "Список рассылки" %}:</label>
-          <select name="sending_list" class="YY-INPUT !mb-0 {% if flow_error_sending_list %}!border-red-500{% endif %}">
-            <option value="">{% trans "— не выбран —" %}</option>
-            {% for it in list_items %}
-              <option value="{{ it.ui_id }}" {% if edit_obj and edit_obj.sending_list_id == it.id %}selected{% endif %}>
-                {{ it.title }}
-              </option>
-            {% endfor %}
-          </select>
+          {% if campaign_mode == "edit" and edit_obj %}
+            <div class="{% if flow_locked_sending_list_type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-full !mb-0">
+              {{ flow_locked_sending_list_title|default:"—" }}
+            </div>
+          {% else %}
+            <select name="sending_list" class="YY-INPUT !mb-0 {% if flow_error_sending_list %}!border-red-500{% endif %}">
+              <option value="">{% trans "— не выбран —" %}</option>
+              {% for it in list_items %}
+                <option value="{{ it.ui_id }}" {% if edit_obj and edit_obj.sending_list_id == it.id %}selected{% endif %}>
+                  {{ it.title }}
+                </option>
+              {% endfor %}
+            </select>
+          {% endif %}
 
           <label class="YY-LABEL mt-5">{% trans "Почтовый сервер для отправки" %}:</label>
           <select name="mailbox" class="YY-INPUT !mb-0 {% if flow_error_mailbox %}!border-red-500{% endif %}">

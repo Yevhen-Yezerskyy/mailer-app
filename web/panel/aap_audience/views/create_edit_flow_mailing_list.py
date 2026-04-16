@@ -287,7 +287,7 @@ def _fetch_mailing_rows(
             "mailing_rows": [],
             "mailing_page": 1,
             "mailing_pages": 1,
-            "mailing_show_paging": False,
+            "mailing_show_paging": True,
             "mailing_total": 0,
             "mailing_total_display": _format_total(0),
             "mailing_has_prev": False,
@@ -364,7 +364,7 @@ def _fetch_mailing_rows(
         "mailing_rows": [_build_mailing_row(request, row) for row in rows],
         "mailing_page": current_page,
         "mailing_pages": total_pages,
-        "mailing_show_paging": total > 0,
+        "mailing_show_paging": True,
         "mailing_total": total,
         "mailing_total_display": _format_total(total),
         "mailing_has_prev": current_page > 1,
@@ -382,7 +382,7 @@ def _resolve_mailing_partial_task(request):
     item_id = str(request.GET.get("id") or "").strip()
     if flow_type not in {"buy", "sell"}:
         return flow_type, item_id, None, 400
-    task = resolve_task(request, flow_type, item_id)
+    task = resolve_task(request, flow_type, item_id, include_archived=True)
     if not task:
         return flow_type, item_id, None, 404
     return flow_type, item_id, task, 200
@@ -487,7 +487,7 @@ def mailing_status_view(request):
     if flow_type not in {"buy", "sell"}:
         return JsonResponse({"ok": False, "error": "invalid_flow_type"}, status=400)
 
-    task = resolve_task(request, flow_type, item_id)
+    task = resolve_task(request, flow_type, item_id, include_archived=True)
     if not task:
         return JsonResponse({"ok": False, "error": "task_not_found"}, status=404)
 
@@ -504,6 +504,7 @@ def handle_mailing_list_step_view(
     task,
     saved_values: Mapping[str, Any],
     flow_status: Mapping[str, Any],
+    rating_hash_alert: Mapping[str, Any],
 ):
     flow_conf = get_flow_config(flow_type)
     step_definitions = build_step_definitions(flow_type)
@@ -580,6 +581,7 @@ def handle_mailing_list_step_view(
                     "nav_partial_url": nav_partial_url,
                     "section_partial_url": section_partial_url,
                 },
+                "rating_hash_alert": dict(rating_hash_alert or {}),
             },
         ),
     )

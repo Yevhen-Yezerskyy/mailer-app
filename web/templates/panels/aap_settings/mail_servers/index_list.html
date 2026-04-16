@@ -1,0 +1,266 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+
+{% block content %}
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_LEFT_TD w-[69%]">
+      <div class="YY-CARD_WHITE">
+        <div class="flex items-center justify-between gap-3 flex-wrap">
+          <div class="YY-STATUS_BLUE">{% trans "Ваши почтовые серверы (SMTP / IMAP):" %}</div>
+        </div>
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-[31%]">
+      <div class="YY-CARD_WHITE h-full">
+        <a href="?state=add" class="YY-BUTTON_MAIN_FULL">
+          {% trans "Добавить почтовый сервер" %}
+        </a>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD">
+      <div class="YY-MAIN_BOTTOM_DIV">
+
+        <table class="w-full">
+          <thead>
+            <tr class="YY-TH_TR">
+              <th class="YY-TH_TH w-[25%]">Email</th>
+              <th class="YY-TH_TH w-[28%]">{% trans "Лимиты" %}</th>
+              <th class="YY-TH_TH w-[25%]">SMTP</th>
+              <th class="YY-TH_TH w-[25%]">IMAP</th>
+              <th class="YY-TH_TH whitespace-nowrap text-right w-[160px]">
+                {% if show_archive %}
+                  <a href="{% url 'settings:mail_servers' %}" class="inline-flex items-center gap-1 text-[#8e0000] !font-normal underline">
+                    <span>{% trans "Активные" %}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                    </svg>
+                  </a>
+                {% elif has_archived_mailboxes %}
+                  <a href="{% url 'settings:mail_servers' %}?show=archive" class="inline-flex items-center gap-1 text-[#8e0000] !font-normal underline">
+                    <span>{% trans "Архив" %}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m7.875 14.25 1.214 1.942a2.25 2.25 0 0 0 1.908 1.058h2.006c.776 0 1.497-.4 1.908-1.058l1.214-1.942M2.41 9h4.636a2.25 2.25 0 0 1 1.872 1.002l.164.246a2.25 2.25 0 0 0 1.872 1.002h2.092a2.25 2.25 0 0 0 1.872-1.002l.164-.246A2.25 2.25 0 0 1 16.954 9h4.636M2.41 9a2.25 2.25 0 0 0-.16.832V12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 12V9.832c0-.287-.055-.57-.16-.832M2.41 9a2.25 2.25 0 0 1 .382-.632l3.285-3.832a2.25 2.25 0 0 1 1.708-.786h8.43c.657 0 1.281.287 1.709.786l3.284 3.832c.163.19.291.404.382.632M4.5 20.25h15A2.25 2.25 0 0 0 21.75 18v-2.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125V18a2.25 2.25 0 0 0 2.25 2.25Z" />
+                    </svg>
+                  </a>
+                {% else %}
+                  &nbsp;
+                {% endif %}
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for it in items %}
+              <tr class="YY-TB_TR align-top">
+
+                <td class="YY-TB_TD !px-1 !py-4">
+                  <div class="space-y-2">
+                    <div class="YY-STATUS_BLUE mb-2">{{ it.email }}</div>
+                    {% if it.domain_whitelisted %}
+                      <div class="YY-STATUS_GREEN !text-[10px] !mb-0">{% trans "Публичный сервис-провайдер" %}<br>{% trans "Проверка домена не нужна" %}</div>
+                    {% elif it.domain_tested %}
+                      {% if it.domain_tech %}
+                        {% if it.domain_tech.status == "GOOD" %}
+                          <div class="YY-STATUS_GREEN !text-[10px] !mb-0">
+                        {% elif it.domain_tech.status == "NORMAL" %}
+                          <div class="YY-STATUS_YELLOW !text-[10px] !mb-0">
+                        {% elif it.domain_tech.status == "BAD" %}
+                          <div class="YY-STATUS_RED !text-[10px] !mb-0">
+                        {% else %}
+                          <div class="YY-STATUS_GRAY !text-[10px] !mb-0">
+                        {% endif %}
+                          <div>{{ it.domain_tech.dt }}</div>
+                          <div>{{ it.domain_tech.action }}: {{ it.domain_tech.status }}</div>
+                        </div>
+                      {% else %}
+                        <div class="YY-STATUS_YELLOW !text-[10px] !mb-0">{% trans "Не проверено" %}</div>
+                      {% endif %}
+
+                      {% if it.domain_rep %}
+                        {% if it.domain_rep.status == "NORMAL" %}
+                          <div class="YY-STATUS_GREEN !text-[10px] !mb-0">
+                        {% elif it.domain_rep.status == "QUESTIONABLE" %}
+                          <div class="YY-STATUS_RED !text-[10px] !mb-0">
+                        {% else %}
+                          <div class="YY-STATUS_GRAY !text-[10px] !mb-0">
+                        {% endif %}
+                          <div>{{ it.domain_rep.dt }}</div>
+                          <div>{{ it.domain_rep.action }}: {{ it.domain_rep.status }}</div>
+                        </div>
+                      {% endif %}
+                    {% else %}
+                      <div class="YY-STATUS_YELLOW !text-[10px] !mb-0">{% trans "Домен не протестирован" %}</div>
+                    {% endif %}
+                  </div>
+                </td>
+
+                <td class="YY-TB_TD !px-1 !py-4">
+                  <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_MAIN_FULL mb-2">
+                    <span class="inline-flex items-center justify-between gap-1 w-full">
+                      <span>{% trans "Изменить лимиты" %}</span>
+                      <svg class="size-[22px] shrink-0" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </span>
+                  </a>
+                  <div class="YY-STATUS_BLUE !mb-2 !font-semibold !grid !grid-cols-[minmax(0,1fr)_auto] !items-center !whitespace-normal gap-2">
+                    <span>{% trans "Лимит отправки в час:" %}</span>
+                    <span class="text-right">{{ it.limit_hour }}</span>
+                  </div>
+                  <div class="YY-STATUS_BLUE !mb-0 !font-semibold !grid !grid-cols-[minmax(0,1fr)_auto] !items-center !whitespace-normal gap-2">
+                    <span>{% trans "Лимит отправки в сутки:" %}</span>
+                    <span class="text-right">{{ it.limit_day }}</span>
+                  </div>
+                </td>
+
+                <td class="YY-TB_TD !px-1 !py-4">
+                  {% if not it.smtp_configured %}
+                    <a href="{% url 'settings:mail_servers_smtp' it.ui_id %}" class="YY-BUTTON_MAIN_FULL mb-2">
+                      <span class="inline-flex items-center justify-between gap-1 w-full">
+                        <span>{% trans "Настроить SMTP сервер" %}</span>
+                        <svg class="size-[22px] shrink-0" aria-hidden="true">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </span>
+                    </a>
+                    <div class="YY-STATUS_YELLOW !text-[10px] ">{% trans "SMTP не настроен" %}</div>
+                  {% else %}
+                    <a href="{% url 'settings:mail_servers_smtp' it.ui_id %}" class="YY-BUTTON_MAIN_FULL mb-2">
+                      <span class="inline-flex items-center justify-between gap-1 w-full">
+                        <span>{% trans "Изменить SMTP сервер" %}</span>
+                        <svg class="size-[22px] shrink-0" aria-hidden="true">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </span>
+                    </a>
+                      {% if it.smtp_auth %}
+                        {% if it.smtp_auth.status == "SUCCESS" %}
+                          <div class="YY-STATUS_GREEN !text-[10px] !mb-2">
+                        {% elif it.smtp_auth.status == "FAIL" %}
+                          <div class="YY-STATUS_RED !text-[10px] !mb-2">
+                        {% else %}
+                          <div class="YY-STATUS_GRAY !text-[10px] !mb-2">
+                        {% endif %}
+                          <div>{{ it.smtp_auth.dt }}</div>
+                          <div>{{ it.smtp_auth.action }}: {{ it.smtp_auth.status }}</div>
+                        </div>
+                      {% else %}
+                      <div class="YY-STATUS_YELLOW !text-[10px] !mb-2">
+                        {% trans "Не проверено" %}
+                      </div>
+                      {% endif %}
+                      {% if it.smtp_send %}
+                        {% if it.smtp_send.status == "SUCCESS" %}
+                          <div class="YY-STATUS_GREEN !text-[10px] !mb-2">
+                        {% elif it.smtp_send.status == "FAIL" %}
+                          <div class="YY-STATUS_RED !text-[10px] !mb-2">
+                        {% else %}
+                          <div class="YY-STATUS_GRAY !text-[10px] !mb-2">
+                        {% endif %}
+                          <div>{{ it.smtp_send.dt }}</div>
+                          <div>{{ it.smtp_send.action }}: {{ it.smtp_send.status }}</div>
+                        </div>
+                      {% endif %}
+                  {% endif %}
+                </td>
+
+                <td class="YY-TB_TD !px-1 !py-4">
+                  {% if not it.imap_configured %}
+                    <a href="{% url 'settings:mail_servers_imap' it.ui_id %}" class="YY-BUTTON_MAIN_FULL mb-2">
+                      <span class="inline-flex items-center justify-between gap-1 w-full">
+                        <span>{% trans "Настроить IMAP сервер" %}</span>
+                        <svg class="size-[22px] shrink-0" aria-hidden="true">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </span>
+                    </a>
+                    <div class="YY-STATUS_YELLOW !text-[10px] ">{% trans "IMAP не настроен" %}</div>
+                  {% else %}
+                    <a href="{% url 'settings:mail_servers_imap' it.ui_id %}" class="YY-BUTTON_MAIN_FULL mb-2">
+                      <span class="inline-flex items-center justify-between gap-1 w-full">
+                        <span>{% trans "Изменить IMAP сервер" %}</span>
+                        <svg class="size-[22px] shrink-0" aria-hidden="true">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </span>
+                    </a>
+                      {% if it.imap_check %}
+                        {% if it.imap_check.status == "SUCCESS" %}
+                          <div class="YY-STATUS_GREEN !text-[10px] !mb-2">
+                        {% elif it.imap_check.status == "FAIL" %}
+                          <div class="YY-STATUS_RED !text-[10px] !mb-2">
+                        {% else %}
+                          <div class="YY-STATUS_GRAY !text-[10px] !mb-2">
+                        {% endif %}
+                          <div>{{ it.imap_check.dt }}</div>
+                          <div>{{ it.imap_check.action }}: {{ it.imap_check.status }}</div>
+                        </div>
+                      {% else %}
+                      <div class="YY-STATUS_YELLOW !text-[10px] !mb-2">
+                        {% trans "Не проверено" %}
+                      </div>
+                      {% endif %}
+                  {% endif %}
+                </td>
+
+                <td class="YY-TB_TD !px-1 !py-4 whitespace-nowrap">
+                  <div class="flex flex-col gap-2">
+                    {% if show_archive %}
+                      <div class="YY-STATUS_WHITE !w-full !mb-0">
+                        <button
+                          type="button"
+                          class="inline-flex items-center justify-between gap-1 !w-full !p-0 !m-0 bg-transparent border-0 text-[#8e0000] !font-normal underline"
+                          data-yy-modal="url={% url 'settings:mail_servers_activate_modal' %}?id={{ it.ui_id|urlencode }}">
+                          <span>{% trans "Активировать" %}</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                          </svg>
+                        </button>
+                      </div>
+                    {% else %}
+                      <div class="YY-STATUS_WHITE !w-full !mb-0">
+                        <a href="?state=edit&id={{ it.ui_id }}" class="inline-flex items-center justify-between gap-1 !w-full !font-normal underline">
+                          <span>{% trans "Изменить" %}</span>
+                          <svg class="size-[22px] shrink-0" aria-hidden="true">
+                            <use href="#icon-arrow-circle"></use>
+                          </svg>
+                        </a>
+                      </div>
+                      <div class="YY-STATUS_WHITE !w-full !mb-0">
+                        <button
+                          type="button"
+                          class="inline-flex items-center justify-between gap-1 !w-full !p-0 !m-0 bg-transparent border-0 text-[#8e0000] !font-normal underline"
+                          data-yy-modal="url={% url 'settings:mail_servers_archive_modal' %}?id={{ it.ui_id|urlencode }}">
+                          <span>{% trans "Архивировать" %}</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859M12 3v8.25m0 0-3-3m3 3 3-3" />
+                          </svg>
+                        </button>
+                      </div>
+                    {% endif %}
+                  </div>
+                </td>
+
+              </tr>
+            {% empty %}
+              <tr class="YY-TB_TR align-top">
+                <td class="YY-TB_TD !px-1" colspan="5">
+                  <div class="YY-STATUS_YELLOW !mb-0">{% trans "Записей не найдено." %}</div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+      </div>
+    </td>
+  </tr>
+</table>
+{% endblock %}

@@ -72,6 +72,11 @@
                     <input type="email" name="test_email" class="YY-INPUT !mb-0 flex-1" placeholder="test@example.com">
                     <button type="submit" name="action" value="send_test" class="YY-BUTTON_MAIN !mb-0 whitespace-nowrap px-5">{% trans "Отправить тестовое письмо" %}</button>
                   </div>
+                  <label class="YY-LABEL mt-4">{% trans "Результат отправки" %}</label>
+                  <textarea
+                    class="YY-TEXTAREA !min-h-[180px] !font-mono !mb-0"
+                    placeholder="{% trans 'Результат отправки' %}"
+                    readonly>{% if flow_test_send_status %}{{ flow_test_send_status }}{% endif %}</textarea>
                 </div>
               {% endif %}
 
