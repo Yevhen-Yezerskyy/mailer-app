@@ -90,26 +90,60 @@ def _pending_by_campaign(campaign_ids: List[int]) -> Dict[int, int]:
 
     rows = fetch_all(
         """
+        WITH selected_campaigns AS (
+          SELECT
+            c.id,
+            c.sending_list_id,
+            c.campaign_parent_id,
+            COALESCE(c.send_after_parent_days, 0)::int AS send_after_parent_days
+          FROM public.campaigns_campaigns c
+          WHERE c.id = ANY(%s)
+        ),
+        parent_send AS (
+          SELECT
+            lg.campaign_id AS parent_campaign_id,
+            lg.sending_list_id,
+            MAX(COALESCE(lg.processed_at, lg.created_at)) AS parent_sent_at
+          FROM public.sending_log lg
+          JOIN (
+            SELECT DISTINCT sc.campaign_parent_id
+            FROM selected_campaigns sc
+            WHERE sc.campaign_parent_id IS NOT NULL
+          ) p
+            ON p.campaign_parent_id = lg.campaign_id
+          WHERE lg.processed = true
+            AND lg.status = 'SEND'
+          GROUP BY lg.campaign_id, lg.sending_list_id
+        )
         SELECT
-          c.id AS campaign_id,
+          sc.id AS campaign_id,
           COUNT(*) FILTER (WHERE lg.id IS NULL)::int AS pending
-        FROM public.campaigns_campaigns c
+        FROM selected_campaigns sc
         JOIN public.aap_audience_audiencetask t
-          ON t.id = c.sending_list_id
+          ON t.id = sc.sending_list_id
         JOIN public.sending_lists sl
-          ON sl.task_id = c.sending_list_id
+          ON sl.task_id = sc.sending_list_id
         JOIN public.aggr_contacts_cb ac
           ON ac.id = sl.aggr_contact_cb_id
+        LEFT JOIN parent_send ps
+          ON ps.parent_campaign_id = sc.campaign_parent_id
+         AND ps.sending_list_id = sl.aggr_contact_cb_id
         LEFT JOIN public.sending_log lg
-          ON lg.campaign_id = c.id
+          ON lg.campaign_id = sc.id
          AND lg.sending_list_id = sl.aggr_contact_cb_id
-        WHERE c.id = ANY(%s)
-          AND COALESCE(sl.removed, false) = false
+        WHERE COALESCE(sl.removed, false) = false
           AND sl.rate IS NOT NULL
           AND sl.rate <= t.rate_limit
           AND COALESCE(ac.blocked, false) = false
           AND COALESCE(ac.wrong_email, false) = false
-        GROUP BY c.id
+          AND (
+            sc.campaign_parent_id IS NULL
+            OR (
+              ps.parent_sent_at IS NOT NULL
+              AND ps.parent_sent_at <= now() - (sc.send_after_parent_days * interval '1 day')
+            )
+          )
+        GROUP BY sc.id
         """,
         [ids],
     )
@@ -123,29 +157,61 @@ def _pending_by_campaign(campaign_ids: List[int]) -> Dict[int, int]:
 def _candidate_batch_for_campaign(campaign_id: int, *, limit: int = 200) -> List[SendCandidate]:
     rows = fetch_all(
         """
+        WITH selected_campaign AS (
+          SELECT
+            c.id,
+            c.sending_list_id,
+            c.campaign_parent_id,
+            COALESCE(c.send_after_parent_days, 0)::int AS send_after_parent_days
+          FROM public.campaigns_campaigns c
+          WHERE c.id = %s
+          LIMIT 1
+        ),
+        parent_send AS (
+          SELECT
+            lg.campaign_id AS parent_campaign_id,
+            lg.sending_list_id,
+            MAX(COALESCE(lg.processed_at, lg.created_at)) AS parent_sent_at
+          FROM public.sending_log lg
+          JOIN selected_campaign sc
+            ON sc.campaign_parent_id IS NOT NULL
+           AND lg.campaign_id = sc.campaign_parent_id
+          WHERE lg.processed = true
+            AND lg.status = 'SEND'
+          GROUP BY lg.campaign_id, lg.sending_list_id
+        )
         SELECT
           sl.aggr_contact_cb_id AS sending_list_id,
           sl.aggr_contact_cb_id AS aggr_contact_id,
           COALESCE(lower(trim(ac.email)), '') AS email,
           COALESCE(ac.company_name, '') AS company_name,
           ac.company_data
-        FROM public.campaigns_campaigns c
+        FROM selected_campaign sc
         JOIN public.aap_audience_audiencetask t
-          ON t.id = c.sending_list_id
+          ON t.id = sc.sending_list_id
         JOIN public.sending_lists sl
-          ON sl.task_id = c.sending_list_id
+          ON sl.task_id = sc.sending_list_id
         JOIN public.aggr_contacts_cb ac
           ON ac.id = sl.aggr_contact_cb_id
+        LEFT JOIN parent_send ps
+          ON ps.parent_campaign_id = sc.campaign_parent_id
+         AND ps.sending_list_id = sl.aggr_contact_cb_id
         LEFT JOIN public.sending_log lg
-          ON lg.campaign_id = c.id
+          ON lg.campaign_id = sc.id
          AND lg.sending_list_id = sl.aggr_contact_cb_id
-        WHERE c.id = %s
-          AND COALESCE(sl.removed, false) = false
+        WHERE COALESCE(sl.removed, false) = false
           AND sl.rate IS NOT NULL
           AND sl.rate <= t.rate_limit
           AND COALESCE(ac.blocked, false) = false
           AND COALESCE(ac.wrong_email, false) = false
           AND lg.id IS NULL
+          AND (
+            sc.campaign_parent_id IS NULL
+            OR (
+              ps.parent_sent_at IS NOT NULL
+              AND ps.parent_sent_at <= now() - (sc.send_after_parent_days * interval '1 day')
+            )
+          )
         ORDER BY
           sl.rate ASC NULLS LAST,
           sl.rate_cb ASC NULLS LAST,
