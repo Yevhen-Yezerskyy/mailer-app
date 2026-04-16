@@ -454,7 +454,7 @@ def run_campaign_status_once() -> dict[str, int | str]:
             "interval_nonnull_cnt": 0,
         }
 
-    pool_rows = [row for row in rows if bool(row[3]) and (not bool(row[4]))]
+    pool_rows = [row for row in rows if (not bool(row[4]))]
     ws_windows = _load_workspace_windows(str(row[1] or "").strip() for row in pool_rows)
     mailbox_limits = _load_mailbox_limits(int(row[2]) for row in pool_rows if row[2] is not None)
     global_window = _load_global_window()
@@ -471,7 +471,7 @@ def run_campaign_status_once() -> dict[str, int | str]:
         ws_id = str(workspace_id or "").strip()
         mid = int(mailbox_id)
         camp_window = campaign_window if isinstance(campaign_window, dict) else {}
-        is_pool_eligible = bool(user_active) and (not bool(archived))
+        is_pool_eligible = not bool(archived)
         ws_window = ws_windows.get(ws_id, {}) if is_pool_eligible else {}
         effective_window = _effective_window(camp_window, ws_window, global_window) if is_pool_eligible else {}
 
