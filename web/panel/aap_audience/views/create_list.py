@@ -3,6 +3,7 @@
 # PURPOSE: "Постановка задачи" list page with create buttons and tasks table (source_* fields).
 
 from django.shortcuts import redirect, render
+from django.urls import reverse
 
 from mailer_web.access import decode_id, encode_id
 from panel.aap_audience.models import AudienceTask
@@ -103,17 +104,20 @@ def create_archive_modal_view(request):
     if not task:
         return render(
             request,
-            "panels/aap_audience/modal_create_archive.html",
+            "panels/components/modal_archive_toggle.html",
             {"status": "error"},
         )
 
     return render(
         request,
-        "panels/aap_audience/modal_create_archive.html",
+        "panels/components/modal_archive_toggle.html",
         {
             "status": "ok",
             "ui_id": token,
             "title": task.title or "",
+            "modal_title": "Перенести в архив",
+            "post_url": reverse("audience:create_list"),
+            "action_name": "delete",
         },
     )
 
@@ -137,16 +141,19 @@ def create_activate_modal_view(request):
     if not task:
         return render(
             request,
-            "panels/aap_audience/modal_create_activate.html",
+            "panels/components/modal_archive_toggle.html",
             {"status": "error"},
         )
 
     return render(
         request,
-        "panels/aap_audience/modal_create_activate.html",
+        "panels/components/modal_archive_toggle.html",
         {
             "status": "ok",
             "ui_id": token,
             "title": task.title or "",
+            "modal_title": "Вернуть из архива",
+            "post_url": reverse("audience:create_list"),
+            "action_name": "activate",
         },
     )

@@ -4,18 +4,22 @@
 
   <div class="overflow-auto mt-10 mb-1 max-h-[calc(85vh-5rem)]">
     {% if status == "ok" %}
-      <div class="YY-STATUS_YELLOW !mb-3">{% trans "Архивировать почтовый сервер?" %}</div>
+      <div class="YY-STATUS_YELLOW !mb-3">{% trans "Вернуть шаблон из архива?" %}</div>
 
       <div class="YY-CARD_WHITE border border-[#71d0f4]">
-        <div class="YY-TEXT !mb-0">{{ email }}</div>
+        {% if title %}
+          <div class="YY-TEXT !mb-0">{{ title|linebreaksbr }}</div>
+        {% else %}
+          <div class="YY-TEXT !mb-0">{% trans "Без названия" %}</div>
+        {% endif %}
       </div>
 
-      <form method="post" action="{% url 'settings:mail_servers' %}" class="mt-4">
+      <form method="post" action="{% url 'campaigns:templates' %}" class="mt-4">
         {% csrf_token %}
-        <input type="hidden" name="action" value="archive">
+        <input type="hidden" name="action" value="activate">
         <input type="hidden" name="id" value="{{ ui_id }}">
         <div class="grid grid-cols-2 gap-4">
-          <button type="submit" class="YY-BUTTON_MAIN_FULL">{% trans "В архив" %}</button>
+          <button type="submit" class="YY-BUTTON_MAIN_FULL">{% trans "Из архива" %}</button>
           <button type="button" class="YY-BUTTON_MAIN_FULL" data-yy-modal-close>{% trans "Отмена" %}</button>
         </div>
       </form>

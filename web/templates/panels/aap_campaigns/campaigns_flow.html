@@ -156,7 +156,7 @@
         function buildGeneratedTitle() {
           if (parentCampaign) {
             const parentTitle = selectedText(parentCampaign);
-            return parentTitle ? (parentTitle + " --->>>") : "";
+            return parentTitle ? ("* " + parentTitle) : "";
           }
           return selectedText(sendingList);
         }

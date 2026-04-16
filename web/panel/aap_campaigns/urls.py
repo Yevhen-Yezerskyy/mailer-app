@@ -10,6 +10,8 @@ from __future__ import annotations
 from django.urls import path
 
 from panel.aap_campaigns.views.campaigns import (
+    campaigns_activate_modal_view,
+    campaigns_archive_modal_view,
     campaigns_flow_campaign_view,
     campaigns_flow_letter_view,
     campaigns_flow_template_view,
@@ -24,7 +26,11 @@ from panel.aap_campaigns.views.campaigns_api import (
     campaigns__preview_modal_by_id_view,
     campaigns__preview_modal_from_editor_view,
 )
-from panel.aap_campaigns.views.templates import templates_view
+from panel.aap_campaigns.views.templates import (
+    templates_activate_modal_view,
+    templates_archive_modal_view,
+    templates_view,
+)
 from panel.aap_campaigns.views.templates_api import (
     templates__global_style_css_view,
     templates__parse_editor_html_view,
@@ -39,6 +45,8 @@ app_name = "campaigns"
 
 urlpatterns = [
     path("campaigns/", campaigns_view, name="campaigns"),
+    path("campaigns/archive/modal/", campaigns_archive_modal_view, name="campaigns_archive_modal"),
+    path("campaigns/activate/modal/", campaigns_activate_modal_view, name="campaigns_activate_modal"),
     path("campaigns/flow/", campaigns_flow_campaign_view, name="campaigns_flow"),
     path("campaigns/flow/campaign/", campaigns_flow_campaign_view, name="campaigns_flow_campaign"),
     path("campaigns/flow/campaign/<str:item_id>/", campaigns_flow_campaign_view, name="campaigns_flow_campaign_id"),
@@ -62,6 +70,8 @@ urlpatterns = [
 
     # templates
     path("templates/", templates_view, name="templates"),
+    path("templates/archive/modal/", templates_archive_modal_view, name="templates_archive_modal"),
+    path("templates/activate/modal/", templates_activate_modal_view, name="templates_activate_modal"),
     path("templates/_render-user-html/", templates__render_user_html_view, name="templates__render_user_html"),
     path("templates/_render-user-css/", templates__render_user_css_view, name="templates__render_user_css"),
     path("templates/_parse-editor-html/", templates__parse_editor_html_view, name="templates__parse_editor_html"),

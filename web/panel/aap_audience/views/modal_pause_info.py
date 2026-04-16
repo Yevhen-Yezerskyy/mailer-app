@@ -117,6 +117,7 @@ def _is_task_used_in_campaigns(task) -> bool:
     return Campaign.objects.filter(
         workspace_id=task.workspace_id,
         sending_list_id=int(task.id),
+        archived=False,
     ).exists()
 
 

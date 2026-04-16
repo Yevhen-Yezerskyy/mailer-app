@@ -275,7 +275,7 @@ def mail_servers_archive_modal_view(request):
     if not ws_id:
         return render(
             request,
-            "panels/aap_settings/mail_servers/_modal_archive.html",
+            "panels/components/modal_archive_toggle.html",
             {"status": "error"},
         )
 
@@ -295,17 +295,20 @@ def mail_servers_archive_modal_view(request):
     if not mailbox:
         return render(
             request,
-            "panels/aap_settings/mail_servers/_modal_archive.html",
+            "panels/components/modal_archive_toggle.html",
             {"status": "error"},
         )
 
     return render(
         request,
-        "panels/aap_settings/mail_servers/_modal_archive.html",
+        "panels/components/modal_archive_toggle.html",
         {
             "status": "ok",
             "ui_id": token,
-            "email": mailbox.email,
+            "title": mailbox.email,
+            "modal_title": "Перенести в архив",
+            "post_url": reverse("settings:mail_servers"),
+            "action_name": "archive",
         },
     )
 
@@ -315,7 +318,7 @@ def mail_servers_activate_modal_view(request):
     if not ws_id:
         return render(
             request,
-            "panels/aap_settings/mail_servers/_modal_activate.html",
+            "panels/components/modal_archive_toggle.html",
             {"status": "error"},
         )
 
@@ -335,16 +338,19 @@ def mail_servers_activate_modal_view(request):
     if not mailbox:
         return render(
             request,
-            "panels/aap_settings/mail_servers/_modal_activate.html",
+            "panels/components/modal_archive_toggle.html",
             {"status": "error"},
         )
 
     return render(
         request,
-        "panels/aap_settings/mail_servers/_modal_activate.html",
+        "panels/components/modal_archive_toggle.html",
         {
             "status": "ok",
             "ui_id": token,
-            "email": mailbox.email,
+            "title": mailbox.email,
+            "modal_title": "Вернуть из архива",
+            "post_url": reverse("settings:mail_servers"),
+            "action_name": "unarchive",
         },
     )

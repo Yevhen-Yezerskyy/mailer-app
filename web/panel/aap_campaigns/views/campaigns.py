@@ -60,9 +60,9 @@ def _guard(request) -> tuple[Optional[UUID], Optional[object]]:
     return ws_id, user
 
 
-def _qs(ws_id: UUID):
+def _qs(ws_id: UUID, *, show_archive: bool = False):
     return (
-        Campaign.objects.filter(workspace_id=ws_id)
+        Campaign.objects.filter(workspace_id=ws_id, archived=bool(show_archive))
         .select_related("sending_list", "mailing_list", "mailbox", "campaign_parent", "letter", "letter__template")
         .order_by("-id")
     )
@@ -573,8 +573,10 @@ def _ctx_build(
     form_error_msg: str = "",
     form_error_field: str = "",
     test_msg: str = "",
+    show_archive: bool = False,
+    has_archived_campaigns: bool = False,
 ):
-    items = _with_ui_ids(_qs(ws_id))
+    items = _with_ui_ids(_qs(ws_id, show_archive=show_archive))
 
     sender_label_by_mb_id = _build_sender_labels(list(mb_items))
     now_de = _now_berlin()
@@ -637,6 +639,8 @@ def _ctx_build(
 
     return {
         "items": items,
+        "show_archive": bool(show_archive),
+        "has_archived_campaigns": bool(has_archived_campaigns),
         "state": state,
         "edit_obj": edit_obj,
         "letter_obj": letter_obj,
@@ -851,6 +855,8 @@ def campaigns_view(request):
             campaign_ui_id = (request.GET.get("id") or "").strip()
             return redirect(_flow_url(_legacy_get_step(request), campaign_ui_id))
 
+    show_archive = str(request.GET.get("show") or "").strip().lower() == "archive"
+
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
         if action == "toggle_user_active":
@@ -860,7 +866,7 @@ def campaigns_view(request):
             except Exception:
                 pk = 0
             if pk > 0:
-                camp = Campaign.objects.filter(id=pk, workspace_id=ws_id).first()
+                camp = Campaign.objects.filter(id=pk, workspace_id=ws_id, archived=False).first()
                 if camp:
                     letter_ready = (
                         Letter.objects.filter(workspace_id=ws_id, campaign_id=int(camp.id))
@@ -872,32 +878,49 @@ def campaigns_view(request):
                         camp.save(update_fields=["user_active", "updated_at"])
             return redirect("campaigns:campaigns")
 
-        if action in ("activate", "pause"):
+        if action == "pause":
             post_id = (request.POST.get("id") or "").strip()
             try:
                 pk = int(decode_id(post_id))
             except Exception:
                 pk = 0
             if pk > 0:
-                camp = Campaign.objects.filter(id=pk, workspace_id=ws_id).first()
+                camp = Campaign.objects.filter(id=pk, workspace_id=ws_id, archived=False).first()
                 if camp:
-                    camp.user_active = action == "activate"
+                    camp.user_active = False
                     camp.save(update_fields=["user_active", "updated_at"])
             return redirect("campaigns:campaigns")
 
-        if action == "delete":
+        if action == "archive":
             post_id = (request.POST.get("id") or "").strip()
             try:
                 pk = int(decode_id(post_id))
             except Exception:
                 pk = 0
             if pk > 0:
-                Campaign.objects.filter(id=pk, workspace_id=ws_id).delete()
+                Campaign.objects.filter(id=pk, workspace_id=ws_id, archived=False).update(archived=True, user_active=False)
+            return redirect("campaigns:campaigns")
+
+        if action == "activate":
+            post_id = (request.POST.get("id") or "").strip()
+            try:
+                pk = int(decode_id(post_id))
+            except Exception:
+                pk = 0
+            if pk > 0:
+                camp = Campaign.objects.filter(id=pk, workspace_id=ws_id, archived=False).first()
+                if camp:
+                    camp.user_active = True
+                    camp.save(update_fields=["user_active", "updated_at"])
+                else:
+                    Campaign.objects.filter(id=pk, workspace_id=ws_id, archived=True).update(archived=False)
             return redirect("campaigns:campaigns")
 
     list_items, mb_items, tpl_items, parent_items, global_window_json, deleted_tpl_ui, deleted_tpl_id = _prepare_campaign_form_data(
         ws_id, None
     )
+
+    has_archived_campaigns = Campaign.objects.filter(workspace_id=ws_id, archived=True).exists()
 
     ctx = _ctx_build(
         ws_id,
@@ -916,10 +939,84 @@ def campaigns_view(request):
         "",
         deleted_tpl_ui,
         deleted_tpl_id,
+        show_archive=show_archive,
+        has_archived_campaigns=has_archived_campaigns,
     )
     if request.method == "GET" and (request.GET.get("_partial") or "").strip() == "campaigns_table":
         return render(request, "panels/aap_campaigns/_campaigns_table.html", ctx)
     return render(request, "panels/aap_campaigns/campaigns_list.html", ctx)
+
+
+def campaigns_archive_modal_view(request):
+    ws_id, user = _guard(request)
+    token = (request.GET.get("id") or "").strip()
+    camp = None
+    if ws_id and getattr(user, "is_authenticated", False) and token:
+        try:
+            pk = int(decode_id(token))
+            camp = Campaign.objects.filter(
+                id=pk,
+                workspace_id=ws_id,
+                archived=False,
+            ).only("id", "title").first()
+        except Exception:
+            camp = None
+
+    if not camp:
+        return render(
+            request,
+            "panels/components/modal_archive_toggle.html",
+            {"status": "error"},
+        )
+
+    return render(
+        request,
+        "panels/components/modal_archive_toggle.html",
+        {
+            "status": "ok",
+            "ui_id": token,
+            "title": camp.title or "",
+            "modal_title": "Перенести в архив",
+            "post_url": reverse("campaigns:campaigns"),
+            "action_name": "archive",
+        },
+    )
+
+
+def campaigns_activate_modal_view(request):
+    ws_id, user = _guard(request)
+    token = (request.GET.get("id") or "").strip()
+    camp = None
+    if ws_id and getattr(user, "is_authenticated", False) and token:
+        try:
+            pk = int(decode_id(token))
+            camp = Campaign.objects.filter(
+                id=pk,
+                workspace_id=ws_id,
+                archived=True,
+            ).only("id", "title").first()
+        except Exception:
+            camp = None
+
+    if not camp:
+        return render(
+            request,
+            "panels/components/modal_archive_toggle.html",
+            {"status": "error"},
+        )
+
+    return render(
+        request,
+        "panels/components/modal_archive_toggle.html",
+        {
+            "status": "ok",
+            "ui_id": token,
+            "title": camp.title or "",
+            "modal_title": "Вернуть из архива",
+            "post_url": reverse("campaigns:campaigns"),
+            "action_name": "activate",
+        },
+    )
 
 
 def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):

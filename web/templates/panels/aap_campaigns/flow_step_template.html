@@ -50,12 +50,6 @@
       <div class="YY-CARD_WHITE h-full min-h-0 flex flex-col" {% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}data-campaign-template-right-card="1"{% endif %}>
         {% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}
           <div class="flex-1 min-h-0 flex flex-col">
-            <textarea
-              name="template_name"
-              rows="2"
-              class="YY-TEXTAREA !mb-3 !min-h-0"
-              placeholder="{% trans "Ваш шаблон: название" %}">{% if tpl_edit_obj %}{{ tpl_edit_obj.template_name }}{% else %}{{ flow_tpl_name_input|default:'' }}{% endif %}</textarea>
-
             <div id="yyUserModeRight" class="flex-1 min-h-0 overflow-y-auto pr-1">
               <div class="grid grid-cols-2 gap-3 mb-10">
                 <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToAdvanced()">{% trans "Экспертный режим" %}</button>
@@ -106,6 +100,14 @@
 
               <textarea id="yyAdvCss" class="YY-TEXTAREA w-full h-full" spellcheck="false"></textarea>
             </div>
+
+            <label class="YY-LABEL mt-8">{% trans "Название шаблона" %}:</label>
+            <input
+              type="text"
+              name="template_name"
+              class="YY-INPUT !mb-0"
+              placeholder="{% trans "Ваш шаблон: название" %}"
+              value="{% if tpl_edit_obj %}{{ tpl_edit_obj.template_name }}{% else %}{{ flow_tpl_name_input|default:'' }}{% endif %}">
 
             <div class="grid grid-cols-2 gap-3 mt-auto pt-5">
               <button type="submit" name="action" value="{% if tpl_state == 'edit' %}tpl_save{% else %}tpl_add{% endif %}" class="YY-BUTTON_MAIN">{% trans "Сохранить" %}</button>

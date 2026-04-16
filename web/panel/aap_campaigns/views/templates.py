@@ -16,12 +16,13 @@ from uuid import UUID
 from django.db import IntegrityError
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.contrib import messages
 from django.utils.translation import gettext as _
 
 from engine.common.email_template import sanitize
-from mailer_web.access import encode_id, resolve_pk_or_redirect
-from panel.aap_campaigns.models import Templates
+from mailer_web.access import encode_id, decode_id, resolve_pk_or_redirect
+from panel.aap_campaigns.models import Templates, Letter
 from panel.aap_campaigns.template_editor import editor_template_parse_html, styles_css_to_json
 from panel.models import GlobalTemplate
 
@@ -34,9 +35,9 @@ def _guard(request) -> tuple[Optional[UUID], Optional[object]]:
     return ws_id, user
 
 
-def _qs(ws_id: UUID):
+def _qs(ws_id: UUID, *, show_archive: bool = False):
     return (
-        Templates.objects.filter(workspace_id=ws_id, archived=False)
+        Templates.objects.filter(workspace_id=ws_id, archived=bool(show_archive))
         .order_by("-updated_at")
     )
 
@@ -45,6 +46,33 @@ def _with_ui_ids(items):
     for it in items:
         it.ui_id = encode_id(int(it.id))
     return items
+
+
+def _with_campaign_titles(items):
+    rows = list(items)
+    if not rows:
+        return rows
+
+    template_ids = [int(it.id) for it in rows]
+    usage_rows = list(
+        Letter.objects
+        .filter(template_id__in=template_ids, campaign__archived=False)
+        .values_list("template_id", "campaign__title")
+        .distinct()
+    )
+
+    campaigns_by_template = {}
+    for tpl_id, campaign_title in usage_rows:
+        title = (campaign_title or "").strip() or "-"
+        if int(tpl_id) not in campaigns_by_template:
+            campaigns_by_template[int(tpl_id)] = set()
+        campaigns_by_template[int(tpl_id)].add(title)
+
+    for it in rows:
+        campaign_titles = sorted(campaigns_by_template.get(int(it.id), set()))
+        it.campaign_titles = campaign_titles
+
+    return rows
 
 
 def _get_state(request) -> str:
@@ -154,6 +182,7 @@ def templates_view(request):
     if not ws_id:
         return redirect("/")
 
+    show_archive = ((request.GET.get("show") or "").strip().lower() == "archive")
     state = _get_state(request)
     edit_obj = _get_edit_obj(request, ws_id) if state == "edit" else None
     if isinstance(edit_obj, HttpResponseRedirect):
@@ -172,7 +201,7 @@ def templates_view(request):
         if action == "close":
             return redirect(request.path)
 
-        if action == "delete":
+        if action in ("delete", "archive"):
             post_id = (request.POST.get("id") or "").strip()
             if post_id:
                 q = request.GET.copy()
@@ -188,6 +217,24 @@ def templates_view(request):
                 workspace_id=ws_id,
                 archived=False,
             ).update(archived=True, is_active=False)
+            return redirect(request.path)
+
+        if action == "activate":
+            post_id = (request.POST.get("id") or "").strip()
+            if post_id:
+                q = request.GET.copy()
+                q["id"] = post_id
+                request.GET = q
+
+            res = resolve_pk_or_redirect(request, Templates, param="id")
+            if isinstance(res, HttpResponseRedirect):
+                return res
+
+            Templates.objects.filter(
+                id=int(res),
+                workspace_id=ws_id,
+                archived=True,
+            ).update(archived=False, is_active=True)
             return redirect(request.path)
 
         template_name = (request.POST.get("template_name") or "").strip()
@@ -272,7 +319,8 @@ def templates_view(request):
     global_style_gid, global_colors, global_fonts = _global_style_keys_by_gid(current_gid)
     global_tpl_items = _build_global_tpl_items(current_gid)
 
-    items = _with_ui_ids(_qs(ws_id))
+    items = _with_campaign_titles(_with_ui_ids(_qs(ws_id, show_archive=show_archive)))
+    has_archived_templates = Templates.objects.filter(workspace_id=ws_id, archived=True).exists()
     return render(
         request,
         "panels/aap_campaigns/templates.html",
@@ -284,5 +332,79 @@ def templates_view(request):
             "global_colors": global_colors,
             "global_fonts": global_fonts,
             "global_tpl_items": global_tpl_items,
+            "show_archive": show_archive,
+            "has_archived_templates": has_archived_templates,
+        },
+    )
+
+
+def templates_archive_modal_view(request):
+    ws_id, user = _guard(request)
+    token = (request.GET.get("id") or "").strip()
+    tpl = None
+    if ws_id and getattr(user, "is_authenticated", False) and token:
+        try:
+            pk = int(decode_id(token))
+            tpl = Templates.objects.filter(
+                id=pk,
+                workspace_id=ws_id,
+                archived=False,
+            ).only("id", "template_name").first()
+        except Exception:
+            tpl = None
+
+    if not tpl:
+        return render(
+            request,
+            "panels/components/modal_archive_toggle.html",
+            {"status": "error"},
+        )
+
+    return render(
+        request,
+        "panels/components/modal_archive_toggle.html",
+        {
+            "status": "ok",
+            "ui_id": token,
+            "title": tpl.template_name or "",
+            "modal_title": "Перенести в архив",
+            "post_url": reverse("campaigns:templates"),
+            "action_name": "archive",
+        },
+    )
+
+
+def templates_activate_modal_view(request):
+    ws_id, user = _guard(request)
+    token = (request.GET.get("id") or "").strip()
+    tpl = None
+    if ws_id and getattr(user, "is_authenticated", False) and token:
+        try:
+            pk = int(decode_id(token))
+            tpl = Templates.objects.filter(
+                id=pk,
+                workspace_id=ws_id,
+                archived=True,
+            ).only("id", "template_name").first()
+        except Exception:
+            tpl = None
+
+    if not tpl:
+        return render(
+            request,
+            "panels/components/modal_archive_toggle.html",
+            {"status": "error"},
+        )
+
+    return render(
+        request,
+        "panels/components/modal_archive_toggle.html",
+        {
+            "status": "ok",
+            "ui_id": token,
+            "title": tpl.template_name or "",
+            "modal_title": "Вернуть из архива",
+            "post_url": reverse("campaigns:templates"),
+            "action_name": "activate",
         },
     )

@@ -933,7 +933,6 @@ def switch_user_login_view(request):
         or settings.AUTHENTICATION_BACKENDS[0]
     )
     auth_login(request, target, backend=backend)
-    messages.info(request, f"Вход выполнен как {target.email}")
     return redirect("dashboard")
 
 

@@ -22,187 +22,245 @@
     <input type="hidden" name="css_text" id="yyCssText">
 {% endif %}
 
-<table class="YY-MAIN_TABLE">
-  <tr>
-    <td class="YY-MAIN_TOP_LEFT_TD w-[70%]">
-      <div class="YY-CARD_WHITE">
-        
-        {% if state == "edit" and edit_obj or state == "add" %}
-        {% if messages %}
+{% if state == "edit" and edit_obj or state == "add" %}
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_TOP_TD">
+        <div class="YY-CARD_WHITE h-full flex items-center justify-between gap-4">
+          <div class="YY-STATUS_BLUE !mb-0">
+            {% trans "Добавление / редактирование шаблона" %}
+          </div>
+          <a id="yyTplCloseTopLink" href="{% url 'campaigns:templates' %}" class="YY-BUTTON_MAIN !mb-0 text-center">
+            {% trans "Закрыть / к списку" %}
+          </a>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="YY-MAIN_TABLE !mt-3 !mb-10" data-campaign-template-flow-root="1">
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD w-[65%]">
+        <div class="YY-CARD_WHITE h-full min-h-0 flex flex-col" data-campaign-template-left-card="1">
+          {% if messages %}
             {% for m in messages %}
-              <div class="YY-CARD_IN_FORM_ERROR">{{ m }}</div>
+              {% if 'error' in m.tags %}
+                <div class="YY-CARD_IN_FORM_ERROR">{{ m }}</div>
+              {% endif %}
             {% endfor %}
-        {% endif %}
-        <input type="text" name="template_name" class="YY-INPUT !mb-3" value="{{ edit_obj.template_name|default:'' }}" placeholder="{% trans "Ваш шаблон: название" %}">
-          <div id="yyUserModeLeft">
-            <textarea id="yyTinyEditor"
-                      class="border border-[#cbcbcb] bg-white w-full"
-                      style="height:800px;"
-                      spellcheck="false"></textarea>
+          {% endif %}
+
+          <div id="yyUserModeLeft" class="flex-1 min-h-0">
+            <textarea id="yyTinyEditor" class="border border-[#cbcbcb] bg-white w-full h-full" spellcheck="false"></textarea>
           </div>
 
-          <div id="yyAdvancedModeLeft" class="hidden">
-            <textarea id="yyAdvHtml"
-                      style="height:900px;"
-                      spellcheck="false"></textarea>
+          <div id="yyAdvancedModeLeft" class="hidden flex-1 min-h-0">
+            <textarea id="yyAdvHtml" class="w-full h-full" spellcheck="false"></textarea>
           </div>
-        {% else %}
-            <div class="YY-STATUS_BLUE">
-              {% trans "Ваши шаблоны:" %}
-            </div>
-        {% endif %}
-      </div>
-    </td>
-
-    <td class="YY-MAIN_TOP_RIGHT_TD w-[30%]">
-      <div class="YY-CARD_WHITE">
-
-        {% if state == "edit" and edit_obj or state == "add" %}
-          <div id="yyUserModeRight">
-            <div class="grid grid-cols-2 gap-3 mb-10">
-              <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToAdvanced()">
-                {% trans "Экспертный режим" %}
-              </button>
-              <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplPreviewCurrent()">
-                {% trans "Предпросмотр" %}
-              </button>
-            </div>
-
-            {% if global_tpl_items %}
-              <div class="YY-STATUS_YELLOW mb-2">{% trans "Глобальные шаблоны" %}:</div>
+        </div>
+      </td>
+      <td class="YY-MAIN_TOP_RIGHT_TD w-[35%]">
+        <div class="YY-CARD_WHITE h-full min-h-0 flex flex-col" data-campaign-template-right-card="1">
+          <div class="flex-1 min-h-0 flex flex-col">
+            <div id="yyUserModeRight" class="flex-1 min-h-0 overflow-y-auto pr-1">
               <div class="grid grid-cols-2 gap-3 mb-10">
-                 {% for gt in global_tpl_items %}
-                 <div>
-                  {% if gt.is_current %}
-                    <button type="button"
-                            class="YY-BUTTON_GREEN yy-tpl-global-btn w-full"
-                            data-gid="{{ gt.id }}">{% trans "Шаблон" %} - {{ gt.template_name }}</button>
-                  {% else %}
-                    <button type="button"
-                            class="YY-BUTTON_MAIN yy-tpl-global-btn w-full"
-                            data-gid="{{ gt.id }}">{% trans "Шаблон" %} - {{ gt.template_name }}</button>
+                <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToAdvanced()">
+                  {% trans "Экспертный режим" %}
+                </button>
+                <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplPreviewCurrent()">
+                  {% trans "Предпросмотр" %}
+                </button>
+              </div>
+
+              {% if global_tpl_items %}
+                <div class="grid grid-cols-2 gap-3 mb-10">
+                  {% for gt in global_tpl_items %}
+                    <div>
+                      {% if gt.is_current %}
+                        <button type="button" class="YY-BUTTON_GREEN yy-tpl-global-btn w-full" data-gid="{{ gt.id }}">{% trans "Шаблон" %} - {{ gt.template_name }}</button>
+                      {% else %}
+                        <button type="button" class="YY-BUTTON_MAIN yy-tpl-global-btn w-full" data-gid="{{ gt.id }}">{% trans "Шаблон" %} - {{ gt.template_name }}</button>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+
+              <div class="grid grid-cols-2 gap-3 mb-10">
+                <div>
+                  {% if global_style_gid and global_colors %}
+                    <div class="flex flex-col gap-2 mb-5">
+                      {% for k in global_colors %}
+                        <button type="button" class="YY-BUTTON_TAB_MAIN yy-tpl-overlay-btn w-full py-1" data-gid="{{ global_style_gid }}" data-type="colors" data-name="{{ k }}">{{ k }}</button>
+                      {% endfor %}
+                    </div>
                   {% endif %}
-                  </div>
-                {% endfor %}
-              </div>
-            {% endif %}
-
-            <div class="grid grid-cols-2 gap-3 mb-10">
-              <div>
-                {% if global_style_gid and global_colors %}
-                  <div class="YY-STATUS_YELLOW mb-2">{% trans "Цвета" %}:</div>
-                  <div class="flex flex-wrap gap-2 mb-5">
-                    {% for k in global_colors %}
-                      <button type="button"
-                              class="YY-BUTTON_TAB_MAIN yy-tpl-overlay-btn"
-                              data-gid="{{ global_style_gid }}"
-                              data-type="colors"
-                              data-name="{{ k }}">{{ k }}</button>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-              </div>
-              <div>
-                {% if global_style_gid and global_fonts %}
-                  <div class="YY-STATUS_YELLOW mb-2">{% trans "Шрифты" %}:</div>
-                  <div class="flex flex-wrap gap-2">
-                    {% for k in global_fonts %}
-                      <button type="button"
-                              class="YY-BUTTON_TAB_MAIN yy-tpl-overlay-btn"
-                              data-gid="{{ global_style_gid }}"
-                              data-type="fonts"
-                              data-name="{{ k }}">{{ k }}</button>
-                    {% endfor %}
-                  </div>
-                {% endif %}
+                </div>
+                <div>
+                  {% if global_style_gid and global_fonts %}
+                    <div class="flex flex-col gap-2">
+                      {% for k in global_fonts %}
+                        <button type="button" class="YY-BUTTON_TAB_MAIN yy-tpl-overlay-btn w-full py-1" data-gid="{{ global_style_gid }}" data-type="fonts" data-name="{{ k }}">{{ k }}</button>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div id="yyAdvancedModeRight" class="hidden">
-            <div class="grid grid-cols-2 gap-3 mb-5">
-              <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToUser()">
-                {% trans "Визуальный режим" %}
-              </button>
-              <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplPreviewCurrent()">
-                {% trans "Предпросмотр" %}
-              </button>
+            <div id="yyAdvancedModeRight" class="hidden flex-1 min-h-0 overflow-y-auto pr-1">
+              <div class="grid grid-cols-2 gap-3 mb-5">
+                <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplSwitchToUser()">
+                  {% trans "Визуальный режим" %}
+                </button>
+                <button type="button" class="YY-BUTTON_MAIN" onclick="yyTplPreviewCurrent()">
+                  {% trans "Предпросмотр" %}
+                </button>
+              </div>
+
+              <textarea id="yyAdvCss" class="YY-TEXTAREA w-full h-full" spellcheck="false"></textarea>
             </div>
 
-            <textarea id="yyAdvCss"
-                      class="YY-TEXTAREA w-full"
-                      style="min-height:700px;"
-                      spellcheck="false"></textarea>
-          </div>
+            <label class="YY-LABEL mt-8">{% trans "Название шаблона" %}:</label>
+            <input
+              type="text"
+              name="template_name"
+              class="YY-INPUT !mb-0"
+              placeholder="{% trans "Ваш шаблон: название" %}"
+              value="{% if edit_obj %}{{ edit_obj.template_name }}{% endif %}">
 
-          <div class="grid grid-cols-2 gap-3 mt-5">
-            <button type="submit" name="action"
-                    value="{% if state == 'edit' %}save{% else %}add{% endif %}"
-                    class="YY-BUTTON_MAIN">
-              {% trans "Сохранить" %}
-            </button>
-            <button type="submit" name="action" value="close"
-                    class="YY-BUTTON_MAIN" formnovalidate>
-              {% trans "Закрыть" %}
-            </button>
+            <div class="grid grid-cols-2 gap-3 mt-auto pt-5">
+              <button type="submit" name="action" value="{% if state == 'edit' %}save{% else %}add{% endif %}" class="YY-BUTTON_MAIN">
+                {% trans "Сохранить" %}
+              </button>
+              <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN gap-2" formnovalidate>
+                <span>{% trans "Закрыть" %}</span>
+                <svg class="size-[22px] shrink-0" aria-hidden="true">
+                  <use href="#icon-arrow-circle"></use>
+                </svg>
+              </button>
+            </div>
           </div>
-        {% else %}
-          <a href="?state=add" class="YY-BUTTON_MAIN mb-2">
+        </div>
+      </td>
+    </tr>
+  </table>
+{% else %}
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD w-[70%]">
+        <div class="YY-CARD_WHITE h-full flex items-center">
+          <div class="YY-STATUS_BLUE !mb-0">
+            {% trans "Шаблоны писем кампаний" %}
+          </div>
+        </div>
+      </td>
+      <td class="YY-MAIN_TOP_RIGHT_TD w-[30%]">
+        <div class="YY-CARD_WHITE h-full flex items-center">
+          <a href="?state=add" class="YY-BUTTON_MAIN_FULL !mb-0">
             {% trans "Добавить шаблон" %}
           </a>
-        {% endif %}
-
-      </div>
-    </td>
-  </tr>
-</table>
+        </div>
+      </td>
+    </tr>
+  </table>
+{% endif %}
 
 {% if state == "edit" and edit_obj or state == "add" %}
   </form>
+  {% include "panels/modals/system/unsaved_changes.html" %}
 {% endif %}
 
-<table class="YY-MAIN_TABLE">
-  <tr>
-    <td class="YY-MAIN_BOTTOM_TD">
-
-      {% if items %}
+{% if not state or state != 'edit' and state != 'add' %}
+  <table class="YY-MAIN_TABLE">
+    <tr>
+      <td class="YY-MAIN_BOTTOM_TD">
         <div class="YY-MAIN_BOTTOM_DIV">
 
           <table class="w-full text-left">
             <thead>
               <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[100%]">{% trans "Список шаблонов:" %}</th>
-                <th class="YY-TH_TH">&nbsp;</th>
-                <th class="YY-TH_TH">&nbsp;</th>
-                <th class="YY-TH_TH">&nbsp;</th>
+                <th class="YY-TH_TH w-[30%]">{% trans "Шаблон" %}</th>
+                <th class="YY-TH_TH w-[70%]">{% trans "Кампании" %}</th>
+                <th class="YY-TH_TH text-right !pr-8">
+                  {% if show_archive %}
+                    <a href="{% url 'campaigns:templates' %}" class="inline-flex items-center gap-1 text-[#8e0000] !font-normal underline">
+                      <span>{% trans "Активные" %}</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                      </svg>
+                    </a>
+                  {% elif has_archived_templates %}
+                      <a href="{% url 'campaigns:templates' %}?show=archive" class="inline-flex items-center gap-1 text-[#8e0000] !font-normal underline">
+                        <span>{% trans "Архив" %}</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="m7.875 14.25 1.214 1.942a2.25 2.25 0 0 0 1.908 1.058h2.006c.776 0 1.497-.4 1.908-1.058l1.214-1.942M2.41 9h4.636a2.25 2.25 0 0 1 1.872 1.002l.164.246a2.25 2.25 0 0 0 1.872 1.002h2.092a2.25 2.25 0 0 0 1.872-1.002l.164-.246A2.25 2.25 0 0 1 16.954 9h4.636M2.41 9a2.25 2.25 0 0 0-.16.832V12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 12V9.832c0-.287-.055-.57-.16-.832M2.41 9a2.25 2.25 0 0 1 .382-.632l3.285-3.832a2.25 2.25 0 0 1 1.708-.786h8.43c.657 0 1.281.287 1.709.786l3.284 3.832c.163.19.291.404.382.632M4.5 20.25h15A2.25 2.25 0 0 0 21.75 18v-2.625c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125V18a2.25 2.25 0 0 0 2.25 2.25Z" />
+                        </svg>
+                      </a>
+                  {% endif %}
+                </th>
               </tr>
             </thead>
             <tbody>
               {% for it in items %}
                 <tr class="YY-TB_TR align-top">
                   <td class="YY-TB_TD">
-                    <div class="YY-STATUS_BLUE">{{ it.template_name }}</div>
-                  </td>
-                  <td class="YY-TB_TD">
-                    <form method="post" onsubmit="return confirm('{% trans "Вы уверены?" %}');">
-                      {% csrf_token %}
-                      <input type="hidden" name="action" value="delete">
-                      <input type="hidden" name="id" value="{{ it.ui_id }}">
-                      <button type="submit" class="YY-BUTTON_TAB_RED">
-                        {% trans "Удалить" %}
-                      </button>
-                    </form>
-                  </td>
-                  <td class="YY-TB_TD">
-                    <button type="button" class="YY-BUTTON_TAB_MAIN" onclick="yyTplPreviewById('{{ it.ui_id }}')">
-                      {% trans "Предпросмотр" %}
-                    </button>
-                  </td>
-
-                  <td class="YY-TB_TD">
-                    <a href="?state=edit&id={{ it.ui_id }}" class="YY-BUTTON_TAB_MAIN">
-                      {% trans "Изменить" %}
+                    <b>{{ it.template_name }}</b>
+                    <a
+                      href="#"
+                      class="YY-STATUS_WHITE !pl-0"
+                      onclick="yyTplPreviewById('{{ it.ui_id }}'); return false;">
+                      <span>{% trans "Предпросмотр" %}</span>
+                      <svg class="size-[22px] shrink-0 ml-2">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
                     </a>
+                  </td>
+                  <td class="YY-TB_TD">
+                    {% if it.campaign_titles %}
+                      {% for campaign_title in it.campaign_titles %}
+                        <div class="break-words {% if not forloop.last %}mb-3{% endif %}">{{ campaign_title }}</div>
+                      {% endfor %}
+                    {% else %}
+                      {% trans "Шаблон не используется" %}
+                    {% endif %}
+                  </td>
+                  <td class="YY-TB_TD">
+                    <div class="flex flex-col">
+                      {% if show_archive %}
+                        <button
+                          type="button"
+                          class="YY-STATUS_WHITE inline-flex items-center justify-between gap-1 text-[#8e0000] border-0 !font-normal underline w-[130px]"
+                          data-yy-modal="url={% url 'campaigns:templates_activate_modal' %}?id={{ it.ui_id|urlencode }}">
+                          <span>{% trans "Вернуть" %}</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                          </svg>
+                        </button>
+                      {% else %}
+                        <a href="?state=edit&id={{ it.ui_id }}" class="YY-STATUS_WHITE inline-flex items-center justify-between gap-1 w-[130px]">
+                          <span>{% trans "Изменить" %}</span>
+                          <svg class="size-[22px] shrink-0">
+                            <use href="#icon-arrow-circle"></use>
+                          </svg>
+                        </a>
+                        <button
+                          type="button"
+                          class="YY-STATUS_WHITE inline-flex items-center justify-between gap-1 text-[#8e0000] border-0 !w-full !font-normal underline"
+                          data-yy-modal="url={% url 'campaigns:templates_archive_modal' %}?id={{ it.ui_id|urlencode }}">
+                          <span>{% trans "В архив" %}</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 3.75H6.912a2.25 2.25 0 0 0-2.15 1.588L2.35 13.177a2.25 2.25 0 0 0-.1.661V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18v-4.162c0-.224-.034-.447-.1-.661L19.24 5.338a2.25 2.25 0 0 0-2.15-1.588H15M2.25 13.5h3.86a2.25 2.25 0 0 1 2.012 1.244l.256.512a2.25 2.25 0 0 0 2.013 1.244h3.218a2.25 2.25 0 0 0 2.013-1.244l.256-.512a2.25 2.25 0 0 1 2.013-1.244h3.859M12 3v8.25m0 0-3-3m3 3 3-3" />
+                          </svg>
+                        </button>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr class="YY-TB_TR align-top">
+                  <td class="YY-TB_TD !px-1" colspan="3">
+                    <div class="YY-STATUS_YELLOW !mb-0">{% trans "Записей не найдено." %}</div>
                   </td>
                 </tr>
               {% endfor %}
@@ -210,15 +268,10 @@
           </table>
 
         </div>
-      {% else %}
-        <div class="YY-CARD_WHITE mb-10">
-          {% trans "Здесь пока нет данных" %}
-        </div>
-      {% endif %}
-
-    </td>
-  </tr>
-</table>
+      </td>
+    </tr>
+  </table>
+{% endif %}
 
 {% endblock %}
 
@@ -228,18 +281,194 @@
   (function () {
     const form = document.getElementById("yyTplForm");
     if (!form) return;
+    const closeTopLink = document.getElementById("yyTplCloseTopLink");
+    let initialSnapshot = null;
+
+    function normalizeComparable(s) {
+      return String(s || "").replace(/\r\n/g, "\n").replace(/\t/g, "  ").trim();
+    }
+
+    function getMode() {
+      const el = document.getElementById("yyEditorMode");
+      const v = el ? String(el.value || "").trim() : "user";
+      return v === "advanced" ? "advanced" : "user";
+    }
+
+    function getUserHtml() {
+      try {
+        const ed = window.tinymce ? window.tinymce.get("yyTinyEditor") : null;
+        return ed ? (ed.getContent({ format: "html" }) || "") : "";
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function getUserCss() {
+      try {
+        return typeof window.yyTplGetCss === "function" ? (window.yyTplGetCss() || "") : "";
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function getAdvHtml() {
+      try {
+        if (typeof window.yyTplEnsureCodeMirror === "function") window.yyTplEnsureCodeMirror();
+        return typeof window.yyTplAdvGetHtml === "function" ? (window.yyTplAdvGetHtml() || "") : "";
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function getAdvCss() {
+      try {
+        if (typeof window.yyTplEnsureCodeMirror === "function") window.yyTplEnsureCodeMirror();
+        return typeof window.yyTplAdvGetCss === "function" ? (window.yyTplAdvGetCss() || "") : "";
+      } catch (_) {
+        return "";
+      }
+    }
+
+    function readCurrentSnapshot() {
+      const nameEl = form.querySelector('[name="template_name"]');
+      const templateName = normalizeComparable(nameEl && nameEl.value ? nameEl.value : "");
+      const mode = getMode();
+      const html = normalizeComparable(mode === "advanced" ? getAdvHtml() : getUserHtml());
+      const css = normalizeComparable(mode === "advanced" ? getAdvCss() : getUserCss());
+      return { templateName, html, css };
+    }
+
+    function snapshotsEqual(a, b) {
+      if (!a || !b) return false;
+      return (
+        a.templateName === b.templateName &&
+        a.html === b.html &&
+        a.css === b.css
+      );
+    }
+
+    function syncInitialSnapshotAfterTinyReady() {
+      let tries = 0;
+      let prev = null;
+      const maxTries = 80;
+
+      const poll = function () {
+        tries += 1;
+        const ed = window.tinymce ? window.tinymce.get("yyTinyEditor") : null;
+        const tinyReady = !!(ed && ed.initialized);
+        const now = readCurrentSnapshot();
+
+        if (tinyReady && prev && snapshotsEqual(prev, now) && tries >= 5) {
+          initialSnapshot = now;
+          return;
+        }
+
+        prev = now;
+        if (tries >= maxTries) {
+          initialSnapshot = now;
+          return;
+        }
+        window.setTimeout(poll, 120);
+      };
+
+      poll();
+    }
+
+    function isDirty() {
+      if (!initialSnapshot) return false;
+      return !snapshotsEqual(initialSnapshot, readCurrentSnapshot());
+    }
+
+    function openUnsavedModal(onApprove) {
+      const tpl = document.getElementById("yy-unsaved-changes-template");
+      if (!tpl || !window.YYModal || typeof window.YYModal.open !== "function") {
+        if (window.confirm("Шаблон не сохранен. Изменения применены не будут. Перейти к списку шаблонов?")) {
+          onApprove();
+        }
+        return;
+      }
+
+      const wrapper = document.createElement("div");
+      wrapper.innerHTML = tpl.innerHTML;
+      const title = wrapper.querySelector("[data-unsaved-title]");
+      const text = wrapper.querySelector("[data-unsaved-text]");
+      const list = wrapper.querySelector("[data-unsaved-list]");
+      const continueBtn = wrapper.querySelector("[data-unsaved-continue]");
+      const cancelBtn = wrapper.querySelector("[data-yy-modal-close]");
+
+      if (title) title.textContent = "Несохраненные изменения";
+      if (text) text.textContent = "Шаблон не сохранен. Изменения применены не будут. Перейти к списку шаблонов?";
+      if (list) list.innerHTML = "<li>Шаблон письма кампании</li>";
+      if (continueBtn) continueBtn.textContent = "Подтвердить";
+      if (cancelBtn) cancelBtn.textContent = "Отменить";
+
+      window.YYModal.open("text=" + wrapper.innerHTML);
+
+      const bind = function () {
+        const btn = document.querySelector("#yy-modal-body [data-unsaved-continue]");
+        if (!btn) {
+          window.setTimeout(bind, 0);
+          return;
+        }
+        btn.addEventListener("click", function () {
+          if (window.YYModal && typeof window.YYModal.close === "function") {
+            window.YYModal.close();
+          }
+          onApprove();
+        }, { once: true });
+      };
+      bind();
+    }
+
+    function handleCloseSubmitWithConfirm(submitter) {
+      form.dataset.yyCloseBypass = "1";
+      if (submitter && typeof form.requestSubmit === "function") {
+        form.requestSubmit(submitter);
+        return;
+      }
+      HTMLFormElement.prototype.submit.call(form);
+    }
+
+    if (closeTopLink) {
+      closeTopLink.addEventListener("click", function (e) {
+        const href = String(closeTopLink.getAttribute("href") || "").trim();
+        if (!href) return;
+        if (!isDirty()) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        openUnsavedModal(function () {
+          window.location.href = href;
+        });
+      });
+    }
 
     form.addEventListener("submit", function (e) {
+      if (form.dataset.yyCloseBypass === "1") {
+        delete form.dataset.yyCloseBypass;
+        return;
+      }
+
       // Кто инициировал submit (кнопка)
       const btn = e.submitter || document.activeElement;
       const action = btn && btn.value ? String(btn.value).trim() : "";
 
-      // close/delete — всегда пропускаем
-      if (action === "close" || action === "delete") return;
+      if (action === "close") {
+        if (!isDirty()) return;
+        e.preventDefault();
+        e.stopPropagation();
+        openUnsavedModal(function () {
+          handleCloseSubmitWithConfirm(btn);
+        });
+        return;
+      }
+
+      // delete — всегда пропускаем
+      if (action === "delete") return;
 
       // add/save — требуем имя
       if (action === "add" || action === "save") {
-        const inp = form.querySelector('input[name="template_name"]');
+        const inp = form.querySelector('[name="template_name"]');
         const name = (inp && inp.value ? inp.value : "").trim();
         if (!name) {
           alert("{% trans "Пожалуйста, заполните название шаблона" %}");
@@ -249,6 +478,8 @@
         }
       }
     });
+
+    syncInitialSnapshotAfterTinyReady();
   })();
 </script>
   <script src="/static/js/campaign_templates/modal_preview.js"></script>
