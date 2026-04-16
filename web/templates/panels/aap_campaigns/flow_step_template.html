@@ -17,7 +17,7 @@
 
 <table class="YY-MAIN_TABLE !mt-3 !mb-10" {% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}data-campaign-template-flow-root="1"{% endif %}>
   <tr>
-    <td class="YY-MAIN_TOP_LEFT_TD {% if tpl_state == 'edit' and tpl_edit_obj or tpl_state == 'add' %}w-[70%]{% else %}w-[40%]{% endif %}">
+    <td class="YY-MAIN_TOP_LEFT_TD {% if tpl_state == 'edit' and tpl_edit_obj or tpl_state == 'add' %}w-[65%]{% else %}w-[40%]{% endif %}">
       <div class="YY-CARD_WHITE h-full min-h-0 flex flex-col" {% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}data-campaign-template-left-card="1"{% endif %}>
         {% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}
           {% if tpl_error_msg %}
@@ -46,7 +46,7 @@
       </div>
     </td>
 
-    <td class="YY-MAIN_TOP_RIGHT_TD {% if tpl_state == 'edit' and tpl_edit_obj or tpl_state == 'add' %}w-[30%]{% else %}w-[60%]{% endif %}">
+    <td class="YY-MAIN_TOP_RIGHT_TD {% if tpl_state == 'edit' and tpl_edit_obj or tpl_state == 'add' %}w-[35%]{% else %}w-[60%]{% endif %}">
       <div class="YY-CARD_WHITE h-full min-h-0 flex flex-col" {% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}data-campaign-template-right-card="1"{% endif %}>
         {% if tpl_state == "edit" and tpl_edit_obj or tpl_state == "add" %}
           <div class="flex-1 min-h-0 flex flex-col">
@@ -131,7 +131,7 @@
                 {% for it in tpl_items %}
                   <div class="YY-CARD_IN_FORM_BLANK !mb-0 !py-1 min-h-[30px] flex items-center justify-between gap-3">
                     <div class="flex items-center gap-2 min-w-0">
-                      <input class="m-0 align-middle" type="radio" name="template" value="{{ it.ui_id }}" id="yyTplRadio{{ forloop.counter }}" {% if flow_selected_template_ui and flow_selected_template_ui == it.ui_id %}checked{% endif %}>
+                      <input class="m-0 align-middle" type="radio" name="template" value="{{ it.ui_id }}" id="yyTplRadio{{ forloop.counter }}" {% if flow_template_checked_ui and flow_template_checked_ui == it.ui_id %}checked{% endif %}>
                       <span class="text-sm leading-none truncate">{{ it.template_name }}</span>
                     </div>
                     <button type="button" class="YY-LINK !mb-0 whitespace-nowrap items-center text-sm leading-none" onclick="yyTplPreviewById('{{ it.ui_id }}')">
@@ -193,7 +193,7 @@
                   const selectedUi = String((checked && checked.value) || "").trim();
                   const savedTemplateUi = String("{{ flow_selected_template_ui|default:''|escapejs }}").trim();
                   const chooseEnabled = !!selectedUi && selectedUi !== savedTemplateUi;
-                  const toLetterEnabled = !!selectedUi;
+                  const toLetterEnabled = !!selectedUi && selectedUi === savedTemplateUi;
                   setButtonState(chooseBtn, chooseEnabled, "mb-8");
                   setButtonState(toLetterBtn, toLetterEnabled, "gap-2");
                 }
@@ -215,30 +215,24 @@
             (function () {
               const form = document.getElementById("yyTplPickForm");
               if (!form) return;
-              const hasReadyLetter = {% if flow_has_ready_letter %}true{% else %}false{% endif %};
-              if (!hasReadyLetter) return;
+              const hasReadyLetter = String("{{ flow_letter_ready_exists|yesno:'1,0' }}") === "1";
 
               let pendingSubmitter = null;
 
               function openWarningModal() {
-                const html =
-                  '<div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:760px;">' +
-                  '<button type="button" class="YY-BUTTON_MAIN !w-fit" data-yy-modal-close style="position:absolute;top:10px;right:10px;">✕</button>' +
-                  '<div class="overflow-auto mt-10 mb-1 max-h-[calc(85vh-5rem)]">' +
-                  '<div class="YY-STATUS_RED !mb-3">Текущее письмо будет удалено!</div>' +
-                  '<div class="YY-CARD_WHITE border border-[#71d0f4]">' +
-                  '<div class="YY-TEXT !mb-2">Вы собираетесь сменить шаблон письма для этой компании. При смене шаблона текущее письмо будет удалено, и его нужно будет создать заново.</div>' +
-                  '<div class="YY-TEXT !mb-2">Текущая версия письма не будет сохранена. Возврат к текущему шаблону не восстановит письмо. Восстановить текущее письмо будет нельзя.</div>' +
-                  '<div class="YY-TEXT !mb-4">Мы рекомендуем заранее сохранить текст письма отдельно, чтобы можно было использовать его при создании нового письма.</div>' +
-                  '<div class="grid grid-cols-2 gap-4">' +
-                  '<button type="button" class="YY-BUTTON_MAIN_FULL" data-yy-tpl-remove-approve="1">Подтвердить</button>' +
-                  '<button type="button" class="YY-BUTTON_MAIN_FULL" data-yy-modal-close>Отмена</button>' +
-                  '</div>' +
-                  '</div>' +
-                  '</div>' +
-                  '</div>';
                 if (window.YYModal && typeof window.YYModal.open === "function") {
-                  window.YYModal.open("text=" + html);
+                  window.YYModal.open("url=/panel/campaigns/campaigns/template/modal/choose-warning/");
+                  return;
+                }
+                if (window.confirm("Продолжить?")) {
+                  const submitter = pendingSubmitter;
+                  pendingSubmitter = null;
+                  form.dataset.yyTplDeleteBypass = "1";
+                  if (submitter && typeof form.requestSubmit === "function") {
+                    form.requestSubmit(submitter);
+                    return;
+                  }
+                  HTMLFormElement.prototype.submit.call(form);
                 }
               }
 
@@ -250,7 +244,7 @@
 
                 const submitter = e.submitter || document.activeElement;
                 const action = String((submitter && submitter.value) || "").trim();
-                if (action !== "tpl_choose" && action !== "tpl_to_add") return;
+                if (action !== "tpl_choose" || !hasReadyLetter) return;
 
                 e.preventDefault();
                 e.stopPropagation();

@@ -4,7 +4,11 @@
 <!-- PURPOSE: Шаг флоу "Письмо". -->
 
 {% if edit_obj %}
-  <form method="post" id="yySendingForm">
+  <form
+    method="post"
+    id="yySendingForm"
+    data-letter-ready-exists="{% if flow_letter_ready_exists %}1{% else %}0{% endif %}"
+    data-letter-template-changed="{% if flow_letter_template_changed %}1{% else %}0{% endif %}">
     {% csrf_token %}
 
     <input type="hidden" id="yyCampaignId" value="{{ edit_obj.ui_id }}">
@@ -15,6 +19,7 @@
     <input type="hidden" name="headers_json" id="yyHeadersJson">
 
     <textarea id="yyInitHtml" class="hidden">{{ letter_init_html }}</textarea>
+    <textarea id="yyInitContent" class="hidden">{% if letter_obj %}{{ letter_obj.html_content|default:'' }}{% endif %}</textarea>
     <textarea id="yyInitCss" class="hidden">{{ letter_init_css }}</textarea>
     <textarea id="yyInitSubjects" class="hidden">{{ letter_init_subjects }}</textarea>
     <textarea id="yyInitHeaders" class="hidden">{{ letter_init_headers }}</textarea>
@@ -65,7 +70,7 @@
                 <input type="text" id="yySubject3" class="YY-INPUT !mb-0">
               </div>
 
-              {% if has_letter %}
+              {% if flow_letter_ready_exists and not flow_letter_template_changed %}
                 <div class="mt-3 mb-8">
                   <label class="YY-LABEL">{% trans "Отправить тестовое письмо по адресу:" %}</label>
                   <div class="flex items-stretch gap-3">
@@ -80,9 +85,14 @@
                 </div>
               {% endif %}
 
-              <div class="grid grid-cols-2 gap-3 mt-auto pt-5">
-                <button type="submit" name="action" value="save_letter" class="YY-BUTTON_MAIN">{% trans "Сохранить" %}</button>
-                <button type="submit" name="action" value="close" class="YY-BUTTON_MAIN" formnovalidate>{% trans "Закрыть" %}</button>
+              <div class="mt-auto pt-5">
+                {% if flow_letter_template_changed %}
+                  <div class="YY-STATUS_RED !mb-3">Шаблон письма был изменен</div>
+                {% endif %}
+                <div class="grid grid-cols-2 gap-3">
+                  <button type="submit" name="action" value="save_letter" class="YY-BUTTON_MAIN">{% trans "Сохранить" %}</button>
+                  <button id="yyLetterCloseBtn" type="button" class="YY-BUTTON_MAIN">{% trans "Закрыть" %}</button>
+                </div>
               </div>
             </div>
           </div>

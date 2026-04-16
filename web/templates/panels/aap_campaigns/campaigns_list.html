@@ -8,17 +8,36 @@
 
 <table class="YY-MAIN_TABLE">
   <tr>
-    <td class="YY-MAIN_TOP_TD">
+    <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
       <div class="YY-CARD_WHITE">
         <a href="{% url 'campaigns:campaigns_flow_campaign' %}" class="YY-BUTTON_MAIN w-full !py-3 text-center">
-          {% trans "Создать кампанию" %}
+          Создать основную кампанию
         </a>
+      </div>
+    </td>
+
+    <td class="YY-MAIN_TOP_RIGHT_TD w-1/2">
+      <div class="YY-CARD_WHITE">
+        {% if items %}
+          <a href="{% url 'campaigns:campaigns_flow_campaign' %}?create_mode=followup" class="YY-BUTTON_MAIN w-full !py-3 text-center">
+            Создать последующую кампанию
+          </a>
+        {% else %}
+          <button type="button" class="YY-BUTTON_GRAY w-full !py-3 text-center" disabled>
+            Создать последующую кампанию
+          </button>
+        {% endif %}
       </div>
     </td>
   </tr>
 </table>
 
-{% include "panels/aap_campaigns/_campaigns_table.html" %}
+<div id="yy-campaigns-table-region" class="relative">
+  <div id="yy-campaigns-table-blur" class="hidden absolute inset-0 z-10 bg-white/60 backdrop-blur-[2px] pointer-events-none"></div>
+  <div id="yy-campaigns-table-content">
+    {% include "panels/aap_campaigns/_campaigns_table.html" %}
+  </div>
+</div>
 
 {% endblock %}
 
@@ -26,4 +45,53 @@
   {{ block.super }}
   <script src="/static/js/campaign_templates/campaigns_preview.js"></script>
   <script src="/static/js/campaign_templates/modal_preview.js"></script>
+  <script>
+    (function () {
+      const contentNode = document.getElementById("yy-campaigns-table-content");
+      const blurNode = document.getElementById("yy-campaigns-table-blur");
+      if (!contentNode || !blurNode) return;
+
+      const pollIntervalMs = 30000;
+      let inFlight = false;
+
+      function setLoading(enabled) {
+        blurNode.classList.toggle("hidden", !enabled);
+      }
+
+      function fetchTableHtml() {
+        const url = new URL(window.location.href);
+        url.searchParams.set("_partial", "campaigns_table");
+        return window.fetch(url.toString(), {
+          credentials: "same-origin",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+          },
+        }).then(function (response) {
+          if (!response.ok) return "";
+          return response.text();
+        }).catch(function () {
+          return "";
+        });
+      }
+
+      function refreshTick() {
+        if (inFlight || document.hidden) return;
+        inFlight = true;
+        setLoading(true);
+        fetchTableHtml().then(function (html) {
+          if (!html) return;
+          contentNode.innerHTML = html;
+        }).finally(function () {
+          setLoading(false);
+          inFlight = false;
+        });
+      }
+
+      refreshTick();
+      window.setInterval(refreshTick, pollIntervalMs);
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden) refreshTick();
+      });
+    })();
+  </script>
 {% endblock %}

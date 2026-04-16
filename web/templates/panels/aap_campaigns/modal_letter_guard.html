@@ -1,0 +1,27 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_campaigns/modal_letter_guard.html -->
+<!-- DATE: 2026-04-16 -->
+<!-- PURPOSE: Standard guard modal for Campaign Letter step (HTML partial for YYModal url=...). -->
+
+<div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:620px;">
+  <button type="button" class="YY-BUTTON_MAIN !w-fit" data-yy-modal-close style="position:absolute;top:10px;right:10px;">✕</button>
+
+  <div class="overflow-auto mt-10 mb-1 max-h-[calc(85vh-5rem)]">
+    <div class="{{ status_class }} !mb-3">{{ title }}</div>
+
+    <div class="YY-CARD_WHITE border border-[#71d0f4]">
+      <div class="YY-TEXT !mb-4">{{ text }}</div>
+
+      {% if show_cancel %}
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" class="YY-BUTTON_MAIN_FULL" data-yy-letter-guard-approve="1">{{ approve_label }}</button>
+          <button type="button" class="YY-BUTTON_MAIN_FULL" data-yy-modal-close>{{ cancel_label }}</button>
+        </div>
+      {% else %}
+        <div class="grid grid-cols-1 gap-2">
+          <button type="button" class="YY-BUTTON_MAIN_FULL" data-yy-modal-close>{{ approve_label }}</button>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>

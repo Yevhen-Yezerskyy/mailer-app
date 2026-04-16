@@ -18,7 +18,7 @@ from urllib.parse import urlencode
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from django.db import IntegrityError, connection
+from django.db import connection
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse
@@ -63,8 +63,8 @@ def _guard(request) -> tuple[Optional[UUID], Optional[object]]:
 def _qs(ws_id: UUID):
     return (
         Campaign.objects.filter(workspace_id=ws_id)
-        .select_related("sending_list", "mailing_list", "mailbox", "letter", "letter__template")
-        .order_by("-updated_at")
+        .select_related("sending_list", "mailing_list", "mailbox", "campaign_parent", "letter", "letter__template")
+        .order_by("-id")
     )
 
 
@@ -122,7 +122,15 @@ def _pop_flow_test_send_status(request) -> str:
     return value
 
 
-def _flow_url(step: str, campaign_ui_id: str = "", *, tpl_state: str = "", tpl_id: str = "", gl_tpl: str = "") -> str:
+def _flow_url(
+    step: str,
+    campaign_ui_id: str = "",
+    *,
+    tpl_state: str = "",
+    tpl_id: str = "",
+    gl_tpl: str = "",
+    create_mode: str = "",
+) -> str:
     route_name_map = {
         "campaign": ("campaigns:campaigns_flow_campaign", "campaigns:campaigns_flow_campaign_id"),
         "template": ("campaigns:campaigns_flow_template", "campaigns:campaigns_flow_template_id"),
@@ -141,6 +149,8 @@ def _flow_url(step: str, campaign_ui_id: str = "", *, tpl_state: str = "", tpl_i
         params["tpl_id"] = tpl_id
     if gl_tpl:
         params["gl_tpl"] = gl_tpl
+    if create_mode:
+        params["create_mode"] = create_mode
     if not params:
         return base
     return f"{base}?{urlencode(params)}"
@@ -309,33 +319,92 @@ def _sending_list_is_taken(ws_id: UUID, sending_list_id: int, exclude_campaign_i
     return q.exists()
 
 
+def _campaign_title_exists(ws_id: UUID, title: str, exclude_campaign_id: Optional[int] = None) -> bool:
+    q = Campaign.objects.filter(workspace_id=ws_id, title=str(title or "").strip())
+    if exclude_campaign_id:
+        q = q.exclude(id=int(exclude_campaign_id))
+    return q.exists()
+
+
+def _make_unique_campaign_title(ws_id: UUID, title: str, exclude_campaign_id: Optional[int] = None) -> str:
+    raw_title = str(title or "").strip()
+    if not raw_title:
+        return ""
+
+    if not _campaign_title_exists(ws_id, raw_title, exclude_campaign_id):
+        return raw_title
+
+    base_title = re.sub(r"\s*-\s*#\d+\s*$", "", raw_title).strip() or raw_title
+    if not _campaign_title_exists(ws_id, base_title, exclude_campaign_id):
+        return base_title
+
+    idx = 2
+    while True:
+        candidate = f"{base_title} - #{idx}"
+        if not _campaign_title_exists(ws_id, candidate, exclude_campaign_id):
+            return candidate
+        idx += 1
+
+
+def _template_name_exists(ws_id: UUID, name: str, exclude_template_id: Optional[int] = None) -> bool:
+    q = Templates.objects.filter(workspace_id=ws_id, template_name=str(name or "").strip(), archived=False)
+    if exclude_template_id:
+        q = q.exclude(id=int(exclude_template_id))
+    return q.exists()
+
+
+def _make_unique_template_name(ws_id: UUID, name: str, exclude_template_id: Optional[int] = None) -> str:
+    raw_name = str(name or "").strip()
+    if not raw_name:
+        raw_name = "Template - #1"
+
+    if not _template_name_exists(ws_id, raw_name, exclude_template_id):
+        return raw_name
+
+    base_name = raw_name
+    if re.search(r"\s*-\s*#\d+\s*$", raw_name):
+        stripped = re.sub(r"\s*-\s*#\d+\s*$", "", raw_name).strip()
+        if stripped:
+            base_name = stripped
+
+    if not _template_name_exists(ws_id, base_name, exclude_template_id):
+        return base_name
+
+    idx = 2
+    while True:
+        candidate = f"{base_name} - #{idx}"
+        if not _template_name_exists(ws_id, candidate, exclude_template_id):
+            return candidate
+        idx += 1
+
+
 def _update_campaign_title_if_needed(camp: Campaign | None, new_title: str) -> None:
     if not camp:
         return
-    title = (new_title or "").strip()
+    title = _make_unique_campaign_title(camp.workspace_id, new_title, exclude_campaign_id=int(camp.id))
     if not title or title == (camp.title or ""):
         return
     camp.title = title
     camp.save(update_fields=["title", "updated_at"])
 
 
-def _reset_campaign_letter_and_disable(camp: Campaign | None, ws_id: UUID, *, template_id: int | None) -> None:
-    if not camp:
-        return
-
-    let = Letter.objects.filter(workspace_id=ws_id, campaign=camp).first()
-    if not let:
-        let = _ensure_letter(ws_id, camp)
-
-    let.html_content = ""
-    let.ready_content = ""
-    let.subjects = []
-    let.headers = {}
-    let.template_id = int(template_id) if template_id else None
-    let.save(update_fields=["html_content", "ready_content", "subjects", "headers", "template", "updated_at"])
-
-    camp.user_active = False
-    camp.save(update_fields=["user_active", "updated_at"])
+def _is_letter_template_changed(letter_obj) -> bool:
+    if not letter_obj:
+        return False
+    tpl = letter_obj.template if getattr(letter_obj, "template_id", None) else None
+    if not tpl or bool(getattr(tpl, "archived", False)):
+        return False
+    ready_saved = str(getattr(letter_obj, "ready_content", "") or "").strip()
+    if not ready_saved:
+        return False
+    content_saved = sanitize(str(getattr(letter_obj, "html_content", "") or ""))
+    rendered_now = render_html(
+        template_html=str(getattr(tpl, "template_html", "") or ""),
+        content_html=content_saved,
+        styles=_styles_pick_main(getattr(tpl, "styles", {}) or {}),
+        vars_json=None,
+    ) or ""
+    return str(rendered_now).strip() != ready_saved
 
 
 def _now_berlin() -> datetime:
@@ -449,13 +518,14 @@ def _stats_by_campaign_ids(campaign_ids: list[int]) -> dict[int, tuple[int, int,
     GROUP BY c.id
     """
 
-    # --- sent: mailbox_sent rows per campaign ---
+    # --- sent: sending_log rows per campaign ---
     sql_sent = """
     SELECT
         campaign_id,
         COUNT(id) AS sent_cnt
-    FROM public.mailbox_sent
-    WHERE campaign_id = ANY(%s)
+    FROM public.sending_log
+    WHERE status = 'SEND'
+      AND campaign_id = ANY(%s)
     GROUP BY campaign_id
     """
 
@@ -527,6 +597,7 @@ def _ctx_build(
         total, sent, left = stats.get(int(it.id), (0, 0, 0))
         it.stat_total = int(total)
         it.stat_sent = int(sent)
+        it.stat_sent_fmt = f"{int(sent):,}".replace(",", " ")
         it.stat_left = int(left)
 
         it.is_in_window = False
@@ -561,7 +632,7 @@ def _ctx_build(
                 flow_locked_sending_list_type = str(getattr(edit_obj.sending_list, "type", "") or "").strip().lower()
 
     # IMPORTANT: тестовая отправка доступна только после первого явного сохранения письма.
-    # Привязка/сохранение шаблона обновляет ready_content, но это еще не "сохраненное письмо".
+    # Смена/сохранение шаблона во флоу не считается сохранением письма.
     has_letter = bool(letter_obj and str(getattr(letter_obj, "html_content", "") or "").strip())
 
     return {
@@ -594,7 +665,13 @@ def _ctx_build(
     }
 
 
-def _build_flow_step_states(current_step: str, campaign_ui_id: str = "", *, template_saved: bool = False):
+def _build_flow_step_states(
+    current_step: str,
+    campaign_ui_id: str = "",
+    *,
+    template_saved: bool = False,
+    create_mode: str = "",
+):
     steps = [
         ("campaign", _("Кампания")),
         ("template", _("Шаблон письма")),
@@ -612,7 +689,7 @@ def _build_flow_step_states(current_step: str, campaign_ui_id: str = "", *, temp
             {
                 "key": key,
                 "label": label,
-                "url": _flow_url(key, campaign_ui_id),
+                "url": _flow_url(key, campaign_ui_id, create_mode=(create_mode if (key == "campaign" and not has_campaign) else "")),
                 "is_current": key == current_step,
                 "is_clickable": clickable,
             }
@@ -644,39 +721,27 @@ def _build_template_step_context(request, ws_id: UUID):
 
 
 def _suggest_flow_template_name(request, ws_id: UUID, edit_obj, mb_items) -> str:
-    ws = getattr(getattr(request, "user", None), "workspace", None)
-    company_name = (getattr(ws, "company_name", "") or "").strip() or "Шаблон"
+    _ = request  # keep signature stable
+    _ = mb_items
+    if not edit_obj:
+        return _make_unique_template_name(ws_id, "Template - #1")
 
-    smtp_label = ""
-    mailbox_id = int(getattr(edit_obj, "mailbox_id", 0) or 0)
-    if mailbox_id > 0:
-        for mb in mb_items:
-            try:
-                if int(getattr(mb, "id", 0)) != mailbox_id:
-                    continue
-            except Exception:
-                continue
-            smtp_label = (
-                str(getattr(mb, "sender_label", "") or "").strip()
-                or str(getattr(mb, "email", "") or "").strip()
-            )
+    sending_list = getattr(edit_obj, "sending_list", None)
+    if not sending_list and getattr(edit_obj, "sending_list_id", None):
+        sending_list = AudienceTask.objects.filter(
+            workspace_id=ws_id, id=int(getattr(edit_obj, "sending_list_id"))
+        ).only("source_company").first()
+
+    source_company = str(getattr(sending_list, "source_company", "") or "")
+    first_line = ""
+    for line in source_company.splitlines():
+        cleaned = str(line or "").strip()
+        if cleaned:
+            first_line = cleaned
             break
-    if not smtp_label:
-        smtp_label = "SMTP"
 
-    def _build_name(company_part: str) -> str:
-        return f"{company_part} - {smtp_label}"
-
-    first = _build_name(company_name)
-    if not Templates.objects.filter(workspace_id=ws_id, template_name=first).exists():
-        return first
-
-    idx = 2
-    while True:
-        candidate = _build_name(f"{company_name} {idx}")
-        if not Templates.objects.filter(workspace_id=ws_id, template_name=candidate).exists():
-            return candidate
-        idx += 1
+    base_name = first_line if first_line else "Template - #1"
+    return _make_unique_template_name(ws_id, base_name)
 
 
 def _prepare_campaign_form_data(ws_id: UUID, edit_obj):
@@ -715,7 +780,7 @@ def _prepare_campaign_form_data(ws_id: UUID, edit_obj):
                     ),
                 )
 
-    parent_items = _with_ui_ids(Campaign.objects.filter(workspace_id=ws_id))
+    parent_items = _with_ui_ids(Campaign.objects.filter(workspace_id=ws_id, archived=False).order_by("-updated_at"))
 
     global_default = default_global_global_window_json()
     gss, _created_gss = GlobalSendingSettings.objects.get_or_create(
@@ -797,8 +862,14 @@ def campaigns_view(request):
             if pk > 0:
                 camp = Campaign.objects.filter(id=pk, workspace_id=ws_id).first()
                 if camp:
-                    camp.user_active = not bool(camp.user_active)
-                    camp.save(update_fields=["user_active", "updated_at"])
+                    letter_ready = (
+                        Letter.objects.filter(workspace_id=ws_id, campaign_id=int(camp.id))
+                        .only("ready_content")
+                        .first()
+                    )
+                    if letter_ready and str(getattr(letter_ready, "ready_content", "") or "").strip():
+                        camp.user_active = not bool(camp.user_active)
+                        camp.save(update_fields=["user_active", "updated_at"])
             return redirect("campaigns:campaigns")
 
         if action in ("activate", "pause"):
@@ -846,6 +917,8 @@ def campaigns_view(request):
         deleted_tpl_ui,
         deleted_tpl_id,
     )
+    if request.method == "GET" and (request.GET.get("_partial") or "").strip() == "campaigns_table":
+        return render(request, "panels/aap_campaigns/_campaigns_table.html", ctx)
     return render(request, "panels/aap_campaigns/campaigns_list.html", ctx)
 
 
@@ -863,6 +936,10 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
         edit_obj.ui_id = encode_id(int(edit_obj.id))
         edit_obj.letter = Letter.objects.filter(workspace_id=ws_id, campaign=edit_obj).select_related("template").first()
 
+    requested_create_mode = (request.GET.get("create_mode") or "").strip().lower()
+    flow_create_mode = "followup" if (requested_create_mode == "followup" and not edit_obj) else ""
+    flow_is_followup = bool(flow_create_mode == "followup" or (edit_obj and getattr(edit_obj, "campaign_parent_id", None)))
+
     campaign_ui_id = edit_obj.ui_id if edit_obj else ""
     template_saved = bool(
         edit_obj
@@ -873,7 +950,7 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
     )
 
     if step in ("template", "letter") and not edit_obj:
-        return redirect(_flow_url("campaign"))
+        return redirect(_flow_url("campaign", create_mode=flow_create_mode))
 
     if step == "letter" and edit_obj and not template_saved:
         return redirect(_flow_url("template", campaign_ui_id))
@@ -898,6 +975,28 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
         action = (request.POST.get("action") or "").strip()
         posted_title = (request.POST.get("title") or "").strip()
 
+        if action == "toggle_user_active":
+            target = edit_obj
+            if not target:
+                post_id = (request.POST.get("id") or "").strip()
+                try:
+                    target_pk = int(decode_id(post_id))
+                except Exception:
+                    target_pk = 0
+                if target_pk > 0:
+                    target = Campaign.objects.filter(id=target_pk, workspace_id=ws_id).first()
+
+            if target:
+                letter_ready = (
+                    Letter.objects.filter(workspace_id=ws_id, campaign_id=int(target.id))
+                    .only("ready_content")
+                    .first()
+                )
+                if letter_ready and str(getattr(letter_ready, "ready_content", "") or "").strip():
+                    target.user_active = not bool(target.user_active)
+                    target.save(update_fields=["user_active", "updated_at"])
+            return redirect(request.get_full_path())
+
         if action == "close":
             return redirect("campaigns:campaigns")
 
@@ -906,7 +1005,7 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
 
         if action == "tpl_to_letter":
             if not edit_obj:
-                return redirect(_flow_url("campaign"))
+                return redirect(_flow_url("campaign", create_mode=flow_create_mode))
 
             tpl_ui = (request.POST.get("id") or request.GET.get("tpl_id") or "").strip()
             try:
@@ -923,17 +1022,13 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
                 return redirect(_flow_url("template", campaign_ui_id))
 
             let = _ensure_letter(ws_id, edit_obj)
-            let.template_id = int(tpl_obj.id)
-
-            content_html = sanitize(let.html_content or "")
-            ready = render_html(
-                template_html=tpl_obj.template_html or "",
-                content_html=content_html,
-                styles=_styles_pick_main(tpl_obj.styles or {}),
-                vars_json=None,
-            )
-            let.ready_content = ready or ""
-            let.save(update_fields=["template", "ready_content", "updated_at"])
+            new_tpl_id = int(tpl_obj.id)
+            old_tpl_id = int(getattr(let, "template_id", 0) or 0)
+            let.template_id = new_tpl_id
+            let.save(update_fields=["template", "updated_at"])
+            if new_tpl_id != old_tpl_id:
+                edit_obj.user_active = False
+                edit_obj.save(update_fields=["user_active", "updated_at"])
             return redirect(_flow_url("letter", campaign_ui_id))
 
         if action == "rename_campaign_title":
@@ -942,7 +1037,7 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
 
         if action == "tpl_choose":
             if not edit_obj:
-                return redirect(_flow_url("campaign"))
+                return redirect(_flow_url("campaign", create_mode=flow_create_mode))
             tpl_ui = (request.POST.get("template") or "").strip()
             try:
                 tpl_pk = int(decode_id(tpl_ui))
@@ -959,13 +1054,16 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
 
             current_tpl_id = int(getattr(getattr(edit_obj, "letter", None), "template_id", 0) or 0)
             if int(tpl_obj.id) != int(current_tpl_id):
-                _reset_campaign_letter_and_disable(edit_obj, ws_id, template_id=int(tpl_obj.id))
+                let = _ensure_letter(ws_id, edit_obj)
+                let.template_id = int(tpl_obj.id)
+                let.save(update_fields=["template", "updated_at"])
+                edit_obj.user_active = False
+                edit_obj.save(update_fields=["user_active", "updated_at"])
             return redirect(_flow_url("template", campaign_ui_id))
 
         if action == "tpl_to_add":
             if not edit_obj:
-                return redirect(_flow_url("campaign"))
-            _reset_campaign_letter_and_disable(edit_obj, ws_id, template_id=None)
+                return redirect(_flow_url("campaign", create_mode=flow_create_mode))
             return redirect(_flow_url("template", campaign_ui_id, tpl_state="add"))
 
         if action == "tpl_delete":
@@ -980,70 +1078,55 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
 
         if action in ("tpl_add", "tpl_save"):
             _update_campaign_title_if_needed(edit_obj, posted_title)
-
-            template_name = (request.POST.get("template_name") or "").strip()
-            tpl_name_input = template_name
             editor_html = request.POST.get("editor_html") or ""
             css_text = request.POST.get("css_text") or ""
 
-            if not template_name:
-                tpl_error_msg = _("Имя шаблона обязательно.")
-            else:
+            raw_template_name = str(request.POST.get("template_name") or "").strip()
+            if action == "tpl_add":
+                template_name = _make_unique_template_name(ws_id, raw_template_name, exclude_template_id=None)
+                tpl_name_input = template_name
                 clean_html = sanitize(editor_template_parse_html(editor_html))
                 styles_obj = styles_css_to_json(css_text)
-                if action == "tpl_add":
-                    try:
-                        obj = Templates.objects.create(
-                            workspace_id=ws_id,
-                            template_name=template_name,
-                            template_html=clean_html,
-                            styles=styles_obj,
-                        )
-                    except IntegrityError:
-                        tpl_error_msg = _("Шаблон с таким именем уже существует.")
-                    else:
-                        if edit_obj:
-                            let = _ensure_letter(ws_id, edit_obj)
-                            let.template_id = int(obj.id)
-                            content_html = sanitize(let.html_content or "")
-                            ready = render_html(
-                                template_html=obj.template_html or "",
-                                content_html=content_html,
-                                styles=_styles_pick_main(obj.styles or {}),
-                                vars_json=None,
-                            )
-                            let.ready_content = ready or ""
-                            let.save(update_fields=["template", "ready_content", "updated_at"])
-                        return redirect(_flow_url("template", campaign_ui_id, tpl_state="edit", tpl_id=encode_id(int(obj.id))))
+                if not template_name:
+                    tpl_error_msg = _("Имя шаблона обязательно.")
                 else:
-                    post_id = (request.POST.get("id") or "").strip()
-                    try:
-                        pk = int(decode_id(post_id))
-                    except Exception:
-                        pk = 0
-                    obj = Templates.objects.filter(id=pk, workspace_id=ws_id, archived=False).first() if pk > 0 else None
-                    if obj:
+                    obj = Templates.objects.create(
+                        workspace_id=ws_id,
+                        template_name=template_name,
+                        template_html=clean_html,
+                        styles=styles_obj,
+                    )
+                    if edit_obj:
+                        let = _ensure_letter(ws_id, edit_obj)
+                        let.template_id = int(obj.id)
+                        let.save(update_fields=["template", "updated_at"])
+                        edit_obj.user_active = False
+                        edit_obj.save(update_fields=["user_active", "updated_at"])
+                    return redirect(_flow_url("template", campaign_ui_id, tpl_state="edit", tpl_id=encode_id(int(obj.id))))
+            else:
+                post_id = (request.POST.get("id") or "").strip()
+                try:
+                    pk = int(decode_id(post_id))
+                except Exception:
+                    pk = 0
+                obj = Templates.objects.filter(id=pk, workspace_id=ws_id, archived=False).first() if pk > 0 else None
+                if obj:
+                    template_name = _make_unique_template_name(ws_id, raw_template_name, exclude_template_id=int(obj.id))
+                    tpl_name_input = template_name
+                    clean_html = sanitize(editor_template_parse_html(editor_html))
+                    styles_obj = styles_css_to_json(css_text)
+                    if not template_name:
+                        tpl_error_msg = _("Имя шаблона обязательно.")
+                    else:
                         obj.template_name = template_name
                         obj.template_html = clean_html
                         obj.styles = styles_obj
-                        try:
-                            obj.save(update_fields=["template_name", "template_html", "styles", "updated_at"])
-                        except IntegrityError:
-                            tpl_error_msg = _("Шаблон с таким именем уже существует.")
-                        else:
-                            if edit_obj:
-                                let = _ensure_letter(ws_id, edit_obj)
-                                let.template_id = int(obj.id)
-                                content_html = sanitize(let.html_content or "")
-                                ready = render_html(
-                                    template_html=obj.template_html or "",
-                                    content_html=content_html,
-                                    styles=_styles_pick_main(obj.styles or {}),
-                                    vars_json=None,
-                                )
-                                let.ready_content = ready or ""
-                                let.save(update_fields=["template", "ready_content", "updated_at"])
-                            return redirect(_flow_url("template", campaign_ui_id, tpl_state="edit", tpl_id=encode_id(int(obj.id))))
+                        obj.save(update_fields=["template_name", "template_html", "styles", "updated_at"])
+                        if edit_obj:
+                            let = _ensure_letter(ws_id, edit_obj)
+                            let.template_id = int(obj.id)
+                            let.save(update_fields=["template", "updated_at"])
+                        return redirect(_flow_url("template", campaign_ui_id, tpl_state="edit", tpl_id=encode_id(int(obj.id))))
 
         if action == "send_test":
             post_id = (request.POST.get("id") or "").strip()
@@ -1171,13 +1254,24 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
         ):
             title = (request.POST.get("title") or "").strip()
             sending_list_ui = (request.POST.get("sending_list") or "").strip()
+            campaign_parent_ui = (request.POST.get("campaign_parent") or "").strip()
             mailbox_ui = (request.POST.get("mailbox") or "").strip()
             is_edit_mode = bool(edit_obj and action in ("save_campaign", "save_campaign_stay", "save_campaign_close"))
+            followup_create_mode = bool((not is_edit_mode) and flow_create_mode == "followup")
             missing_title = not bool(title)
-            missing_sending_list = (not is_edit_mode) and (not bool(sending_list_ui))
+            missing_parent_campaign = followup_create_mode and (not bool(campaign_parent_ui))
+            missing_sending_list = (not is_edit_mode) and (not followup_create_mode) and (not bool(sending_list_ui))
             missing_mailbox = not bool(mailbox_ui)
 
-            if missing_title or missing_sending_list or missing_mailbox:
+            send_after_default = 21 if followup_create_mode else 0
+            try:
+                send_after_posted = int(request.POST.get("send_after_parent_days") or send_after_default)
+            except Exception:
+                send_after_posted = send_after_default
+            if send_after_posted < 0:
+                send_after_posted = 0
+
+            if missing_title or missing_parent_campaign or missing_sending_list or missing_mailbox:
                 ctx = _ctx_build(
                     ws_id,
                     "edit" if edit_obj else "add",
@@ -1201,7 +1295,12 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
                 ctx.update(
                     {
                         "flow_current_step": "campaign",
-                        "flow_step_states": _build_flow_step_states("campaign", campaign_ui_id, template_saved=template_saved),
+                        "flow_step_states": _build_flow_step_states(
+                            "campaign",
+                            campaign_ui_id,
+                            template_saved=template_saved,
+                            create_mode=flow_create_mode,
+                        ),
                         "flow_close_url": reverse("campaigns:campaigns"),
                         "flow_title": edit_obj.title if edit_obj else _("Новая кампания"),
                         "flow_campaign_title_input": title,
@@ -1212,100 +1311,46 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
                         "step_template": "panels/aap_campaigns/flow_step_campaign.html",
                         "campaign_mode": "edit" if edit_obj else "add",
                         "campaign_save_action": "save_campaign_stay" if edit_obj else "add_campaign_stay",
+                        "flow_campaign_user_active": bool(getattr(edit_obj, "user_active", False)) if edit_obj else False,
+                        "flow_is_followup": flow_is_followup,
+                        "flow_selected_sending_list_ui": sending_list_ui,
+                        "flow_selected_mailbox_ui": mailbox_ui,
+                        "flow_selected_parent_ui": campaign_parent_ui,
+                        "flow_send_after_parent_days": send_after_posted,
                         "flow_error_title": missing_title,
+                        "flow_error_campaign_parent": missing_parent_campaign,
                         "flow_error_sending_list": missing_sending_list,
                         "flow_error_mailbox": missing_mailbox,
                     }
                 )
                 return render(request, "panels/aap_campaigns/campaigns_flow.html", ctx)
 
+            campaign_parent_pk = 0
             try:
                 mailbox_pk = int(decode_id(mailbox_ui))
                 if is_edit_mode:
                     sending_list_pk = int(getattr(edit_obj, "sending_list_id", 0) or 0)
+                    campaign_parent_pk = int(getattr(edit_obj, "campaign_parent_id", 0) or 0)
+                elif followup_create_mode:
+                    campaign_parent_pk = int(decode_id(campaign_parent_ui))
+                    parent_campaign = Campaign.objects.filter(id=campaign_parent_pk, workspace_id=ws_id, archived=False).first()
+                    if not parent_campaign or not int(getattr(parent_campaign, "sending_list_id", 0) or 0):
+                        raise ValueError("invalid_parent_campaign")
+                    sending_list_pk = int(parent_campaign.sending_list_id)
                 else:
                     sending_list_pk = int(decode_id(sending_list_ui))
             except Exception:
-                return redirect(_flow_url("campaign", campaign_ui_id))
-
-            if (not is_edit_mode) and _sending_list_is_taken(ws_id, sending_list_pk, None):
-                tmp = edit_obj or SimpleNamespace()
-                if not getattr(tmp, "id", None):
-                    tmp.id = 0
-                if not getattr(tmp, "ui_id", ""):
-                    tmp.ui_id = campaign_ui_id
-
-                tmp.title = title
-                tmp.sending_list_id = int(sending_list_pk)
-                tmp.mailbox_id = int(mailbox_pk)
-                tmp.start_at = _parse_date_from_post(request, "start_date") or date.today()
-                tmp.end_at = _parse_date_from_post(request, "end_date")
-                try:
-                    tmp.send_after_parent_days = max(int(request.POST.get("send_after_parent_days") or 0), 0)
-                except Exception:
-                    tmp.send_after_parent_days = 0
-
-                use_global_window_tmp = True if request.POST.get("use_global_window") else False
-                window_raw_tmp = (request.POST.get("window") or "").strip()
-                window_obj_tmp: dict = {}
-                if not use_global_window_tmp:
-                    try:
-                        parsed_tmp = json.loads(window_raw_tmp) if window_raw_tmp else {}
-                        window_obj_tmp = parsed_tmp if isinstance(parsed_tmp, dict) else {}
-                    except Exception:
-                        window_obj_tmp = {}
-                tmp.window = window_obj_tmp
-
-                ctx = _ctx_build(
-                    ws_id,
-                    "edit" if edit_obj else "add",
-                    tmp,
-                    list_items,
-                    mb_items,
-                    tpl_items,
-                    parent_items,
-                    global_window_json,
-                    letter_obj,
-                    letter_init_html,
-                    letter_init_css,
-                    letter_init_subjects,
-                    letter_init_headers,
-                    letter_template_html,
-                    deleted_tpl_ui,
-                    deleted_tpl_id,
-                    form_error_msg="",
-                    form_error_field="sending_list",
-                )
-                ctx.update(
-                    {
-                        "flow_current_step": "campaign",
-                        "flow_step_states": _build_flow_step_states("campaign", campaign_ui_id, template_saved=template_saved),
-                        "flow_close_url": reverse("campaigns:campaigns"),
-                        "flow_title": edit_obj.title if edit_obj else _("Новая кампания"),
-                        "flow_campaign_title_input": title,
-                        "flow_header_form_id": "yyCampaignForm",
-                        "flow_header_save_action": "save_campaign_stay" if edit_obj else "add_campaign_stay",
-                        "flow_template_step_url": _flow_url("template", campaign_ui_id),
-                        "campaign_form_saved": False,
-                        "step_template": "panels/aap_campaigns/flow_step_campaign.html",
-                        "campaign_mode": "edit" if edit_obj else "add",
-                        "campaign_save_action": "save_campaign_stay" if edit_obj else "add_campaign_stay",
-                        "flow_error_title": False,
-                        "flow_error_sending_list": True,
-                        "flow_error_mailbox": False,
-                    }
-                )
-                return render(request, "panels/aap_campaigns/campaigns_flow.html", ctx)
+                return redirect(_flow_url("campaign", campaign_ui_id, create_mode=flow_create_mode))
 
             start_at = _parse_date_from_post(request, "start_date") or date.today()
             end_at = _parse_date_from_post(request, "end_date")
 
             send_after_days = 0
-            if edit_obj and edit_obj.campaign_parent_id:
+            if (edit_obj and edit_obj.campaign_parent_id) or followup_create_mode:
                 try:
-                    send_after_days = int(request.POST.get("send_after_parent_days") or 0)
+                    send_after_days = int(request.POST.get("send_after_parent_days") or 21)
                 except Exception:
-                    send_after_days = 0
+                    send_after_days = 21
                 if send_after_days < 0:
                     send_after_days = 0
 
@@ -1320,15 +1365,22 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
                     window_obj = {}
 
             if action in ("add_campaign", "add_campaign_stay", "add_campaign_close"):
-                camp = Campaign.objects.create(
+                saved_title = _make_unique_campaign_title(ws_id, title, exclude_campaign_id=None)
+                create_kwargs = dict(
                     workspace_id=ws_id,
-                    title=title,
+                    title=saved_title,
                     sending_list_id=sending_list_pk,
                     mailbox_id=mailbox_pk,
                     start_at=start_at,
                     end_at=end_at,
                     window=window_obj,
+                    user_active=False,
                 )
+                if followup_create_mode and campaign_parent_pk > 0:
+                    create_kwargs["campaign_parent_id"] = int(campaign_parent_pk)
+                    create_kwargs["send_after_parent_days"] = int(send_after_days)
+
+                camp = Campaign.objects.create(**create_kwargs)
                 clear_is_more_needed_full_cache(int(sending_list_pk))
                 new_ui_id = encode_id(int(camp.id))
                 if action == "add_campaign_close":
@@ -1336,27 +1388,29 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
                 return redirect(_flow_url("campaign", new_ui_id))
 
             if not edit_obj:
-                return redirect(_flow_url("campaign"))
+                return redirect(_flow_url("campaign", create_mode=flow_create_mode))
 
-            edit_obj.title = title
+            saved_title = _make_unique_campaign_title(ws_id, title, exclude_campaign_id=int(edit_obj.id))
+            edit_obj.title = saved_title
             edit_obj.sending_list_id = int(getattr(edit_obj, "sending_list_id", 0) or 0)
             edit_obj.mailbox_id = mailbox_pk
             edit_obj.start_at = start_at
             edit_obj.end_at = end_at
-            edit_obj.send_after_parent_days = send_after_days
+            if edit_obj.campaign_parent_id:
+                edit_obj.send_after_parent_days = send_after_days
             edit_obj.window = window_obj
-            edit_obj.save(
-                update_fields=[
-                    "title",
-                    "sending_list",
-                    "mailbox",
-                    "start_at",
-                    "end_at",
-                    "send_after_parent_days",
-                    "window",
-                    "updated_at",
-                ]
-            )
+            update_fields = [
+                "title",
+                "sending_list",
+                "mailbox",
+                "start_at",
+                "end_at",
+                "window",
+                "updated_at",
+            ]
+            if edit_obj.campaign_parent_id:
+                update_fields.insert(-2, "send_after_parent_days")
+            edit_obj.save(update_fields=update_fields)
 
             if action == "save_campaign_close":
                 return redirect("campaigns:campaigns")
@@ -1364,7 +1418,7 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
 
         if action in ("save_letter", "save_ready"):
             if not edit_obj:
-                return redirect(_flow_url("campaign"))
+                return redirect(_flow_url("campaign", create_mode=flow_create_mode))
 
             _update_campaign_title_if_needed(edit_obj, posted_title)
 
@@ -1408,31 +1462,81 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
 
             return redirect(_flow_url("letter", campaign_ui_id))
 
+    flow_selected_template_ui = (
+        encode_id(int(edit_obj.letter.template_id))
+        if (edit_obj and getattr(edit_obj, "letter", None) and getattr(edit_obj.letter, "template_id", None))
+        else ""
+    )
+    flow_template_checked_ui = flow_selected_template_ui
+    if (not flow_template_checked_ui) and edit_obj and getattr(edit_obj, "campaign_parent_id", None):
+        parent_letter = (
+            Letter.objects
+            .filter(workspace_id=ws_id, campaign_id=int(edit_obj.campaign_parent_id))
+            .select_related("template")
+            .first()
+        )
+        if (
+            parent_letter
+            and getattr(parent_letter, "template_id", None)
+            and getattr(parent_letter, "template", None)
+            and not bool(getattr(parent_letter.template, "archived", False))
+        ):
+            flow_template_checked_ui = encode_id(int(parent_letter.template_id))
+
+    flow_selected_sending_list_ui = ""
+    flow_selected_mailbox_ui = ""
+    flow_selected_parent_ui = ""
+    flow_send_after_parent_days = 21
+    if edit_obj:
+        if getattr(edit_obj, "sending_list_id", None):
+            flow_selected_sending_list_ui = encode_id(int(edit_obj.sending_list_id))
+        if getattr(edit_obj, "mailbox_id", None):
+            flow_selected_mailbox_ui = encode_id(int(edit_obj.mailbox_id))
+        if getattr(edit_obj, "campaign_parent_id", None):
+            flow_selected_parent_ui = encode_id(int(edit_obj.campaign_parent_id))
+            flow_send_after_parent_days = int(getattr(edit_obj, "send_after_parent_days", 21) or 21)
+    elif flow_create_mode == "followup":
+        flow_send_after_parent_days = 21
+
     flow_ctx = {
         "flow_current_step": step,
-        "flow_step_states": _build_flow_step_states(step, campaign_ui_id, template_saved=template_saved),
+        "flow_step_states": _build_flow_step_states(
+            step,
+            campaign_ui_id,
+            template_saved=template_saved,
+            create_mode=flow_create_mode,
+        ),
         "flow_close_url": reverse("campaigns:campaigns"),
         "flow_title": edit_obj.title if edit_obj else _("Новая кампания"),
         "flow_campaign_ui_id": campaign_ui_id,
+        "flow_campaign_user_active": bool(getattr(edit_obj, "user_active", False)) if edit_obj else False,
+        "flow_is_followup": flow_is_followup,
+        "flow_create_mode": flow_create_mode,
+        "flow_selected_sending_list_ui": flow_selected_sending_list_ui,
+        "flow_selected_mailbox_ui": flow_selected_mailbox_ui,
+        "flow_selected_parent_ui": flow_selected_parent_ui,
+        "flow_send_after_parent_days": flow_send_after_parent_days,
         "flow_campaign_title_input": (edit_obj.title if edit_obj else ""),
         "flow_header_form_id": ("yyFlowTitleForm" if campaign_ui_id else ""),
         "flow_header_save_action": ("rename_campaign_title" if campaign_ui_id else ""),
         "flow_template_step_url": _flow_url("template", campaign_ui_id),
         "flow_letter_step_url": _flow_url("letter", campaign_ui_id),
         "flow_template_add_url": _flow_url("template", campaign_ui_id, tpl_state="add"),
-        "flow_selected_template_ui": (
-            encode_id(int(edit_obj.letter.template_id))
-            if (edit_obj and getattr(edit_obj, "letter", None) and getattr(edit_obj.letter, "template_id", None))
-            else ""
-        ),
-        "flow_has_ready_letter": bool(
+        "flow_selected_template_ui": flow_selected_template_ui,
+        "flow_template_checked_ui": flow_template_checked_ui,
+        "flow_letter_ready_exists": bool(
             edit_obj
             and getattr(edit_obj, "letter", None)
-            and str(getattr(edit_obj.letter, "html_content", "") or "").strip()
             and str(getattr(edit_obj.letter, "ready_content", "") or "").strip()
+        ),
+        "flow_letter_template_changed": bool(
+            edit_obj
+            and getattr(edit_obj, "letter", None)
+            and _is_letter_template_changed(edit_obj.letter)
         ),
         "campaign_form_saved": bool(edit_obj),
         "flow_error_title": False,
+        "flow_error_campaign_parent": False,
         "flow_error_sending_list": False,
         "flow_error_mailbox": False,
         "flow_test_send_status": _pop_flow_test_send_status(request),
@@ -1457,7 +1561,7 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
 
     if step == "letter" and (not edit_obj or not template_saved):
         if not edit_obj:
-            return redirect(_flow_url("campaign"))
+            return redirect(_flow_url("campaign", create_mode=flow_create_mode))
         return redirect(_flow_url("template", campaign_ui_id))
 
     state = "letter" if step == "letter" else ("edit" if edit_obj else "add")

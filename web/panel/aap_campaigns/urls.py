@@ -18,6 +18,8 @@ from panel.aap_campaigns.views.campaigns import (
 from panel.aap_campaigns.views.campaigns_api import (
     campaigns__letter_extract_content_view,
     campaigns__letter_buttons_by_template_view,
+    campaigns__letter_guard_modal_view,
+    campaigns__template_choose_warning_modal_view,
     campaigns__letter_render_editor_html_view,
     campaigns__preview_modal_by_id_view,
     campaigns__preview_modal_from_editor_view,
@@ -55,6 +57,8 @@ urlpatterns = [
     path("campaigns/letter/_extract-content/", campaigns__letter_extract_content_view, name="campaigns__letter_extract_content"),
     path("campaigns/letter/_render-editor-html/", campaigns__letter_render_editor_html_view, name="campaigns__letter_render_editor_html"),
     path("campaigns/letter/_buttons-by-template/", campaigns__letter_buttons_by_template_view, name="campaigns__letter_buttons_by_template"),
+    path("campaigns/letter/modal/guard/", campaigns__letter_guard_modal_view, name="campaigns__letter_guard_modal"),
+    path("campaigns/template/modal/choose-warning/", campaigns__template_choose_warning_modal_view, name="campaigns__template_choose_warning_modal"),
 
     # templates
     path("templates/", templates_view, name="templates"),

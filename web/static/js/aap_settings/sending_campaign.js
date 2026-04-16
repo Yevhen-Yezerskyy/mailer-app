@@ -284,6 +284,16 @@
   const globalState = ensureState(safeParseJson(taGlobal.value || "{}"));
   let state = ensureState(safeParseJson(ta.value || "{}"));
 
+  function firstWindowFromGlobalTuesday() {
+    const tue = Array.isArray(globalState.tue) ? globalState.tue : [];
+    const first = tue[0] && typeof tue[0] === "object" ? tue[0] : null;
+    if (!first) return { from: "", to: "" };
+    const from = String(first.from || "").trim();
+    const to = String(first.to || "").trim();
+    if (!from || !to) return { from: "", to: "" };
+    return { from: from, to: to };
+  }
+
   function useGlobalNow() {
     state = ensureState(JSON.parse(JSON.stringify(globalState)));
     setUiDisabled(true);
@@ -376,7 +386,7 @@
 
       const btnPlus = mkBtn("plus");
       btnPlus.addEventListener("click", function () {
-        state[day].push({ from: "", to: "" });
+        state[day].push(firstWindowFromGlobalTuesday());
         renderDay(day);
       });
 

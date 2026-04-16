@@ -15,27 +15,43 @@
         <div class="YY-CARD_WHITE">
           <div class="h-full min-h-0 flex flex-col">
           <div class="YY-STATUS_BLUE !w-full !mb-0">{% trans "Кампания по рассылке" %}</div>
-          <label class="YY-LABEL mt-5">{% trans "Список рассылки" %}:</label>
-          {% if campaign_mode == "edit" and edit_obj %}
-            <div class="{% if flow_locked_sending_list_type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-full !mb-0">
-              {{ flow_locked_sending_list_title|default:"—" }}
-            </div>
-          {% else %}
-            <select name="sending_list" class="YY-INPUT !mb-0 {% if flow_error_sending_list %}!border-red-500{% endif %}">
-              <option value="">{% trans "— не выбран —" %}</option>
-              {% for it in list_items %}
-                <option value="{{ it.ui_id }}" {% if edit_obj and edit_obj.sending_list_id == it.id %}selected{% endif %}>
+          {% if campaign_mode == "edit" and edit_obj and edit_obj.campaign_parent %}
+            <label class="YY-LABEL mt-5">{% trans "Следуем за кампанией:" %}</label>
+            <div class="YY-STATUS_BLUE !w-full !mb-0">{{ edit_obj.campaign_parent.title }}</div>
+          {% endif %}
+          {% if flow_is_followup and campaign_mode == "add" %}
+            <label class="YY-LABEL mt-5">Кампания-родитель:</label>
+            <select name="campaign_parent" class="YY-INPUT !mb-0 {% if flow_error_campaign_parent %}!border-red-500{% endif %}">
+              <option value="">— не выбрана —</option>
+              {% for it in parent_items %}
+                <option value="{{ it.ui_id }}" {% if flow_selected_parent_ui and flow_selected_parent_ui == it.ui_id %}selected{% endif %}>
                   {{ it.title }}
                 </option>
               {% endfor %}
             </select>
+          {% else %}
+            <label class="YY-LABEL mt-5">{% trans "Список рассылки" %}:</label>
+            {% if campaign_mode == "edit" and edit_obj %}
+              <div class="{% if flow_locked_sending_list_type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-full !mb-0">
+                {{ flow_locked_sending_list_title|default:"—" }}
+              </div>
+            {% else %}
+              <select name="sending_list" class="YY-INPUT !mb-0 {% if flow_error_sending_list %}!border-red-500{% endif %}">
+                <option value="">{% trans "— не выбран —" %}</option>
+                {% for it in list_items %}
+                  <option value="{{ it.ui_id }}" {% if flow_selected_sending_list_ui and flow_selected_sending_list_ui == it.ui_id %}selected{% endif %}>
+                    {{ it.title }}
+                  </option>
+                {% endfor %}
+              </select>
+            {% endif %}
           {% endif %}
 
           <label class="YY-LABEL mt-5">{% trans "Почтовый сервер для отправки" %}:</label>
           <select name="mailbox" class="YY-INPUT !mb-0 {% if flow_error_mailbox %}!border-red-500{% endif %}">
             <option value="">{% trans "— не выбрано —" %}</option>
             {% for it in mb_items %}
-              <option value="{{ it.ui_id }}" {% if edit_obj and edit_obj.mailbox_id == it.id %}selected{% endif %}>
+              <option value="{{ it.ui_id }}" {% if flow_selected_mailbox_ui and flow_selected_mailbox_ui == it.ui_id %}selected{% endif %}>
                 {{ it.sender_label }}
               </option>
             {% endfor %}
@@ -49,12 +65,16 @@
             <input type="date" name="end_date" class="YY-INPUT !mb-0 w-full" value="{% if edit_obj and edit_obj.end_at %}{{ edit_obj.end_at|date:'Y-m-d' }}{% endif %}">
           </div>
 
-          {% if campaign_mode == "edit" and edit_obj and edit_obj.campaign_parent %}
-            <div class="YY-TEXT mb-1">
-              {% trans "Следуем за кампанией" %}: <strong>{{ edit_obj.campaign_parent.title }}</strong>
+          {% if flow_is_followup %}
+            <div class="flex items-center gap-3 mb-4 w-full">
+              <div class="YY-STATUS_BLUE !mb-0 !py-1 !px-3 whitespace-nowrap">Отправка не ранее, дней:</div>
+              <input
+                type="number"
+                min="0"
+                name="send_after_parent_days"
+                class="YY-INPUT !mb-0 w-[25%] min-w-[150px]"
+                value="{{ flow_send_after_parent_days|default:21 }}">
             </div>
-            <label class="YY-LABEL mt-5">{% trans "Отправлять письма через (дней)" %}</label>
-            <input type="number" name="send_after_parent_days" class="YY-INPUT !mb-0" value="{{ edit_obj.send_after_parent_days }}">
           {% endif %}
 
           <div class="grid grid-cols-2 gap-3 mt-auto pt-5">

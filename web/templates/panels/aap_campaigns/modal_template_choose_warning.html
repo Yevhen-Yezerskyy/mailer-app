@@ -1,0 +1,21 @@
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_campaigns/modal_template_choose_warning.html -->
+<!-- DATE: 2026-04-16 -->
+<!-- PURPOSE: Standard HTML modal for tpl_choose warning in campaign flow. -->
+
+<div class="YY-CARD_WHITE overflow-hidden" style="max-height:85vh;width:760px;">
+  <button type="button" class="YY-BUTTON_MAIN !w-fit" data-yy-modal-close style="position:absolute;top:10px;right:10px;">✕</button>
+
+  <div class="overflow-auto mt-10 mb-1 max-h-[calc(85vh-5rem)]">
+    <div class="YY-STATUS_BLUE !mb-3">Проверьте письмо и сохраните изменения</div>
+
+    <div class="YY-CARD_WHITE border border-[#71d0f4]">
+      <div class="YY-TEXT !mb-2">При смене шаблона письмо кампании автоматически не изменяется. Для оптимального результата необходимо проверить результат смены шаблона.</div>
+      <div class="YY-TEXT !mb-4">Перейдите в письмо кампании, для которого шаблон был изменён, проверьте результат и сохраните изменения. Тогда новый шаблон будет применён.</div>
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" class="YY-BUTTON_MAIN_FULL" data-yy-tpl-remove-approve="1">Продолжить</button>
+        <button type="button" class="YY-BUTTON_MAIN_FULL" data-yy-modal-close>Отмена</button>
+      </div>
+    </div>
+  </div>
+</div>

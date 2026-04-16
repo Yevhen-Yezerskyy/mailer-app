@@ -210,6 +210,56 @@ _EMPTY_CTX = {"status": "empty", "view_html": "", "content_html": "", "raw_css":
 
 @require_GET
 @csrf_exempt
+def campaigns__letter_guard_modal_view(request: HttpRequest) -> HttpResponse:
+    ws_id = _guard_ws(request)
+    if not ws_id:
+        return HttpResponse(status=403)
+
+    title = (request.GET.get("title") or "").strip() or "Письмо кампании"
+    text = (request.GET.get("text") or "").strip() or "Подтвердите действие."
+    approve_label = (request.GET.get("approve") or "").strip() or "Продолжить"
+    cancel_label = (request.GET.get("cancel") or "").strip() or "Отмена"
+    show_cancel_raw = (request.GET.get("show_cancel") or "1").strip()
+    show_cancel = show_cancel_raw not in ("0", "false", "False", "no", "No")
+
+    status_raw = (request.GET.get("status") or "").strip()
+    status_map = {
+        "YY-STATUS_RED": "YY-STATUS_RED",
+        "YY-STATUS_BLUE": "YY-STATUS_BLUE",
+        "YY-STATUS_YELLOW": "YY-STATUS_YELLOW",
+        "YY-STATUS_GREEN": "YY-STATUS_GREEN",
+        "red": "YY-STATUS_RED",
+        "blue": "YY-STATUS_BLUE",
+        "yellow": "YY-STATUS_YELLOW",
+        "green": "YY-STATUS_GREEN",
+    }
+    status_class = status_map.get(status_raw, "YY-STATUS_BLUE")
+
+    return render(
+        request,
+        "panels/aap_campaigns/modal_letter_guard.html",
+        {
+            "title": title,
+            "text": text,
+            "status_class": status_class,
+            "approve_label": approve_label,
+            "cancel_label": cancel_label,
+            "show_cancel": show_cancel,
+        },
+    )
+
+
+@require_GET
+@csrf_exempt
+def campaigns__template_choose_warning_modal_view(request: HttpRequest) -> HttpResponse:
+    ws_id = _guard_ws(request)
+    if not ws_id:
+        return HttpResponse(status=403)
+    return render(request, "panels/aap_campaigns/modal_template_choose_warning.html")
+
+
+@require_GET
+@csrf_exempt
 def campaigns__preview_modal_by_id_view(request: HttpRequest) -> HttpResponse:
     ws_id = _guard_ws(request)
     if not ws_id:
