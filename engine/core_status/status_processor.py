@@ -6,6 +6,7 @@ from engine.common.worker import Worker
 from engine.core_status import status
 
 TASK_TIMEOUT_SEC = 120
+CAMPAIGN_SENT_RECOUNT_EVERY_SEC = 60 * 60
 
 
 def main() -> None:
@@ -43,6 +44,16 @@ def main() -> None:
         singleton=True,
         heavy=False,
         priority=15,
+    )
+
+    w.register(
+        name="campaign_sent_recount_run_once",
+        fn=status.run_campaign_sent_recount_once,
+        every_sec=CAMPAIGN_SENT_RECOUNT_EVERY_SEC,
+        timeout_sec=TASK_TIMEOUT_SEC,
+        singleton=True,
+        heavy=False,
+        priority=20,
     )
 
     w.run_forever()

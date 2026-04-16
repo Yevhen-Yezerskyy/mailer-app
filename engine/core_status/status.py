@@ -625,3 +625,53 @@ def run_campaign_status_once() -> dict[str, int | str]:
         "interval_nonnull_cnt": int(interval_nonnull_cnt),
         "to_send_nonnull_cnt": int(to_send_nonnull_cnt),
     }
+
+
+def run_campaign_sent_recount_once() -> dict[str, int | str]:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            WITH sent AS (
+                SELECT
+                    sl.campaign_id::bigint AS campaign_id,
+                    COUNT(sl.id)::int AS sent_cnt
+                FROM public.sending_log sl
+                WHERE COALESCE(sl.processed, false) = true
+                GROUP BY sl.campaign_id
+            ),
+            calc AS (
+                SELECT
+                    c.id::bigint AS campaign_id,
+                    COALESCE(s.sent_cnt, 0)::int AS sent_value
+                FROM public.campaigns_campaigns c
+                LEFT JOIN sent s
+                  ON s.campaign_id = c.id
+            ),
+            upd AS (
+                UPDATE public.campaigns_campaigns c
+                SET sent_num = calc.sent_value,
+                    updated_at = now()
+                FROM calc
+                WHERE c.id = calc.campaign_id
+                  AND c.sent_num IS DISTINCT FROM calc.sent_value
+                RETURNING c.id
+            )
+            SELECT
+                (SELECT COUNT(*)::int FROM public.campaigns_campaigns) AS scanned_cnt,
+                (SELECT COUNT(*)::int FROM upd) AS updated_cnt,
+                (
+                    SELECT COUNT(*)::int
+                    FROM public.campaigns_campaigns c
+                    WHERE COALESCE(c.sent_num, 0) > 0
+                ) AS sent_nonzero_cnt
+            """
+        )
+        row = cur.fetchone() or [0, 0, 0]
+        conn.commit()
+
+    return {
+        "mode": "ok",
+        "scanned_cnt": int(row[0] or 0),
+        "updated_cnt": int(row[1] or 0),
+        "sent_nonzero_cnt": int(row[2] or 0),
+    }

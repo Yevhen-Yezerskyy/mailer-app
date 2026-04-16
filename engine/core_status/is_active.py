@@ -263,7 +263,6 @@ def _load_active_campaign_demands(task_id: int) -> list[tuple[int, int]]:
             GREATEST(COALESCE(c.to_send_num, 0)::int - COALESCE(c.sent_num, 0)::int, 0)::int AS need_num
         FROM public.campaigns_campaigns c
         WHERE c.sending_list_id = %s
-          AND COALESCE(c.user_active, false) = true
           AND COALESCE(c.archived, false) = false
         """,
         [int(task_id)],
