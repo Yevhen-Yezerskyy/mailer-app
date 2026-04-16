@@ -472,10 +472,11 @@ def run_campaign_status_once() -> dict[str, int | str]:
         mid = int(mailbox_id)
         camp_window = campaign_window if isinstance(campaign_window, dict) else {}
         is_pool_eligible = not bool(archived)
+        is_active_eligible = bool(user_active) and (not bool(archived))
         ws_window = ws_windows.get(ws_id, {}) if is_pool_eligible else {}
         effective_window = _effective_window(camp_window, ws_window, global_window) if is_pool_eligible else {}
 
-        is_active_now = bool(is_pool_eligible) and _is_now_in_send_window(now_de, effective_window)
+        is_active_now = bool(is_active_eligible) and _is_now_in_send_window(now_de, effective_window)
 
         today_minutes = _sum_window_minutes_for_date(effective_window, now_de.date())
         interval_day, interval_day_minutes = _pick_window_day(now_de, effective_window)
