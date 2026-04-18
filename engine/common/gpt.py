@@ -219,7 +219,8 @@ def _log_header(
     now: datetime,
     status: str,
     model_name: str,
-    service_tier: str,
+    request_tier: str,
+    response_tier: str,
     user_id: str,
     usage: Optional[GptUsage],
     cache_hit: bool,
@@ -228,7 +229,7 @@ def _log_header(
     return (
         f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] "
         f"STATUS={status} CACHE={'yes' if cache_hit else 'no'} REAL={'yes' if real_request else 'no'} "
-        f"MODEL={model_name} SERVICE_TIER={service_tier} USER={user_id} "
+        f"MODEL={model_name} REQUEST_TIER={request_tier} RESPONSE_TIER={response_tier} USER={user_id} "
         f"TOKENS(in={getattr(usage, 'prompt_tokens', None)},"
         f"out={getattr(usage, 'completion_tokens', None)},"
         f"total={getattr(usage, 'total_tokens', None)})"
@@ -240,7 +241,8 @@ def _log_host_stream(
     now: datetime,
     status: str,
     model_name: str,
-    service_tier: str,
+    request_tier: str,
+    response_tier: str,
     user_id: str,
     instructions: str,
     input_text: str,
@@ -255,7 +257,8 @@ def _log_host_stream(
             now=now,
             status=status,
             model_name=model_name,
-            service_tier=service_tier,
+            request_tier=request_tier,
+            response_tier=response_tier,
             user_id=user_id,
             usage=usage,
             cache_hit=cache_hit,
@@ -279,7 +282,8 @@ def _log_host_error(
     now: datetime,
     status: str,
     model_name: str,
-    service_tier: str,
+    request_tier: str,
+    response_tier: str,
     user_id: str,
     instructions: str,
     input_text: str,
@@ -294,7 +298,8 @@ def _log_host_error(
             now=now,
             status=status,
             model_name=model_name,
-            service_tier=service_tier,
+            request_tier=request_tier,
+            response_tier=response_tier,
             user_id=user_id,
             usage=usage,
             cache_hit=cache_hit,
@@ -318,13 +323,14 @@ def _log_system_request(
     now: datetime,
     status: str,
     model_name: str,
-    service_tier: str,
+    request_tier: str,
+    response_tier: str,
     user_id: str,
     usage: Optional[GptUsage],
 ) -> None:
     line = (
         f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] "
-        f"STATUS={status} MODEL={model_name} SERVICE_TIER={service_tier} USER={user_id} "
+        f"STATUS={status} MODEL={model_name} REQUEST_TIER={request_tier} RESPONSE_TIER={response_tier} USER={user_id} "
         f"TOKENS(in={getattr(usage, 'prompt_tokens', None)},"
         f"out={getattr(usage, 'completion_tokens', None)},"
         f"total={getattr(usage, 'total_tokens', None)})"
@@ -418,7 +424,8 @@ class GPTClient:
             now=now,
             status=status,
             model_name=model_name,
-            service_tier=service_tier,
+            request_tier=service_tier,
+            response_tier="-",
             user_id=user_id_str,
             instructions=instructions,
             input_text=input_text,
@@ -432,7 +439,8 @@ class GPTClient:
             now=now,
             status=status,
             model_name=model_name,
-            service_tier=service_tier,
+            request_tier=service_tier,
+            response_tier="-",
             user_id=user_id_str,
             instructions=instructions,
             input_text=input_text,
@@ -446,7 +454,8 @@ class GPTClient:
             now=now,
             status=status,
             model_name=model_name,
-            service_tier=service_tier,
+            request_tier=service_tier,
+            response_tier="-",
             user_id=user_id_str,
             usage=None,
         )
@@ -468,7 +477,7 @@ class GPTClient:
         model_for_log = _optional_str(payload.get("model")) or "-"
         instructions_for_log = str(payload.get("instructions", ""))
         input_for_log = str(payload.get("input", ""))
-        tier_for_log = _optional_str(payload.get("service_tier")) or default_tier
+        request_tier_for_log = _optional_str(payload.get("service_tier")) or default_tier
 
         if _is_tmp_error_block_active():
             message = _tmp_block_message()
@@ -476,7 +485,8 @@ class GPTClient:
                 now=datetime.now(),
                 status=f"{STATUS_ERROR_TMP} (global_lock_active)",
                 model_name=model_for_log,
-                service_tier=tier_for_log,
+                request_tier=request_tier_for_log,
+                response_tier="-",
                 user_id=user_id_str,
                 instructions=instructions_for_log,
                 input_text=input_for_log,
@@ -494,7 +504,8 @@ class GPTClient:
                     now=datetime.now(),
                     status=f"{STATUS_ERROR_INT} (gate_timeout)",
                     model_name=model_for_log,
-                    service_tier=tier_for_log,
+                    request_tier=request_tier_for_log,
+                    response_tier="-",
                     user_id=user_id_str,
                     instructions=instructions_for_log,
                     input_text=input_for_log,
@@ -507,7 +518,8 @@ class GPTClient:
                     now=datetime.now(),
                     status=f"{STATUS_ERROR_INT} (gate_timeout)",
                     model_name=model_for_log,
-                    service_tier=tier_for_log,
+                    request_tier=request_tier_for_log,
+                    response_tier="-",
                     user_id=user_id_str,
                     instructions=instructions_for_log,
                     input_text=input_for_log,
@@ -539,7 +551,8 @@ class GPTClient:
                     now=datetime.now(),
                     status=status_for_log,
                     model_name=model_for_log,
-                    service_tier=tier_for_log,
+                    request_tier=request_tier_for_log,
+                    response_tier=_optional_str(raw.get("service_tier")) or "-",
                     user_id=user_id_str,
                     instructions=instructions_for_log,
                     input_text=input_for_log,
@@ -552,7 +565,8 @@ class GPTClient:
                     now=datetime.now(),
                     status=status_for_log,
                     model_name=model_for_log,
-                    service_tier=tier_for_log,
+                    request_tier=request_tier_for_log,
+                    response_tier=_optional_str(raw.get("service_tier")) or "-",
                     user_id=user_id_str,
                     usage=usage,
                 )
@@ -570,7 +584,8 @@ class GPTClient:
                     now=datetime.now(),
                     status=f"{status_out}" if http_code is None else f"{status_out} ({http_code})",
                     model_name=model_for_log,
-                    service_tier=tier_for_log,
+                    request_tier=request_tier_for_log,
+                    response_tier="-",
                     user_id=user_id_str,
                     instructions=instructions_for_log,
                     input_text=input_for_log,
@@ -584,7 +599,8 @@ class GPTClient:
                     now=datetime.now(),
                     status=f"{status_out}" if http_code is None else f"{status_out} ({http_code})",
                     model_name=model_for_log,
-                    service_tier=tier_for_log,
+                    request_tier=request_tier_for_log,
+                    response_tier="-",
                     user_id=user_id_str,
                     instructions=instructions_for_log,
                     input_text=input_for_log,
@@ -598,7 +614,8 @@ class GPTClient:
                     now=datetime.now(),
                     status=f"{status_out}" if http_code is None else f"{status_out} ({http_code})",
                     model_name=model_for_log,
-                    service_tier=tier_for_log,
+                    request_tier=request_tier_for_log,
+                    response_tier="-",
                     user_id=user_id_str,
                     usage=None,
                 )
@@ -727,7 +744,8 @@ class GPTClient:
                         now=datetime.now(),
                         status="cache",
                         model_name=model_name,
-                        service_tier=effective_tier,
+                        request_tier=effective_tier,
+                        response_tier="-",
                         user_id=user_id_str,
                         instructions=instr,
                         input_text=inp,

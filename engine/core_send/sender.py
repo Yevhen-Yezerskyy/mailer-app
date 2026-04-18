@@ -18,7 +18,7 @@ from engine.common.mail.send import send_one
 from engine.common.utils import safe_dict
 
 _SEND_FAIL_SLEEP_SEC = 1.0
-_RUNTIME_TO_EMAIL_OVERRIDE = "eee@nowedel.de"
+_RUNTIME_TO_EMAIL_OVERRIDE = "bootsp85@gmail.com"
 
 
 @dataclass
