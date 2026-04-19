@@ -40,6 +40,7 @@ DISPATCHER_LOOP_SEC = 1.5
 DISPATCH_POOL_LIMIT = 10
 DISPATCH_HEAD_LIMIT = 5
 ACTIVE_TASK_REFRESH_SEC = 10.0
+TASK_EXHAUSTED_TTL_SEC = 10 * 60.0
 GS_SLOT_WORKER_MIN_LIFETIME_SEC = 60 * 60.0
 GS_SLOT_WORKER_MAX_LIFETIME_SEC = 90 * 60.0
 
@@ -198,6 +199,28 @@ def _try_lock_cb(cb_id: int) -> Optional[tuple[str, str]]:
     if resp and resp.get("acquired") is True and isinstance(resp.get("token"), str):
         return lock_key, str(resp["token"])
     return None
+
+
+def _task_exhausted_key(task_id: int) -> str:
+    return f"core_crawler:task_exhausted:{int(task_id)}"
+
+
+def _is_task_exhausted_cached(task_id: int) -> bool:
+    try:
+        return bool(CLIENT.get(_task_exhausted_key(task_id), ttl_sec=int(TASK_EXHAUSTED_TTL_SEC)))
+    except Exception:
+        return False
+
+
+def _mark_task_exhausted(task_id: int) -> None:
+    try:
+        CLIENT.set(
+            _task_exhausted_key(task_id),
+            str(int(time.time())).encode("ascii"),
+            ttl_sec=int(TASK_EXHAUSTED_TTL_SEC),
+        )
+    except Exception:
+        pass
 
 
 def _route_lock_key(site: str, slot_name: str) -> str:
@@ -617,10 +640,14 @@ def _refresh_dispatcher_active_tasks(state: DispatcherState, force: bool = False
         return
     active_tasks = _list_active_task_ids()
     active_set = set(active_tasks)
-    state.active_tasks = list(active_tasks)
+    state.active_tasks = [
+        int(task_id)
+        for task_id in active_tasks
+        if not _is_task_exhausted_cached(int(task_id))
+    ]
     state.pool_by_task = {
         int(task_id): list(state.pool_by_task.get(int(task_id), []) or [])
-        for task_id in active_tasks
+        for task_id in state.active_tasks
         if int(task_id) in active_set
     }
     state.last_active_refresh_at = now
@@ -630,6 +657,9 @@ def _reload_dispatcher_task_pool(state: DispatcherState, task_id: int) -> list[Q
     task_key = int(task_id)
     pool = _fetch_task_pool(task_key, limit=DISPATCH_POOL_LIMIT)
     state.pool_by_task[task_key] = list(pool)
+    if not pool:
+        _mark_task_exhausted(task_key)
+        _refresh_dispatcher_active_tasks(state, force=True)
     return pool
 
 
