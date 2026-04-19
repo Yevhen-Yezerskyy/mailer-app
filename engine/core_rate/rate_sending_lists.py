@@ -15,6 +15,7 @@ from urllib.request import Request, urlopen
 
 from psycopg.types.json import Json
 
+from engine.common.cache.client import CLIENT
 from engine.common.db import get_connection
 from engine.common.gpt import GPTClient
 from engine.common.logs import log
@@ -32,6 +33,8 @@ MAX_PAGE_TEXT_LEN = 8000
 MAX_WEBSITE_INPUT_LEN = 12000
 MAX_MEANINGFUL_BLOCKS = 30
 MIN_WORK_BATCH_SIZE = 15
+SMALL_BATCH_WAIT_TTL_SEC = 15 * 60
+SMALL_BATCH_READY_TTL_SEC = 7 * 24 * 60 * 60
 LOG_FILE = "rate_contacts.log"
 LOG_FOLDER = "processing"
 NOISY_LINE_MARKERS = (
@@ -43,6 +46,31 @@ NOISY_LINE_MARKERS = (
     "newsletter",
     "kontakt",
 )
+
+
+def _small_batch_wait_key(task_id: int) -> str:
+    return f"core_rate:contacts:small_batch:wait:{int(task_id)}"
+
+
+def _small_batch_ready_key(task_id: int) -> str:
+    return f"core_rate:contacts:small_batch:ready:{int(task_id)}"
+
+
+def _small_batch_is_waiting(task_id: int) -> bool:
+    return CLIENT.get(_small_batch_wait_key(int(task_id)), ttl_sec=1) is not None
+
+
+def _small_batch_is_ready(task_id: int) -> bool:
+    return CLIENT.get(_small_batch_ready_key(int(task_id)), ttl_sec=1) is not None
+
+
+def _small_batch_mark_first_seen(task_id: int) -> None:
+    CLIENT.set(_small_batch_wait_key(int(task_id)), b"1", ttl_sec=int(SMALL_BATCH_WAIT_TTL_SEC))
+    CLIENT.set(_small_batch_ready_key(int(task_id)), b"1", ttl_sec=int(SMALL_BATCH_READY_TTL_SEC))
+
+
+def _small_batch_clear_state(task_id: int) -> None:
+    CLIENT.delete_many([_small_batch_wait_key(int(task_id)), _small_batch_ready_key(int(task_id))])
 
 
 def _log_event(payload: Dict[str, Any]) -> None:
@@ -350,10 +378,23 @@ def run_once() -> Dict[str, Any]:
                 result["status"] = "no_batch"
                 conn.rollback()
                 return result
+
             if len(rows) < MIN_WORK_BATCH_SIZE:
-                result["status"] = "small_batch"
-                conn.rollback()
-                return result
+                small_batch_ready = _small_batch_is_ready(int(task_id))
+                small_batch_waiting = _small_batch_is_waiting(int(task_id))
+                if not small_batch_ready:
+                    _small_batch_mark_first_seen(int(task_id))
+                    result["status"] = "small_batch_wait_first"
+                    result["small_batch_wait_sec"] = int(SMALL_BATCH_WAIT_TTL_SEC)
+                    conn.rollback()
+                    return result
+                if small_batch_waiting:
+                    result["status"] = "small_batch_wait"
+                    conn.rollback()
+                    return result
+                _small_batch_clear_state(int(task_id))
+            else:
+                _small_batch_clear_state(int(task_id))
 
             items: List[Dict[str, Any]] = []
 
