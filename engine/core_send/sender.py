@@ -18,7 +18,6 @@ from engine.common.mail.send import send_one
 from engine.common.utils import safe_dict
 
 _SEND_FAIL_SLEEP_SEC = 1.0
-_RUNTIME_TO_EMAIL_OVERRIDE = "bootsp85@gmail.com"
 
 
 @dataclass
@@ -492,7 +491,6 @@ def _sender_loop(
                     campaign=campaign_payload,
                     contact=contact,
                     sending_list_id=int(candidate.sending_list_id),
-                    to_email_override=_RUNTIME_TO_EMAIL_OVERRIDE,
                     record_sent=True,
                 )
             )
