@@ -4,6 +4,7 @@
 
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils.translation import gettext as _trans
 
 from mailer_web.access import decode_id, encode_id
 from panel.aap_audience.models import AudienceTask
@@ -115,7 +116,7 @@ def create_archive_modal_view(request):
             "status": "ok",
             "ui_id": token,
             "title": task.title or "",
-            "modal_title": "Перенести в архив",
+            "modal_title": _trans("Перенести в архив"),
             "post_url": reverse("audience:create_list"),
             "action_name": "delete",
         },
@@ -152,7 +153,7 @@ def create_activate_modal_view(request):
             "status": "ok",
             "ui_id": token,
             "title": task.title or "",
-            "modal_title": "Вернуть из архива",
+            "modal_title": _trans("Вернуть из архива"),
             "post_url": reverse("audience:create_list"),
             "action_name": "activate",
         },

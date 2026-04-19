@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from django.http import JsonResponse
 from django.shortcuts import render
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _trans
 
 from mailer_web.access import decode_id
 from mailer_web.format_data import get_branches_sys_translations
@@ -55,17 +55,17 @@ def modal_edit_branch_rate_view(request):
 
     if request.method == "POST":
         if not task:
-            return JsonResponse({"ok": False, "error": str(_("Запись не найдена."))}, status=404)
+            return JsonResponse({"ok": False, "error": str(_trans("Запись не найдена."))}, status=404)
         if not branch_ids:
-            return JsonResponse({"ok": False, "error": str(_("Категория не найдена."))}, status=404)
+            return JsonResponse({"ok": False, "error": str(_trans("Категория не найдена."))}, status=404)
 
         try:
             rate = int(str(request.POST.get("rate") or "").strip())
         except Exception:
-            return JsonResponse({"ok": False, "error": str(_("Введите рейтинг от 1 до 20."))}, status=400)
+            return JsonResponse({"ok": False, "error": str(_trans("Введите рейтинг от 1 до 20."))}, status=400)
 
         if rate < 1 or rate > 20:
-            return JsonResponse({"ok": False, "error": str(_("Введите рейтинг от 1 до 20."))}, status=400)
+            return JsonResponse({"ok": False, "error": str(_trans("Введите рейтинг от 1 до 20."))}, status=400)
 
         with connection.cursor() as cur:
             cur.execute(

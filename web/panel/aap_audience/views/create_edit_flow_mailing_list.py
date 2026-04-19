@@ -12,6 +12,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 
+from engine.common.cache.client import CLIENT
 from engine.common.utils import parse_json_object
 from mailer_web.access import encode_id
 from mailer_web.format_contact import (
@@ -38,6 +39,16 @@ MAILING_SECTION_KEYS = {
     MAILING_SECTION_ALL,
 }
 MAILING_PAGE_SIZE = 50
+
+
+def _is_task_exhausted(task) -> bool:
+    if not task:
+        return False
+    try:
+        key = f"core_crawler:task_exhausted:{int(task.id)}"
+        return bool(CLIENT.get(key, ttl_sec=24 * 60 * 60))
+    except Exception:
+        return False
 
 
 def _format_total(value: int) -> str:
@@ -174,6 +185,8 @@ def _fetch_mailing_status(task) -> dict[str, Any]:
         return {
             "is_running": False,
             "is_paused": False,
+            "is_completed": False,
+            "is_exhausted": False,
             "total_count": 0,
             "rated_count": 0,
             "unrated_count": 0,
@@ -217,13 +230,17 @@ def _fetch_mailing_status(task) -> dict[str, Any]:
     out_count = int(row[4] or 0)
     max_rating = int(row[5]) if row[5] is not None else None
     is_task_active = bool(task.active and not task.archived)
-    is_running = bool(is_task_active)
-    is_paused = bool(not is_task_active)
+    is_exhausted = _is_task_exhausted(task)
+    is_completed = bool(is_exhausted and int(unrated_count) <= 0)
+    is_running = bool(is_task_active and not is_completed)
+    is_paused = bool((not is_task_active) and not is_completed)
     percent = int((rated_count * 100) / total_count) if total_count else 0
 
     return {
         "is_running": is_running,
         "is_paused": is_paused,
+        "is_completed": is_completed,
+        "is_exhausted": is_exhausted,
         "total_count": total_count,
         "rated_count": rated_count,
         "unrated_count": unrated_count,

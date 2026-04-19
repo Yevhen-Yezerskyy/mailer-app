@@ -18,7 +18,7 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.contrib import messages
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _trans
 
 from engine.common.email_template import sanitize
 from mailer_web.access import encode_id, decode_id, resolve_pk_or_redirect
@@ -244,7 +244,7 @@ def templates_view(request):
         if not template_name:
             storage = messages.get_messages(request)
             storage.used = True
-            messages.error(request, _("Имя шаблона обязательно."))
+            messages.error(request, _trans("Имя шаблона обязательно."))
             return redirect(f"{request.path}?{request.GET.urlencode()}")
 
         clean_html = sanitize(editor_template_parse_html(editor_html))
@@ -261,7 +261,7 @@ def templates_view(request):
             except IntegrityError:
                 storage = messages.get_messages(request)
                 storage.used = True
-                messages.error(request, _("Шаблон с таким именем уже существует."))
+                messages.error(request, _trans("Шаблон с таким именем уже существует."))
                 return redirect(f"{request.path}?{request.GET.urlencode()}")
 
             return redirect(f"{request.path}?state=edit&id={encode_id(int(obj.id))}")
@@ -299,7 +299,7 @@ def templates_view(request):
                 except IntegrityError:
                     storage = messages.get_messages(request)
                     storage.used = True
-                    messages.error(request, _("Шаблон с таким именем уже существует."))
+                    messages.error(request, _trans("Шаблон с таким именем уже существует."))
                     return redirect(f"{request.path}?{request.GET.urlencode()}")
 
                 return redirect(
@@ -367,7 +367,7 @@ def templates_archive_modal_view(request):
             "status": "ok",
             "ui_id": token,
             "title": tpl.template_name or "",
-            "modal_title": "Перенести в архив",
+            "modal_title": _trans("Перенести в архив"),
             "post_url": reverse("campaigns:templates"),
             "action_name": "archive",
         },
@@ -403,7 +403,7 @@ def templates_activate_modal_view(request):
             "status": "ok",
             "ui_id": token,
             "title": tpl.template_name or "",
-            "modal_title": "Вернуть из архива",
+            "modal_title": _trans("Вернуть из архива"),
             "post_url": reverse("campaigns:templates"),
             "action_name": "activate",
         },

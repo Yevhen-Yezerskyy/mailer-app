@@ -9,6 +9,7 @@
       <div
         class="YY-CARD_WHITE"
         data-contacts-total-panel="1"
+        data-contacts-exhausted="{% if contacts_step.is_exhausted %}1{% else %}0{% endif %}"
         data-contacts-total-url="{% if task and task_id_token %}{% url 'audience:create_contacts_total' %}?flow_type={{ type|urlencode }}&id={{ task_id_token|urlencode }}{% endif %}">
         <div class="flex items-center justify-between gap-4">
           <div>
@@ -16,11 +17,24 @@
               data-contacts-top-state="active"
               class="flex items-center gap-2 flex-wrap"
               {% if not contacts_step.is_active %}style="display:none !important;"{% endif %}>
-              <span class="{{ flow_mode_class }} !w-[33ch] !mb-0">
+              <span
+                data-contacts-active-label="collecting"
+                class="{{ flow_mode_class }} !w-[33ch] !mb-0"
+                {% if contacts_step.is_exhausted %}style="display:none !important;"{% endif %}>
                 {% trans "Контакты собираются" %}
               </span>
+              <span
+                data-contacts-active-label="collected"
+                class="{{ flow_mode_class }} !w-[33ch] !mb-0"
+                {% if not contacts_step.is_exhausted %}style="display:none !important;"{% endif %}>
+                {% trans "Контакты собраны" %}
+              </span>
               <span class="{{ flow_mode_class }} !w-fit !mb-0 gap-2">
-                <span class="inline-block h-3.5 w-3.5 rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin align-[-0.125em]" aria-hidden="true"></span>
+                <span
+                  data-contacts-active-spinner="1"
+                  class="inline-block h-3.5 w-3.5 rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin align-[-0.125em]"
+                  aria-hidden="true"
+                  {% if contacts_step.is_exhausted %}style="display:none !important;"{% endif %}></span>
                 <span>{% trans "Собрано контактов:" %}&nbsp;</span>
                 <span data-contacts-total-value="1">{{ contacts_step.contacts_total_display }}</span>
               </span>
@@ -36,12 +50,12 @@
                 <span>{% trans "Собрано контактов:" %}&nbsp;</span>
                 <span data-contacts-total-value="1">{{ contacts_step.contacts_total_display }}</span>
               </span>
-              {% if pause_info_modal_url and task and not task.archived %}
+              {% if pause_info_modal_url and task and not task.archived and not contacts_step.is_exhausted %}
                 <button
                   type="button"
                   class="{{ flow_mode_class }} !w-fit !mb-0 !px-2 inline-flex items-center justify-center shrink-0"
-                  aria-label="Инфо"
-                  title="Инфо"
+                  aria-label="{% trans 'Инфо' %}"
+                  title="{% trans 'Инфо' %}"
                   data-yy-modal="url={{ pause_info_modal_url|escape }}">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
@@ -112,17 +126,17 @@
         <form method="post">
           {% csrf_token %}
           <div class="YY-STATUS_RED !mb-3">
-            Задача на рейтингование и сбор контактов была изменена.
+            {% trans "Задача на рейтингование и сбор контактов была изменена." %}
           </div>
           <div class="grid grid-cols-3 gap-4">
             <button type="submit" name="action" value="contacts_rating_recalc" class="YY-BUTTON_MAIN_FULL">
-              Пересчитать рейтинги
+              {% trans "Пересчитать рейтинги" %}
             </button>
             <button type="submit" name="action" value="contacts_rating_restart" class="YY-BUTTON_MAIN_FULL">
-              Начать сбор контактов заново
+              {% trans "Начать сбор контактов заново" %}
             </button>
             <button type="submit" name="action" value="contacts_rating_ignore_hash" class="YY-BUTTON_MAIN_FULL">
-              Игнорировать
+              {% trans "Игнорировать" %}
             </button>
           </div>
         </form>
@@ -141,12 +155,12 @@
       style="position:absolute;top:10px;right:10px;">✕</button>
     <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
       <div class="YY-STATUS_BLUE !w-fit !mb-3">{% trans "Рейтинг Pair-R" %}</div>
-      <div class="YY-TEXT !mb-1">Сбор контактов производится по паре «Город — Категория».</div>
-      <div class="YY-TEXT">Для обеспечения оптимального порядка сбора контактов (сначала — самые лучшие) категориям и городам присвоен рейтинг.</div>
-      <div class="YY-TEXT !mb-1">Категориям присвоен рейтинг от 1 до 20, где 1 — лучший.</div>
-      <div class="YY-TEXT">Городам присвоен рейтинг от 1 до 100, где 1 — лучший.</div>
-      <div class="YY-TEXT">Рейтинг «Pair-R» — это произведение рейтинга категории и рейтинга города. Именно по нему сортируются пары «Город — Категория» при определении порядка сбора контактов.</div>
-      <div class="YY-TEXT !mb-0">На этапе формирования списка рассылки каждый контакт оценивается индивидуально, и ему присваивается рейтинг от 1 до 100, где 1 — лучший. Таким образом, рейтинг Pair-R — это не рейтинг контакта, а индикатор порядка сбора данных.</div>
+      <div class="YY-TEXT !mb-1">{% trans "Сбор контактов производится по паре «Город — Категория»." %}</div>
+      <div class="YY-TEXT">{% trans "Для обеспечения оптимального порядка сбора контактов (сначала — самые лучшие) категориям и городам присвоен рейтинг." %}</div>
+      <div class="YY-TEXT !mb-1">{% trans "Категориям присвоен рейтинг от 1 до 20, где 1 — лучший." %}</div>
+      <div class="YY-TEXT">{% trans "Городам присвоен рейтинг от 1 до 100, где 1 — лучший." %}</div>
+      <div class="YY-TEXT">{% trans "Рейтинг «Pair-R» — это произведение рейтинга категории и рейтинга города. Именно по нему сортируются пары «Город — Категория» при определении порядка сбора контактов." %}</div>
+      <div class="YY-TEXT !mb-0">{% trans "На этапе формирования списка рассылки каждый контакт оценивается индивидуально, и ему присваивается рейтинг от 1 до 100, где 1 — лучший. Таким образом, рейтинг Pair-R — это не рейтинг контакта, а индикатор порядка сбора данных." %}</div>
     </div>
   </div>
 </template>

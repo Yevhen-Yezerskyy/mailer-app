@@ -4,6 +4,11 @@
 
 (function () {
   let pendingForm = null;
+  const i18n = window.yyI18n || (document.documentElement && document.documentElement.yyI18n) || {};
+  const t = (key, fallback) => {
+    const v = i18n[key];
+    return typeof v === "string" && v.trim() ? v : fallback;
+  };
 
   function esc(s) {
     return String(s || "")
@@ -51,9 +56,9 @@
       e.preventDefault();
       pendingForm = form;
 
-      const message = form.getAttribute("data-yy-confirm") || "Подтвердить действие?";
-      const approveLabel = form.getAttribute("data-yy-confirm-approve") || "Подтвердить";
-      const cancelLabel = form.getAttribute("data-yy-confirm-cancel") || "Отмена";
+      const message = form.getAttribute("data-yy-confirm") || t("confirm_action_question", "Confirm action?");
+      const approveLabel = form.getAttribute("data-yy-confirm-approve") || t("confirm_approve", "Confirm");
+      const cancelLabel = form.getAttribute("data-yy-confirm-cancel") || t("cancel", "Cancel");
       openConfirmModal(message, approveLabel, cancelLabel);
     },
     true

@@ -8,6 +8,11 @@
 
 (function () {
   const SECRET_MASK = "********";
+  const i18n = window.yyI18n || (document.documentElement && document.documentElement.yyI18n) || {};
+  const t = (key, fallback) => {
+    const v = i18n[key];
+    return typeof v === "string" && v.trim() ? v : fallback;
+  };
 
   let yySecretModalState = null;
 
@@ -63,12 +68,12 @@
       const resp = await fetch(url, { method: "GET", credentials: "same-origin" });
       data = await resp.json();
     } catch (e) {
-      alert("Error");
+      alert(t("error", "Error"));
       return;
     }
 
     if (!data || !data.ok) {
-      alert("Error");
+      alert(t("error", "Error"));
       return;
     }
 

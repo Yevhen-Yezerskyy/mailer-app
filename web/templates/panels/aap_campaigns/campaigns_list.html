@@ -11,7 +11,7 @@
     <td class="YY-MAIN_TOP_LEFT_TD w-1/2">
       <div class="YY-CARD_WHITE">
         <a href="{% url 'campaigns:campaigns_flow_campaign' %}" class="YY-BUTTON_MAIN w-full !py-3 text-center">
-          Создать основную кампанию
+          {% trans "Создать основную кампанию" %}
         </a>
       </div>
     </td>
@@ -20,11 +20,11 @@
       <div class="YY-CARD_WHITE">
         {% if items %}
           <a href="{% url 'campaigns:campaigns_flow_campaign' %}?create_mode=followup" class="YY-BUTTON_MAIN w-full !py-3 text-center">
-            Создать последующую кампанию
+            {% trans "Создать последующую кампанию" %}
           </a>
         {% else %}
           <button type="button" class="YY-BUTTON_GRAY w-full !py-3 text-center" disabled>
-            Создать последующую кампанию
+            {% trans "Создать последующую кампанию" %}
           </button>
         {% endif %}
       </div>

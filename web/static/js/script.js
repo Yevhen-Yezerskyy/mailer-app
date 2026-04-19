@@ -120,6 +120,11 @@ document.addEventListener("click", function (e) {
 
 (function () {
   const $ = (s) => document.querySelector(s);
+  const i18n = window.yyI18n || (document.documentElement && document.documentElement.yyI18n) || {};
+  const t = (key, fallback) => {
+    const v = i18n[key];
+    return typeof v === "string" && v.trim() ? v : fallback;
+  };
 
   function openModal(html) {
     const m = $("#yy-modal");
@@ -186,6 +191,99 @@ document.addEventListener("click", function (e) {
     }
 
     openModal("");
+  }
+
+  function _resolveFormActionUrl(form) {
+    if (!form) return "";
+    const raw = String(form.getAttribute("action") || "").trim();
+    if (!raw) return "";
+    try {
+      return new URL(raw, window.location.href).toString();
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  function _setPauseInfoModalError(form, message) {
+    const text = String(message || "").trim();
+    const node = form ? form.querySelector("[data-pause-info-error='1']") : null;
+    const wrap = form ? form.querySelector("[data-pause-info-error-wrap='1']") : null;
+    if (node) node.textContent = text;
+    if (wrap) wrap.classList.toggle("hidden", !text);
+  }
+
+  function _handlePauseInfoContinueSubmit(event) {
+    const form = event.target.closest("[data-pause-info-continue-form='1']");
+    if (!form) return;
+
+    event.preventDefault();
+    _setPauseInfoModalError(form, "");
+
+    const data = new FormData(form);
+    const actionUrl = _resolveFormActionUrl(form) || window.location.href;
+    const csrfInput = form.querySelector("input[name='csrfmiddlewaretoken']");
+    const csrfFromInput = csrfInput ? String(csrfInput.value || "").trim() : "";
+    const csrfFromCookie = String(_getCookie("csrftoken") || "").trim();
+    const csrfToken = csrfFromInput || csrfFromCookie;
+    if (!String(data.get("csrfmiddlewaretoken") || "").trim() && csrfToken) {
+      data.set("csrfmiddlewaretoken", csrfToken);
+    }
+
+    if (window.YYWaitModal && typeof window.YYWaitModal.open === "function") {
+      window.YYWaitModal.open();
+    }
+
+    window.fetch(actionUrl, {
+      method: "POST",
+      body: data,
+      credentials: "same-origin",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+        "X-CSRFToken": csrfToken,
+      },
+    }).then(function (response) {
+      return response.text().then(function (text) {
+        let payload = {};
+        try {
+          payload = JSON.parse(String(text || ""));
+        } catch (_) {
+          payload = {};
+        }
+        return { response: response, payload: payload, text: String(text || "") };
+      });
+    }).then(function (result) {
+      const payload = result.payload || {};
+      if (result.response.ok) {
+        if (payload.ok === false) {
+          _setPauseInfoModalError(form, payload.error || t("request_failed", "Request failed"));
+          return;
+        }
+        window.location.reload();
+        return;
+      }
+
+      const bodyText = String(result.text || "");
+      if (payload && payload.error) {
+        _setPauseInfoModalError(form, payload.error);
+        return;
+      }
+      if (bodyText && /csrf/i.test(bodyText)) {
+        _setPauseInfoModalError(form, t("csrf_validation_failed", "CSRF validation failed"));
+        return;
+      }
+      _setPauseInfoModalError(form, t("request_failed", "Request failed"));
+    }).catch(function () {
+      _setPauseInfoModalError(form, t("request_failed", "Request failed"));
+    }).finally(function () {
+      if (window.YYWaitModal && typeof window.YYWaitModal.close === "function") {
+        window.YYWaitModal.close();
+      }
+    });
+  }
+
+  if (!window.__YY_PAUSE_INFO_HANDLER_BOUND__) {
+    document.addEventListener("submit", _handlePauseInfoContinueSubmit);
+    window.__YY_PAUSE_INFO_HANDLER_BOUND__ = true;
   }
 
   document.addEventListener("click", (e) => {

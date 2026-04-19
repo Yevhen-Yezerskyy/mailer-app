@@ -12,6 +12,11 @@
   "use strict";
 
   if (!window.tinymce) return;
+  const i18n = window.yyI18n || (document.documentElement && document.documentElement.yyI18n) || {};
+  const t = (key, fallback) => {
+    const v = i18n[key];
+    return typeof v === "string" && v.trim() ? v : fallback;
+  };
 
   const PREFIXES = {
     "": "",
@@ -58,7 +63,7 @@
     const initialText = existingText || selectedText;
 
     editor.windowManager.open({
-      title: "Link",
+      title: t("link_title", "Link"),
       body: {
         type: "panel",
         items: [
@@ -68,20 +73,20 @@
               {
                 type: "selectbox",
                 name: "protoKey",
-                label: "Protocol",
+                label: t("link_protocol_label", "Protocol"),
                 items: [
-                  { text: "(none)", value: "" },
+                  { text: t("link_protocol_none", "(none)"), value: "" },
                   { text: "https://", value: "https://" },
                   { text: "mailto:", value: "mailto:" },
                   { text: "tel:", value: "tel:" },
-                  { text: "WhatsApp", value: "wa" },
-                  { text: "Telegram", value: "tg" },
+                  { text: t("link_whatsapp", "WhatsApp"), value: "wa" },
+                  { text: t("link_telegram", "Telegram"), value: "tg" },
                 ],
               },
               {
                 type: "input",
                 name: "address",
-                label: "Address",
+                label: t("link_address_label", "Address"),
                 maximized: true, // Address шире, Protocol уже
               },
             ],
@@ -89,7 +94,7 @@
           {
             type: "input",
             name: "text",
-            label: "Text",
+            label: t("link_text_label", "Text"),
           },
         ],
       },
@@ -100,10 +105,10 @@
       },
       buttons: [
         linkNode
-          ? { type: "custom", name: "unlink", text: "Remove link", icon: "unlink", align: "start" }
+          ? { type: "custom", name: "unlink", text: t("link_remove", "Remove link"), icon: "unlink", align: "start" }
           : null,
-        { type: "cancel", text: "Cancel" },
-        { type: "submit", text: "Save", primary: true },
+        { type: "cancel", text: t("cancel", "Cancel") },
+        { type: "submit", text: t("link_save", "Save"), primary: true },
       ].filter(Boolean),
 
       onAction(api, details) {

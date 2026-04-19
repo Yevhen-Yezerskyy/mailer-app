@@ -226,7 +226,7 @@
                   window.YYModal.open("url=/panel/campaigns/campaigns/template/modal/choose-warning/");
                   return;
                 }
-                if (window.confirm("Продолжить?")) {
+                if (window.confirm("{% trans 'Продолжить?' %}")) {
                   const submitter = pendingSubmitter;
                   pendingSubmitter = null;
                   form.dataset.yyTplDeleteBypass = "1";

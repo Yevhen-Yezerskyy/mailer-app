@@ -7,6 +7,11 @@
 
 (function () {
   "use strict";
+  const i18n = window.yyI18n || (document.documentElement && document.documentElement.yyI18n) || {};
+  const t = (key, fallback) => {
+    const v = i18n[key];
+    return typeof v === "string" && v.trim() ? v : fallback;
+  };
 
   const _overlayCssCache = new Map();
   const _overlayHeaderTokensCache = new Map();
@@ -369,7 +374,7 @@
     if (!(gid && /^\d+$/.test(gid))) return;
 
     const ok = window.confirm(
-      "Вы уверены? Текущая работа над шаблоном будет частично или полностью потеряна."
+      t("template_switch_confirm", "Are you sure? Current template work will be partially or fully lost.")
     );
     if (!ok) return;
 

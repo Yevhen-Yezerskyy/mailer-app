@@ -5,6 +5,32 @@
 <!-- PURPOSE: "Постановка задачи" list page with create buttons and source fields table. -->
 
 {% block content %}
+<style>
+  @media (max-width: 1600px) {
+    .yy-create-flow-table th.yy-create-flow-left-col,
+    .yy-create-flow-table td.yy-create-flow-left-col {
+      width: 1% !important;
+      min-width: 1% !important;
+      white-space: nowrap !important;
+    }
+    .yy-create-flow-table td.yy-create-flow-left-col .YY-STATUS_YELLOW,
+    .yy-create-flow-table td.yy-create-flow-left-col .YY-STATUS_GREEN,
+    .yy-create-flow-table td.yy-create-flow-left-col .YY-STATUS_BLUE,
+    .yy-create-flow-table td.yy-create-flow-left-col .YY-STATUS_GRAY {
+      white-space: nowrap !important;
+    }
+    .yy-create-flow-stats {
+      flex-wrap: wrap;
+    }
+    .yy-create-flow-main-state {
+      flex: 1 0 100%;
+    }
+    .yy-create-flow-substat {
+      flex: 1 1 calc(50% - 0.25rem);
+      min-width: 0;
+    }
+  }
+</style>
 
 <table class="YY-MAIN_TABLE">
   <tr>
@@ -36,13 +62,13 @@
   <tr>
     <td class="YY-MAIN_BOTTOM_TD">
       <div class="YY-MAIN_BOTTOM_DIV">
-        <table class="w-full text-left">
+        <table class="w-full text-left yy-create-flow-table">
           <thead>
             <tr class="YY-TH_TR">
               {% if show_archive %}
-                <th class="YY-TH_TH !w-[220px]">{% trans "Архив" %}</th>
+                <th class="YY-TH_TH !w-[220px] yy-create-flow-left-col">{% trans "Архив" %}</th>
               {% else %}
-                <th class="YY-TH_TH !w-[220px]">{% trans "Списки рассылок" %}</th>
+                <th class="YY-TH_TH !w-[220px] yy-create-flow-left-col">{% trans "Списки рассылок" %}</th>
               {% endif %}
               <th class="YY-TH_TH w-[70%]">&nbsp;</th>
               <th class="YY-TH_TH text-right">
@@ -67,7 +93,7 @@
           <tbody>
             {% for t in tasks %}
                 <tr class="YY-TB_TR">
-                  <td class="YY-TB_TD !w-[220px] !px-1 !py-4">
+                  <td class="YY-TB_TD !w-[220px] !px-1 !py-4 yy-create-flow-left-col">
                     {% if t.type == "buy" %}
                       <div class="YY-STATUS_YELLOW !bg-white !mb-0">{% trans "Поиск поставщиков / подрядчиков" %}</div>
                     {% else %}
@@ -107,103 +133,84 @@
                   <td
                     class="YY-TB_TD !px-1 !py-4"
                     data-create-flow-row="1"
+                    data-create-contacts-active="{% if t.active %}1{% else %}0{% endif %}"
+                    data-create-rating-running="{% if t.active %}1{% else %}0{% endif %}"
                     data-create-contacts-url="{% url 'audience:create_contacts_total' %}?flow_type={{ t.type|urlencode }}&id={{ t.ui_id|urlencode }}"
                     data-create-mailing-url="{% url 'audience:create_mailing_status' %}?flow_type={{ t.type|urlencode }}&id={{ t.ui_id|urlencode }}">
                     {% if t.type == "buy" %}
                       <div class="YY-STATUS_YELLOW !bg-white !w-full !mb-0">
                         <div class="w-full">
-                          <span class="min-w-0">{{ t.title|default:""|linebreaksbr }}</span>&nbsp;&nbsp;&nbsp;<a href="#" class="inline-flex items-center gap-1 shrink-0 !font-normal text-[#795b00]" data-yy-modal="url=/panel/audience/create/modal/?id={{ t.ui_id }}">
-                            <span>{% trans "Подробнее" %}</span>
-                            <svg class="size-[22px] shrink-0" aria-hidden="true">
-                              <use href="#icon-arrow-circle"></use>
-                            </svg>
-                          </a>
+                          <a href="#" class="min-w-0 !font-semibold !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline text-[#795b00]" data-yy-modal="url=/panel/audience/create/modal/?id={{ t.ui_id }}">{{ t.title|default:""|linebreaksbr }}</a>
                         </div>
                       </div>
                     {% else %}
                       <div class="YY-STATUS_GREEN !bg-white !w-full !mb-0">
                         <div class="w-full">
-                          <span class="min-w-0">{{ t.title|default:""|linebreaksbr }}</span>&nbsp;&nbsp;&nbsp;<a href="#" class="inline-flex items-center gap-1 shrink-0 !font-normal text-[#097309]" data-yy-modal="url=/panel/audience/create/modal/?id={{ t.ui_id }}">
-                            <span>{% trans "Подробнее" %}</span>
-                            <svg class="size-[22px] shrink-0" aria-hidden="true">
-                              <use href="#icon-arrow-circle"></use>
-                            </svg>
-                          </a>
+                          <a href="#" class="min-w-0 !font-semibold !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline text-[#097309]" data-yy-modal="url=/panel/audience/create/modal/?id={{ t.ui_id }}">{{ t.title|default:""|linebreaksbr }}</a>
                         </div>
                       </div>
                     {% endif %}
-                    <div class="mt-3 flex items-stretch gap-2 w-full">
-                      <div class="basis-1/2 min-w-0" data-create-contacts-widget="1">
+                    <div class="mt-3 flex items-stretch gap-2 w-full yy-create-flow-stats">
+                      <div data-create-flow-state-widget="1" class="shrink-0 yy-create-flow-main-state">
                         <div
-                          data-create-contacts-state="active"
-                          class="flex items-center gap-1 flex-wrap"
+                          data-create-flow-state="active"
+                          class="flex items-center gap-1"
                           {% if not t.active %}style="display:none !important;"{% endif %}>
-                          <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-[31ch] !mb-0 !justify-between gap-1">
-                            <span>{% trans "Контакты собираются" %}</span>
+                          <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-[43ch] !mb-0 !justify-between !items-center !gap-1">
+                            <span>{% trans "Рейтингование / сбор запущены" %}</span>
                             <span class="inline-block h-3.5 w-3.5 rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin align-[-0.125em] shrink-0" aria-hidden="true"></span>
                           </span>
-                          <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-[21ch] !mb-0 !grid !grid-cols-[minmax(0,1fr)_auto] !items-center !gap-1">
-                            <span>{% trans "Собрано:" %}</span>
-                            <span data-create-contacts-total="1" class="text-right">0</span>
-                          </span>
-                          {% if t.type == "buy" %}
-                            <a href="{% url 'audience:create_edit_buy_contacts_id' t.ui_id %}" class="inline-flex items-center text-[#795b00] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Контакты' %}" title="{% trans 'Перейти в Контакты' %}">
-                              <svg class="size-[22px] shrink-0" aria-hidden="true">
-                                <use href="#icon-arrow-circle"></use>
-                              </svg>
-                            </a>
-                          {% else %}
-                            <a href="{% url 'audience:create_edit_sell_contacts_id' t.ui_id %}" class="inline-flex items-center text-[#097309] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Контакты' %}" title="{% trans 'Перейти в Контакты' %}">
-                              <svg class="size-[22px] shrink-0" aria-hidden="true">
-                                <use href="#icon-arrow-circle"></use>
-                              </svg>
-                            </a>
-                          {% endif %}
                         </div>
                         <div
-                          data-create-contacts-state="inactive"
-                          class="flex items-center gap-1 flex-wrap"
+                          data-create-flow-state="inactive"
+                          class="flex items-center gap-1"
                           {% if t.active %}style="display:none !important;"{% endif %}>
-                          <span class="YY-STATUS_GRAY !w-[31ch] !mb-0">
-                            {% trans "Сбор контактов приостановлен" %}
-                          </span>
-                          <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-[21ch] !mb-0 !grid !grid-cols-[minmax(0,1fr)_auto] !items-center !gap-1">
-                            <span>{% trans "Собрано:" %}</span>
-                            <span data-create-contacts-total="1" class="text-right">0</span>
-                          </span>
-                          {% if t.type == "buy" %}
-                            <a href="{% url 'audience:create_edit_buy_contacts_id' t.ui_id %}" class="inline-flex items-center text-[#795b00] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Контакты' %}" title="{% trans 'Перейти в Контакты' %}">
-                              <svg class="size-[22px] shrink-0" aria-hidden="true">
-                                <use href="#icon-arrow-circle"></use>
+                          <span class="YY-STATUS_GRAY !w-[43ch] !mb-0 !justify-between !items-center !gap-1">
+                            <span>{% trans "Рейтингование / сбор приостановлены" %}</span>
+                            <a
+                              href="#"
+                              class="inline-flex shrink-0 items-center justify-center text-[#5a6475] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline"
+                              data-yy-modal="url={% url 'audience:create_pause_info_modal' %}?id={{ t.ui_id|urlencode }}"
+                              aria-label="{% trans 'Информация о приостановке' %}">
+                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
                               </svg>
                             </a>
-                          {% else %}
-                            <a href="{% url 'audience:create_edit_sell_contacts_id' t.ui_id %}" class="inline-flex items-center text-[#097309] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Контакты' %}" title="{% trans 'Перейти в Контакты' %}">
-                              <svg class="size-[22px] shrink-0" aria-hidden="true">
-                                <use href="#icon-arrow-circle"></use>
-                              </svg>
-                            </a>
-                          {% endif %}
+                          </span>
                         </div>
                       </div>
-                      <div class="basis-1/2 min-w-0" data-create-rating-widget="1">
-                        <div
-                          data-create-rating-state="active"
-                          class="flex items-center gap-1 flex-wrap"
-                          {% if not t.active %}style="display:none !important;"{% endif %}>
-                          <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-[31ch] !mb-0 !justify-between gap-1">
-                            <span>{% trans "Рейтингование запущено" %}</span>
-                            <span class="inline-block h-3.5 w-3.5 rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin align-[-0.125em] shrink-0" aria-hidden="true"></span>
-                          </span>
-                          <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-[21ch] !mb-0 !grid !grid-cols-[minmax(0,1fr)_auto] !items-center !gap-1">
-                            <span class="inline-flex items-center !gap-0">
-                              <span>{% trans "Рейтинги" %}</span><span aria-hidden="true">&nbsp;</span>
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.25c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V2.75a.75.75 0 0 1 .75-.75 2.25 2.25 0 0 1 2.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282m0 0h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23H5.904m10.598-9.75H14.25M5.904 18.5c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 0 1-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h1.053c.472 0 .745.556.5.96a8.958 8.958 0 0 0-1.302 4.665c0 1.194.232 2.333.654 3.375Z" />
+                      <div class="basis-1/2 min-w-0 yy-create-flow-substat" data-create-contacts-widget="1">
+                        <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-full !mb-0 !grid !grid-cols-[minmax(0,1fr)_auto_auto] !items-center !gap-1">
+                          <span>{% trans "Собрано:" %}</span>
+                          <span data-create-contacts-total="1" class="text-right">0</span>
+                          {% if t.type == "buy" %}
+                            <a href="{% url 'audience:create_edit_buy_contacts_id' t.ui_id %}" class="inline-flex items-center text-[#795b00] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Контакты' %}" title="{% trans 'Перейти в Контакты' %}">
+                              <svg class="size-[22px] shrink-0" aria-hidden="true">
+                                <use href="#icon-arrow-circle"></use>
                               </svg>
-                              <span>:</span>
-                            </span>
-                            <span data-create-rating-total="1" class="text-right">0</span>
+                            </a>
+                          {% else %}
+                            <a href="{% url 'audience:create_edit_sell_contacts_id' t.ui_id %}" class="inline-flex items-center text-[#097309] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Контакты' %}" title="{% trans 'Перейти в Контакты' %}">
+                              <svg class="size-[22px] shrink-0" aria-hidden="true">
+                                <use href="#icon-arrow-circle"></use>
+                              </svg>
+                            </a>
+                          {% endif %}
+                        </span>
+                      </div>
+                      <div class="basis-1/2 min-w-0 yy-create-flow-substat" data-create-rating-widget="1">
+                        <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-full !mb-0 !grid !grid-cols-[minmax(0,1fr)_auto_auto] !items-center !gap-1">
+                          <span>{% trans "Рейтинги:" %}</span>
+                          <span class="inline-flex items-center gap-1 justify-end text-right whitespace-nowrap">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.25c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V2.75a.75.75 0 0 1 .75-.75 2.25 2.25 0 0 1 2.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282m0 0h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23H5.904m10.598-9.75H14.25M5.904 18.5c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 0 1-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h1.053c.472 0 .745.556.5.96a8.958 8.958 0 0 0-1.302 4.665c0 1.194.232 2.333.654 3.375Z" />
+                            </svg>
+                            <span data-create-rating-good="1">0</span>
+                            <span>/</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 rotate-180" aria-hidden="true">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.25c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V2.75a.75.75 0 0 1 .75-.75 2.25 2.25 0 0 1 2.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282m0 0h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23H5.904m10.598-9.75H14.25M5.904 18.5c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 0 1-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h1.053c.472 0 .745.556.5.96a8.958 8.958 0 0 0-1.302 4.665c0 1.194.232 2.333.654 3.375Z" />
+                            </svg>
+                            <span data-create-rating-bad="1">0</span>
                           </span>
                           {% if t.type == "buy" %}
                             <a href="{% url 'audience:create_edit_buy_mailing_list_id' t.ui_id %}" class="inline-flex items-center text-[#795b00] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Рейтинг' %}" title="{% trans 'Перейти в Рейтинг' %}">
@@ -218,38 +225,7 @@
                               </svg>
                             </a>
                           {% endif %}
-                        </div>
-                        <div
-                          data-create-rating-state="inactive"
-                          class="flex items-center gap-1 flex-wrap"
-                          {% if t.active %}style="display:none !important;"{% endif %}>
-                          <span class="YY-STATUS_GRAY !w-[31ch] !mb-0">
-                            {% trans "Рейтингование приостановлено" %}
-                          </span>
-                          <span class="{% if t.type == 'buy' %}YY-STATUS_YELLOW{% else %}YY-STATUS_GREEN{% endif %} !w-[21ch] !mb-0 !grid !grid-cols-[minmax(0,1fr)_auto] !items-center !gap-1">
-                            <span class="inline-flex items-center !gap-0">
-                              <span>{% trans "Рейтинги" %}</span><span aria-hidden="true">&nbsp;</span>
-                              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.25c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V2.75a.75.75 0 0 1 .75-.75 2.25 2.25 0 0 1 2.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282m0 0h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23H5.904m10.598-9.75H14.25M5.904 18.5c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 0 1-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h1.053c.472 0 .745.556.5.96a8.958 8.958 0 0 0-1.302 4.665c0 1.194.232 2.333.654 3.375Z" />
-                              </svg>
-                              <span>:</span>
-                            </span>
-                            <span data-create-rating-total="1" class="text-right">0</span>
-                          </span>
-                          {% if t.type == "buy" %}
-                            <a href="{% url 'audience:create_edit_buy_mailing_list_id' t.ui_id %}" class="inline-flex items-center text-[#795b00] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Рейтинг' %}" title="{% trans 'Перейти в Рейтинг' %}">
-                              <svg class="size-[22px] shrink-0" aria-hidden="true">
-                                <use href="#icon-arrow-circle"></use>
-                              </svg>
-                            </a>
-                          {% else %}
-                            <a href="{% url 'audience:create_edit_sell_mailing_list_id' t.ui_id %}" class="inline-flex items-center text-[#097309] !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" aria-label="{% trans 'Перейти в Рейтинг' %}" title="{% trans 'Перейти в Рейтинг' %}">
-                              <svg class="size-[22px] shrink-0" aria-hidden="true">
-                                <use href="#icon-arrow-circle"></use>
-                              </svg>
-                            </a>
-                          {% endif %}
-                        </div>
+                        </span>
                       </div>
                     </div>
                   </td>
@@ -366,12 +342,36 @@
       });
     }
 
+    function parseStatusFlag(value) {
+      if (String(value) === "1") return true;
+      if (String(value) === "0") return false;
+      return null;
+    }
+
+    function syncFlowStateBadge(row) {
+      const widget = row.querySelector("[data-create-flow-state-widget='1']");
+      if (!widget) return;
+
+      const contactsActive = parseStatusFlag(row.getAttribute("data-create-contacts-active"));
+      const ratingRunning = parseStatusFlag(row.getAttribute("data-create-rating-running"));
+      if (contactsActive === null && ratingRunning === null) return;
+
+      const isRunning = (
+        contactsActive !== null && ratingRunning !== null
+      )
+        ? (contactsActive && ratingRunning)
+        : (contactsActive !== null ? contactsActive : ratingRunning);
+
+      setVisible(widget.querySelector("[data-create-flow-state='active']"), isRunning);
+      setVisible(widget.querySelector("[data-create-flow-state='inactive']"), !isRunning);
+    }
+
     function applyContactsState(row, payload) {
       const widget = row.querySelector("[data-create-contacts-widget='1']");
       if (!widget || !payload) return;
       const isActive = payload.is_active === true;
-      setVisible(widget.querySelector("[data-create-contacts-state='active']"), isActive);
-      setVisible(widget.querySelector("[data-create-contacts-state='inactive']"), !isActive);
+      row.setAttribute("data-create-contacts-active", isActive ? "1" : "0");
+      syncFlowStateBadge(row);
       const totalText = formatNumber(payload.contacts_total || 0);
       widget.querySelectorAll("[data-create-contacts-total='1']").forEach(function (node) {
         node.textContent = totalText;
@@ -382,14 +382,19 @@
       const widget = row.querySelector("[data-create-rating-widget='1']");
       if (!widget || !payload) return;
       const isRunning = payload.is_running === true;
-      setVisible(widget.querySelector("[data-create-rating-state='active']"), isRunning);
-      setVisible(widget.querySelector("[data-create-rating-state='inactive']"), !isRunning);
+      row.setAttribute("data-create-rating-running", isRunning ? "1" : "0");
+      syncFlowStateBadge(row);
       const ratedCount = Number(payload.rated_count || 0);
       const outCount = Number(payload.out_count || 0);
       const leRateLimit = Math.max(0, (Number.isFinite(ratedCount) ? ratedCount : 0) - (Number.isFinite(outCount) ? outCount : 0));
-      const ratedText = formatNumber(leRateLimit);
-      widget.querySelectorAll("[data-create-rating-total='1']").forEach(function (node) {
-        node.textContent = ratedText;
+      const badCount = Math.max(0, Number.isFinite(outCount) ? outCount : 0);
+      const goodText = formatNumber(leRateLimit);
+      const badText = formatNumber(badCount);
+      widget.querySelectorAll("[data-create-rating-good='1']").forEach(function (node) {
+        node.textContent = goodText;
+      });
+      widget.querySelectorAll("[data-create-rating-bad='1']").forEach(function (node) {
+        node.textContent = badText;
       });
     }
 

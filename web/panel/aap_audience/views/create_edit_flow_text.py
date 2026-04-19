@@ -12,6 +12,7 @@ from django.shortcuts import redirect, render
 from engine.common.gpt import GPTClient
 from mailer_web.access import encode_id
 
+from .create_edit_flow_gpt_consts import FLOW_GPT_MODEL, FLOW_GPT_SERVICE_TIER
 from .create_edit_flow_shared import (
     FLOW_GPT_UNAVAILABLE_TEXT,
     TEXT_STEP_KEYS,
@@ -127,13 +128,13 @@ def _run_section_dialog(
         payload = f"{step_def['input_label']}:\n{value}\n\nКОМАНДА:\n{command}"
 
     resp = GPTClient().ask_dialog(
-        model="standard",
+        model=FLOW_GPT_MODEL,
         instructions=prompt_instructions(request, step_def["prompt_key"]),
         input=payload,
         conversation=str(state.get("conversation_id") or ""),
         previous_response_id=str(state.get("response_id") or ""),
         user_id=step_def["user_id"],
-        service_tier="flex",
+        service_tier=FLOW_GPT_SERVICE_TIER,
         web_search=True,
     )
     if not is_gpt_ok(resp):

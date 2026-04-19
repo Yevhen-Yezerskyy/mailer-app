@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils.translation import gettext as _trans
 
 from engine.common.mail.domain_whitelist import is_domain_whitelisted
 from mailer_web.access import decode_id, encode_id
@@ -145,7 +146,7 @@ def mail_servers_view(request):
 
     flow_mode = state in ("add", "edit")
     flow_mailbox_ui_id = edit_obj.ui_id if edit_obj else ""
-    flow_title = edit_obj.email if edit_obj else "Новый почтовый сервер"
+    flow_title = edit_obj.email if edit_obj else _trans("Новый почтовый сервер")
     flow_step_states = build_mail_servers_flow_step_states(
         current_step="identity",
         mailbox_ui_id=flow_mailbox_ui_id,
@@ -306,7 +307,7 @@ def mail_servers_archive_modal_view(request):
             "status": "ok",
             "ui_id": token,
             "title": mailbox.email,
-            "modal_title": "Перенести в архив",
+            "modal_title": _trans("Перенести в архив"),
             "post_url": reverse("settings:mail_servers"),
             "action_name": "archive",
         },
@@ -349,7 +350,7 @@ def mail_servers_activate_modal_view(request):
             "status": "ok",
             "ui_id": token,
             "title": mailbox.email,
-            "modal_title": "Вернуть из архива",
+            "modal_title": _trans("Вернуть из архива"),
             "post_url": reverse("settings:mail_servers"),
             "action_name": "unarchive",
         },

@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 from django.urls import reverse
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _trans
 
 
 FLOW_STEP_LABELS: dict[str, Any] = {
-    "identity": _("Email и лимиты"),
-    "smtp": _("SMTP сервер"),
-    "imap": _("IMAP сервер"),
+    "identity": _trans("Email и лимиты"),
+    "smtp": _trans("SMTP сервер"),
+    "imap": _trans("IMAP сервер"),
 }
 
 

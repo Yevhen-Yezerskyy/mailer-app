@@ -12,6 +12,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import reverse
 
+from engine.common.cache.client import CLIENT
 from engine.common.utils import parse_json_object
 from mailer_web.access import encode_id
 from mailer_web.format_contact import (
@@ -600,16 +601,28 @@ def _is_contacts_active(task) -> bool:
     return bool(task and task.active and not task.archived)
 
 
+def _is_contacts_exhausted(task) -> bool:
+    if not task:
+        return False
+    try:
+        key = f"core_crawler:task_exhausted:{int(task.id)}"
+        return bool(CLIENT.get(key, ttl_sec=24 * 60 * 60))
+    except Exception:
+        return False
+
+
 def _is_contacts_completed(task) -> bool:
     return False
 
 
 def _build_contacts_step_context(task) -> dict[str, Any]:
     is_active = _is_contacts_active(task)
+    is_exhausted = _is_contacts_exhausted(task)
     is_completed = _is_contacts_completed(task)
     contacts_total = _fetch_contacts_total(int(task.id)) if task else 0
     return {
         "is_active": is_active,
+        "is_exhausted": is_exhausted,
         "is_completed": is_completed,
         "contacts_total": contacts_total,
         "contacts_total_display": _format_contacts_total(contacts_total),
@@ -665,6 +678,8 @@ def _build_active_contacts_context(
     active_section: str,
 ) -> dict[str, Any]:
     section_key = _normalize_contacts_section(active_section)
+    is_active = _is_contacts_active(task)
+    is_exhausted = _is_contacts_exhausted(task)
     query = str(request.GET.get("q") or "").strip()
     page = _get_page_value(str(request.GET.get("page") or "1"))
     section_urls = _build_contacts_section_urls(flow_type, item_id)
@@ -682,7 +697,7 @@ def _build_active_contacts_context(
     context = {
         "contacts_active_section": section_key,
         "contacts_section_urls": section_urls,
-        "contacts_collect_running": _is_contacts_active(task),
+        "contacts_collect_running": bool(is_active and not is_exhausted),
         "contacts_active_partial_url": active_partial_url,
     }
     context.update(
@@ -742,6 +757,7 @@ def contacts_total_view(request):
         {
             "ok": True,
             "is_active": _is_contacts_active(task),
+            "is_exhausted": _is_contacts_exhausted(task),
             "contacts_total": _fetch_contacts_total(int(task.id)),
         }
     )

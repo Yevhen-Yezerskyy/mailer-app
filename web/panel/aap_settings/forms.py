@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, List, get_args
 
 from django import forms
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _trans
 
 from engine.common.mail.types import ConnSecurity, ImapCredsLogin, SmtpCredsLogin, SmtpCredsRelayNoAuth
 from panel.aap_settings.client_subsites import normalize_client_domain
@@ -84,12 +84,12 @@ LOGIN_FIELD_BUILDERS: Dict[str, Callable[[], forms.Field]] = {
 
 class MailboxAddForm(forms.Form):
     email = forms.EmailField(
-        label=_("Email"),
+        label=_trans("Email"),
         required=True,
         widget=forms.TextInput(attrs={"class": "YY-INPUT !w-full !mb-0", "placeholder": "name@domain.tld"}),
     )
     limit_hour = forms.IntegerField(
-        label=_("Лимит отправки в час"),
+        label=_trans("Лимит отправки в час"),
         required=True,
         initial=60,
         widget=forms.NumberInput(
@@ -105,7 +105,7 @@ class MailboxAddForm(forms.Form):
         ),
     )
     limit_day = forms.IntegerField(
-        label=_("Лимит отправки в сутки"),
+        label=_trans("Лимит отправки в сутки"),
         required=True,
         initial=500,
         widget=forms.NumberInput(
@@ -136,7 +136,7 @@ class MailboxAddForm(forms.Form):
         if self.mailbox_id is not None:
             q = q.exclude(id=self.mailbox_id)
         if q.exists():
-            self.add_error("email", _("Этот Email уже используется."))
+            self.add_error("email", _trans("Этот Email уже используется."))
 
         return cleaned
 
@@ -157,7 +157,7 @@ class WorkspaceDomainForm(forms.ModelForm):
             ),
         }
         labels = {
-            "domain": _("Домен"),
+            "domain": _trans("Домен"),
         }
 
     def __init__(self, *args, workspace_id=None, **kwargs):
@@ -170,7 +170,7 @@ class WorkspaceDomainForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)
         if qs.exists():
-            raise forms.ValidationError(_("Такой домен уже добавлен."))
+            raise forms.ValidationError(_trans("Такой домен уже добавлен."))
         return domain
 
     def save(self, commit=True):
@@ -202,13 +202,13 @@ class SmtpConnForm(forms.Form, _LoginFieldsFromTypesMixin):
     auth_type = forms.CharField(required=False, widget=forms.HiddenInput())
 
     from_name = forms.CharField(
-        label=_("Отправитель:"),
+        label=_trans("Отправитель:"),
         required=False,
-        widget=forms.TextInput(attrs={"class": "YY-INPUT", "placeholder": _("Отправитель")}),
+        widget=forms.TextInput(attrs={"class": "YY-INPUT", "placeholder": _trans("Отправитель")}),
     )
 
     limit_hour_sent = forms.IntegerField(
-        label=_("Лимит/час"),
+        label=_trans("Лимит/час"),
         required=False,
         initial=50,
         widget=forms.TextInput(
@@ -258,7 +258,7 @@ class SmtpConnForm(forms.Form, _LoginFieldsFromTypesMixin):
             if self.require_password:
                 required.append("password")
 
-        if not _require_all_or_error(self, cleaned, required, _("Заполните все поля SMTP.")):
+        if not _require_all_or_error(self, cleaned, required, _trans("Заполните все поля SMTP.")):
             return cleaned
 
         try:
@@ -266,15 +266,15 @@ class SmtpConnForm(forms.Form, _LoginFieldsFromTypesMixin):
         except Exception:
             lim = 0
         if lim < 1:
-            self.add_error(None, _("Лимит должен быть не меньше 1 письма в час."))
+            self.add_error(None, _trans("Лимит должен быть не меньше 1 письма в час."))
             return cleaned
         if lim > 300:
-            self.add_error(None, _("Максимум 300 писем в час."))
+            self.add_error(None, _trans("Максимум 300 писем в час."))
             return cleaned
 
         sec = (cleaned.get("security") or "").strip()
         if sec not in SECURITY_SET:
-            self.add_error("security", _("Некорректное значение шифрования."))
+            self.add_error("security", _trans("Некорректное значение шифрования."))
             return cleaned
 
         return cleaned
@@ -317,12 +317,12 @@ class ImapConnForm(forms.Form, _LoginFieldsFromTypesMixin):
         if self.require_password:
             required.append("password")
 
-        if not _require_all_or_error(self, cleaned, required, _("Заполните все поля IMAP.")):
+        if not _require_all_or_error(self, cleaned, required, _trans("Заполните все поля IMAP.")):
             return cleaned
 
         sec = (cleaned.get("security") or "").strip()
         if sec not in SECURITY_SET:
-            self.add_error("security", _("Некорректное значение шифрования."))
+            self.add_error("security", _trans("Некорректное значение шифрования."))
             return cleaned
 
         return cleaned
@@ -339,13 +339,13 @@ class SmtpServerForm(forms.Form, _LoginFieldsFromTypesMixin):
     auth_type = forms.CharField(required=False, widget=forms.HiddenInput())
 
     sender_name = forms.CharField(
-        label=_("Отправитель"),
+        label=_trans("Отправитель"),
         required=True,
         widget=forms.TextInput(attrs={"class": "YY-INPUT"}),
     )
 
     email = forms.EmailField(
-        label=_("Email"),
+        label=_trans("Email"),
         required=True,
         widget=forms.EmailInput(attrs={"class": "YY-INPUT", "autocomplete": "off"}),
     )
@@ -375,19 +375,19 @@ class SmtpServerForm(forms.Form, _LoginFieldsFromTypesMixin):
         auth_type = (cleaned.get("auth_type") or "LOGIN").strip().upper()
 
         required = list(SMTP_RELAY_NOAUTH_KEYS)
-        err_msg = _("Заполните все поля SMTP (RELAY NOAUTH).")
+        err_msg = _trans("Заполните все поля SMTP (RELAY NOAUTH).")
         if auth_type != "RELAY_NOAUTH":
             required.append("username")
             if self.require_password:
                 required.append("password")
-            err_msg = _("Заполните все поля SMTP (LOGIN).")
+            err_msg = _trans("Заполните все поля SMTP (LOGIN).")
 
         if not _require_all_or_error(self, cleaned, required, err_msg):
             return cleaned
 
         sec = (cleaned.get("security") or "").strip()
         if sec not in SECURITY_SET:
-            self.add_error("security", _("Некорректное значение шифрования."))
+            self.add_error("security", _trans("Некорректное значение шифрования."))
             return cleaned
 
         return cleaned

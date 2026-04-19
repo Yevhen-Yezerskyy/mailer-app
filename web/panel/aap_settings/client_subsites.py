@@ -9,6 +9,7 @@ import shutil
 from pathlib import Path
 
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext_lazy as _trans
 
 
 _RE_DOMAIN = re.compile(
@@ -21,11 +22,11 @@ CLIENT_SUBSITES_ROOT = _REPO_ROOT / "client-subsites"
 def normalize_client_domain(value: str) -> str:
     domain = (value or "").strip().lower().rstrip(".")
     if not domain:
-        raise ValidationError("Укажите домен.")
+        raise ValidationError(_trans("Укажите домен."))
     if "://" in domain or "/" in domain or "\\" in domain:
-        raise ValidationError("Укажите только домен без протокола и пути.")
+        raise ValidationError(_trans("Укажите только домен без протокола и пути."))
     if not _RE_DOMAIN.fullmatch(domain):
-        raise ValidationError("Укажите корректный домен.")
+        raise ValidationError(_trans("Укажите корректный домен."))
     return domain
 
 
@@ -39,7 +40,7 @@ def client_subsite_path(domain: str) -> Path:
     root = CLIENT_SUBSITES_ROOT.resolve()
     path = (root / normalized).resolve()
     if path.parent != root:
-        raise ValidationError("Некорректный домен.")
+        raise ValidationError(_trans("Некорректный домен."))
     return path
 
 
@@ -47,7 +48,7 @@ def ensure_client_subsite_dir(domain: str) -> Path:
     path = client_subsite_path(domain)
     CLIENT_SUBSITES_ROOT.mkdir(parents=True, exist_ok=True)
     if path.exists() and not path.is_dir():
-        raise ValidationError("Путь домена уже занят не каталогом.")
+        raise ValidationError(_trans("Путь домена уже занят не каталогом."))
     path.mkdir(exist_ok=True)
     return path
 

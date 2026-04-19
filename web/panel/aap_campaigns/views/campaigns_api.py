@@ -16,6 +16,7 @@ from uuid import UUID
 
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.utils.translation import gettext as _trans
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
@@ -215,10 +216,10 @@ def campaigns__letter_guard_modal_view(request: HttpRequest) -> HttpResponse:
     if not ws_id:
         return HttpResponse(status=403)
 
-    title = (request.GET.get("title") or "").strip() or "Письмо кампании"
-    text = (request.GET.get("text") or "").strip() or "Подтвердите действие."
-    approve_label = (request.GET.get("approve") or "").strip() or "Продолжить"
-    cancel_label = (request.GET.get("cancel") or "").strip() or "Отмена"
+    title = (request.GET.get("title") or "").strip() or _trans("Письмо кампании")
+    text = (request.GET.get("text") or "").strip() or _trans("Подтвердите действие.")
+    approve_label = (request.GET.get("approve") or "").strip() or _trans("Продолжить")
+    cancel_label = (request.GET.get("cancel") or "").strip() or _trans("Отмена")
     show_cancel_raw = (request.GET.get("show_cancel") or "1").strip()
     show_cancel = show_cancel_raw not in ("0", "false", "False", "no", "No")
 

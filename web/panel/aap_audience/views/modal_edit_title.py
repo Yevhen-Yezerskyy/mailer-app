@@ -6,12 +6,13 @@ from __future__ import annotations
 
 from django.http import JsonResponse
 from django.shortcuts import render
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _trans
 
 from engine.common.gpt import GPTClient
 from engine.common.translate import get_prompt
 from mailer_web.access import decode_id
 from panel.aap_audience.models import AudienceTask
+from .create_edit_flow_gpt_consts import FLOW_GPT_MODEL, FLOW_GPT_SERVICE_TIER
 from .create_edit_flow_shared import FLOW_GPT_UNAVAILABLE_TEXT, is_gpt_ok, mark_flow_gpt_unavailable
 
 def _resolve_task(request, token: str):
@@ -63,7 +64,7 @@ def _display_title(task) -> str:
     title = (task.title or "").strip()
     if title:
         return title
-    return f"{_('Список рассылки')} #{int(task.id)}"
+    return f"{_trans('Список рассылки')} #{int(task.id)}"
 
 
 def modal_edit_title_view(request):
@@ -72,7 +73,7 @@ def modal_edit_title_view(request):
 
     if request.method == "POST":
         if not task:
-            return JsonResponse({"ok": False, "error": str(_("Запись не найдена."))}, status=404)
+            return JsonResponse({"ok": False, "error": str(_trans("Запись не найдена."))}, status=404)
 
         action = (request.POST.get("action") or "").strip()
 
@@ -81,17 +82,17 @@ def modal_edit_title_view(request):
                 return JsonResponse(
                     {
                         "ok": False,
-                        "error": str(_("Для предложения названия нужно сохранить продукт и компанию.")),
+                        "error": str(_trans("Для предложения названия нужно сохранить продукт и компанию.")),
                     },
                     status=400,
                 )
 
             resp = GPTClient().ask(
-                model="standard",
+                model=FLOW_GPT_MODEL,
                 instructions=_prompt_instructions(request, _title_prompt_key(task)),
                 input=_title_input(task),
                 user_id=_title_user_id(task),
-                service_tier="flex",
+                service_tier=FLOW_GPT_SERVICE_TIER,
                 web_search=False,
             )
             if not is_gpt_ok(resp):
@@ -99,7 +100,7 @@ def modal_edit_title_view(request):
                 return JsonResponse(
                     {
                         "ok": False,
-                        "error": str(_(FLOW_GPT_UNAVAILABLE_TEXT)),
+                        "error": str(_trans(FLOW_GPT_UNAVAILABLE_TEXT)),
                         "gpt_unavailable": True,
                         "popup_text": FLOW_GPT_UNAVAILABLE_TEXT,
                     },
@@ -108,7 +109,7 @@ def modal_edit_title_view(request):
             title = (resp.content or "").strip()
             if not title:
                 return JsonResponse(
-                    {"ok": False, "error": str(_("Не удалось предложить название."))},
+                    {"ok": False, "error": str(_trans("Не удалось предложить название."))},
                     status=400,
                 )
             return JsonResponse({"ok": True, "title": title})
@@ -117,14 +118,14 @@ def modal_edit_title_view(request):
             title = (request.POST.get("title") or "").strip()
             if not title:
                 return JsonResponse(
-                    {"ok": False, "error": str(_("Введите название списка рассылки."))},
+                    {"ok": False, "error": str(_trans("Введите название списка рассылки."))},
                     status=400,
                 )
             task.title = title
             task.save(update_fields=["title", "updated_at"])
             return JsonResponse({"ok": True, "title": title})
 
-        return JsonResponse({"ok": False, "error": str(_("Неизвестное действие."))}, status=400)
+        return JsonResponse({"ok": False, "error": str(_trans("Неизвестное действие."))}, status=400)
 
     return render(
         request,

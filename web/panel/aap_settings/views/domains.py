@@ -8,6 +8,7 @@ from django.contrib import messages
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.translation import gettext as _trans
 from django.views.decorators.http import require_POST
 
 from panel.aap_settings.client_subsites import client_subsite_relpath, delete_client_subsite_dir, ensure_client_subsite_dir
@@ -34,7 +35,7 @@ def domains_view(request):
             with transaction.atomic():
                 obj = form.save()
                 ensure_client_subsite_dir(obj.domain)
-            messages.success(request, "Домен добавлен.")
+            messages.success(request, _trans("Домен добавлен."))
             return redirect(reverse("settings:domains"))
     else:
         form = WorkspaceDomainForm(workspace_id=ws_id)
@@ -70,5 +71,5 @@ def domain_delete_view(request, pk: int):
         obj.delete()
         delete_client_subsite_dir(domain)
 
-    messages.success(request, "Домен удалён.")
+    messages.success(request, _trans("Домен удалён."))
     return redirect(reverse("settings:domains"))

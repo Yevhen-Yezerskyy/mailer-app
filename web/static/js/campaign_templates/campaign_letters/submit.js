@@ -7,6 +7,11 @@
   "use strict";
 
   const $ = (s) => document.querySelector(s);
+  const i18n = window.yyI18n || (document.documentElement && document.documentElement.yyI18n) || {};
+  const t = (key, fallback) => {
+    const v = i18n[key];
+    return typeof v === "string" && v.trim() ? v : fallback;
+  };
 
   function normalizeTabsTo2Spaces(s) {
     return (s || "").replace(/\t/g, "  ");
@@ -20,8 +25,8 @@
     const title = String((opts && opts.title) || "");
     const text = String((opts && opts.text) || "");
     const statusClass = String((opts && opts.statusClass) || "YY-STATUS_BLUE");
-    const approveLabel = String((opts && opts.approveLabel) || "Продолжить");
-    const cancelLabel = String((opts && opts.cancelLabel) || "Отмена");
+    const approveLabel = String((opts && opts.approveLabel) || t("continue_label", "Continue"));
+    const cancelLabel = String((opts && opts.cancelLabel) || t("cancel", "Cancel"));
     const onApprove = opts && typeof opts.onApprove === "function" ? opts.onApprove : null;
     const showCancel = (opts && opts.showCancel) !== false;
 
@@ -183,11 +188,11 @@
   }
 
   function openConfirmModal(opts) {
-    const title = String((opts && opts.title) || "Письмо кампании");
+    const title = String((opts && opts.title) || t("campaign_letter", "Campaign letter"));
     const text = String((opts && opts.text) || "");
     const statusClass = String((opts && opts.statusClass) || "YY-STATUS_BLUE");
-    const approveLabel = String((opts && opts.approveLabel) || "Продолжить");
-    const cancelLabel = String((opts && opts.cancelLabel) || "Отмена");
+    const approveLabel = String((opts && opts.approveLabel) || t("continue_label", "Continue"));
+    const cancelLabel = String((opts && opts.cancelLabel) || t("cancel", "Cancel"));
     const onApprove = opts && typeof opts.onApprove === "function" ? opts.onApprove : null;
 
     if (openGuardModal({
@@ -206,14 +211,14 @@
   }
 
   function openInfoModal(opts) {
-    const title = String((opts && opts.title) || "Письмо кампании");
+    const title = String((opts && opts.title) || t("campaign_letter", "Campaign letter"));
     const text = String((opts && opts.text) || "");
     const statusClass = String((opts && opts.statusClass) || "YY-STATUS_BLUE");
     if (openGuardModal({
       title,
       text,
       statusClass,
-      approveLabel: "Ок",
+      approveLabel: t("ok_label", "OK"),
       onApprove: null,
       showCancel: false,
     })) {
@@ -313,27 +318,36 @@
     function guardClose(proceedFn) {
       if (!readyExists) {
         openConfirmModal({
-          title: "Изменения не сохранены",
+          title: t("unsaved_changes_title", "Unsaved changes"),
           statusClass: "YY-STATUS_RED",
-          text: "Письмо не сохранено. Изменения применены не будут. Перейти к списку кампаний?",
+          text: t(
+            "unsaved_close_to_campaigns",
+            "Letter is not saved. Changes will not be applied. Go to campaigns list?"
+          ),
           onApprove: proceedFn,
         });
         return true;
       }
       if (templateChanged) {
         openConfirmModal({
-          title: "Письмо кампании",
+          title: t("campaign_letter", "Campaign letter"),
           statusClass: "YY-STATUS_BLUE",
-          text: "Шаблон письма был изменен. Проверьте письмо и сохраните изменения. Тогда новый шаблон будет применён.",
+          text: t(
+            "template_changed_save_to_apply",
+            "Letter template has changed. Review the letter and save changes. Then the new template will be applied."
+          ),
           onApprove: proceedFn,
         });
         return true;
       }
       if (isDirtyByEditorAndSubjects()) {
         openConfirmModal({
-          title: "Изменения не сохранены",
+          title: t("unsaved_changes_title", "Unsaved changes"),
           statusClass: "YY-STATUS_RED",
-          text: "Письмо не сохранено. Изменения применены не будут. Перейти к списку кампаний?",
+          text: t(
+            "unsaved_close_to_campaigns",
+            "Letter is not saved. Changes will not be applied. Go to campaigns list?"
+          ),
           onApprove: proceedFn,
         });
         return true;
@@ -374,9 +388,12 @@
           e.preventDefault();
           e.stopPropagation();
           openInfoModal({
-            title: "Письмо кампании",
+            title: t("campaign_letter", "Campaign letter"),
             statusClass: "YY-STATUS_BLUE",
-            text: "Шаблон письма был изменен. Проверьте письмо и сохраните изменения. Тогда новый шаблон будет применён.",
+            text: t(
+              "template_changed_save_to_apply",
+              "Letter template has changed. Review the letter and save changes. Then the new template will be applied."
+            ),
           });
           return;
         }
@@ -384,9 +401,12 @@
           e.preventDefault();
           e.stopPropagation();
           openInfoModal({
-            title: "Письмо кампании",
+            title: t("campaign_letter", "Campaign letter"),
             statusClass: "YY-STATUS_BLUE",
-            text: "Есть несохраненные изменения в письме. Сначала сохраните письмо.",
+            text: t(
+              "save_first_unsaved_changes",
+              "There are unsaved changes in the letter. Save the letter first."
+            ),
           });
           return;
         }

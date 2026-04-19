@@ -2,52 +2,719 @@
 {% load i18n %}
 
 <!-- FILE: web/templates/panels/stats.html -->
-<!-- DATE: 2026-03-08 -->
-<!-- PURPOSE: Статистика: таблица кликов (бывший контент Обзора). -->
+<!-- DATE: 2026-04-18 -->
+<!-- PURPOSE: Статистика: два подпункта (Переходы/Отправка) + пустышка по умолчанию. -->
 
 {% block content %}
 
 <table class="YY-MAIN_TABLE">
-  <tr>
-    <td class="YY-MAIN_BOTTOM_TD">
+  {% if stats_section == "clicks" or stats_section == "sending" %}
+    <tr>
+      <td class="YY-MAIN_TOP_TD" {% if stats_section == "clicks" and stats_clicks_show_campaign or stats_section == "sending" and stats_sending_show_campaign %}colspan="2"{% endif %}>
+        <div class="YY-CARD_WHITE">
+          <div class="flex items-center gap-2">
+            <span class="YY-STATUS_BLUE !mb-0 !w-fit shrink-0 whitespace-nowrap">{% trans "Кампания:" %}</span>
+            <div class="relative w-[50%]" data-stats-campaign-dropdown="1">
+              <button
+                type="button"
+                class="{% if stats_campaign_selected_type == 'buy' %}YY-STATUS_YELLOW{% elif stats_campaign_selected_type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %} !mb-0 !w-full !font-semibold !justify-between !items-center"
+                aria-label="{% trans 'Выбрать кампанию' %}"
+                aria-expanded="false"
+                data-stats-campaign-toggle="1">
+                <span class="truncate font-semibold">{{ stats_campaign_selected_title }}</span>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m9 12.75 3 3m0 0 3-3m-3 3v-7.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+              </button>
+              <div data-stats-campaign-menu="1" class="hidden absolute left-0 right-0 mt-2 z-20 YY-CARD_WHITE !h-auto overflow-hidden border border-[#71d0f4] p-2">
+                <div class="space-y-2 max-h-[52vh] overflow-auto">
+                  <a href="{% url stats_section_url_name %}" class="YY-STATUS_BLUE !mb-0 !w-full !font-semibold !justify-between !items-center hover:!bg-[#dff4ff] !no-underline hover:!no-underline focus:!no-underline{% if not stats_campaign_selected_ui %} !bg-[#dff4ff]{% endif %}">
+                    <span>{% trans "Все кампании" %}</span>
+                    <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                      <use href="#icon-arrow-circle"></use>
+                    </svg>
+                  </a>
+                  {% for it in stats_campaign_active %}
+                    <a href="{% url stats_section_url_name %}?campaign={{ it.ui_id }}" class="{% if it.type == 'buy' %}YY-STATUS_YELLOW{% elif it.type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %} !mb-0 !w-full !font-semibold !justify-between !items-center {% if it.type == 'buy' %}hover:!bg-[#f6edcc]{% elif it.type == 'sell' %}hover:!bg-[#ddf5e0]{% else %}hover:!bg-[#dff4ff]{% endif %} !no-underline hover:!no-underline focus:!no-underline{% if stats_campaign_selected_ui == it.ui_id %} {% if it.type == 'buy' %}!bg-[#f6edcc]{% elif it.type == 'sell' %}!bg-[#ddf5e0]{% else %}!bg-[#dff4ff]{% endif %}{% endif %}">
+                      <span class="truncate">{{ it.title }}</span>
+                      <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </a>
+                  {% endfor %}
+                  {% if stats_campaign_archived %}
+                    <div class="YY-STATUS_GRAY !mb-0 !w-full !font-semibold">{% trans "Архивные кампании" %}</div>
+                    {% for it in stats_campaign_archived %}
+                      <a href="{% url stats_section_url_name %}?campaign={{ it.ui_id }}" class="{% if it.type == 'buy' %}YY-STATUS_YELLOW{% elif it.type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %} !mb-0 !w-full !font-semibold !justify-between !items-center {% if it.type == 'buy' %}hover:!bg-[#f6edcc]{% elif it.type == 'sell' %}hover:!bg-[#ddf5e0]{% else %}hover:!bg-[#dff4ff]{% endif %} !no-underline hover:!no-underline focus:!no-underline{% if stats_campaign_selected_ui == it.ui_id %} {% if it.type == 'buy' %}!bg-[#f6edcc]{% elif it.type == 'sell' %}!bg-[#ddf5e0]{% else %}!bg-[#dff4ff]{% endif %}{% endif %}">
+                        <span class="truncate">{{ it.title }} ({% trans "архивная" %})</span>
+                        <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </a>
+                    {% endfor %}
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% if stats_campaign_summary_show and stats_campaign_summary_mode == "clicks" %}
+              <span class="{% if stats_campaign_selected_type == 'buy' %}YY-STATUS_YELLOW{% elif stats_campaign_selected_type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %} !mb-0 !w-fit ml-auto whitespace-nowrap">
+                {% trans "Переходы:" %} {{ stats_campaign_unique_fmt }} / {{ stats_campaign_sent_fmt }}, CTR {{ stats_campaign_ctr }}%
+              </span>
+            {% elif stats_campaign_summary_show and stats_campaign_summary_mode == "sending" %}
+              <span class="{% if stats_campaign_selected_type == 'buy' %}YY-STATUS_YELLOW{% elif stats_campaign_selected_type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %} !mb-0 !w-fit ml-auto whitespace-nowrap">
+                {% trans "Отправлено:" %} {{ stats_campaign_send_ok_fmt }} / {{ stats_campaign_send_total_fmt }}, {% trans "успешность:" %} {{ stats_campaign_send_success_pct }}%
+              </span>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+    </tr>
+  {% endif %}
 
-      {% if stats %}
-        <div class="YY-MAIN_BOTTOM_DIV">
+  {% if stats_section == "clicks" and stats_clicks_show_all %}
+    {% if stats_clicks_rows %}
+      <tr>
+        <td class="YY-MAIN_TOP_TD !pt-3">
+          <div class="YY-CARD_WHITE">
+            <div class="YY-MAIN_TEXT flex items-center gap-3">
+              <span>{% trans "Найдено:" %}&nbsp;{{ stats_clicks_total_display }},</span>
+              <span>{% trans "Страница:" %}</span>
+              {% if stats_clicks_page_items %}
+                {% if stats_clicks_has_prev %}
+                  <a href="{% url 'stats_clicks' %}?p={{ stats_clicks_prev_page }}" class="YY-LINK inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke-width="1.5"
+                         stroke="currentColor"
+                         class="size-[22px] shrink-0 relative top-[0px]"
+                         aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                    </svg>
+                  </a>
+                {% endif %}
+                {% for item in stats_clicks_page_items %}
+                  {% if item.kind == "gap" %}
+                    <span>...</span>
+                  {% elif item.is_current %}
+                    <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
+                  {% else %}
+                    <a href="{% url 'stats_clicks' %}?p={{ item.number }}" class="YY-LINK">{{ item.number }}</a>
+                  {% endif %}
+                {% endfor %}
+                {% if stats_clicks_has_next %}
+                  <a href="{% url 'stats_clicks' %}?p={{ stats_clicks_next_page }}" class="YY-LINK inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke-width="1.5"
+                         stroke="currentColor"
+                         class="size-[22px] shrink-0 rotate-180 relative top-[2px]"
+                         aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                    </svg>
+                  </a>
+                {% endif %}
+              {% else %}
+                <strong class="font-semibold text-base text-[#016b09]">{{ stats_clicks_page }}</strong>
+              {% endif %}
+            </div>
+          </div>
+        </td>
+      </tr>
+    {% endif %}
 
-          <table class="w-full text-left">
-            <thead>
-              <tr class="YY-TH_TR">
-                <th class="YY-TH_TH w-[220px]">{% trans "Первое посещение" %}</th>
-                <th class="YY-TH_TH w-[120px]">{% trans "Переходов" %}</th>
-                <th class="YY-TH_TH w-[35%]">{% trans "Кампания" %}</th>
-                <th class="YY-TH_TH">{% trans "Компания" %}</th>
-                <th class="YY-TH_TH w-[200px]">{% trans "Действие" %}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for it in stats %}
-                <tr class="YY-TB_TR align-top">
-                  <td class="YY-TB_TD">{{ it.first_time|date:"d.m.Y H:i:s" }}</td>
-                  <td class="YY-TB_TD">{{ it.visits }}</td>
-                  <td class="YY-TB_TD">{{ it.campaign_title }}</td>
-                  <td class="YY-TB_TD">{{ it.company_name }}</td>
-                  <td class="YY-TB_TD">
-                    {{ it.company_name }}
-                  </td>
-                </tr>
+    <tr>
+        <td class="YY-MAIN_TOP_TD !pt-3{% if not stats_clicks_rows %} !pb-12{% endif %}">
+        <div class="YY-CARD_WHITE" data-stats-site-traffic-wrap="1" data-stats-clicks-all-traffic-wrap="1">
+          <div data-stats-traffic-head="1" class="YY-STATUS_BLUE !mb-0 !w-full !font-normal" style="display:grid !important;grid-template-columns:var(--yy-stats-traffic-time-col,max-content) var(--yy-stats-traffic-campaign-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1.5rem;">
+            <span data-stats-traffic-col-time="1">{% trans "Время" %}</span>
+            <span data-stats-traffic-col-campaign="1">{% trans "Кампания" %}</span>
+            <span>{% trans "Контакт" %}</span>
+            <span class="inline-flex justify-end items-center" aria-hidden="true"></span>
+          </div>
+          <div data-stats-site-traffic="1" class="mt-3 space-y-[3px]">
+            {% if stats_clicks_rows %}
+              {% for r in stats_clicks_rows %}
+                <div data-stats-timeline-row-key="{{ r.row_key|default:''|escape }}" data-stats-traffic-row="1" class="{% if r.campaign_type == 'buy' %}YY-STATUS_YELLOW{% elif r.campaign_type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %} !w-full !items-center !mb-0 !font-normal" style="display:grid !important;grid-template-columns:var(--yy-stats-traffic-time-col,max-content) var(--yy-stats-traffic-campaign-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1.5rem;">
+                  <span data-stats-traffic-col-time="1" class="shrink-0 whitespace-nowrap">{{ r.time_text }}</span>
+                  <span data-stats-traffic-col-campaign="1" class="truncate">{{ r.campaign_title }}</span>
+                  {% if r.contact_modal_url %}
+                    <a href="#" class="truncate text-current no-underline hover:underline" data-yy-modal="url={{ r.contact_modal_url|escape }}">{{ r.contact_name }}</a>
+                  {% else %}
+                    <span class="truncate">{{ r.contact_name }}</span>
+                  {% endif %}
+                  <span class="inline-flex shrink-0 justify-end text-right">{{ r.visits_count_fmt }}</span>
+                </div>
               {% endfor %}
-            </tbody>
-          </table>
-
+            {% else %}
+              <div data-stats-timeline-row-key="site:empty" class="YY-STATUS_GRAY inline-flex !w-full !items-center !mb-0 !font-normal gap-2">
+                <span>{% trans "Переходов на сайт / сайты из писем по рассылкам не зафиксировано." %}</span>
+              </div>
+            {% endif %}
+          </div>
         </div>
-      {% else %}
-        <div class="YY-CARD_WHITE mb-10">
-          {% trans "Здесь пока нет данных" %}
-        </div>
-      {% endif %}
+      </td>
+    </tr>
 
-    </td>
-  </tr>
+    {% if stats_clicks_rows %}
+      <tr>
+        <td class="YY-MAIN_TOP_TD !pt-3 !pb-12">
+          <div class="YY-CARD_WHITE">
+            <div class="YY-MAIN_TEXT flex items-center gap-3">
+              <span>{% trans "Найдено:" %}&nbsp;{{ stats_clicks_total_display }},</span>
+              <span>{% trans "Страница:" %}</span>
+              {% if stats_clicks_page_items %}
+                {% if stats_clicks_has_prev %}
+                  <a href="{% url 'stats_clicks' %}?p={{ stats_clicks_prev_page }}" class="YY-LINK inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke-width="1.5"
+                         stroke="currentColor"
+                         class="size-[22px] shrink-0 relative top-[0px]"
+                         aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                    </svg>
+                  </a>
+                {% endif %}
+                {% for item in stats_clicks_page_items %}
+                  {% if item.kind == "gap" %}
+                    <span>...</span>
+                  {% elif item.is_current %}
+                    <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
+                  {% else %}
+                    <a href="{% url 'stats_clicks' %}?p={{ item.number }}" class="YY-LINK">{{ item.number }}</a>
+                  {% endif %}
+                {% endfor %}
+                {% if stats_clicks_has_next %}
+                  <a href="{% url 'stats_clicks' %}?p={{ stats_clicks_next_page }}" class="YY-LINK inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke-width="1.5"
+                         stroke="currentColor"
+                         class="size-[22px] shrink-0 rotate-180 relative top-[2px]"
+                         aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                    </svg>
+                  </a>
+                {% endif %}
+              {% else %}
+                <strong class="font-semibold text-base text-[#016b09]">{{ stats_clicks_page }}</strong>
+              {% endif %}
+            </div>
+          </div>
+        </td>
+      </tr>
+    {% endif %}
+  {% endif %}
+
+  {% if stats_section == "sending" and stats_sending_show_all %}
+    {% if stats_sending_rows %}
+      <tr>
+        <td class="YY-MAIN_TOP_TD !pt-3">
+          <div class="YY-CARD_WHITE">
+            <div class="YY-MAIN_TEXT flex items-center gap-3">
+              <span>{% trans "Найдено:" %}&nbsp;{{ stats_sending_total_display }},</span>
+              <span>{% trans "Страница:" %}</span>
+              {% if stats_sending_page_items %}
+                {% if stats_sending_has_prev %}
+                  <a href="{% url 'stats_sending' %}?p={{ stats_sending_prev_page }}" class="YY-LINK inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke-width="1.5"
+                         stroke="currentColor"
+                         class="size-[22px] shrink-0 relative top-[0px]"
+                         aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                    </svg>
+                  </a>
+                {% endif %}
+                {% for item in stats_sending_page_items %}
+                  {% if item.kind == "gap" %}
+                    <span>...</span>
+                  {% elif item.is_current %}
+                    <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
+                  {% else %}
+                    <a href="{% url 'stats_sending' %}?p={{ item.number }}" class="YY-LINK">{{ item.number }}</a>
+                  {% endif %}
+                {% endfor %}
+                {% if stats_sending_has_next %}
+                  <a href="{% url 'stats_sending' %}?p={{ stats_sending_next_page }}" class="YY-LINK inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke-width="1.5"
+                         stroke="currentColor"
+                         class="size-[22px] shrink-0 rotate-180 relative top-[2px]"
+                         aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                    </svg>
+                  </a>
+                {% endif %}
+              {% else %}
+                <strong class="font-semibold text-base text-[#016b09]">{{ stats_sending_page }}</strong>
+              {% endif %}
+            </div>
+          </div>
+        </td>
+      </tr>
+    {% endif %}
+
+    <tr>
+      <td class="YY-MAIN_TOP_TD !pt-3{% if not stats_sending_rows %} !pb-12{% endif %}">
+        <div class="YY-CARD_WHITE" data-stats-site-traffic-wrap="1" data-stats-sending-all-traffic-wrap="1">
+          <div data-stats-traffic-head="1" class="YY-STATUS_BLUE !mb-0 !w-full !font-normal" style="display:grid !important;grid-template-columns:var(--yy-stats-traffic-time-col,max-content) var(--yy-stats-traffic-campaign-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1.5rem;">
+            <span data-stats-traffic-col-time="1">{% trans "Время" %}</span>
+            <span data-stats-traffic-col-campaign="1">{% trans "Кампания" %}</span>
+            <span>{% trans "Контакт" %}</span>
+            <span></span>
+          </div>
+          <div data-stats-site-traffic="1" class="mt-3 space-y-[3px]">
+            {% if stats_sending_rows %}
+              {% for r in stats_sending_rows %}
+                <div data-stats-timeline-row-key="{{ r.row_key|default:''|escape }}" data-stats-traffic-row="1" class="{% if r.is_ok %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} !w-full !items-center !mb-0 !font-normal" style="display:grid !important;grid-template-columns:var(--yy-stats-traffic-time-col,max-content) var(--yy-stats-traffic-campaign-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1.5rem;">
+                  <span data-stats-traffic-col-time="1" class="shrink-0 whitespace-nowrap">{{ r.time_text }}</span>
+                  <span data-stats-traffic-col-campaign="1" class="truncate">{{ r.campaign_title }}</span>
+                  {% if r.contact_modal_url %}
+                    <a href="#" class="truncate text-current no-underline hover:underline" data-yy-modal="url={{ r.contact_modal_url|escape }}">{{ r.contact_name }}</a>
+                  {% else %}
+                    <span class="truncate">{{ r.contact_name }}</span>
+                  {% endif %}
+                  <span class="inline-flex shrink-0 items-center justify-center" aria-hidden="true">
+                    {% if r.icon == 'check' %}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                    {% else %}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                      </svg>
+                    {% endif %}
+                  </span>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="YY-STATUS_GRAY inline-flex !w-full !items-center !mb-0 !font-normal gap-2">
+                <span>{% trans "Отправок по рассылкам не зафиксировано." %}</span>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+    </tr>
+
+    {% if stats_sending_rows %}
+      <tr>
+        <td class="YY-MAIN_TOP_TD !pt-3 !pb-12">
+          <div class="YY-CARD_WHITE">
+            <div class="YY-MAIN_TEXT flex items-center gap-3">
+              <span>{% trans "Найдено:" %}&nbsp;{{ stats_sending_total_display }},</span>
+              <span>{% trans "Страница:" %}</span>
+              {% if stats_sending_page_items %}
+                {% if stats_sending_has_prev %}
+                  <a href="{% url 'stats_sending' %}?p={{ stats_sending_prev_page }}" class="YY-LINK inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke-width="1.5"
+                         stroke="currentColor"
+                         class="size-[22px] shrink-0 relative top-[0px]"
+                         aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                    </svg>
+                  </a>
+                {% endif %}
+                {% for item in stats_sending_page_items %}
+                  {% if item.kind == "gap" %}
+                    <span>...</span>
+                  {% elif item.is_current %}
+                    <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
+                  {% else %}
+                    <a href="{% url 'stats_sending' %}?p={{ item.number }}" class="YY-LINK">{{ item.number }}</a>
+                  {% endif %}
+                {% endfor %}
+                {% if stats_sending_has_next %}
+                  <a href="{% url 'stats_sending' %}?p={{ stats_sending_next_page }}" class="YY-LINK inline-flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke-width="1.5"
+                         stroke="currentColor"
+                         class="size-[22px] shrink-0 rotate-180 relative top-[2px]"
+                         aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                    </svg>
+                  </a>
+                {% endif %}
+              {% else %}
+                <strong class="font-semibold text-base text-[#016b09]">{{ stats_sending_page }}</strong>
+              {% endif %}
+            </div>
+          </div>
+        </td>
+      </tr>
+    {% endif %}
+  {% endif %}
+
+  {% if stats_section == "clicks" and stats_clicks_show_campaign %}
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD w-1/2 !pt-3 !pb-12">
+        <div class="YY-CARD_WHITE" data-stats-site-traffic-wrap="1">
+          <div class="YY-STATUS_BLUE !mb-0 !w-full !font-normal" style="display:grid !important;grid-template-columns:var(--yy-stats-traffic-time-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1rem;">
+            <span data-stats-traffic-col-time="1">{% trans "Время" %}</span>
+            <span>{% trans "Контакт" %}</span>
+            <span class="inline-flex justify-end items-center" aria-hidden="true"></span>
+          </div>
+          <div class="mt-3 space-y-[3px]">
+            {% if stats_clicks_campaign_left_rows %}
+              {% for r in stats_clicks_campaign_left_rows %}
+                <div class="{% if r.campaign_type == 'buy' %}YY-STATUS_YELLOW{% elif r.campaign_type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %} !w-full !items-center !mb-0 !font-normal" style="display:grid !important;grid-template-columns:var(--yy-stats-traffic-time-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1rem;">
+                  <span data-stats-traffic-col-time="1" class="shrink-0 whitespace-nowrap">{{ r.time_text }}</span>
+                  {% if r.contact_modal_url %}
+                    <a href="#" class="truncate text-current no-underline hover:underline" data-yy-modal="url={{ r.contact_modal_url|escape }}">{{ r.contact_name }}</a>
+                  {% else %}
+                    <span class="truncate">{{ r.contact_name }}</span>
+                  {% endif %}
+                  <span class="inline-flex shrink-0 justify-end text-right">{{ r.visits_count_fmt }}</span>
+                </div>
+              {% endfor %}
+            {% elif not stats_clicks_campaign_right_rows %}
+              <div class="YY-STATUS_GRAY inline-flex !w-full !items-center !mb-0 !font-normal gap-2">
+                <span>{% trans "Переходов на сайт / сайты из писем по рассылкам не зафиксировано." %}</span>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+      <td class="YY-MAIN_TOP_RIGHT_TD w-1/2 !pt-3 !pb-12">
+        <div class="YY-CARD_WHITE" data-stats-site-traffic-wrap="1">
+          <div class="YY-STATUS_BLUE !mb-0 !w-full !font-normal" style="display:grid !important;grid-template-columns:var(--yy-stats-traffic-time-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1rem;">
+            <span data-stats-traffic-col-time="1">{% trans "Время" %}</span>
+            <span>{% trans "Контакт" %}</span>
+            <span class="inline-flex justify-end items-center" aria-hidden="true"></span>
+          </div>
+          <div class="mt-3 space-y-[3px]">
+            {% if stats_clicks_campaign_right_rows %}
+              {% for r in stats_clicks_campaign_right_rows %}
+                <div class="{% if r.campaign_type == 'buy' %}YY-STATUS_YELLOW{% elif r.campaign_type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %} !w-full !items-center !mb-0 !font-normal" style="display:grid !important;grid-template-columns:var(--yy-stats-traffic-time-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1rem;">
+                  <span data-stats-traffic-col-time="1" class="shrink-0 whitespace-nowrap">{{ r.time_text }}</span>
+                  {% if r.contact_modal_url %}
+                    <a href="#" class="truncate text-current no-underline hover:underline" data-yy-modal="url={{ r.contact_modal_url|escape }}">{{ r.contact_name }}</a>
+                  {% else %}
+                    <span class="truncate">{{ r.contact_name }}</span>
+                  {% endif %}
+                  <span class="inline-flex shrink-0 justify-end text-right">{{ r.visits_count_fmt }}</span>
+                </div>
+              {% endfor %}
+            {% elif not stats_clicks_campaign_left_rows %}
+              <div class="YY-STATUS_GRAY inline-flex !w-full !items-center !mb-0 !font-normal gap-2">
+                <span>{% trans "Переходов на сайт / сайты из писем по рассылкам не зафиксировано." %}</span>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+    </tr>
+  {% endif %}
+
+  {% if stats_section == "sending" and stats_sending_show_campaign %}
+    <tr>
+      <td class="YY-MAIN_TOP_TD !pt-3" colspan="2">
+        <div class="YY-CARD_WHITE">
+          <div class="YY-MAIN_TEXT flex items-center gap-3">
+            <span>{% trans "Найдено:" %}&nbsp;{{ stats_sending_campaign_total_display }},</span>
+            <span>{% trans "Страница:" %}</span>
+            {% if stats_sending_campaign_page_items %}
+              {% if stats_sending_campaign_has_prev %}
+                <a href="{% url 'stats_sending' %}?campaign={{ stats_campaign_selected_ui|urlencode }}&p={{ stats_sending_campaign_prev_page }}" class="YY-LINK inline-flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[22px] shrink-0 relative top-[0px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+              {% for item in stats_sending_campaign_page_items %}
+                {% if item.kind == "gap" %}
+                  <span>...</span>
+                {% elif item.is_current %}
+                  <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
+                {% else %}
+                  <a href="{% url 'stats_sending' %}?campaign={{ stats_campaign_selected_ui|urlencode }}&p={{ item.number }}" class="YY-LINK">{{ item.number }}</a>
+                {% endif %}
+              {% endfor %}
+              {% if stats_sending_campaign_has_next %}
+                <a href="{% url 'stats_sending' %}?campaign={{ stats_campaign_selected_ui|urlencode }}&p={{ stats_sending_campaign_next_page }}" class="YY-LINK inline-flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[22px] shrink-0 rotate-180 relative top-[2px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+            {% else %}
+              <strong class="font-semibold text-base text-[#016b09]">{{ stats_sending_campaign_page }}</strong>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+    </tr>
+
+    <tr>
+      <td class="YY-MAIN_TOP_LEFT_TD w-1/2 !pt-3">
+        <div class="YY-CARD_WHITE" data-stats-site-traffic-wrap="1">
+          <div class="YY-STATUS_BLUE !mb-0 !w-full !font-normal" style="display:grid !important;grid-template-columns:var(--yy-stats-traffic-time-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1rem;">
+            <span data-stats-traffic-col-time="1">{% trans "Время" %}</span>
+            <span>{% trans "Контакт" %}</span>
+            <span></span>
+          </div>
+          <div class="mt-3 space-y-[3px]">
+            {% if stats_sending_campaign_left_rows %}
+              {% for r in stats_sending_campaign_left_rows %}
+                <div class="{% if r.is_ok %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} !w-full !items-center !mb-0 !font-normal" style="display:grid !important;grid-template-columns:var(--yy-stats-traffic-time-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1rem;">
+                  <span data-stats-traffic-col-time="1" class="shrink-0 whitespace-nowrap">{{ r.time_text }}</span>
+                  {% if r.contact_modal_url %}
+                    <a href="#" class="truncate text-current no-underline hover:underline" data-yy-modal="url={{ r.contact_modal_url|escape }}">{{ r.contact_name }}</a>
+                  {% else %}
+                    <span class="truncate">{{ r.contact_name }}</span>
+                  {% endif %}
+                  <span class="inline-flex shrink-0 items-center justify-center" aria-hidden="true">
+                    {% if r.icon == 'check' %}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                    {% else %}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                      </svg>
+                    {% endif %}
+                  </span>
+                </div>
+              {% endfor %}
+            {% elif not stats_sending_campaign_right_rows %}
+              <div class="YY-STATUS_GRAY inline-flex !w-full !items-center !mb-0 !font-normal gap-2">
+                <span>{% trans "Отправок по рассылкам не зафиксировано." %}</span>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+      <td class="YY-MAIN_TOP_RIGHT_TD w-1/2 !pt-3">
+        <div class="YY-CARD_WHITE" data-stats-site-traffic-wrap="1">
+          <div class="YY-STATUS_BLUE !mb-0 !w-full !font-normal" style="display:grid !important;grid-template-columns:var(--yy-stats-traffic-time-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1rem;">
+            <span data-stats-traffic-col-time="1">{% trans "Время" %}</span>
+            <span>{% trans "Контакт" %}</span>
+            <span></span>
+          </div>
+          <div class="mt-3 space-y-[3px]">
+            {% if stats_sending_campaign_right_rows %}
+              {% for r in stats_sending_campaign_right_rows %}
+                <div class="{% if r.is_ok %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} !w-full !items-center !mb-0 !font-normal" style="display:grid !important;grid-template-columns:var(--yy-stats-traffic-time-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1rem;">
+                  <span data-stats-traffic-col-time="1" class="shrink-0 whitespace-nowrap">{{ r.time_text }}</span>
+                  {% if r.contact_modal_url %}
+                    <a href="#" class="truncate text-current no-underline hover:underline" data-yy-modal="url={{ r.contact_modal_url|escape }}">{{ r.contact_name }}</a>
+                  {% else %}
+                    <span class="truncate">{{ r.contact_name }}</span>
+                  {% endif %}
+                  <span class="inline-flex shrink-0 items-center justify-center" aria-hidden="true">
+                    {% if r.icon == 'check' %}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                    {% else %}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                      </svg>
+                    {% endif %}
+                  </span>
+                </div>
+              {% endfor %}
+            {% elif not stats_sending_campaign_left_rows %}
+              <div class="YY-STATUS_GRAY inline-flex !w-full !items-center !mb-0 !font-normal gap-2">
+                <span>{% trans "Отправок по рассылкам не зафиксировано." %}</span>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+    </tr>
+
+    <tr>
+      <td class="YY-MAIN_TOP_TD !pt-3 !pb-12" colspan="2">
+        <div class="YY-CARD_WHITE">
+          <div class="YY-MAIN_TEXT flex items-center gap-3">
+            <span>{% trans "Найдено:" %}&nbsp;{{ stats_sending_campaign_total_display }},</span>
+            <span>{% trans "Страница:" %}</span>
+            {% if stats_sending_campaign_page_items %}
+              {% if stats_sending_campaign_has_prev %}
+                <a href="{% url 'stats_sending' %}?campaign={{ stats_campaign_selected_ui|urlencode }}&p={{ stats_sending_campaign_prev_page }}" class="YY-LINK inline-flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[22px] shrink-0 relative top-[0px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+              {% for item in stats_sending_campaign_page_items %}
+                {% if item.kind == "gap" %}
+                  <span>...</span>
+                {% elif item.is_current %}
+                  <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
+                {% else %}
+                  <a href="{% url 'stats_sending' %}?campaign={{ stats_campaign_selected_ui|urlencode }}&p={{ item.number }}" class="YY-LINK">{{ item.number }}</a>
+                {% endif %}
+              {% endfor %}
+              {% if stats_sending_campaign_has_next %}
+                <a href="{% url 'stats_sending' %}?campaign={{ stats_campaign_selected_ui|urlencode }}&p={{ stats_sending_campaign_next_page }}" class="YY-LINK inline-flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[22px] shrink-0 rotate-180 relative top-[2px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+            {% else %}
+              <strong class="font-semibold text-base text-[#016b09]">{{ stats_sending_campaign_page }}</strong>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+    </tr>
+  {% endif %}
+
 </table>
 
+{% endblock %}
+
+{% block extra_js %}
+  {% if stats_section == "clicks" or stats_section == "sending" %}
+    <script>
+      (function () {
+        var root = document.querySelector("[data-stats-campaign-dropdown='1']");
+        if (!root) return;
+        var toggle = root.querySelector("[data-stats-campaign-toggle='1']");
+        var menu = root.querySelector("[data-stats-campaign-menu='1']");
+        if (!toggle || !menu) return;
+
+        function closeMenu() {
+          menu.classList.add("hidden");
+          toggle.setAttribute("aria-expanded", "false");
+        }
+
+        function openMenu() {
+          menu.classList.remove("hidden");
+          toggle.setAttribute("aria-expanded", "true");
+        }
+
+        toggle.addEventListener("click", function (event) {
+          event.preventDefault();
+          event.stopPropagation();
+          if (menu.classList.contains("hidden")) {
+            openMenu();
+            return;
+          }
+          closeMenu();
+        });
+
+        document.addEventListener("click", function (event) {
+          if (!root.contains(event.target)) {
+            closeMenu();
+          }
+        });
+
+        document.addEventListener("keydown", function (event) {
+          if (event.key === "Escape") {
+            closeMenu();
+          }
+        });
+
+        function syncStatsTrafficColumns() {
+          var hosts = document.querySelectorAll("[data-stats-site-traffic-wrap='1']");
+          if (!hosts.length) return;
+          for (var h = 0; h < hosts.length; h += 1) {
+            var host = hosts[h];
+            host.style.removeProperty("--yy-stats-traffic-time-col");
+            host.style.removeProperty("--yy-stats-traffic-campaign-col");
+
+            var timeNodes = host.querySelectorAll("[data-stats-traffic-col-time='1']");
+            var campaignNodes = host.querySelectorAll("[data-stats-traffic-col-campaign='1']");
+            var maxTimePx = 0;
+            for (var i = 0; i < timeNodes.length; i += 1) {
+              var tn = timeNodes[i];
+              var tw = Math.max(
+                Number(tn.scrollWidth || 0),
+                Number(tn.getBoundingClientRect ? tn.getBoundingClientRect().width : 0)
+              );
+              if (tw > maxTimePx) {
+                maxTimePx = tw;
+              }
+            }
+            if (maxTimePx > 0) {
+              host.style.setProperty("--yy-stats-traffic-time-col", String(Math.ceil(maxTimePx)) + "px");
+            }
+
+            var maxCampaignPx = 0;
+            for (var j = 0; j < campaignNodes.length; j += 1) {
+              var cn = campaignNodes[j];
+              var cw = Math.max(
+                Number(cn.scrollWidth || 0),
+                Number(cn.getBoundingClientRect ? cn.getBoundingClientRect().width : 0)
+              );
+              if (cw > maxCampaignPx) {
+                maxCampaignPx = cw;
+              }
+            }
+            var campaignColPx = maxCampaignPx;
+            var isAllMainTrafficHost = host.matches && (
+              host.matches("[data-stats-clicks-all-traffic-wrap='1']") ||
+              host.matches("[data-stats-sending-all-traffic-wrap='1']")
+            );
+            if (isAllMainTrafficHost) {
+              var widthProbe = host.querySelector("[data-stats-site-traffic='1']") || host;
+              var hostWidthPx = Number(widthProbe.getBoundingClientRect ? widthProbe.getBoundingClientRect().width : 0);
+              var gapProbe = host.querySelector("[data-stats-traffic-row='1']") || host.querySelector("[data-stats-traffic-head='1']");
+              var gapPx = 24;
+              if (gapProbe && window.getComputedStyle) {
+                var gapRaw = window.getComputedStyle(gapProbe).columnGap;
+                var gapNum = parseFloat(gapRaw);
+                if (Number.isFinite(gapNum) && gapNum > 0) {
+                  gapPx = gapNum;
+                }
+              }
+              var minCampaignPx = 0;
+              if (hostWidthPx > 0) {
+                minCampaignPx = Math.max(0, (hostWidthPx * 0.5) - maxTimePx - (gapPx * 2));
+              }
+              campaignColPx = Math.max(maxCampaignPx, minCampaignPx);
+            }
+            if (campaignColPx > 0) {
+              host.style.setProperty("--yy-stats-traffic-campaign-col", String(Math.ceil(campaignColPx)) + "px");
+            }
+          }
+        }
+
+        syncStatsTrafficColumns();
+        window.addEventListener("resize", syncStatsTrafficColumns);
+      })();
+    </script>
+  {% endif %}
 {% endblock %}

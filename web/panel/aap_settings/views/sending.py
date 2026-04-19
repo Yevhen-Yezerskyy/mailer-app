@@ -9,8 +9,9 @@ import json
 from typing import Any, Dict
 
 from django.shortcuts import redirect, render
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _trans
 
+from engine.common.cache.client import CLIENT
 from panel.aap_settings.models import (
     GlobalSendingSettings,
     SendingSettings,
@@ -18,6 +19,23 @@ from panel.aap_settings.models import (
 
 
 DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun", "hol"]
+
+
+def _ws_window_cache_key(workspace_id: str) -> str:
+    return f"core_status:campaign:window:ws:{str(workspace_id)}"
+
+
+def _global_window_cache_key() -> str:
+    return "core_status:campaign:window:global"
+
+
+def _invalidate_status_window_cache(workspace_id: str) -> None:
+    CLIENT.delete_many(
+        [
+            _ws_window_cache_key(str(workspace_id)),
+            _global_window_cache_key(),
+        ]
+    )
 
 
 def _guard(request):
@@ -55,6 +73,7 @@ def sending_settings_view(request):
         action = (request.POST.get("action") or "").strip()
         if action == "reset_defaults":
             SendingSettings.objects.filter(workspace_id=ws).delete()
+            _invalidate_status_window_cache(str(ws))
             return redirect(request.path)
 
         raw = (request.POST.get("value_json") or "").strip()
@@ -73,7 +92,7 @@ def sending_settings_view(request):
                     break
 
         if not ok:
-            errors.append(_("Неверный JSON."))
+            errors.append(_trans("Неверный JSON."))
         else:
             data = _normalize_value_json(data)
             if obj is None:
@@ -81,6 +100,7 @@ def sending_settings_view(request):
             else:
                 obj.value_json = data
                 obj.save(update_fields=["value_json", "updated_at"])
+            _invalidate_status_window_cache(str(ws))
             return redirect(request.path)
 
     value_json = obj.value_json if obj is not None else _global_value_json()
@@ -94,14 +114,14 @@ def sending_settings_view(request):
         "global_value_json_str": json.dumps(global_value_json, ensure_ascii=False),
         "has_custom_settings": has_custom_settings,
         "day_labels": [
-            ("mon", _("Понедельник")),
-            ("tue", _("Вторник")),
-            ("wed", _("Среда")),
-            ("thu", _("Четверг")),
-            ("fri", _("Пятница")),
-            ("sat", _("Суббота")),
-            ("sun", _("Воскресенье")),
-            ("hol", _("Праздники")),
+            ("mon", _trans("Понедельник")),
+            ("tue", _trans("Вторник")),
+            ("wed", _trans("Среда")),
+            ("thu", _trans("Четверг")),
+            ("fri", _trans("Пятница")),
+            ("sat", _trans("Суббота")),
+            ("sun", _trans("Воскресенье")),
+            ("hol", _trans("Праздники")),
         ],
     }
     return render(request, "panels/aap_settings/sending.html", ctx)

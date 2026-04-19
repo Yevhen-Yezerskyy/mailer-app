@@ -150,7 +150,7 @@ def _ensure_lang_row(letter: MailLetter, lang: str) -> MailLetterLang:
         )
 
     with transaction.atomic():
-        row, _ = MailLetterLang.objects.get_or_create(letter=letter, lang=wanted)
+        row, _unused = MailLetterLang.objects.get_or_create(letter=letter, lang=wanted)
         row.subject = translated_subject
         row.letter_html = sanitize(translated_html)
         row.send_html = _render_send_html(

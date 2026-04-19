@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import ast
 import re
 import string
 import subprocess
@@ -62,6 +63,8 @@ _PRINTF_SPEC_RE = re.compile(
     re.VERBOSE,
 )
 _BAD_TOKEN_RE = re.compile(r"__FMT\d+__")
+_ASCII_RE = re.compile(r"^[\x00-\x7F]+$")
+_PY_TRANS_EXCLUDE_PARTS = {"locale", "__pycache__", "migrations"}
 
 
 # ---------------- manage.py helpers ----------------
@@ -84,6 +87,66 @@ def run_compilemessages() -> None:
 
 def po_path(lang: str) -> Path:
     return LOCALE_DIR / lang / "LC_MESSAGES" / "django.po"
+
+
+def _collect_python_trans_literals() -> Dict[str, List[str]]:
+    refs_by_msgid: Dict[str, List[str]] = {}
+    for py_file in PROJECT_ROOT.rglob("*.py"):
+        rel = py_file.relative_to(PROJECT_ROOT)
+        if any(part in _PY_TRANS_EXCLUDE_PARTS for part in rel.parts):
+            continue
+        try:
+            tree = ast.parse(py_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if not isinstance(func, ast.Name) or func.id != "_trans":
+                continue
+            if not node.args:
+                continue
+            first_arg = node.args[0]
+            if not isinstance(first_arg, ast.Constant) or not isinstance(first_arg.value, str):
+                continue
+            msgid = first_arg.value
+            if msgid == "":
+                continue
+            ref = f"{rel.as_posix()}:{getattr(node, 'lineno', 1)}"
+            refs_by_msgid.setdefault(msgid, []).append(ref)
+    return refs_by_msgid
+
+
+def _inject_python_trans_literals(lang: str, refs_by_msgid: Dict[str, List[str]]) -> int:
+    p = po_path(lang)
+    if not p.exists() or not refs_by_msgid:
+        return 0
+
+    header, entries = parse_po(p.read_text(encoding="utf-8"))
+    existing_keys = {_entry_key(e) for e in entries}
+
+    added = 0
+    for msgid in sorted(refs_by_msgid.keys()):
+        key = ("", msgid, "")
+        if key in existing_keys:
+            continue
+        refs = sorted(set(refs_by_msgid.get(msgid) or []))
+        prefix = [f"#: {' '.join(refs)}\n"] if refs else []
+        entries.append(
+            PoEntry(
+                prefix_lines=prefix,
+                msgid_lines=[f"msgid {_quote_po(msgid)}\n"],
+                msgstr_lines=['msgstr ""\n'],
+                suffix_lines=["\n"],
+            )
+        )
+        existing_keys.add(key)
+        added += 1
+
+    if added:
+        p.write_text(serialize_po(header, entries), encoding="utf-8")
+    return added
 
 
 # ---------------- fuzzy cleanup ----------------
@@ -495,6 +558,9 @@ def _translate_safe(
     src0 = (src or "").strip()
     if not src0:
         return ("", "gpt_empty")
+    # Keep simple ASCII tokens as-is for English target (e.g. "(none)").
+    if str(lang or "").strip().lower() in {"en", "eng"} and _ASCII_RE.fullmatch(src0):
+        return (src0, "ok")
 
     guard_printf = _needs_printf_guard(entry, src0)
     guard_brace = _needs_brace_guard(entry, src0)
@@ -863,6 +929,12 @@ def main() -> None:
 
     print("[1/6] makemessages")
     run_makemessages()
+
+    print("[1.5/6] inject missing _trans literals from Python")
+    refs_by_msgid = _collect_python_trans_literals()
+    for lang in ALL_LANGS:
+        added = _inject_python_trans_literals(lang, refs_by_msgid)
+        print(f"    - {lang}: added={added}")
 
     print("[2/6] strip fuzzy")
     strip_fuzzy_all()

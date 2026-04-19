@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from django.http import JsonResponse
 from django.shortcuts import render
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _trans
 
 from engine.core_status.is_active import clear_is_more_needed_full_cache, is_more_needed
 from mailer_web.access import decode_id
@@ -35,15 +35,15 @@ def modal_edit_rate_limit_view(request):
 
     if request.method == "POST":
         if not task:
-            return JsonResponse({"ok": False, "error": str(_("Запись не найдена."))}, status=404)
+            return JsonResponse({"ok": False, "error": str(_trans("Запись не найдена."))}, status=404)
 
         try:
             rate_limit = int(str(request.POST.get("rate_limit") or "").strip())
         except Exception:
-            return JsonResponse({"ok": False, "error": str(_("Введите лимит от 20 до 60."))}, status=400)
+            return JsonResponse({"ok": False, "error": str(_trans("Введите лимит от 20 до 60."))}, status=400)
 
         if rate_limit < 20 or rate_limit > 60:
-            return JsonResponse({"ok": False, "error": str(_("Введите лимит от 20 до 60."))}, status=400)
+            return JsonResponse({"ok": False, "error": str(_trans("Введите лимит от 20 до 60."))}, status=400)
 
         task.rate_limit = int(rate_limit)
         task.save(update_fields=["rate_limit", "updated_at"])

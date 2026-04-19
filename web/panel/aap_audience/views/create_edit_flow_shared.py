@@ -12,7 +12,7 @@ from django.db import connection
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.text import format_lazy
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _trans
 
 from engine.common.gpt import GPTClient
 from engine.common.translate import get_prompt
@@ -21,6 +21,7 @@ from mailer_web.access import decode_id
 from panel.aap_campaigns.models import Campaign
 from panel.aap_audience.models import AudienceTask
 
+from .create_edit_flow_gpt_consts import FLOW_GPT_MODEL, FLOW_GPT_SERVICE_TIER
 
 FLOW_STEP_ORDER = (
     "product",
@@ -35,7 +36,7 @@ FLOW_STEP_ORDER = (
 TEXT_STEP_KEYS = ("product", "company", "geo")
 TASK_CREATION_STEP_KEYS = frozenset({"product", "company"})
 FLOW_GPT_UNAVAILABLE_SESSION_KEY = "aap:create_flow:gpt_unavailable_popup_text"
-FLOW_GPT_UNAVAILABLE_TEXT = "Ассистент ИИ сейчас недоступен. Повторите попытку в течение пяти минут."
+FLOW_GPT_UNAVAILABLE_TEXT = _trans("Ассистент ИИ сейчас недоступен. Повторите попытку в течение пяти минут.")
 
 STEP_URL_PARTS = {
     "product": "product",
@@ -47,7 +48,7 @@ STEP_URL_PARTS = {
     "mailing_list": "mailing_list",
 }
 
-COMMON_AI_HELP_TEXT = _(
+COMMON_AI_HELP_TEXT = _trans(
     "В процессе обработки ИИ будет задавать вопросы и давать подсказки для уточнения описания. "
     "Поскольку основные варианты уже указаны в начальном описании, часть подсказок может быть "
     "нерелевантной. При необходимости добавьте информацию в описание или в команду для ассистента ИИ."
@@ -55,24 +56,24 @@ COMMON_AI_HELP_TEXT = _(
 
 COMMON_FUTURE_STEPS = {
     "branches": {
-        "nav_label": _("Категории"),
-        "summary_label": _("Категории"),
-        "dirty_label": _("Категории"),
+        "nav_label": _trans("Категории"),
+        "summary_label": _trans("Категории"),
+        "dirty_label": _trans("Категории"),
     },
     "cities": {
-        "nav_label": _("Города"),
-        "summary_label": _("Города"),
-        "dirty_label": _("Города"),
+        "nav_label": _trans("Города"),
+        "summary_label": _trans("Города"),
+        "dirty_label": _trans("Города"),
     },
     "contacts": {
-        "nav_label": _("Контакты"),
-        "summary_label": _("Сбор контактов"),
-        "dirty_label": _("Сбор контактов"),
+        "nav_label": _trans("Контакты"),
+        "summary_label": _trans("Сбор контактов"),
+        "dirty_label": _trans("Сбор контактов"),
     },
     "mailing_list": {
-        "nav_label": _("Рейтинг"),
-        "summary_label": _("Список рассылки"),
-        "dirty_label": _("Список рассылки"),
+        "nav_label": _trans("Рейтинг"),
+        "summary_label": _trans("Список рассылки"),
+        "dirty_label": _trans("Список рассылки"),
     },
 }
 
@@ -149,14 +150,14 @@ BASE_STEP_DEFINITIONS = {
 def _make_ai_help_paragraphs(subject):
     return (
         format_lazy(
-            _(
+            _trans(
                 "Введите команду для работы с {subject} — что нужно добавить, удалить или изменить. "
                 "Указанная команда будет применена к текущему описанию."
             ),
             subject=subject,
         ),
         format_lazy(
-            _(
+            _trans(
                 "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над {subject}. "
                 "Ответ на вопрос будет дан отдельно и не изменит текст описания."
             ),
@@ -197,17 +198,17 @@ FLOW_TYPE_CONFIG = {
         "edit_url_name_id": "audience:create_edit_sell_id",
         "dialog_session_prefix": "create_edit_sell_dialog",
         "mode_class": "YY-STATUS_GREEN",
-        "mode_label": _("Поиск клиентов / покупателей"),
-        "page_title": _("Список рассылки: поиск клиентов / покупателей"),
+        "mode_label": _trans("Поиск клиентов / покупателей"),
+        "page_title": _trans("Список рассылки: поиск клиентов / покупателей"),
         "steps": {
             "product": _text_step(
                 prompt_key="create_sell_product",
                 user_id="panel.audience.create_edit_sell.product",
-                nav_label=_("Продукт"),
-                summary_label=_("Продукт / услуга"),
-                dirty_label=_("Продукт / услуга"),
-                editor_label=_("Продукт / услуга. Что продаётся? Где применяется? Кто покупатель?"),
-                placeholder=_(
+                nav_label=_trans("Продукт"),
+                summary_label=_trans("Продукт / услуга"),
+                dirty_label=_trans("Продукт / услуга"),
+                editor_label=_trans("Продукт / услуга. Что продаётся? Где применяется? Кто покупатель?"),
+                placeholder=_trans(
                     "Для корректного выбора бизнес-категорий и рейтингования потенциальных клиентов необходимо "
                     "сформировать описание продукта или услуги. Введите описание продукта / услуги. Можно "
                     "использовать ссылку / ссылки в формате https://www.example.com. Можно воспользоваться "
@@ -220,16 +221,16 @@ FLOW_TYPE_CONFIG = {
                     "«Сохранить» — сохранить описание\n"
                     "Кнопка «Сохранить» записывает текущую версию описания для дальнейшего использования."
                 ),
-                ai_subject=_("описанием продукта или услуги"),
+                ai_subject=_trans("описанием продукта или услуги"),
             ),
             "company": _text_step(
                 prompt_key="create_sell_company",
                 user_id="panel.audience.create_edit_sell.company",
-                nav_label=_("Компания"),
-                summary_label=_("Компания - продавец"),
-                dirty_label=_("Компания"),
-                editor_label=_("Компания - продавец. Название, адрес, страна, размер, опыт, специализация."),
-                placeholder=_(
+                nav_label=_trans("Компания"),
+                summary_label=_trans("Компания - продавец"),
+                dirty_label=_trans("Компания"),
+                editor_label=_trans("Компания - продавец. Название, адрес, страна, размер, опыт, специализация."),
+                placeholder=_trans(
                     "Для корректного выбора бизнес-категорий и рейтингования потенциальных клиентов необходимо "
                     "сформировать описание компании-продавца. Укажите название компании, страну и адрес. "
                     "Уточните специализацию компании, опыт работы, возраст и размер компании. Укажите сайт "
@@ -243,16 +244,16 @@ FLOW_TYPE_CONFIG = {
                     "«Сохранить» — сохранить описание\n"
                     "Кнопка «Сохранить» записывает текущую версию описания для дальнейшего использования."
                 ),
-                ai_subject=_("описанием компании"),
+                ai_subject=_trans("описанием компании"),
             ),
             "geo": _text_step(
                 prompt_key="create_sell_geo",
                 user_id="panel.audience.create_edit_sell.geo",
-                nav_label=_("География"),
-                summary_label=_("География. Ограничения, предпочтения, приоритеты."),
-                dirty_label=_("География"),
-                editor_label=_("География. Ограничения, предпочтения, приоритеты."),
-                placeholder=_(
+                nav_label=_trans("География"),
+                summary_label=_trans("География. Ограничения, предпочтения, приоритеты."),
+                dirty_label=_trans("География"),
+                editor_label=_trans("География. Ограничения, предпочтения, приоритеты."),
+                placeholder=_trans(
                     "Для корректного отбора и приоритезации городов необходимо сформировать географические "
                     "критерии.\n"
                     "Если существуют конкретные ограничения по географии поиска клиентов, укажите их. Это "
@@ -266,7 +267,7 @@ FLOW_TYPE_CONFIG = {
                     "«Сохранить» — сохранить географические ограничения и предпочтения\n"
                     "Кнопка «Сохранить» записывает текущую версию географических критериев для дальнейшего использования."
                 ),
-                ai_subject=_("описанием географии"),
+                ai_subject=_trans("описанием географии"),
             ),
             **COMMON_FUTURE_STEPS,
         },
@@ -278,19 +279,19 @@ FLOW_TYPE_CONFIG = {
         "edit_url_name_id": "audience:create_edit_buy_id",
         "dialog_session_prefix": "create_edit_buy_dialog",
         "mode_class": "YY-STATUS_YELLOW",
-        "mode_label": _("Поиск поставщиков / подрядчиков"),
-        "page_title": _("Список рассылки: поиск поставщиков / подрядчиков"),
+        "mode_label": _trans("Поиск поставщиков / подрядчиков"),
+        "page_title": _trans("Список рассылки: поиск поставщиков / подрядчиков"),
         "steps": {
             "product": _text_step(
                 prompt_key="create_buy_product",
                 user_id="panel.audience.create_edit_buy.product",
-                nav_label=_("Продукт"),
-                summary_label=_("Продукт / услуга"),
-                dirty_label=_("Продукт / услуга"),
-                editor_label=_(
+                nav_label=_trans("Продукт"),
+                summary_label=_trans("Продукт / услуга"),
+                dirty_label=_trans("Продукт / услуга"),
+                editor_label=_trans(
                     "Продукт / услуга. Что нужно купить / заказать? Кто поставляет / выполняет работы?"
                 ),
-                placeholder=_(
+                placeholder=_trans(
                     "Для корректного выбора бизнес-категорий и рейтингования потенциальных поставщиков и "
                     "подрядчиков необходимо сформировать описание закупаемого продукта, услуги или работ. "
                     "Введите описание того, что нужно купить, заказать или отдать на подряд. Можно "
@@ -304,16 +305,16 @@ FLOW_TYPE_CONFIG = {
                     "«Сохранить» — сохранить описание\n"
                     "Кнопка «Сохранить» записывает текущую версию описания для дальнейшего использования."
                 ),
-                ai_subject=_("описанием закупаемого продукта, услуги или работ"),
+                ai_subject=_trans("описанием закупаемого продукта, услуги или работ"),
             ),
             "company": _text_step(
                 prompt_key="create_buy_company",
                 user_id="panel.audience.create_edit_buy.company",
-                nav_label=_("Компания"),
-                summary_label=_("Компания-заказчик"),
-                dirty_label=_("Компания-заказчик"),
-                editor_label=_("Компания-заказчик. Название, адрес, страна, размер, опыт, специализация."),
-                placeholder=_(
+                nav_label=_trans("Компания"),
+                summary_label=_trans("Компания-заказчик"),
+                dirty_label=_trans("Компания-заказчик"),
+                editor_label=_trans("Компания-заказчик. Название, адрес, страна, размер, опыт, специализация."),
+                placeholder=_trans(
                     "Для корректного выбора бизнес-категорий и рейтингования потенциальных поставщиков и "
                     "подрядчиков необходимо сформировать описание компании-заказчика. Укажите название компании, "
                     "страну и адрес. Уточните специализацию компании, опыт работы, возраст и размер компании. "
@@ -327,16 +328,16 @@ FLOW_TYPE_CONFIG = {
                     "«Сохранить» — сохранить описание\n"
                     "Кнопка «Сохранить» записывает текущую версию описания для дальнейшего использования."
                 ),
-                ai_subject=_("описанием компании-заказчика"),
+                ai_subject=_trans("описанием компании-заказчика"),
             ),
             "geo": _text_step(
                 prompt_key="create_buy_geo",
                 user_id="panel.audience.create_edit_buy.geo",
-                nav_label=_("География"),
-                summary_label=_("География. Ограничения, предпочтения, приоритеты."),
-                dirty_label=_("География"),
-                editor_label=_("География. Ограничения, предпочтения, приоритеты."),
-                placeholder=_(
+                nav_label=_trans("География"),
+                summary_label=_trans("География. Ограничения, предпочтения, приоритеты."),
+                dirty_label=_trans("География"),
+                editor_label=_trans("География. Ограничения, предпочтения, приоритеты."),
+                placeholder=_trans(
                     "Для корректного отбора и приоритезации городов необходимо сформировать географические "
                     "критерии поиска поставщиков и подрядчиков.\n"
                     "Если существуют конкретные ограничения по географии поиска поставщиков и подрядчиков, "
@@ -351,7 +352,7 @@ FLOW_TYPE_CONFIG = {
                     "«Сохранить» — сохранить географические ограничения и предпочтения\n"
                     "Кнопка «Сохранить» записывает текущую версию географических критериев для дальнейшего использования."
                 ),
-                ai_subject=_("описанием географии поиска поставщиков и подрядчиков"),
+                ai_subject=_trans("описанием географии поиска поставщиков и подрядчиков"),
             ),
             **COMMON_FUTURE_STEPS,
         },
@@ -468,11 +469,11 @@ def has_technical_title(task) -> bool:
 
 def suggest_title_for_task(request, task) -> tuple[str, bool]:
     resp = GPTClient().ask(
-        model="standard",
+        model=FLOW_GPT_MODEL,
         instructions=prompt_instructions(request, title_prompt_key(task)),
         input=title_input(task),
         user_id=title_user_id(task),
-        service_tier="flex",
+        service_tier=FLOW_GPT_SERVICE_TIER,
         web_search=False,
     )
     if not is_gpt_ok(resp):
@@ -556,7 +557,7 @@ def create_task(request, *, flow_type: str, title: str, **extra_fields):
         type=flow_type,
         **extra_fields,
     )
-    title_value = f"{_('Список рассылки')} #{int(task.id)}"
+    title_value = f"{_trans('Список рассылки')} #{int(task.id)}"
     AudienceTask.objects.filter(id=task.id).update(title=title_value)
     task.title = title_value
     return task
@@ -736,9 +737,9 @@ def build_flow_js_config(
             },
         },
         "requiredStepKeys": ["product", "company", "geo"],
-        "missingTitle": str(_("Не заполнены обязательные разделы")),
-        "missingText": str(_("Не заполнены или не сохранены разделы:")),
-        "closeLabel": str(_("Отменить")),
+        "missingTitle": str(_trans("Не заполнены обязательные разделы")),
+        "missingText": str(_trans("Не заполнены или не сохранены разделы:")),
+        "closeLabel": str(_trans("Отменить")),
         "geoTitleAutogenPending": bool(geo_title_autogen_pending),
     }
 
@@ -769,7 +770,7 @@ def build_flow_render_context(
         "task": task,
         "task_id_token": item_id,
         "saved_title": saved_values["title"],
-        "display_title": saved_values["title"] or str(_("Новый список рассылки")),
+        "display_title": saved_values["title"] or str(_trans("Новый список рассылки")),
         "flow_mode_class": flow_conf["mode_class"],
         "flow_mode_label": flow_conf["mode_label"],
         "page_title": flow_conf["page_title"],

@@ -1,238 +1,1779 @@
-<!-- FILE: web/templates/panels/overview.html -->
-<!-- DATE: 2026-03-08 -->
-<!-- PURPOSE: Обзор: дашборд-карточки 2x2. -->
-
 {% extends "panels/base.html" %}
-{% load i18n audience_extras %}
+{% load i18n %}
 
 {% block content %}
+<style>
+  [data-overview-run-status="1"],
+  [data-overview-list-processing-badge="1"],
+  [data-overview-list-activity-badge="1"] {
+    white-space: normal !important;
+  }
 
+  [data-overview-sent-badge="1"],
+  [data-overview-views-badge="1"],
+  [data-overview-demo-sent-badge="1"],
+  [data-overview-demo-views-badge="1"] {
+    white-space: nowrap !important;
+  }
+
+  [data-overview-sent-badge="1"] > span:last-child,
+  [data-overview-views-badge="1"] > span:last-child,
+  [data-overview-demo-sent-badge="1"] > span:last-child,
+  [data-overview-demo-views-badge="1"] > span:last-child {
+    white-space: nowrap !important;
+    flex-shrink: 0;
+  }
+
+  [data-overview-title-badge="1"] {
+    white-space: normal !important;
+    align-items: flex-start !important;
+  }
+
+  [data-overview-run-text="1"],
+  [data-overview-list-processing-text="1"],
+  [data-overview-list-activity-text="1"] {
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    min-width: 0;
+    line-height: 1.2;
+    flex: 1 1 auto;
+  }
+
+  [data-overview-title-text="1"] {
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    min-width: 0;
+    line-height: 1.2;
+    flex: 1 1 auto;
+  }
+
+  @media (max-width: 1449px) {
+    tr.yy-overview-stack-row > td.yy-overview-stack-cell,
+    tr.yy-overview-stack-row-split > td.yy-overview-stack-cell {
+      width: 100% !important;
+      vertical-align: top !important;
+      padding-left: 2rem !important;
+      padding-right: 2rem !important;
+    }
+  }
+</style>
 <table class="YY-MAIN_TABLE">
   <tr>
-    <td class="YY-MAIN_BOTTOM_TD">
-
-      <div class="grid grid-cols-2 gap-4 mb-10">
-        <div class="YY-CARD_WHITE">
-          <div class="YY-STATUS_BLUE mb-3">{% trans "Кампании" %}</div>
-          {% if card_campaigns %}
-            {% for it in card_campaigns %}
-              <div class="YY-MAIN_BOTTOM_DIV mb-3 px-4 py-3">
-                <div class="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1">
-                  <div class="my-1">{% trans "Кампания" %}:</div>
-                  <div class="my-1"><strong>{{ it.title }}</strong></div>
-
-                  <div class="my-1">{% trans "Аудитория" %}:</div>
-                  <div class="my-1">{{ it.audience }}</div>
-
-                  <div class="my-1">{% trans "Список" %}:</div>
-                  <div class="my-1">{{ it.mailing_list }}</div>
-
-                  <div class="my-1">{% trans "Даты" %}:</div>
-                  <div class="my-1">
-                    {% if it.start_at %}{{ it.start_at|date:"d.m.Y" }}{% else %}-{% endif %}
-                    -
-                    {% if it.end_at %}{{ it.end_at|date:"d.m.Y" }}{% else %}-{% endif %}
-                  </div>
-
-                  <div class="my-1">{% trans "Статус" %}:</div>
-                  <div class="my-1">
-                    <div class="grid grid-cols-2 gap-2">
-                      {% if it.campaign_status == "Кампания включена" %}
-                        <div class="YY-STATUS_GREEN !py-1 w-full text-center whitespace-nowrap">{{ it.campaign_status }}</div>
-                      {% else %}
-                        <div class="YY-STATUS_GRAY !py-1 w-full text-center whitespace-nowrap">{{ it.campaign_status }}</div>
-                      {% endif %}
-                      {% if it.work_status == "Идет рассылка" %}
-                        <div class="YY-STATUS_GREEN !py-1 w-full text-center whitespace-nowrap">{{ it.work_status }}</div>
-                      {% elif it.work_status == "Ждем окно отправки" %}
-                        <div class="YY-STATUS_YELLOW !py-1 w-full text-center whitespace-nowrap">{{ it.work_status }}</div>
-                      {% else %}
-                        <div class="YY-STATUS_GRAY !py-1 w-full text-center whitespace-nowrap">{{ it.work_status }}</div>
-                      {% endif %}
-                    </div>
-                  </div>
-
-                  <div class="mt-4 !py-1">&nbsp;</div>
-                  <div class="mt-4 !py-1">
-                    <div class="grid grid-cols-3 gap-2">
-                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Отправлено" %}</div>
-                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Осталось" %}</div>
-                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Всего" %}</div>
-                    </div>
-                  </div>
-
-                  <div class="mb-4">{% trans "Всего" %}:</div>
-                  <div class="mb-4">
-                    <div class="grid grid-cols-3 gap-2">
-                      <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">
-                        {{ it.sent|group_int:lang_code }} <span class="font-normal">({{ it.sent_pct }}%)</span>
-                      </div>
-                      <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">
-                        {{ it.left|group_int:lang_code }} <span class="font-normal">({{ it.left_pct }}%)</span>
-                      </div>
-                      <div class="YY-STATUS_BLUE !py-1 !px-1 text-center">
-                        {{ it.total|group_int:lang_code }} <span class="font-normal">({{ it.total_pct }}%)</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {% if it.is_active and it.left > 0 %}
-                    <div>{% trans "Сегодня" %}:</div>
-                    <div>
-                      <div class="grid grid-cols-3 gap-2">
-                        <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">
-                          {{ it.today_sent|group_int:lang_code }} <span class="font-normal">({{ it.today_sent_pct }}%)</span>
-                        </div>
-                        <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">
-                          {{ it.today_left|group_int:lang_code }} <span class="font-normal">({{ it.today_left_pct }}%)</span>
-                        </div>
-                        <div class="YY-STATUS_BLUE !py-1 !px-1 text-center">
-                          {{ it.today_total|group_int:lang_code }} <span class="font-normal">({% if it.today_total %}100{% else %}0{% endif %}%)</span>
-                        </div>
-                      </div>
-                    </div>
-                  {% endif %}
-
-                  {% if it.is_active and it.left > 0 %}
-                    {% for row in it.future_rows %}
-                      <div>{{ row.day|date:"d.m.Y" }}:</div>
-                      <div>
-                        <div class="grid grid-cols-3 gap-2">
-                          <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">
-                            -
-                          </div>
-                          <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">
-                            {{ row.left|group_int:lang_code }}
-                          </div>
-                          <div class="YY-STATUS_BLUE !py-1 !px-1 text-center">
-                            {{ row.total|group_int:lang_code }}
-                          </div>
-                        </div>
-                      </div>
-                    {% endfor %}
-                  {% endif %}
-
-                </div>
-              </div>
-            {% endfor %}
-          {% else %}
-            <div class="YY-STATUS_GRAY">{% trans "Здесь пока нет данных" %}</div>
-          {% endif %}
-        </div>
-
-        <div class="YY-CARD_WHITE">
-          <div class="YY-STATUS_BLUE mb-3">{% trans "Статистика" %}</div>
-          {% if card_stats %}
-            {% for it in card_stats %}
-              <div class="YY-MAIN_BOTTOM_DIV mb-3 px-4 py-3">
-                <div class="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1">
-                  <div>{% trans "Кампания" %}:</div>
-                  <div><strong>{{ it.title }}</strong></div>
-
-                  <div class="mt-4 !py-1">&nbsp;</div>
-                  <div class="mt-4 !py-1">
-                    <div class="grid grid-cols-4 gap-2">
-                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Отправлено" %}</div>
-                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Доставлено" %}</div>
-                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Переходы" %}</div>
-                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">%</div>
-                    </div>
-                  </div>
-
-                  <div class="mb-4">{% trans "Всего" %}:</div>
-                  <div class="mb-4">
-                    <div class="grid grid-cols-4 gap-2">
-                      <div class="YY-STATUS_BLUE !py-1 !px-1 text-center">{{ it.sent|group_int:lang_code }}</div>
-                      <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">{{ it.delivered|group_int:lang_code }}</div>
-                      <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">{{ it.views|group_int:lang_code }}</div>
-                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{{ it.pct }}%</div>
-                    </div>
-                  </div>
-
-                  {% if it.has_recent_sent %}
-                    {% for d in it.days %}
-                      <div>
-                        {% if d.is_today %}{% trans "Сегодня" %}{% else %}{{ d.day|date:"d.m.Y" }}{% endif %}:
-                      </div>
-                      <div>
-                        <div class="grid grid-cols-4 gap-2">
-                          <div class="YY-STATUS_BLUE !py-1 !px-1 text-center">{{ d.sent|group_int:lang_code }}</div>
-                          <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">{{ d.delivered|group_int:lang_code }}</div>
-                          <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">{{ d.views|group_int:lang_code }}</div>
-                          <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{{ d.pct }}%</div>
-                        </div>
-                      </div>
-                    {% endfor %}
-                  {% endif %}
-                </div>
-              </div>
-            {% endfor %}
-          {% else %}
-            <div class="YY-STATUS_GRAY">{% trans "Здесь пока нет данных" %}</div>
-          {% endif %}
-        </div>
-
-        <div class="YY-CARD_WHITE">
-          <div class="YY-STATUS_BLUE mb-3">{% trans "Активные аудитории" %}</div>
-          {% if card_audiences %}
-            {% for it in card_audiences %}
-              <div class="YY-MAIN_BOTTOM_DIV mb-3 px-4 py-3">
-                <div class="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1">
-                  <div class="my-1">{% trans "Аудитория" %}:</div>
-                  <div class="my-1"><strong>{{ it.title }}</strong></div>
-
-                  <div class="my-1">{% trans "Статус" %}:</div>
-                  <div class="my-1">
-                    {% if it.status_on %}
-                      <span class="YY-STATUS_GREEN !py-1 !px-2">{{ it.status }}</span>
-                    {% else %}
-                      <span class="YY-STATUS_GRAY !py-1 !px-2">{{ it.status }}</span>
-                    {% endif %}
-                  </div>
-
-                  <div class="my-1">{% trans "Собрано" %}:</div>
-                  <div class="my-1"><span class="YY-STATUS_GRAY !py-1 !px-2">{{ it.total|group_int:lang_code }}</span></div>
-
-                  <div class="my-1 mb-3">{% trans "Отрейтинговано" %}:</div>
-                  <div class="my-1 mb-3"><span class="YY-STATUS_BLUE !py-1 !px-2">{{ it.rated|group_int:lang_code }}</span></div>
-
-                  <div class="!py-1">&nbsp;</div>
-                  <div class="!py-1">
-                    <div class="grid grid-cols-3 gap-2">
-                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Рейтинг 1-30" %}</div>
-                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Рейтинг 31-70" %}</div>
-                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{% trans "Рейтинг 71-100" %}</div>
-                    </div>
-                  </div>
-
-                  <div>&nbsp;</div>
-                  <div>
-                    <div class="grid grid-cols-3 gap-2">
-                      <div class="YY-STATUS_GREEN !py-1 !px-1 text-center">{{ it.b1|group_int:lang_code }}</div>
-                      <div class="YY-STATUS_YELLOW !py-1 !px-1 text-center">{{ it.b2|group_int:lang_code }}</div>
-                      <div class="YY-STATUS_GRAY !py-1 !px-1 text-center">{{ it.b3|group_int:lang_code }}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            {% endfor %}
-          {% else %}
-            <div class="YY-STATUS_GRAY">{% trans "Здесь пока нет данных" %}</div>
-          {% endif %}
-        </div>
-
-        <div class="YY-CARD_WHITE">
-          <div class="YY-STATUS_BLUE mb-3">{% trans "Ссылки" %}</div>
-
-          <div class="grid grid-cols-1 gap-2">
-            <a href="{% url 'audience:index' %}" class="YY-BUTTON_TAB_MAIN">{% trans "Добавить аудиторию" %}</a>
-            <a href="{% url 'campaigns:campaigns' %}" class="YY-BUTTON_TAB_MAIN">{% trans "Добавить кампанию" %}</a>
+    <td class="YY-MAIN_TOP_TD" colspan="2">
+      <div class="YY-CARD_WHITE">
+        <div class="w-full grid grid-cols-2 gap-16 items-center">
+          <div>
+            <div class="YY-STATUS_GREEN">{% trans "Переходы" %}</div>
+          </div>
+          <div class="flex items-center justify-end gap-2">
+            <a href="{% url 'settings:url_stats' %}" class="YY-BUTTON_MAIN !mb-0 !justify-between gap-2">
+              <span>{% trans "Счетчик переходов" %}</span>
+              <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                <use href="#icon-arrow-circle"></use>
+              </svg>
+            </a>
+            <a href="{% url 'stats_clicks' %}" class="YY-BUTTON_MAIN !mb-0 !justify-between gap-2">
+              <span>{% trans "Статистика переходов" %}</span>
+              <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                <use href="#icon-arrow-circle"></use>
+              </svg>
+            </a>
           </div>
         </div>
       </div>
-
     </td>
   </tr>
-</table>
 
+  <tr>
+    <td class="YY-MAIN_TOP_TD !pt-3" colspan="2">
+      <div class="YY-CARD_WHITE" data-overview-site-traffic-wrap="1">
+        <div data-overview-traffic-head="1" class="YY-STATUS_BLUE !mb-0 !w-full !font-normal" style="display:grid !important;grid-template-columns:var(--yy-overview-traffic-time-col,max-content) var(--yy-overview-traffic-campaign-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1.5rem;">
+          <span data-overview-traffic-col-time="1">{% trans "Время" %}</span>
+          <span data-overview-traffic-col-campaign="1">{% trans "Кампания" %}</span>
+          <span>{% trans "Контакт" %}</span>
+          <span class="inline-flex justify-end items-center" aria-hidden="true">
+            <span class="inline-block size-[19px] rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin"></span>
+          </span>
+        </div>
+        <div data-overview-site-traffic="1" class="mt-3 space-y-[2px]">
+          {% if overview_site_click_rows %}
+            {% for r in overview_site_click_rows %}
+              <div data-overview-timeline-row-key="{{ r.row_key|default:''|escape }}" data-overview-traffic-row="1" class="{% if r.campaign_type == 'buy' %}YY-STATUS_YELLOW{% elif r.campaign_type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %} !w-full !items-center !mb-0 !font-normal" style="display:grid !important;grid-template-columns:var(--yy-overview-traffic-time-col,max-content) var(--yy-overview-traffic-campaign-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1.5rem;">
+                <span data-overview-traffic-col-time="1" class="shrink-0 whitespace-nowrap">{{ r.time_text }}</span>
+                <span data-overview-traffic-col-campaign="1" class="truncate">{{ r.campaign_title }}</span>
+                {% if r.contact_modal_url %}
+                  <a href="#" class="truncate text-current no-underline hover:underline" data-yy-modal="url={{ r.contact_modal_url|escape }}">{{ r.contact_name }}</a>
+                {% else %}
+                  <span class="truncate">{{ r.contact_name }}</span>
+                {% endif %}
+                <span class="inline-flex shrink-0 justify-end text-right">{{ r.visits_count_fmt }}</span>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div data-overview-timeline-row-key="site:empty" class="YY-STATUS_GRAY inline-flex !w-full !items-center !mb-0 !font-normal gap-2">
+              <span>{% trans "Переходов на сайт / сайты из писем по рассылкам не зафиксировано. Проверьте установку счетчика переходов на сайте." %}</span>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </td>
+  </tr>
+
+  <tr>
+    <td class="YY-MAIN_TOP_TD !pt-12" colspan="2">
+      <div class="YY-CARD_WHITE">
+        <div class="w-full grid grid-cols-2 gap-16 items-center">
+          <div>
+            <div class="YY-STATUS_BLUE">{% trans "Ваши кампании" %}</div>
+          </div>
+          <div class="flex items-center justify-end gap-2">
+            <a href="{% url 'audience:create_list' %}" class="YY-BUTTON_MAIN !mb-0 gap-2">
+              <span>{% trans "Создать новый список рассылки" %}</span>
+              <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                <use href="#icon-arrow-circle"></use>
+              </svg>
+            </a>
+            <a href="{% url 'campaigns:campaigns' %}" class="YY-BUTTON_MAIN !mb-0 gap-2">
+              <span>{% trans "Создать новую кампанию" %}</span>
+              <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                <use href="#icon-arrow-circle"></use>
+              </svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </td>
+  </tr>
+
+  {% if campaign_rows %}
+    {% for row in campaign_rows %}
+      <tr class="yy-overview-stack-row">
+        <td class="YY-MAIN_TOP_LEFT_TD w-1/2 !pt-3 yy-overview-stack-cell">
+          <div class="YY-CARD_WHITE">
+            <div data-overview-title-badge="1" class="{% if row.0.type == 'buy' %}YY-STATUS_YELLOW{% elif row.0.type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %} !mb-0 !w-full !justify-between !items-center">
+              <span data-overview-title-text="1" class="!my-1.5">{{ row.0.title }}</span>
+              <a href="{% url 'campaigns:campaigns' %}?state=edit&id={{ row.0.ui_id }}" class="inline-flex ml-auto pl-2 !mt-1" aria-label="{% trans 'Редактировать кампанию' %}">
+                <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                  <use href="#icon-arrow-circle"></use>
+                </svg>
+              </a>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-7">
+              <div>
+                {% if row.0.is_running %}
+                  <span
+                    data-overview-run-status="1"
+                    data-campaign-ui="{{ row.0.ui_id }}"
+                    class="{% if row.0.is_in_window %}YY-STATUS_GREEN inline-flex !w-full !justify-between !items-center !mb-0{% else %}YY-STATUS_BLUE inline-flex !w-full !mb-0{% endif %}">
+                    <span data-overview-run-text="1" data-campaign-ui="{{ row.0.ui_id }}">{% if row.0.is_in_window %}{% trans "Письма отправляются" %}{% else %}{% trans "Ждем окна отправки" %}{% endif %}</span>
+                      <span
+                        data-overview-run-spinner="1"
+                        data-campaign-ui="{{ row.0.ui_id }}"
+                        class="{% if row.0.is_in_window %}inline-flex size-[22px] shrink-0 items-center justify-center mr-[3px]{% else %}hidden{% endif %}"
+                        aria-hidden="true">
+                      <span class="inline-block size-[19px] mr-[3px] rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin"></span>
+                    </span>
+                  </span>
+                {% else %}
+                  <a href="{% url 'campaigns:campaigns' %}?state=edit&id={{ row.0.ui_id }}" class="YY-BUTTON_MAIN !w-full !mb-0 !justify-between gap-2">
+                    <span>{% trans "Редактировать кампанию" %}</span>
+                    <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                      <use href="#icon-arrow-circle"></use>
+                    </svg>
+                  </a>
+                {% endif %}
+              </div>
+              <div>
+                {% if row.0.has_ready_letter %}
+                  <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="toggle_user_active">
+                    <input type="hidden" name="id" value="{{ row.0.ui_id }}">
+                    <button
+                      type="submit"
+                      class="{% if row.0.is_running %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0"
+                      aria-label="{% if row.0.is_running %}{% trans "Остановить кампанию" %}{% else %}{% trans "Запустить кампанию" %}{% endif %}"
+                      title="{% if row.0.is_running %}{% trans "Остановить кампанию" %}{% else %}{% trans "Запустить кампанию" %}{% endif %}">
+                      <span>{% if row.0.is_running %}{% trans "Кампания запущена" %}{% else %}{% trans "Кампания остановлена" %}{% endif %}</span>
+                      {% if row.0.is_running %}
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                      {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />
+                        </svg>
+                      {% endif %}
+                    </button>
+                  </form>
+                {% else %}
+                  <span class="YY-STATUS_GRAY inline-flex !w-full !mb-0">{% trans "Кампания без письма" %}</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-1">
+              <div>
+                <span data-overview-sent-badge="1" data-campaign-ui="{{ row.0.ui_id }}" class="{% if row.0.sent_count > 0 %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                  <span>{% trans "Отправлено" %}:</span>
+                  <span class="inline-flex ml-auto items-center justify-end text-right">
+                    <span data-overview-sent-value="1" data-campaign-ui="{{ row.0.ui_id }}">{{ row.0.sent_count_fmt }}</span>
+                    <a
+                      href="{% url 'stats_sending' %}"
+                      data-overview-sent-link="1"
+                      data-campaign-ui="{{ row.0.ui_id }}"
+                      class="{% if row.0.sent_count > 0 %}inline-flex ml-2 shrink-0 items-center justify-center{% else %}hidden{% endif %}"
+                      aria-label="{% trans 'Перейти в статистику отправки' %}">
+                      <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </a>
+                  </span>
+                </span>
+              </div>
+              <div>
+                <span data-overview-views-badge="1" data-campaign-ui="{{ row.0.ui_id }}" class="{% if row.0.views_count > 0 %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                  <span>{% trans "Переходы на сайт" %}:</span>
+                  <span class="inline-flex ml-auto items-center justify-end text-right">
+                    <span data-overview-views-value="1" data-campaign-ui="{{ row.0.ui_id }}">{{ row.0.views_count_fmt }}</span>
+                    <span class="ml-1">(<span data-overview-views-pct="1" data-campaign-ui="{{ row.0.ui_id }}">{{ row.0.views_pct }}</span>%)</span>
+                    <a
+                      href="{% url 'stats_clicks' %}"
+                      data-overview-views-link="1"
+                      data-campaign-ui="{{ row.0.ui_id }}"
+                      class="{% if row.0.views_count > 0 %}inline-flex ml-2 shrink-0 items-center justify-center{% else %}hidden{% endif %}"
+                      aria-label="{% trans 'Перейти в статистику переходов' %}">
+                      <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </a>
+                  </span>
+                </span>
+              </div>
+            </div>
+            <div data-overview-timeline="1" data-campaign-ui="{{ row.0.ui_id }}" class="mt-7 space-y-[2px]">
+              {% for t in row.0.timeline_rows %}
+                <div data-overview-timeline-row-key="{{ t.row_key|default:''|escape }}" class="{% if t.tone == 'blue' %}YY-STATUS_BLUE{% elif t.tone == 'yellow' %}YY-STATUS_YELLOW{% elif t.tone == 'green' %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !w-full !items-center !mb-0 !font-normal gap-2">
+                  <span class="shrink-0 whitespace-nowrap">{{ t.time_text }}</span>
+                  {% if t.contact_modal_url %}
+                    <a href="#" class="truncate text-current no-underline hover:underline" data-yy-modal="url={{ t.contact_modal_url|escape }}">{{ t.company_name }}</a>
+                  {% else %}
+                    <span class="truncate">{{ t.company_name }}</span>
+                  {% endif %}
+                  <span class="inline-flex ml-auto shrink-0 items-center justify-center" aria-hidden="true">
+                    {% if t.icon == 'spinner' %}
+                      <span class="inline-block size-[19px] mr-[3px] rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin"></span>
+                    {% elif t.icon == 'check' %}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                    {% elif t.icon == 'info' %}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                      </svg>
+                    {% else %}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                    {% endif %}
+                  </span>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </td>
+        {% if row|length == 2 %}
+          <td class="YY-MAIN_TOP_RIGHT_TD w-1/2 !pt-3 yy-overview-stack-cell">
+            <div class="YY-CARD_WHITE">
+              <div data-overview-title-badge="1" class="{% if row.1.type == 'buy' %}YY-STATUS_YELLOW{% elif row.1.type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %} !mb-0 !w-full !justify-between !items-center">
+                <span data-overview-title-text="1" class="!my-1.5">{{ row.1.title }}</span>
+                <a href="{% url 'campaigns:campaigns' %}?state=edit&id={{ row.1.ui_id }}" class="inline-flex ml-auto pl-2 !mt-1" aria-label="{% trans 'Редактировать кампанию' %}">
+                  <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                    <use href="#icon-arrow-circle"></use>
+                  </svg>
+                </a>
+              </div>
+              <div class="grid grid-cols-2 gap-2 mt-7">
+                <div>
+                  {% if row.1.is_running %}
+                    <span
+                      data-overview-run-status="1"
+                      data-campaign-ui="{{ row.1.ui_id }}"
+                      class="{% if row.1.is_in_window %}YY-STATUS_GREEN inline-flex !w-full !justify-between !items-center !mb-0{% else %}YY-STATUS_BLUE inline-flex !w-full !mb-0{% endif %}">
+                      <span data-overview-run-text="1" data-campaign-ui="{{ row.1.ui_id }}">{% if row.1.is_in_window %}{% trans "Письма отправляются" %}{% else %}{% trans "Ждем окна отправки" %}{% endif %}</span>
+                      <span
+                        data-overview-run-spinner="1"
+                        data-campaign-ui="{{ row.1.ui_id }}"
+                        class="{% if row.1.is_in_window %}inline-flex size-[22px] shrink-0 items-center justify-center mr-[3px]{% else %}hidden{% endif %}"
+                        aria-hidden="true">
+                        <span class="inline-block size-[19px] mr-[3px] rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin"></span>
+                      </span>
+                    </span>
+                  {% else %}
+                    <a href="{% url 'campaigns:campaigns' %}?state=edit&id={{ row.1.ui_id }}" class="YY-BUTTON_MAIN !w-full !mb-0 !justify-between gap-2">
+                      <span>{% trans "Редактировать кампанию" %}</span>
+                      <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </a>
+                  {% endif %}
+                </div>
+                <div>
+                  {% if row.1.has_ready_letter %}
+                    <form method="post">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="toggle_user_active">
+                      <input type="hidden" name="id" value="{{ row.1.ui_id }}">
+                      <button
+                        type="submit"
+                        class="{% if row.1.is_running %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0"
+                        aria-label="{% if row.1.is_running %}{% trans "Остановить кампанию" %}{% else %}{% trans "Запустить кампанию" %}{% endif %}"
+                        title="{% if row.1.is_running %}{% trans "Остановить кампанию" %}{% else %}{% trans "Запустить кампанию" %}{% endif %}">
+                        <span>{% if row.1.is_running %}{% trans "Кампания запущена" %}{% else %}{% trans "Кампания остановлена" %}{% endif %}</span>
+                        {% if row.1.is_running %}
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          </svg>
+                        {% else %}
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />
+                          </svg>
+                        {% endif %}
+                      </button>
+                    </form>
+                  {% else %}
+                    <span class="YY-STATUS_GRAY inline-flex !w-full !mb-0">{% trans "Кампания без письма" %}</span>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 mt-1">
+                <div>
+                  <span data-overview-sent-badge="1" data-campaign-ui="{{ row.1.ui_id }}" class="{% if row.1.sent_count > 0 %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                    <span>{% trans "Отправлено" %}:</span>
+                    <span class="inline-flex ml-auto items-center justify-end text-right">
+                      <span data-overview-sent-value="1" data-campaign-ui="{{ row.1.ui_id }}">{{ row.1.sent_count_fmt }}</span>
+                      <a
+                        href="{% url 'stats_sending' %}"
+                        data-overview-sent-link="1"
+                        data-campaign-ui="{{ row.1.ui_id }}"
+                        class="{% if row.1.sent_count > 0 %}inline-flex ml-2 shrink-0 items-center justify-center{% else %}hidden{% endif %}"
+                        aria-label="{% trans 'Перейти в статистику отправки' %}">
+                        <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </a>
+                    </span>
+                  </span>
+                </div>
+                <div>
+                  <span data-overview-views-badge="1" data-campaign-ui="{{ row.1.ui_id }}" class="{% if row.1.views_count > 0 %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                    <span>{% trans "Переходы на сайт" %}:</span>
+                    <span class="inline-flex ml-auto items-center justify-end text-right">
+                      <span data-overview-views-value="1" data-campaign-ui="{{ row.1.ui_id }}">{{ row.1.views_count_fmt }}</span>
+                      <span class="ml-1">(<span data-overview-views-pct="1" data-campaign-ui="{{ row.1.ui_id }}">{{ row.1.views_pct }}</span>%)</span>
+                      <a
+                        href="{% url 'stats_clicks' %}"
+                        data-overview-views-link="1"
+                        data-campaign-ui="{{ row.1.ui_id }}"
+                        class="{% if row.1.views_count > 0 %}inline-flex ml-2 shrink-0 items-center justify-center{% else %}hidden{% endif %}"
+                        aria-label="{% trans 'Перейти в статистику переходов' %}">
+                        <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                          <use href="#icon-arrow-circle"></use>
+                        </svg>
+                      </a>
+                    </span>
+                  </span>
+                </div>
+              </div>
+              <div data-overview-timeline="1" data-campaign-ui="{{ row.1.ui_id }}" class="mt-7 space-y-[2px]">
+                {% for t in row.1.timeline_rows %}
+                  <div data-overview-timeline-row-key="{{ t.row_key|default:''|escape }}" class="{% if t.tone == 'blue' %}YY-STATUS_BLUE{% elif t.tone == 'yellow' %}YY-STATUS_YELLOW{% elif t.tone == 'green' %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !w-full !items-center !mb-0 !font-normal gap-2">
+                    <span class="shrink-0 whitespace-nowrap">{{ t.time_text }}</span>
+                    {% if t.contact_modal_url %}
+                      <a href="#" class="truncate text-current no-underline hover:underline" data-yy-modal="url={{ t.contact_modal_url|escape }}">{{ t.company_name }}</a>
+                    {% else %}
+                      <span class="truncate">{{ t.company_name }}</span>
+                    {% endif %}
+                    <span class="inline-flex ml-auto shrink-0 items-center justify-center" aria-hidden="true">
+                      {% if t.icon == 'spinner' %}
+                      <span class="inline-block size-[19px] mr-[3px] rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin"></span>
+                      {% elif t.icon == 'check' %}
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                      {% elif t.icon == 'info' %}
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                        </svg>
+                      {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                      {% endif %}
+                    </span>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          </td>
+        {% else %}
+          <td class="YY-MAIN_TOP_RIGHT_TD w-1/2 !pt-3 yy-overview-stack-cell yy-overview-stack-empty"></td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+  {% else %}
+    {% if overview_demo %}
+      <tr class="yy-overview-stack-row">
+        <td class="YY-MAIN_TOP_LEFT_TD w-1/2 !pt-3 yy-overview-stack-cell">
+          <div class="YY-CARD_WHITE">
+            <div data-overview-title-badge="1" class="YY-STATUS_GREEN !mb-0 !w-full !justify-between !items-center">
+              <span data-overview-title-text="1" class="!my-1.5">{{ overview_demo.title }}</span>
+              <span class="inline-flex ml-auto pl-2 !mt-1">
+                <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                  <use href="#icon-arrow-circle"></use>
+                </svg>
+              </span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-7">
+              <div>
+                <span class="YY-STATUS_GREEN inline-flex !justify-between !items-center !w-full !mb-0">
+                  <span>{% trans "Кампания запущена" %}</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                </span>
+              </div>
+              <div>
+                <span class="YY-STATUS_GREEN inline-flex !w-full !justify-between !items-center !mb-0">
+                  <span>{% trans "Письма отправляются" %}</span>
+                  <span class="inline-flex size-[22px] shrink-0 items-center justify-center mr-[3px]" aria-hidden="true">
+                    <span class="inline-block size-[19px] mr-[3px] rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin"></span>
+                  </span>
+                </span>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-1">
+              <div>
+                <span data-overview-demo-views-badge="1" class="{% if overview_demo.views_count > 0 %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                  <span>{% trans "Переходы на сайт" %}:</span>
+                  <span class="inline-flex ml-auto items-center justify-end text-right">
+                    <span data-overview-demo-views-value="1">{{ overview_demo.views_count_fmt }}</span>
+                    <span class="ml-1">(<span data-overview-demo-views-pct="1">{{ overview_demo.views_pct }}</span>%)</span>
+                    <span data-overview-demo-views-arrow="1" class="{% if overview_demo.views_count > 0 %}inline-flex ml-2 shrink-0 items-center justify-center{% else %}hidden{% endif %}" aria-hidden="true">
+                      <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </span>
+                  </span>
+                </span>
+              </div>
+              <div>
+                <span data-overview-demo-sent-badge="1" class="{% if overview_demo.sent_count > 0 %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                  <span>{% trans "Отправлено" %}:</span>
+                  <span class="inline-flex ml-auto items-center justify-end text-right">
+                    <span data-overview-demo-sent-value="1">{{ overview_demo.sent_count_fmt }}</span>
+                    <span data-overview-demo-sent-arrow="1" class="{% if overview_demo.sent_count > 0 %}inline-flex ml-2 shrink-0 items-center justify-center{% else %}hidden{% endif %}" aria-hidden="true">
+                      <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </span>
+                  </span>
+                </span>
+              </div>
+            </div>
+            <div data-overview-demo-timeline="1" class="mt-7 space-y-[2px]">
+              {% for t in overview_demo.timeline_rows %}
+                <div data-overview-timeline-row-key="{{ t.row_key|default:''|escape }}" class="{% if t.tone == 'blue' %}YY-STATUS_BLUE{% elif t.tone == 'yellow' %}YY-STATUS_YELLOW{% elif t.tone == 'green' %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !w-full !items-center !mb-0 !font-normal gap-2">
+                  <span class="shrink-0 whitespace-nowrap">{{ t.time_text }}</span>
+                  {% if t.contact_modal_url %}
+                    <a href="#" class="truncate text-current no-underline hover:underline" data-yy-modal="url={{ t.contact_modal_url|escape }}">{{ t.company_name }}</a>
+                  {% else %}
+                    <span class="truncate">{{ t.company_name }}</span>
+                  {% endif %}
+                  <span class="inline-flex ml-auto shrink-0 items-center justify-center" aria-hidden="true">
+                    {% if t.icon == 'spinner' %}
+                      <span class="inline-block size-[19px] mr-[3px] rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin"></span>
+                    {% elif t.icon == 'check' %}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                    {% elif t.icon == 'info' %}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                      </svg>
+                    {% else %}
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                    {% endif %}
+                  </span>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </td>
+        <td class="YY-MAIN_TOP_RIGHT_TD w-1/2 !pt-3 yy-overview-stack-cell">
+          <div class="YY-CARD_WHITE">
+            <div class="YY-STATUS_BLUE !mb-0">{% trans "Нет, ваши письма не отправляются." %}</div>
+            <div class="YY-STATUS_WHITE !mb-0 mt-4">{% trans "Начните использовать систему рассылки" %}&nbsp;<b>{% trans "Serenity Mailer" %}</b>.</div>
+            <div class="YY-STATUS_WHITE !mb-0 mt-2">{% trans "Настройте первую кампанию рассылки!" %}</div>
+            <div class="grid grid-cols-2 gap-2 mt-4">
+              <span class="YY-STATUS_BLUE !w-full !mb-0">{% trans "Почтовые серверы:" %}</span>
+              <a href="{% url 'settings:mail_servers' %}" class="YY-BUTTON_MAIN !w-full !mb-0 !justify-between gap-2">
+                <span>{% trans "Создать / Настроить" %}</span>
+                <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                  <use href="#icon-arrow-circle"></use>
+                </svg>
+              </a>
+
+              <span class="YY-STATUS_BLUE !w-full !mb-0">{% trans "Учет переходов:" %}</span>
+              <a href="{% url 'settings:url_stats' %}" class="YY-BUTTON_MAIN !w-full !mb-0 !justify-between gap-2">
+                <span>{% trans "Посмотреть инструкции" %}</span>
+                <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                  <use href="#icon-arrow-circle"></use>
+                </svg>
+              </a>
+
+              <span class="YY-STATUS_BLUE !w-full !mb-0">{% trans "Списки рассылок:" %}</span>
+              <a href="{% url 'audience:create_list' %}" class="YY-BUTTON_MAIN !w-full !mb-0 !justify-between gap-2">
+                <span>{% trans "Создать / Настроить" %}</span>
+                <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                  <use href="#icon-arrow-circle"></use>
+                </svg>
+              </a>
+
+              <span class="YY-STATUS_BLUE !w-full !mb-0">{% trans "Кампании рассылок:" %}</span>
+              <a href="{% url 'campaigns:campaigns' %}" class="YY-BUTTON_MAIN !w-full !mb-0 !justify-between gap-2">
+                <span>{% trans "Создать / Настроить" %}</span>
+                <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                  <use href="#icon-arrow-circle"></use>
+                </svg>
+              </a>
+            </div>
+          </div>
+        </td>
+      </tr>
+    {% else %}
+      <tr>
+        <td class="YY-MAIN_TOP_TD" colspan="2">
+          <div class="YY-CARD_WHITE">{% trans "Здесь пока нет данных" %}</div>
+        </td>
+      </tr>
+    {% endif %}
+  {% endif %}
+
+  {% if mailing_list_rows %}
+    <tr>
+      <td class="YY-MAIN_TOP_TD !pt-12" colspan="2">
+        <div class="YY-CARD_WHITE">
+          <div class="w-full grid grid-cols-2 gap-16 items-center">
+            <div>
+              <div class="YY-STATUS_BLUE">{% trans "Ваши списки рассылок" %}</div>
+            </div>
+            <div class="flex items-center justify-end gap-2">
+              <a href="{% url 'audience:create_list' %}" class="YY-BUTTON_MAIN !mb-0 !justify-between gap-2">
+                <span>{% trans "Создать новый список рассылки" %}</span>
+                <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                  <use href="#icon-arrow-circle"></use>
+                </svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
+
+    {% for row in mailing_list_rows %}
+      <tr class="yy-overview-stack-row">
+        <td class="YY-MAIN_TOP_LEFT_TD w-1/2 !pt-3 yy-overview-stack-cell">
+          <div class="YY-CARD_WHITE">
+            <div data-overview-title-badge="1" class="{% if row.0.type == 'buy' %}YY-STATUS_YELLOW{% elif row.0.type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %} !mb-0 !w-full !justify-between !items-center">
+              <span data-overview-title-text="1" class="!my-1.5">{{ row.0.title }}</span>
+              {% if row.0.rating_url %}
+                <a href="{{ row.0.rating_url }}" class="inline-flex ml-auto pl-2 !mt-1" aria-label="{% trans 'Перейти в рейтинг' %}">
+                  <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                    <use href="#icon-arrow-circle"></use>
+                  </svg>
+                </a>
+              {% endif %}
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mt-7">
+              <div>
+                {% if row.0.processing_toggleable and row.0.task_ui_id %}
+                  <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="toggle_task_user_active">
+                    <input type="hidden" name="id" value="{{ row.0.task_ui_id }}">
+                    <button
+                      type="submit"
+                      data-overview-list-processing-badge="1"
+                      data-list-ui="{{ row.0.list_ui_id }}"
+                      class="{% if row.0.processing_enabled %}YY-STATUS_BLUE{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0"
+                      aria-label="{% if row.0.processing_enabled %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}"
+                      title="{% if row.0.processing_enabled %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}">
+                      <span data-overview-list-processing-text="1" data-list-ui="{{ row.0.list_ui_id }}">{% if row.0.processing_enabled %}{% trans "Обработка включена" %}{% else %}{% trans "Обработка отключена" %}{% endif %}</span>
+                      <span data-overview-list-processing-icon="1" data-list-ui="{{ row.0.list_ui_id }}" class="inline-flex ml-auto shrink-0 items-center justify-center">
+                        {% if row.0.processing_enabled %}
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          </svg>
+                        {% else %}
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />
+                          </svg>
+                        {% endif %}
+                      </span>
+                    </button>
+                  </form>
+                {% else %}
+                  <span
+                    data-overview-list-processing-badge="1"
+                    data-list-ui="{{ row.0.list_ui_id }}"
+                    class="{% if row.0.processing_enabled %}YY-STATUS_BLUE{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                    <span data-overview-list-processing-text="1" data-list-ui="{{ row.0.list_ui_id }}">{% if row.0.processing_enabled %}{% trans "Обработка включена" %}{% else %}{% trans "Обработка отключена" %}{% endif %}</span>
+                    <span data-overview-list-processing-icon="1" data-list-ui="{{ row.0.list_ui_id }}" class="inline-flex ml-auto shrink-0 items-center justify-center">
+                      {% if row.0.processing_enabled %}
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                        </svg>
+                      {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />
+                        </svg>
+                      {% endif %}
+                    </span>
+                  </span>
+                {% endif %}
+              </div>
+              <div>
+                <span
+                  data-overview-list-activity-badge="1"
+                  data-list-ui="{{ row.0.list_ui_id }}"
+                  class="{% if row.0.is_completed or row.0.is_running %}{% if row.0.type == 'buy' %}YY-STATUS_YELLOW{% elif row.0.type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %}{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                  <span data-overview-list-activity-text="1" data-list-ui="{{ row.0.list_ui_id }}">{% if row.0.is_completed %}{% trans "Рейтингование завершено" %}{% elif row.0.is_running %}{% trans "Рейтингование запущено" %}{% else %}{% trans "Рейтингование приостановлено" %}{% endif %}</span>
+                  <span
+                    data-overview-list-activity-spinner="1"
+                    data-list-ui="{{ row.0.list_ui_id }}"
+                    class="{% if row.0.is_running %}inline-flex ml-auto size-[22px] shrink-0 items-center justify-center mr-[3px]{% else %}hidden{% endif %}"
+                    aria-hidden="true">
+                    <span class="inline-block size-[19px] mr-[3px] rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin"></span>
+                  </span>
+                  {% if row.0.pause_modal_url %}
+                    <a
+                      href="#"
+                      data-overview-list-activity-help="1"
+                      data-list-ui="{{ row.0.list_ui_id }}"
+                      data-help-url="{{ row.0.pause_modal_url|escape }}"
+                      data-yy-modal="url={{ row.0.pause_modal_url|escape }}"
+                      class="{% if row.0.is_running or row.0.is_completed %}hidden{% else %}inline-flex ml-auto shrink-0 items-center justify-center{% endif %}"
+                      aria-label="{% trans 'Информация о приостановке' %}">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                      </svg>
+                    </a>
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mt-1">
+              <div>
+                <a href="{{ row.0.rating_url }}?mailing_section=in" class="!no-underline hover:!no-underline focus:!no-underline">
+                  <span data-overview-list-good-badge="1" data-list-ui="{{ row.0.list_ui_id }}" class="{% if row.0.good_count > 0 %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                    <span class="inline-flex items-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.25c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V2.75a.75.75 0 0 1 .75-.75 2.25 2.25 0 0 1 2.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282m0 0h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23H5.904m10.598-9.75H14.25M5.904 18.5c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 0 1-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h1.053c.472 0 .745.556.5.96a8.958 8.958 0 0 0-1.302 4.665c0 1.194.232 2.333.654 3.375Z" />
+                      </svg>
+                      <span>({% trans "меньше отсечения" %} {{ row.0.rate_limit_display }}):</span>
+                    </span>
+                    <span data-overview-list-good-value="1" data-list-ui="{{ row.0.list_ui_id }}" class="inline-flex ml-auto justify-end text-right">{{ row.0.good_count_fmt }}</span>
+                  </span>
+                </a>
+              </div>
+              <div>
+                <a href="{{ row.0.rating_url }}?mailing_section=out" class="!no-underline hover:!no-underline focus:!no-underline">
+                  <span data-overview-list-bad-badge="1" data-list-ui="{{ row.0.list_ui_id }}" class="{% if row.0.bad_count > 0 %}YY-STATUS_YELLOW{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                    <span class="inline-flex items-center gap-1">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 rotate-180" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.25c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V2.75a.75.75 0 0 1 .75-.75 2.25 2.25 0 0 1 2.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282m0 0h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23H5.904m10.598-9.75H14.25M5.904 18.5c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 0 1-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h1.053c.472 0 .745.556.5.96a8.958 8.958 0 0 0-1.302 4.665c0 1.194.232 2.333.654 3.375Z" />
+                      </svg>
+                      <span>({% trans "больше отсечения" %} {{ row.0.rate_limit_display }}):</span>
+                    </span>
+                    <span data-overview-list-bad-value="1" data-list-ui="{{ row.0.list_ui_id }}" class="inline-flex ml-auto justify-end text-right">{{ row.0.bad_count_fmt }}</span>
+                  </span>
+                </a>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mt-1">
+              <div>
+                <span data-overview-list-rated-badge="1" data-list-ui="{{ row.0.list_ui_id }}" class="{% if row.0.rated_count > 0 %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                  <span>{% trans "С рейтингом" %}:</span>
+                  <span data-overview-list-rated-value="1" data-list-ui="{{ row.0.list_ui_id }}" class="inline-flex ml-auto justify-end text-right">{{ row.0.rated_count_fmt }}</span>
+                </span>
+              </div>
+              <div>
+                <span data-overview-list-unrated-badge="1" data-list-ui="{{ row.0.list_ui_id }}" class="{% if row.0.unrated_count > 0 %}YY-STATUS_BLUE{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                  <span>{% trans "Без рейтинга" %}:</span>
+                  <span data-overview-list-unrated-value="1" data-list-ui="{{ row.0.list_ui_id }}" class="inline-flex ml-auto justify-end text-right">{{ row.0.unrated_count_fmt }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </td>
+
+        {% if row|length == 2 %}
+          <td class="YY-MAIN_TOP_RIGHT_TD w-1/2 !pt-3 yy-overview-stack-cell">
+            <div class="YY-CARD_WHITE">
+              <div data-overview-title-badge="1" class="{% if row.1.type == 'buy' %}YY-STATUS_YELLOW{% elif row.1.type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %} !mb-0 !w-full !justify-between !items-center">
+                <span data-overview-title-text="1" class="!my-1.5">{{ row.1.title }}</span>
+                {% if row.1.rating_url %}
+                  <a href="{{ row.1.rating_url }}" class="inline-flex ml-auto pl-2 !mt-1" aria-label="{% trans 'Перейти в рейтинг' %}">
+                    <svg class="!size-[22px] shrink-0" aria-hidden="true">
+                      <use href="#icon-arrow-circle"></use>
+                    </svg>
+                  </a>
+                {% endif %}
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 mt-7">
+                <div>
+                  {% if row.1.processing_toggleable and row.1.task_ui_id %}
+                    <form method="post">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="toggle_task_user_active">
+                      <input type="hidden" name="id" value="{{ row.1.task_ui_id }}">
+                      <button
+                        type="submit"
+                        data-overview-list-processing-badge="1"
+                        data-list-ui="{{ row.1.list_ui_id }}"
+                        class="{% if row.1.processing_enabled %}YY-STATUS_BLUE{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0"
+                        aria-label="{% if row.1.processing_enabled %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}"
+                        title="{% if row.1.processing_enabled %}{% trans 'Остановить сбор' %}{% else %}{% trans 'Включить сбор' %}{% endif %}">
+                        <span data-overview-list-processing-text="1" data-list-ui="{{ row.1.list_ui_id }}">{% if row.1.processing_enabled %}{% trans "Обработка включена" %}{% else %}{% trans "Обработка отключена" %}{% endif %}</span>
+                        <span data-overview-list-processing-icon="1" data-list-ui="{{ row.1.list_ui_id }}" class="inline-flex ml-auto shrink-0 items-center justify-center">
+                          {% if row.1.processing_enabled %}
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            </svg>
+                          {% else %}
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                              <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />
+                            </svg>
+                          {% endif %}
+                        </span>
+                      </button>
+                    </form>
+                  {% else %}
+                    <span
+                      data-overview-list-processing-badge="1"
+                      data-list-ui="{{ row.1.list_ui_id }}"
+                      class="{% if row.1.processing_enabled %}YY-STATUS_BLUE{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                      <span data-overview-list-processing-text="1" data-list-ui="{{ row.1.list_ui_id }}">{% if row.1.processing_enabled %}{% trans "Обработка включена" %}{% else %}{% trans "Обработка отключена" %}{% endif %}</span>
+                      <span data-overview-list-processing-icon="1" data-list-ui="{{ row.1.list_ui_id }}" class="inline-flex ml-auto shrink-0 items-center justify-center">
+                        {% if row.1.processing_enabled %}
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                          </svg>
+                        {% else %}
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" />
+                          </svg>
+                        {% endif %}
+                      </span>
+                    </span>
+                  {% endif %}
+                </div>
+                <div>
+                  <span
+                    data-overview-list-activity-badge="1"
+                    data-list-ui="{{ row.1.list_ui_id }}"
+                    class="{% if row.1.is_completed or row.1.is_running %}{% if row.1.type == 'buy' %}YY-STATUS_YELLOW{% elif row.1.type == 'sell' %}YY-STATUS_GREEN{% else %}YY-STATUS_BLUE{% endif %}{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                    <span data-overview-list-activity-text="1" data-list-ui="{{ row.1.list_ui_id }}">{% if row.1.is_completed %}{% trans "Рейтингование завершено" %}{% elif row.1.is_running %}{% trans "Рейтингование запущено" %}{% else %}{% trans "Рейтингование приостановлено" %}{% endif %}</span>
+                    <span
+                      data-overview-list-activity-spinner="1"
+                      data-list-ui="{{ row.1.list_ui_id }}"
+                      class="{% if row.1.is_running %}inline-flex ml-auto size-[22px] shrink-0 items-center justify-center mr-[3px]{% else %}hidden{% endif %}"
+                      aria-hidden="true">
+                      <span class="inline-block size-[19px] mr-[3px] rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin"></span>
+                    </span>
+                    {% if row.1.pause_modal_url %}
+                      <a
+                        href="#"
+                        data-overview-list-activity-help="1"
+                        data-list-ui="{{ row.1.list_ui_id }}"
+                        data-help-url="{{ row.1.pause_modal_url|escape }}"
+                        data-yy-modal="url={{ row.1.pause_modal_url|escape }}"
+                        class="{% if row.1.is_running or row.1.is_completed %}hidden{% else %}inline-flex ml-auto shrink-0 items-center justify-center{% endif %}"
+                        aria-label="{% trans 'Информация о приостановке' %}">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                        </svg>
+                      </a>
+                    {% endif %}
+                  </span>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 mt-1">
+                <div>
+                  <a href="{{ row.1.rating_url }}?mailing_section=in" class="!no-underline hover:!no-underline focus:!no-underline">
+                    <span data-overview-list-good-badge="1" data-list-ui="{{ row.1.list_ui_id }}" class="{% if row.1.good_count > 0 %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                      <span class="inline-flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.25c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V2.75a.75.75 0 0 1 .75-.75 2.25 2.25 0 0 1 2.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282m0 0h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23H5.904m10.598-9.75H14.25M5.904 18.5c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 0 1-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h1.053c.472 0 .745.556.5.96a8.958 8.958 0 0 0-1.302 4.665c0 1.194.232 2.333.654 3.375Z" />
+                        </svg>
+                        <span>({% trans "меньше отсечения" %} {{ row.1.rate_limit_display }}):</span>
+                      </span>
+                      <span data-overview-list-good-value="1" data-list-ui="{{ row.1.list_ui_id }}" class="inline-flex ml-auto justify-end text-right">{{ row.1.good_count_fmt }}</span>
+                    </span>
+                  </a>
+                </div>
+                <div>
+                  <a href="{{ row.1.rating_url }}?mailing_section=out" class="!no-underline hover:!no-underline focus:!no-underline">
+                    <span data-overview-list-bad-badge="1" data-list-ui="{{ row.1.list_ui_id }}" class="{% if row.1.bad_count > 0 %}YY-STATUS_YELLOW{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                      <span class="inline-flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 rotate-180" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M6.633 10.25c.806 0 1.533-.446 2.031-1.08a9.041 9.041 0 0 1 2.861-2.4c.723-.384 1.35-.956 1.653-1.715a4.498 4.498 0 0 0 .322-1.672V2.75a.75.75 0 0 1 .75-.75 2.25 2.25 0 0 1 2.25 2.25c0 1.152-.26 2.243-.723 3.218-.266.558.107 1.282.725 1.282m0 0h3.126c1.026 0 1.945.694 2.054 1.715.045.422.068.85.068 1.285a11.95 11.95 0 0 1-2.649 7.521c-.388.482-.987.729-1.605.729H13.48c-.483 0-.964-.078-1.423-.23l-3.114-1.04a4.501 4.501 0 0 0-1.423-.23H5.904m10.598-9.75H14.25M5.904 18.5c.083.205.173.405.27.602.197.4-.078.898-.523.898h-.908c-.889 0-1.713-.518-1.972-1.368a12 12 0 0 1-.521-3.507c0-1.553.295-3.036.831-4.398C3.387 9.953 4.167 9.5 5 9.5h1.053c.472 0 .745.556.5.96a8.958 8.958 0 0 0-1.302 4.665c0 1.194.232 2.333.654 3.375Z" />
+                        </svg>
+                        <span>({% trans "больше отсечения" %} {{ row.1.rate_limit_display }}):</span>
+                      </span>
+                      <span data-overview-list-bad-value="1" data-list-ui="{{ row.1.list_ui_id }}" class="inline-flex ml-auto justify-end text-right">{{ row.1.bad_count_fmt }}</span>
+                    </span>
+                  </a>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 mt-1">
+                <div>
+                  <span data-overview-list-rated-badge="1" data-list-ui="{{ row.1.list_ui_id }}" class="{% if row.1.rated_count > 0 %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                    <span>{% trans "С рейтингом" %}:</span>
+                    <span data-overview-list-rated-value="1" data-list-ui="{{ row.1.list_ui_id }}" class="inline-flex ml-auto justify-end text-right">{{ row.1.rated_count_fmt }}</span>
+                  </span>
+                </div>
+                <div>
+                  <span data-overview-list-unrated-badge="1" data-list-ui="{{ row.1.list_ui_id }}" class="{% if row.1.unrated_count > 0 %}YY-STATUS_BLUE{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-full !mb-0">
+                    <span>{% trans "Без рейтинга" %}:</span>
+                    <span data-overview-list-unrated-value="1" data-list-ui="{{ row.1.list_ui_id }}" class="inline-flex ml-auto justify-end text-right">{{ row.1.unrated_count_fmt }}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </td>
+        {% else %}
+          <td class="YY-MAIN_TOP_RIGHT_TD w-1/2 !pt-3 yy-overview-stack-cell yy-overview-stack-empty"></td>
+        {% endif %}
+      </tr>
+    {% endfor %}
+    <tr>
+      <td class="YY-MAIN_TOP_TD !pt-12" colspan="2"></td>
+    </tr>
+  {% else %}
+    <tr>
+      <td class="YY-MAIN_TOP_TD !pt-12" colspan="2"></td>
+    </tr>
+  {% endif %}
+</table>
+{% if overview_demo %}
+  {{ overview_demo|json_script:"yy-overview-demo-data" }}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    var endpoint = "{% url 'overview_live_stats' %}";
+    var classMap = window.yyClassMap || (document.documentElement && document.documentElement.yyClassMap) || {};
+    var SENT_GREEN_TOKENS = "YY-STATUS_GREEN inline-flex !justify-between !items-center !w-full !mb-0";
+    var SENT_GRAY_TOKENS = "YY-STATUS_GRAY inline-flex !justify-between !items-center !w-full !mb-0";
+    var RUN_SENDING_TOKENS = "YY-STATUS_GREEN inline-flex !w-full !justify-between !items-center !mb-0";
+    var RUN_WAIT_TOKENS = "YY-STATUS_BLUE inline-flex !w-full !mb-0";
+    var RUN_SPINNER_TOKENS = "inline-flex size-[22px] shrink-0 items-center justify-center mr-[3px]";
+    var TL_BLUE_TOKENS = "YY-STATUS_BLUE inline-flex !w-full !items-center !mb-0 !font-normal gap-2";
+    var TL_YELLOW_TOKENS = "YY-STATUS_YELLOW inline-flex !w-full !items-center !mb-0 !font-normal gap-2";
+    var TL_GREEN_TOKENS = "YY-STATUS_GREEN inline-flex !w-full !items-center !mb-0 !font-normal gap-2";
+    var TL_GRAY_TOKENS = "YY-STATUS_GRAY inline-flex !w-full !items-center !mb-0 !font-normal gap-2";
+    var TRAFFIC_BLUE_TOKENS = "YY-STATUS_BLUE !w-full !items-center !mb-0 !font-normal";
+    var TRAFFIC_YELLOW_TOKENS = "YY-STATUS_YELLOW !w-full !items-center !mb-0 !font-normal";
+    var TRAFFIC_GREEN_TOKENS = "YY-STATUS_GREEN !w-full !items-center !mb-0 !font-normal";
+    var TRAFFIC_GRAY_TOKENS = "YY-STATUS_GRAY !w-full !items-center !mb-0 !font-normal";
+    var LIST_PROCESSING_ON_TOKENS = "YY-STATUS_BLUE inline-flex !justify-between !items-center !w-full !mb-0";
+    var LIST_PROCESSING_OFF_TOKENS = "YY-STATUS_GRAY inline-flex !justify-between !items-center !w-full !mb-0";
+    var LIST_ACTIVITY_BUY_TOKENS = "YY-STATUS_YELLOW inline-flex !justify-between !items-center !w-full !mb-0";
+    var LIST_ACTIVITY_SELL_TOKENS = "YY-STATUS_GREEN inline-flex !justify-between !items-center !w-full !mb-0";
+    var LIST_ACTIVITY_DEFAULT_TOKENS = "YY-STATUS_BLUE inline-flex !justify-between !items-center !w-full !mb-0";
+    var LIST_ACTIVITY_PAUSED_TOKENS = "YY-STATUS_GRAY inline-flex !justify-between !items-center !w-full !mb-0";
+    var LIST_COUNT_YELLOW_TOKENS = "YY-STATUS_YELLOW inline-flex !justify-between !items-center !w-full !mb-0";
+    var LIST_COUNT_BLUE_TOKENS = "YY-STATUS_BLUE inline-flex !justify-between !items-center !w-full !mb-0";
+    var LIST_ACTIVITY_COMPLETED_TEXT = "{% trans 'Рейтингование завершено' %}";
+    var LIST_ACTIVITY_RUNNING_TEXT = "{% trans 'Рейтингование запущено' %}";
+    var LIST_ACTIVITY_PAUSED_TEXT = "{% trans 'Рейтингование приостановлено' %}";
+    var LIST_PROCESSING_ON_TEXT = "{% trans 'Обработка включена' %}";
+    var LIST_PROCESSING_OFF_TEXT = "{% trans 'Обработка отключена' %}";
+    var TRAFFIC_EMPTY_TEXT = "{% trans 'Переходов на сайт / сайты из писем по рассылкам не зафиксировано. Проверьте установку счетчика переходов на сайте.' %}";
+    var TRAFFIC_ROW_STYLE = "display:grid !important;grid-template-columns:var(--yy-overview-traffic-time-col,max-content) var(--yy-overview-traffic-campaign-col,max-content) minmax(0,1fr) max-content;align-items:center;column-gap:1.5rem;";
+    var demoState = null;
+    var inFlight = false;
+
+    function expandTokens(tokensStr) {
+      var tokens = String(tokensStr || "").trim().split(/\s+/).filter(Boolean);
+      var out = [];
+      for (var i = 0; i < tokens.length; i += 1) {
+        var t = tokens[i];
+        out.push(t);
+        var extra = classMap[t];
+        if (extra) {
+          out = out.concat(String(extra).trim().split(/\s+/).filter(Boolean));
+        }
+      }
+      return out.join(" ");
+    }
+
+    function formatPctOneDecimal(v) {
+      var n = Number(v);
+      if (!Number.isFinite(n) || n < 0) {
+        n = 0;
+      }
+      return n.toFixed(1);
+    }
+
+    function clampNumber(v, minV, maxV) {
+      var n = Number(v);
+      if (!Number.isFinite(n)) {
+        n = minV;
+      }
+      if (n < minV) return minV;
+      if (n > maxV) return maxV;
+      return n;
+    }
+
+    function listProcessingIconHtml(isEnabled) {
+      if (isEnabled) {
+        return '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>';
+      }
+      return '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 0 1 0 .656l-5.603 3.113a.375.375 0 0 1-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112Z" /></svg>';
+    }
+
+    function listActivityTokens(item) {
+      if (!item) {
+        return LIST_ACTIVITY_PAUSED_TOKENS;
+      }
+      var completedNow = !!item.is_completed;
+      var runningNow = !!item.is_running;
+      if (!completedNow && !runningNow) {
+        return LIST_ACTIVITY_PAUSED_TOKENS;
+      }
+      var kind = String(item.type || "").toLowerCase();
+      if (kind === "buy") {
+        return LIST_ACTIVITY_BUY_TOKENS;
+      }
+      if (kind === "sell") {
+        return LIST_ACTIVITY_SELL_TOKENS;
+      }
+      return LIST_ACTIVITY_DEFAULT_TOKENS;
+    }
+
+    function applyMailingItem(item) {
+      var ui = String((item && item.list_ui_id) || "");
+      if (!ui) {
+        return;
+      }
+
+      var processingOn = !!(item && item.processing_enabled);
+      var completedNow = !!(item && item.is_completed);
+      var runningNow = !!(item && item.is_running);
+      var pausedNow = !runningNow && !completedNow;
+      var pauseHelpUrl = String((item && item.pause_modal_url) || "");
+
+      var processingBadges = document.querySelectorAll('[data-overview-list-processing-badge][data-list-ui="' + ui + '"]');
+      for (var i = 0; i < processingBadges.length; i += 1) {
+        processingBadges[i].setAttribute("class", expandTokens(processingOn ? LIST_PROCESSING_ON_TOKENS : LIST_PROCESSING_OFF_TOKENS));
+      }
+
+      var processingTextNodes = document.querySelectorAll('[data-overview-list-processing-text][data-list-ui="' + ui + '"]');
+      for (var j = 0; j < processingTextNodes.length; j += 1) {
+        processingTextNodes[j].textContent = processingOn ? LIST_PROCESSING_ON_TEXT : LIST_PROCESSING_OFF_TEXT;
+      }
+
+      var processingIcons = document.querySelectorAll('[data-overview-list-processing-icon][data-list-ui="' + ui + '"]');
+      for (var k = 0; k < processingIcons.length; k += 1) {
+        processingIcons[k].innerHTML = listProcessingIconHtml(processingOn);
+      }
+
+      var activityBadges = document.querySelectorAll('[data-overview-list-activity-badge][data-list-ui="' + ui + '"]');
+      for (var l = 0; l < activityBadges.length; l += 1) {
+        activityBadges[l].setAttribute("class", expandTokens(listActivityTokens(item)));
+      }
+
+      var activityTextNodes = document.querySelectorAll('[data-overview-list-activity-text][data-list-ui="' + ui + '"]');
+      for (var m = 0; m < activityTextNodes.length; m += 1) {
+        activityTextNodes[m].textContent = completedNow
+          ? LIST_ACTIVITY_COMPLETED_TEXT
+          : (runningNow ? LIST_ACTIVITY_RUNNING_TEXT : LIST_ACTIVITY_PAUSED_TEXT);
+      }
+
+      var activitySpinners = document.querySelectorAll('[data-overview-list-activity-spinner][data-list-ui="' + ui + '"]');
+      for (var n = 0; n < activitySpinners.length; n += 1) {
+        activitySpinners[n].setAttribute(
+          "class",
+          expandTokens(runningNow ? "inline-flex ml-auto size-[22px] shrink-0 items-center justify-center mr-[3px]" : "hidden")
+        );
+      }
+
+      var activityHelpNodes = document.querySelectorAll('[data-overview-list-activity-help][data-list-ui="' + ui + '"]');
+      for (var o = 0; o < activityHelpNodes.length; o += 1) {
+        var helpNode = activityHelpNodes[o];
+        if (pausedNow && pauseHelpUrl) {
+          helpNode.setAttribute("class", expandTokens("inline-flex ml-auto shrink-0 items-center justify-center"));
+          helpNode.setAttribute("data-yy-modal", "url=" + pauseHelpUrl);
+        } else {
+          helpNode.setAttribute("class", expandTokens("hidden"));
+        }
+      }
+
+      var goodCount = Number((item && item.good_count) || 0);
+      var badCount = Number((item && item.bad_count) || 0);
+      var ratedCount = Number((item && item.rated_count) || 0);
+      var unratedCount = Number((item && item.unrated_count) || 0);
+
+      var goodBadges = document.querySelectorAll('[data-overview-list-good-badge][data-list-ui="' + ui + '"]');
+      for (var p = 0; p < goodBadges.length; p += 1) {
+        goodBadges[p].setAttribute("class", expandTokens(goodCount > 0 ? SENT_GREEN_TOKENS : SENT_GRAY_TOKENS));
+      }
+      var goodValues = document.querySelectorAll('[data-overview-list-good-value][data-list-ui="' + ui + '"]');
+      for (var q = 0; q < goodValues.length; q += 1) {
+        goodValues[q].textContent = String((item && item.good_count_fmt) || "0");
+      }
+
+      var badBadges = document.querySelectorAll('[data-overview-list-bad-badge][data-list-ui="' + ui + '"]');
+      for (var r = 0; r < badBadges.length; r += 1) {
+        badBadges[r].setAttribute("class", expandTokens(badCount > 0 ? LIST_COUNT_YELLOW_TOKENS : SENT_GRAY_TOKENS));
+      }
+      var badValues = document.querySelectorAll('[data-overview-list-bad-value][data-list-ui="' + ui + '"]');
+      for (var s = 0; s < badValues.length; s += 1) {
+        badValues[s].textContent = String((item && item.bad_count_fmt) || "0");
+      }
+
+      var ratedBadges = document.querySelectorAll('[data-overview-list-rated-badge][data-list-ui="' + ui + '"]');
+      for (var t = 0; t < ratedBadges.length; t += 1) {
+        ratedBadges[t].setAttribute("class", expandTokens(ratedCount > 0 ? SENT_GREEN_TOKENS : SENT_GRAY_TOKENS));
+      }
+      var ratedValues = document.querySelectorAll('[data-overview-list-rated-value][data-list-ui="' + ui + '"]');
+      for (var u = 0; u < ratedValues.length; u += 1) {
+        ratedValues[u].textContent = String((item && item.rated_count_fmt) || "0");
+      }
+
+      var unratedBadges = document.querySelectorAll('[data-overview-list-unrated-badge][data-list-ui="' + ui + '"]');
+      for (var v = 0; v < unratedBadges.length; v += 1) {
+        unratedBadges[v].setAttribute("class", expandTokens(unratedCount > 0 ? LIST_COUNT_BLUE_TOKENS : SENT_GRAY_TOKENS));
+      }
+      var unratedValues = document.querySelectorAll('[data-overview-list-unrated-value][data-list-ui="' + ui + '"]');
+      for (var w = 0; w < unratedValues.length; w += 1) {
+        unratedValues[w].textContent = String((item && item.unrated_count_fmt) || "0");
+      }
+    }
+
+    function applyItem(item) {
+      var ui = String(item.ui_id || "");
+      if (!ui) {
+        return;
+      }
+      var sentCount = Number((item && item.sent_count) || 0);
+      var viewsCount = Number((item && item.views_count) || 0);
+
+      var sentNodes = document.querySelectorAll('[data-overview-sent-badge][data-campaign-ui="' + ui + '"]');
+      for (var i = 0; i < sentNodes.length; i += 1) {
+        sentNodes[i].setAttribute("class", expandTokens(sentCount > 0 ? SENT_GREEN_TOKENS : SENT_GRAY_TOKENS));
+      }
+
+      var sentVals = document.querySelectorAll('[data-overview-sent-value][data-campaign-ui="' + ui + '"]');
+      for (var j = 0; j < sentVals.length; j += 1) {
+        sentVals[j].textContent = String(item.sent_count_fmt || "0");
+      }
+      var sentLinks = document.querySelectorAll('[data-overview-sent-link][data-campaign-ui="' + ui + '"]');
+      for (var j2 = 0; j2 < sentLinks.length; j2 += 1) {
+        sentLinks[j2].setAttribute("class", expandTokens(sentCount > 0 ? "inline-flex ml-2 shrink-0 items-center justify-center" : "hidden"));
+      }
+
+      var viewsNodes = document.querySelectorAll('[data-overview-views-badge][data-campaign-ui="' + ui + '"]');
+      for (var k = 0; k < viewsNodes.length; k += 1) {
+        viewsNodes[k].setAttribute("class", expandTokens(viewsCount > 0 ? SENT_GREEN_TOKENS : SENT_GRAY_TOKENS));
+      }
+
+      var viewsVals = document.querySelectorAll('[data-overview-views-value][data-campaign-ui="' + ui + '"]');
+      for (var l = 0; l < viewsVals.length; l += 1) {
+        viewsVals[l].textContent = String(item.views_count_fmt || "0");
+      }
+      var viewsLinks = document.querySelectorAll('[data-overview-views-link][data-campaign-ui="' + ui + '"]');
+      for (var l2 = 0; l2 < viewsLinks.length; l2 += 1) {
+        viewsLinks[l2].setAttribute("class", expandTokens(viewsCount > 0 ? "inline-flex ml-2 shrink-0 items-center justify-center" : "hidden"));
+      }
+
+      var viewsPctVals = document.querySelectorAll('[data-overview-views-pct][data-campaign-ui="' + ui + '"]');
+      for (var m = 0; m < viewsPctVals.length; m += 1) {
+        viewsPctVals[m].textContent = formatPctOneDecimal(item.views_pct);
+      }
+
+      if (item.is_running) {
+        var runStatusNodes = document.querySelectorAll('[data-overview-run-status][data-campaign-ui="' + ui + '"]');
+        for (var n = 0; n < runStatusNodes.length; n += 1) {
+          runStatusNodes[n].setAttribute("class", expandTokens(item.is_in_window ? RUN_SENDING_TOKENS : RUN_WAIT_TOKENS));
+        }
+
+        var runTextNodes = document.querySelectorAll('[data-overview-run-text][data-campaign-ui="' + ui + '"]');
+        var runText = item.is_in_window ? "{% trans 'Письма отправляются' %}" : "{% trans 'Ждем окна отправки' %}";
+        for (var o = 0; o < runTextNodes.length; o += 1) {
+          runTextNodes[o].textContent = runText;
+        }
+
+        var runSpinnerNodes = document.querySelectorAll('[data-overview-run-spinner][data-campaign-ui="' + ui + '"]');
+        for (var p = 0; p < runSpinnerNodes.length; p += 1) {
+          runSpinnerNodes[p].setAttribute("class", expandTokens(item.is_in_window ? RUN_SPINNER_TOKENS : "hidden"));
+        }
+      }
+
+      if (Array.isArray(item.timeline_rows)) {
+        var timelineNodes = document.querySelectorAll('[data-overview-timeline][data-campaign-ui="' + ui + '"]');
+        var timelineHtml = renderTimelineRows(item.timeline_rows);
+        var shouldAnimateTimeline = !!(item.is_running && item.is_in_window);
+        for (var q = 0; q < timelineNodes.length; q += 1) {
+          var node = timelineNodes[q];
+          var previousLayout = shouldAnimateTimeline ? snapshotOverviewTimelineLayout(node) : null;
+          node.innerHTML = timelineHtml;
+          if (shouldAnimateTimeline) {
+            animateOverviewTimelineRefresh(node, previousLayout);
+          }
+        }
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function timelineToneTokens(tone) {
+      var t = String(tone || "").toLowerCase();
+      if (t === "yellow") {
+        return TL_YELLOW_TOKENS;
+      }
+      if (t === "green") {
+        return TL_GREEN_TOKENS;
+      }
+      if (t === "gray") {
+        return TL_GRAY_TOKENS;
+      }
+      return TL_BLUE_TOKENS;
+    }
+
+    function timelineIconHtml(icon) {
+      var kind = String(icon || "").toLowerCase();
+      if (kind === "spinner") {
+        return '<span class="inline-block size-[19px] mr-[3px] rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin"></span>';
+      }
+      if (kind === "check") {
+        return '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>';
+      }
+      if (kind === "info") {
+        return '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>';
+      }
+      return '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>';
+    }
+
+    function snapshotOverviewTimelineLayout(container) {
+      if (!container) return "";
+      var rows = Array.from(container.querySelectorAll("[data-overview-timeline-row-key]"));
+      if (!rows.length) return null;
+      var positions = {};
+      rows.forEach(function (row) {
+        var key = String(row.getAttribute("data-overview-timeline-row-key") || "").trim();
+        if (!key) return;
+        positions[key] = { top: row.getBoundingClientRect().top };
+      });
+      var topKey = String(rows[0].getAttribute("data-overview-timeline-row-key") || "").trim();
+      return { topKey: topKey, positions: positions };
+    }
+
+    function animateOverviewTimelineRefresh(container, previousLayout) {
+      if (!container || !previousLayout || !previousLayout.positions) return;
+
+      try {
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          return;
+        }
+      } catch (e) {
+      }
+
+      var rows = Array.from(container.querySelectorAll("[data-overview-timeline-row-key]"));
+      if (!rows.length) return;
+      var currentTopKey = String(rows[0].getAttribute("data-overview-timeline-row-key") || "").trim();
+      if (!previousLayout.topKey || !currentTopKey || previousLayout.topKey === currentTopKey) return;
+
+      var animatedRows = [];
+      var durationMs = 620;
+      var easing = "cubic-bezier(0.22, 0.61, 0.36, 1)";
+
+      rows.forEach(function (row) {
+        var key = String(row.getAttribute("data-overview-timeline-row-key") || "").trim();
+        if (!key) return;
+        var nowTop = row.getBoundingClientRect().top;
+        var prev = previousLayout.positions[key];
+        if (prev && Number.isFinite(prev.top)) {
+          var dy = prev.top - nowTop;
+          if (Math.abs(dy) >= 1) {
+            row.style.transition = "none";
+            row.style.transform = "translateY(" + String(dy) + "px)";
+            row.style.willChange = "transform";
+            animatedRows.push(row);
+          }
+          return;
+        }
+        if (key === currentTopKey) {
+          row.style.transition = "none";
+          row.style.transform = "translateY(-14px)";
+          row.style.opacity = "0";
+          row.style.willChange = "transform, opacity";
+          animatedRows.push(row);
+        }
+      });
+
+      if (!animatedRows.length) return;
+
+      void container.offsetHeight;
+
+      animatedRows.forEach(function (row) {
+        row.style.transition = "transform " + String(durationMs) + "ms " + easing + ", opacity " + String(durationMs) + "ms ease";
+        row.style.transform = "translateY(0)";
+        row.style.opacity = "1";
+      });
+
+      window.setTimeout(function () {
+        animatedRows.forEach(function (row) {
+          row.style.removeProperty("transition");
+          row.style.removeProperty("transform");
+          row.style.removeProperty("opacity");
+          row.style.removeProperty("will-change");
+        });
+      }, durationMs + 40);
+    }
+
+    function renderTimelineRows(rows) {
+      var safeRows = Array.isArray(rows) ? rows.slice(0, 5) : [];
+      var out = [];
+      for (var i = 0; i < safeRows.length; i += 1) {
+        var row = safeRows[i] || {};
+        var rowKey = escapeHtml(row.row_key || ("timeline:" + String(i)));
+        var companyName = escapeHtml(row.company_name || "—");
+        var modalUrl = String(row.contact_modal_url || "");
+        var companyNodeHtml = "";
+        if (modalUrl) {
+          companyNodeHtml = '<a href="#" class="truncate text-current no-underline hover:underline" data-yy-modal="url=' + escapeHtml(modalUrl) + '">' + companyName + "</a>";
+        } else {
+          companyNodeHtml = '<span class="truncate">' + companyName + "</span>";
+        }
+        out.push(
+          '<div data-overview-timeline-row-key="' + rowKey + '" class="' + escapeHtml(expandTokens(timelineToneTokens(row.tone))) + '">' +
+            '<span class="shrink-0 whitespace-nowrap">' + escapeHtml(row.time_text || "--.-- --:--") + "</span>" +
+            companyNodeHtml +
+            '<span class="inline-flex ml-auto shrink-0 items-center justify-center" aria-hidden="true">' +
+              timelineIconHtml(row.icon) +
+            "</span>" +
+          "</div>"
+        );
+      }
+      return out.join("");
+    }
+
+    function trafficToneTokens(campaignType) {
+      var t = String(campaignType || "").toLowerCase();
+      if (t === "buy") {
+        return TRAFFIC_YELLOW_TOKENS;
+      }
+      if (t === "sell") {
+        return TRAFFIC_GREEN_TOKENS;
+      }
+      return TRAFFIC_BLUE_TOKENS;
+    }
+
+    function renderTrafficRows(rows) {
+      var safeRows = Array.isArray(rows) ? rows.slice(0, 8) : [];
+      if (!safeRows.length) {
+        return (
+          '<div data-overview-timeline-row-key="site:empty" class="' + escapeHtml(expandTokens(TRAFFIC_GRAY_TOKENS)) + '">' +
+            '<span>' + escapeHtml(TRAFFIC_EMPTY_TEXT) + '</span>' +
+          "</div>"
+        );
+      }
+      var out = [];
+      for (var i = 0; i < safeRows.length; i += 1) {
+        var row = safeRows[i] || {};
+        var rowKey = escapeHtml(row.row_key || ("site:" + String(i)));
+        var campaignTitle = escapeHtml(row.campaign_title || "—");
+        var contactName = escapeHtml(row.contact_name || "—");
+        var modalUrl = String(row.contact_modal_url || "");
+        var contactNodeHtml = "";
+        if (modalUrl) {
+          contactNodeHtml = '<a href="#" class="truncate text-current no-underline hover:underline" data-yy-modal="url=' + escapeHtml(modalUrl) + '">' + contactName + "</a>";
+        } else {
+          contactNodeHtml = '<span class="truncate">' + contactName + "</span>";
+        }
+        out.push(
+          '<div data-overview-timeline-row-key="' + rowKey + '" data-overview-traffic-row="1" class="' + escapeHtml(expandTokens(trafficToneTokens(row.campaign_type))) + '" style="' + escapeHtml(TRAFFIC_ROW_STYLE) + '">' +
+            '<span data-overview-traffic-col-time="1" class="shrink-0 whitespace-nowrap">' + escapeHtml(row.time_text || "--.-- --:--") + "</span>" +
+            '<span data-overview-traffic-col-campaign="1" class="truncate">' + campaignTitle + "</span>" +
+            contactNodeHtml +
+            '<span class="inline-flex shrink-0 justify-end text-right">' + escapeHtml(row.visits_count_fmt || "0") + "</span>" +
+          "</div>"
+        );
+      }
+      return out.join("");
+    }
+
+    function syncTrafficColumnWidths(container) {
+      if (!container) {
+        return;
+      }
+      var host = container.closest("[data-overview-site-traffic-wrap='1']") || container;
+      host.style.removeProperty("--yy-overview-traffic-time-col");
+      host.style.removeProperty("--yy-overview-traffic-campaign-col");
+      var allTimeNodes = host.querySelectorAll("[data-overview-traffic-col-time='1']");
+      var allCampaignNodes = host.querySelectorAll("[data-overview-traffic-col-campaign='1']");
+      if (!allTimeNodes.length && !allCampaignNodes.length) {
+        return;
+      }
+      var maxTimePx = 0;
+      for (var i = 0; i < allTimeNodes.length; i += 1) {
+        var tn = allTimeNodes[i];
+        var tw = Math.max(
+          Number(tn.scrollWidth || 0),
+          Number(tn.getBoundingClientRect ? tn.getBoundingClientRect().width : 0)
+        );
+        if (tw > maxTimePx) {
+          maxTimePx = tw;
+        }
+      }
+      if (maxTimePx > 0) {
+        host.style.setProperty("--yy-overview-traffic-time-col", String(Math.ceil(maxTimePx)) + "px");
+      }
+      var maxPx = 0;
+      for (var j = 0; j < allCampaignNodes.length; j += 1) {
+        var n = allCampaignNodes[j];
+        var w = Math.max(
+          Number(n.scrollWidth || 0),
+          Number(n.getBoundingClientRect ? n.getBoundingClientRect().width : 0)
+        );
+        if (w > maxPx) {
+          maxPx = w;
+        }
+      }
+      var widthProbe = host.querySelector("[data-overview-site-traffic='1']") || host;
+      var hostWidthPx = Number(widthProbe.getBoundingClientRect ? widthProbe.getBoundingClientRect().width : 0);
+      var gapProbe = host.querySelector("[data-overview-traffic-row='1']") || host.querySelector("[data-overview-traffic-head='1']");
+      var gapPx = 16;
+      if (gapProbe && window.getComputedStyle) {
+        var gapRaw = window.getComputedStyle(gapProbe).columnGap;
+        var gapNum = parseFloat(gapRaw);
+        if (Number.isFinite(gapNum) && gapNum > 0) {
+          gapPx = gapNum;
+        }
+      }
+      var minCampaignPx = 0;
+      if (hostWidthPx > 0) {
+        minCampaignPx = Math.max(0, (hostWidthPx * 0.5) - maxTimePx - (gapPx * 2));
+      }
+      var campaignColPx = Math.max(maxPx, minCampaignPx);
+      if (campaignColPx > 0) {
+        host.style.setProperty("--yy-overview-traffic-campaign-col", String(Math.ceil(campaignColPx)) + "px");
+      }
+    }
+
+    function syncAllTrafficColumns() {
+      var nodes = document.querySelectorAll("[data-overview-site-traffic='1']");
+      for (var i = 0; i < nodes.length; i += 1) {
+        syncTrafficColumnWidths(nodes[i]);
+      }
+    }
+
+    function applyTrafficRows(rows) {
+      var nodes = document.querySelectorAll("[data-overview-site-traffic='1']");
+      if (!nodes.length) {
+        return;
+      }
+      var html = renderTrafficRows(rows);
+      for (var i = 0; i < nodes.length; i += 1) {
+        var node = nodes[i];
+        var prev = snapshotOverviewTimelineLayout(node);
+        node.innerHTML = html;
+        syncTrafficColumnWidths(node);
+        animateOverviewTimelineRefresh(node, prev);
+      }
+    }
+
+    function formatDemoCount(v) {
+      var n = parseInt(v, 10);
+      if (!Number.isFinite(n) || n < 0) {
+        n = 0;
+      }
+      return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    }
+
+    function formatDemoTime(tsMs) {
+      var dt = new Date(Number(tsMs || Date.now()));
+      var dd = String(dt.getDate() || 1).padStart(2, "0");
+      var mm = String((dt.getMonth() || 0) + 1).padStart(2, "0");
+      var hh = String(dt.getHours() || 0).padStart(2, "0");
+      var mi = String(dt.getMinutes() || 0).padStart(2, "0");
+      return dd + "." + mm + " " + hh + ":" + mi;
+    }
+
+    function demoContactAt(idx) {
+      if (!demoState || !Array.isArray(demoState.contacts) || !demoState.contacts.length) {
+        return { idx: 0, company_name: "—", contact_modal_url: "" };
+      }
+      var len = demoState.contacts.length;
+      var safe = ((parseInt(idx, 10) || 0) % len + len) % len;
+      var item = demoState.contacts[safe] || {};
+      return {
+        idx: safe,
+        company_name: String(item.company_name || "—"),
+        contact_modal_url: String(item.contact_modal_url || "")
+      };
+    }
+
+    function buildDemoTimelineRows(nowMs) {
+      var rows = [];
+      if (!demoState || !Array.isArray(demoState.contacts) || !demoState.contacts.length) {
+        return rows;
+      }
+      var intervalSec = Math.max(1, parseInt(demoState.interval_sec, 10) || 45);
+      var intervalMs = intervalSec * 1000;
+      var sentHistory = Array.isArray(demoState.sent_history_indices) ? demoState.sent_history_indices.slice(0, 3) : [];
+      var sentShown = Math.min(3, sentHistory.length);
+      var blueNeeded = 4 - sentShown;
+      var activeIndex = parseInt(demoState.active_index, 10) || 0;
+
+      for (var offset = blueNeeded; offset >= 1; offset -= 1) {
+        var nextContact = demoContactAt(activeIndex + offset);
+        rows.push({
+          time_text: formatDemoTime(nowMs + intervalMs * offset),
+          company_name: nextContact.company_name,
+          contact_modal_url: nextContact.contact_modal_url,
+          row_key: "demo:plan:" + String(nextContact.idx) + ":" + String(offset),
+          tone: "blue",
+          icon: "clock"
+        });
+      }
+
+      var activeContact = demoContactAt(activeIndex);
+      rows.push({
+        time_text: formatDemoTime(nowMs),
+        company_name: activeContact.company_name,
+        contact_modal_url: activeContact.contact_modal_url,
+        row_key: "demo:yellow:" + String(activeContact.idx) + ":" + String(parseInt(demoState.tick, 10) || 0),
+        tone: "yellow",
+        icon: "spinner"
+      });
+
+      for (var i = 0; i < sentShown; i += 1) {
+        var sentContact = demoContactAt(sentHistory[i]);
+        rows.push({
+          time_text: formatDemoTime(nowMs - intervalMs * (i + 1)),
+          company_name: sentContact.company_name,
+          contact_modal_url: sentContact.contact_modal_url,
+          row_key: "demo:sent:" + String(sentContact.idx) + ":" + String(i) + ":" + String(parseInt(demoState.tick, 10) || 0),
+          tone: "green",
+          icon: "check"
+        });
+      }
+      return rows.slice(0, 5);
+    }
+
+    function renderOverviewDemo() {
+      if (!demoState) {
+        return;
+      }
+      var sentCount = parseInt(demoState.sent_count, 10) || 0;
+      var sentValue = formatDemoCount(demoState.sent_count || 0);
+      var sentVals = document.querySelectorAll("[data-overview-demo-sent-value='1']");
+      for (var i = 0; i < sentVals.length; i += 1) {
+        sentVals[i].textContent = sentValue;
+      }
+      var sentBadges = document.querySelectorAll("[data-overview-demo-sent-badge='1']");
+      for (var i2 = 0; i2 < sentBadges.length; i2 += 1) {
+        sentBadges[i2].setAttribute("class", expandTokens(sentCount > 0 ? SENT_GREEN_TOKENS : SENT_GRAY_TOKENS));
+      }
+      var sentArrows = document.querySelectorAll("[data-overview-demo-sent-arrow='1']");
+      for (var i3 = 0; i3 < sentArrows.length; i3 += 1) {
+        sentArrows[i3].setAttribute("class", expandTokens(sentCount > 0 ? "inline-flex ml-2 shrink-0 items-center justify-center" : "hidden"));
+      }
+      var viewsCount = parseInt(demoState.views_count, 10) || 0;
+      var viewsValue = formatDemoCount(viewsCount);
+      var viewsPct = sentCount > 0 ? (viewsCount * 100.0) / sentCount : 0;
+      var viewsBadges = document.querySelectorAll("[data-overview-demo-views-badge='1']");
+      for (var j = 0; j < viewsBadges.length; j += 1) {
+        viewsBadges[j].setAttribute("class", expandTokens(viewsCount > 0 ? SENT_GREEN_TOKENS : SENT_GRAY_TOKENS));
+      }
+      var viewsVals = document.querySelectorAll("[data-overview-demo-views-value='1']");
+      for (var k = 0; k < viewsVals.length; k += 1) {
+        viewsVals[k].textContent = viewsValue;
+      }
+      var viewsPctVals = document.querySelectorAll("[data-overview-demo-views-pct='1']");
+      for (var l = 0; l < viewsPctVals.length; l += 1) {
+        viewsPctVals[l].textContent = formatPctOneDecimal(viewsPct);
+      }
+      var viewsArrows = document.querySelectorAll("[data-overview-demo-views-arrow='1']");
+      for (var l2 = 0; l2 < viewsArrows.length; l2 += 1) {
+        viewsArrows[l2].setAttribute("class", expandTokens(viewsCount > 0 ? "inline-flex ml-2 shrink-0 items-center justify-center" : "hidden"));
+      }
+
+      var timelineRows = buildDemoTimelineRows(Date.now());
+      var timelineHtml = renderTimelineRows(timelineRows);
+      var nodes = document.querySelectorAll("[data-overview-demo-timeline='1']");
+      for (var m = 0; m < nodes.length; m += 1) {
+        var node = nodes[m];
+        var prev = snapshotOverviewTimelineLayout(node);
+        node.innerHTML = timelineHtml;
+        animateOverviewTimelineRefresh(node, prev);
+      }
+    }
+
+    function advanceOverviewDemo() {
+      if (!demoState || !Array.isArray(demoState.contacts) || !demoState.contacts.length) {
+        return;
+      }
+      var len = demoState.contacts.length;
+      var active = ((parseInt(demoState.active_index, 10) || 0) % len + len) % len;
+      var hist = Array.isArray(demoState.sent_history_indices) ? demoState.sent_history_indices.slice(0) : [];
+      hist.unshift(active);
+      while (hist.length > 3) {
+        hist.pop();
+      }
+      demoState.sent_history_indices = hist;
+      demoState.active_index = (active + 1) % len;
+      var sentPrev = parseInt(demoState.sent_count, 10) || 0;
+      var viewsPrev = parseInt(demoState.views_count, 10) || 0;
+      var sentNext = sentPrev + (1 + Math.floor(Math.random() * 3));
+      demoState.sent_count = sentNext;
+
+      var currentPct = sentPrev > 0 ? (viewsPrev * 100.0) / sentPrev : 10.0;
+      currentPct = clampNumber(currentPct, 9.0, 12.0);
+      var drift = (Math.random() * 1.2) - 0.6;
+      var targetPct = clampNumber(currentPct + drift, 9.0, 12.0);
+      var desiredViews = Math.round((sentNext * targetPct) / 100.0);
+      demoState.views_count = Math.max(viewsPrev, desiredViews);
+
+      demoState.tick = (parseInt(demoState.tick, 10) || 0) + 1;
+      renderOverviewDemo();
+    }
+
+    function initOverviewDemo() {
+      var node = document.getElementById("yy-overview-demo-data");
+      if (!node) {
+        return;
+      }
+      try {
+        demoState = JSON.parse(node.textContent || "{}");
+      } catch (e) {
+        demoState = null;
+      }
+      if (!demoState || !Array.isArray(demoState.contacts) || !demoState.contacts.length) {
+        return;
+      }
+      demoState.sent_count = parseInt(demoState.sent_count, 10) || 0;
+      demoState.views_count = parseInt(demoState.views_count, 10) || 0;
+      demoState.interval_sec = Math.max(1, parseInt(demoState.interval_sec, 10) || 45);
+      demoState.tick = parseInt(demoState.tick, 10) || 0;
+      renderOverviewDemo();
+      if (window.yyOverviewDemoTimer) {
+        clearInterval(window.yyOverviewDemoTimer);
+      }
+      window.yyOverviewDemoTimer = setInterval(advanceOverviewDemo, demoState.interval_sec * 1000);
+    }
+
+    function refreshOverviewStats() {
+      if (inFlight) {
+        return;
+      }
+      inFlight = true;
+      fetch(endpoint, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin"
+      })
+        .then(function (resp) { return resp.ok ? resp.json() : null; })
+        .then(function (payload) {
+          if (!payload || !payload.ok || !Array.isArray(payload.items)) {
+            return;
+          }
+          for (var i = 0; i < payload.items.length; i += 1) {
+            applyItem(payload.items[i]);
+          }
+          applyTrafficRows(payload.traffic_rows);
+          if (Array.isArray(payload.mailing_items)) {
+            for (var j = 0; j < payload.mailing_items.length; j += 1) {
+              applyMailingItem(payload.mailing_items[j]);
+            }
+          }
+        })
+        .catch(function () {})
+        .finally(function () {
+          inFlight = false;
+        });
+    }
+
+    if (window.yyOverviewStatsTimer) {
+      clearInterval(window.yyOverviewStatsTimer);
+    }
+
+    (function initOverviewStackRows() {
+      var BREAKPOINT = 1450;
+      var resizeTimer = 0;
+      var idSeq = 0;
+
+      function rowCells(row) {
+        if (!row) return [];
+        return Array.prototype.filter.call(row.children || [], function (node) {
+          return node && node.tagName === "TD" && node.classList && node.classList.contains("yy-overview-stack-cell");
+        });
+      }
+
+      function getOrAssignRowId(row) {
+        if (!row) return "";
+        var existing = String(row.getAttribute("data-stack-row-id") || "").trim();
+        if (existing) return existing;
+        idSeq += 1;
+        var next = "ov-stack-" + String(idSeq);
+        row.setAttribute("data-stack-row-id", next);
+        return next;
+      }
+
+      function splitRow(row) {
+        if (!row || row.getAttribute("data-stack-split") === "1") return;
+        var cells = rowCells(row).filter(function (td) {
+          return !td.classList.contains("yy-overview-stack-empty");
+        });
+        if (cells.length < 2) return;
+
+        var second = cells[1];
+        var ownerId = getOrAssignRowId(row);
+        var splitRowNode = document.createElement("tr");
+        splitRowNode.className = "yy-overview-stack-row-split";
+        splitRowNode.setAttribute("data-stack-owner", ownerId);
+        splitRowNode.appendChild(second);
+        row.parentNode.insertBefore(splitRowNode, row.nextSibling);
+        row.setAttribute("data-stack-split", "1");
+      }
+
+      function combineRow(row) {
+        if (!row || row.getAttribute("data-stack-split") !== "1") return;
+        var ownerId = getOrAssignRowId(row);
+        var splitRowNode = row.parentNode
+          ? row.parentNode.querySelector("tr.yy-overview-stack-row-split[data-stack-owner='" + ownerId + "']")
+          : null;
+        if (!splitRowNode) {
+          row.setAttribute("data-stack-split", "0");
+          return;
+        }
+        var movedCell = rowCells(splitRowNode)[0] || null;
+        var emptyCell = rowCells(row).find(function (td) {
+          return td.classList.contains("yy-overview-stack-empty");
+        }) || null;
+        if (movedCell) {
+          if (emptyCell) {
+            row.insertBefore(movedCell, emptyCell);
+          } else {
+            row.appendChild(movedCell);
+          }
+        }
+        splitRowNode.remove();
+        row.setAttribute("data-stack-split", "0");
+      }
+
+      function setCellColspan(cell, isSmall) {
+        if (!cell) return;
+        if (isSmall) {
+          cell.setAttribute("colspan", "2");
+        } else {
+          cell.removeAttribute("colspan");
+        }
+      }
+
+      function syncColspans(row, isSmall) {
+        if (!row) return;
+
+        var ownFilledCells = rowCells(row).filter(function (td) {
+          return !td.classList.contains("yy-overview-stack-empty");
+        });
+
+        ownFilledCells.forEach(function (cell) {
+          setCellColspan(cell, isSmall && ownFilledCells.length === 1);
+        });
+
+        var ownerId = getOrAssignRowId(row);
+        var splitRowNode = row.parentNode
+          ? row.parentNode.querySelector("tr.yy-overview-stack-row-split[data-stack-owner='" + ownerId + "']")
+          : null;
+        if (!splitRowNode) return;
+
+        var splitCells = rowCells(splitRowNode).filter(function (td) {
+          return !td.classList.contains("yy-overview-stack-empty");
+        });
+        splitCells.forEach(function (cell) {
+          setCellColspan(cell, isSmall);
+        });
+      }
+
+      function applyStackLayout() {
+        var rows = Array.prototype.slice.call(document.querySelectorAll("tr.yy-overview-stack-row"));
+        if (!rows.length) return;
+        var isSmall = window.innerWidth < BREAKPOINT;
+
+        rows.forEach(function (row) {
+          getOrAssignRowId(row);
+          if (isSmall) {
+            splitRow(row);
+          } else {
+            combineRow(row);
+          }
+
+          var emptyCell = rowCells(row).find(function (td) {
+            return td.classList.contains("yy-overview-stack-empty");
+          }) || null;
+          if (emptyCell) {
+            if (isSmall) {
+              emptyCell.style.setProperty("display", "none", "important");
+            } else {
+              emptyCell.style.removeProperty("display");
+            }
+          }
+          syncColspans(row, isSmall);
+        });
+      }
+
+      applyStackLayout();
+      window.addEventListener("resize", function () {
+        if (resizeTimer) {
+          clearTimeout(resizeTimer);
+        }
+        resizeTimer = setTimeout(applyStackLayout, 80);
+      });
+    })();
+
+    syncAllTrafficColumns();
+    window.yyOverviewStatsTimer = setInterval(refreshOverviewStats, 3000);
+    refreshOverviewStats();
+    initOverviewDemo();
+  })();
+</script>
 {% endblock %}

@@ -2,20 +2,20 @@
 # PURPOSE: форма списка рассылки в стиле панели: YY-INPUT + обязательные поля (title, audience).
 
 from django import forms
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _trans
 
 
 class MailingListForm(forms.Form):
     title = forms.CharField(
-        label=_("Название списка"),
+        label=_trans("Название списка"),
         required=True,
         widget=forms.TextInput(
-            attrs={"class": "YY-INPUT", "placeholder": _("Название списка")}
+            attrs={"class": "YY-INPUT", "placeholder": _trans("Название списка")}
         ),
     )
 
     audience_task_id = forms.ChoiceField(
-        label=_("Аудитория"),
+        label=_trans("Аудитория"),
         required=True,
         widget=forms.Select(attrs={"class": "YY-INPUT"}),
     )
@@ -37,7 +37,7 @@ class MailingListForm(forms.Form):
             missing.append("audience_task_id")
 
         if missing:
-            self.add_error(None, _("Заполните все поля."))
+            self.add_error(None, _trans("Заполните все поля."))
             for f in missing:
                 self.add_error(f, "")
 

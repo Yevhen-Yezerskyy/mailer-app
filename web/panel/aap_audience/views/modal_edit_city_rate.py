@@ -7,7 +7,7 @@ from __future__ import annotations
 from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import render
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _trans
 
 from mailer_web.access import decode_id
 from panel.aap_audience.models import AudienceTask
@@ -54,17 +54,17 @@ def modal_edit_city_rate_view(request):
 
     if request.method == "POST":
         if not task:
-            return JsonResponse({"ok": False, "error": str(_("Запись не найдена."))}, status=404)
+            return JsonResponse({"ok": False, "error": str(_trans("Запись не найдена."))}, status=404)
         if not city_ids:
-            return JsonResponse({"ok": False, "error": str(_("Город не найден."))}, status=404)
+            return JsonResponse({"ok": False, "error": str(_trans("Город не найден."))}, status=404)
 
         try:
             rate = int(str(request.POST.get("rate") or "").strip())
         except Exception:
-            return JsonResponse({"ok": False, "error": str(_("Введите рейтинг от 1 до 100."))}, status=400)
+            return JsonResponse({"ok": False, "error": str(_trans("Введите рейтинг от 1 до 100."))}, status=400)
 
         if rate < 1 or rate > 100:
-            return JsonResponse({"ok": False, "error": str(_("Введите рейтинг от 1 до 100."))}, status=400)
+            return JsonResponse({"ok": False, "error": str(_trans("Введите рейтинг от 1 до 100."))}, status=400)
 
         with connection.cursor() as cur:
             cur.execute(

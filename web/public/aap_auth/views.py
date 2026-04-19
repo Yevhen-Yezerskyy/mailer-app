@@ -9,7 +9,7 @@ from django.db import transaction
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _trans
 
 from mailer_web.access import decode_id, encode_id
 from mailer_web.letter_sender import LetterSenderError, send_letter_by_slug
@@ -30,9 +30,9 @@ from .token_service import (
 
 
 _LOGIN_ERROR_MESSAGES = {
-    "login_blocked": _("Логин заблокирован"),
-    "login_retired": _("Логин больше не обслуживается"),
-    "invalid_credentials": _("Неверный логин или пароль"),
+    "login_blocked": _trans("Логин заблокирован"),
+    "login_retired": _trans("Логин больше не обслуживается"),
+    "invalid_credentials": _trans("Неверный логин или пароль"),
 }
 
 
@@ -152,7 +152,7 @@ def login_view(request):
     else:
         form = AuthenticationForm(request)
 
-    form.fields["username"].label = _("Email")
+    form.fields["username"].label = _trans("Email")
     return render(
         request,
         "public/login.html",
@@ -175,7 +175,7 @@ def login_error_view(request, code: str, uid: str):
     auth_error = _LOGIN_ERROR_MESSAGES[auth_error_code]
 
     form = AuthenticationForm(request)
-    form.fields["username"].label = _("Email")
+    form.fields["username"].label = _trans("Email")
     return render(
         request,
         "public/login.html",
@@ -243,7 +243,7 @@ def resend_email_confirm_view(request):
             if _send_email_confirm(request, user):
                 return redirect(f"{reverse('email_pending', kwargs={'uid': uid})}?sent=1")
             else:
-                messages.error(request, _("Не удалось отправить письмо"))
+                messages.error(request, _trans("Не удалось отправить письмо"))
             return redirect("email_pending", uid=uid)
     return redirect("login")
 
@@ -251,7 +251,7 @@ def resend_email_confirm_view(request):
 def confirm_email_view(request, token: str):
     token_obj = get_active_token(token=token, action=ACTION_EMAIL_CONFIRM)
     if not token_obj:
-        messages.error(request, _("Ссылка подтверждения недействительна или устарела"))
+        messages.error(request, _trans("Ссылка подтверждения недействительна или устарела"))
         return redirect("login")
 
     user = token_obj.user
@@ -280,7 +280,7 @@ def edit_registration_view(request):
 
     workspace = user.workspace
     if not workspace:
-        messages.error(request, _("Рабочее пространство не найдено"))
+        messages.error(request, _trans("Рабочее пространство не найдено"))
         return redirect("email_pending", uid=uid)
 
     if request.method == "POST":
@@ -303,7 +303,7 @@ def edit_registration_view(request):
                 if form.cleaned_data.get("password"):
                     user.set_password(form.cleaned_data["password"])
                 user.save()
-            messages.info(request, _("Данные обновлены"))
+            messages.info(request, _trans("Данные обновлены"))
             return redirect("email_pending", uid=uid)
     else:
         form = RegistrationForm(

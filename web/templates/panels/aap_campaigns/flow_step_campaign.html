@@ -20,9 +20,9 @@
             <div class="YY-STATUS_BLUE !w-full !mb-0">{{ edit_obj.campaign_parent.title }}</div>
           {% endif %}
           {% if flow_is_followup and campaign_mode == "add" %}
-            <label class="YY-LABEL mt-5">Кампания-родитель:</label>
+            <label class="YY-LABEL mt-5">{% trans "Кампания-родитель:" %}</label>
             <select name="campaign_parent" class="YY-INPUT !mb-0 {% if flow_error_campaign_parent %}!border-red-500{% endif %}">
-              <option value="">— не выбрана —</option>
+              <option value="">{% trans "— не выбрана —" %}</option>
               {% for it in parent_items %}
                 <option value="{{ it.ui_id }}" {% if flow_selected_parent_ui and flow_selected_parent_ui == it.ui_id %}selected{% endif %}>
                   {{ it.title }}
@@ -67,7 +67,7 @@
 
           {% if flow_is_followup %}
             <div class="flex items-center gap-3 mb-4 w-full">
-              <div class="YY-STATUS_BLUE !mb-0 !py-1 !px-3 whitespace-nowrap">Отправка не ранее, дней:</div>
+              <div class="YY-STATUS_BLUE !mb-0 !py-1 !px-3 whitespace-nowrap">{% trans "Отправка не ранее, дней:" %}</div>
               <input
                 type="number"
                 min="0"

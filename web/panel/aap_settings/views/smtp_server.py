@@ -16,6 +16,7 @@ from django.db import connection
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils.translation import gettext as _trans
 from django.views.decorators.http import require_GET
 
 from engine.common import db as engine_db
@@ -330,7 +331,7 @@ def smtp_server_view(request, id: str):
                 if not v:
                     v = stored_password_plain
                 if not v:
-                    form.add_error("password", "Пароль обязателен.")
+                    form.add_error("password", _trans("Пароль обязателен."))
                     return render(
                         request,
                         "panels/aap_settings/mail_servers/flow.html",

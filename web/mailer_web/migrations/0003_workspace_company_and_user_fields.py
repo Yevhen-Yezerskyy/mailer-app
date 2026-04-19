@@ -14,7 +14,7 @@ def _forward_migrate_workspace_links(apps, schema_editor):
 
     # перенос существующих связей (accounts_userworkspace -> accounts_workspaces + accounts_clientuser.workspace_id)
     for row in UserWorkspace.objects.all().only("user_id", "workspace_id").iterator():
-        ws, _ = Workspace.objects.get_or_create(
+        ws, _unused = Workspace.objects.get_or_create(
             id=row.workspace_id,
             defaults={
                 "company_name": "",

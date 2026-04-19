@@ -9,6 +9,7 @@ import json
 
 from django import forms
 from django.core.exceptions import ValidationError
+from django.utils.translation import gettext as _trans
 
 from panel.aap_campaigns.models import Templates
 
@@ -36,9 +37,9 @@ class TemplatesForm(forms.Form):
         try:
             val = json.loads(raw)
         except Exception:
-            raise ValidationError("styles: invalid JSON")
+            raise ValidationError(_trans("styles: invalid JSON"))
         if not isinstance(val, dict):
-            raise ValidationError("styles: must be a JSON object")
+            raise ValidationError(_trans("styles: must be a JSON object"))
         return val
 
     def to_model_fields(self) -> dict:

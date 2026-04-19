@@ -56,7 +56,7 @@
                   <td class="YY-TB_TD"><div class="YY-STATUS_BLUE">{{ it.domain }}</div></td>
                   <td class="YY-TB_TD"><code>{{ it.relpath }}/</code></td>
                   <td class="YY-TB_TD">
-                    <form method="post" action="{% url 'settings:domain_delete' it.id %}" onsubmit="return confirm('Удалить домен и его каталог?');">
+                    <form method="post" action="{% url 'settings:domain_delete' it.id %}" onsubmit="return confirm('{% trans 'Удалить домен и его каталог?' %}');">
                       {% csrf_token %}
                       <button type="submit" class="YY-BUTTON_RED w-full">{% trans "Удалить" %}</button>
                     </form>

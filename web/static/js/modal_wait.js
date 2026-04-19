@@ -3,6 +3,13 @@
 // PURPOSE: Global non-closable wait overlay with the same backdrop style as modal.
 
 (function () {
+  const i18n = window.yyI18n || (document.documentElement && document.documentElement.yyI18n) || {};
+  const t = (key, fallback) => {
+    const v = i18n[key];
+    return typeof v === "string" && v.trim() ? v : fallback;
+  };
+  const escAttr = (value) => String(value || "").replace(/"/g, "&quot;");
+
   function ensureRoot() {
     let el = document.getElementById("yy-wait-loading");
     if (el) return el;
@@ -11,9 +18,10 @@
     el.id = "yy-wait-loading";
     el.className = "yy-loading hidden";
     el.setAttribute("aria-hidden", "true");
+    const loadingLabel = escAttr(t("loading_label", "Loading"));
     el.innerHTML =
       '<div class="yy-loading__backdrop" style="background: rgba(5, 112, 235, 0.012);"></div>' +
-      '<div class="yy-loading__box" role="status" aria-live="polite" aria-label="Loading">' +
+      '<div class="yy-loading__box" role="status" aria-live="polite" aria-label="' + loadingLabel + '">' +
         '<img src="/static/img/spinner.svg" alt="" class="w-[150px] h-[150px]">' +
       '</div>';
     document.body.appendChild(el);

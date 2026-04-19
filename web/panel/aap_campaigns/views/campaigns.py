@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import random
 import re
 from datetime import date, datetime
 from types import SimpleNamespace
@@ -23,10 +24,11 @@ from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _trans
 
 from engine.common.email_template import _is_de_public_holiday, render_html, sanitize
 from engine.common.mail.send import send_one
+from engine.common.utils import parse_json_object
 from engine.core_status.is_active import clear_is_more_needed_full_cache
 from mailer_web.access import decode_id, encode_id, resolve_pk_or_redirect
 from panel.aap_audience.models import AudienceTask
@@ -594,7 +596,7 @@ def _ctx_build(
         if tpl and not getattr(tpl, "archived", False):
             it.letter_tpl_label = tpl.template_name
         else:
-            it.letter_tpl_label = _("Шаблон удален")
+            it.letter_tpl_label = _trans("Шаблон удален")
 
         total, sent, left = stats.get(int(it.id), (0, 0, 0))
         it.stat_total = int(total)
@@ -677,9 +679,9 @@ def _build_flow_step_states(
     create_mode: str = "",
 ):
     steps = [
-        ("campaign", _("Кампания")),
-        ("template", _("Шаблон письма")),
-        ("letter", _("Письмо кампании")),
+        ("campaign", _trans("Кампания")),
+        ("template", _trans("Шаблон письма")),
+        ("letter", _trans("Письмо кампании")),
     ]
     out = []
     has_campaign = bool(campaign_ui_id)
@@ -725,8 +727,8 @@ def _build_template_step_context(request, ws_id: UUID):
 
 
 def _suggest_flow_template_name(request, ws_id: UUID, edit_obj, mb_items) -> str:
-    _ = request  # keep signature stable
-    _ = mb_items
+    _unused_value = request  # keep signature stable
+    _unused_value = mb_items
     if not edit_obj:
         return _make_unique_template_name(ws_id, "Template - #1")
 
@@ -779,7 +781,7 @@ def _prepare_campaign_form_data(ws_id: UUID, edit_obj):
                     SimpleNamespace(
                         id=int(t_id),
                         ui_id=deleted_tpl_ui,
-                        template_name=_("Шаблон удален"),
+                        template_name=_trans("Шаблон удален"),
                         is_deleted_option=True,
                     ),
                 )
@@ -842,6 +844,61 @@ def _prepare_letter_init(ws_id: UUID, edit_obj):
             letter_init_headers = "{}"
 
     return letter_obj, letter_init_html, letter_init_css, letter_init_subjects, letter_init_headers, letter_template_html
+
+
+def _pick_test_contact_from_top_rated(task_id: int) -> tuple[dict[str, Any] | None, int | None]:
+    with connection.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                sl.aggr_contact_cb_id AS sending_list_id,
+                sl.aggr_contact_cb_id AS aggr_contact_id,
+                COALESCE(lower(trim(ac.email)), '') AS email,
+                COALESCE(ac.company_name, '') AS company_name,
+                ac.company_data
+            FROM public.aap_audience_audiencetask t
+            JOIN public.sending_lists sl
+              ON sl.task_id = t.id
+            JOIN public.aggr_contacts_cb ac
+              ON ac.id = sl.aggr_contact_cb_id
+            WHERE t.id = %s
+              AND COALESCE(sl.removed, false) = false
+              AND sl.rate IS NOT NULL
+              AND sl.rate <= COALESCE(t.rate_limit, 0)
+              AND COALESCE(ac.blocked, false) = false
+              AND COALESCE(ac.wrong_email, false) = false
+              AND COALESCE(lower(trim(ac.email)), '') <> ''
+            ORDER BY
+              sl.rate ASC NULLS LAST,
+              sl.rate_cb ASC NULLS LAST,
+              sl.aggr_contact_cb_id ASC
+            LIMIT 10
+            """,
+            [int(task_id)],
+        )
+        rows = cur.fetchall() or []
+
+    if not rows:
+        return None, None
+
+    sending_list_id, aggr_contact_id, email, company_name, company_data = random.choice(rows)
+    try:
+        company_data_obj = parse_json_object(company_data, field_name="company_data")
+    except Exception:
+        company_data_obj = {}
+    norm_obj = company_data_obj.get("norm") if isinstance(company_data_obj.get("norm"), dict) else {}
+
+    return (
+        {
+            "aggr_contact_id": int(aggr_contact_id) if aggr_contact_id is not None else None,
+            "company_name": str(company_name or "").strip(),
+            "email": str(email or "").strip().lower(),
+            "norm": norm_obj,
+            "blocked": False,
+            "wrong_email": False,
+        },
+        int(sending_list_id),
+    )
 
 
 def campaigns_view(request):
@@ -976,7 +1033,7 @@ def campaigns_archive_modal_view(request):
             "status": "ok",
             "ui_id": token,
             "title": camp.title or "",
-            "modal_title": "Перенести в архив",
+            "modal_title": _trans("Перенести в архив"),
             "post_url": reverse("campaigns:campaigns"),
             "action_name": "archive",
         },
@@ -1012,7 +1069,7 @@ def campaigns_activate_modal_view(request):
             "status": "ok",
             "ui_id": token,
             "title": camp.title or "",
-            "modal_title": "Вернуть из архива",
+            "modal_title": _trans("Вернуть из архива"),
             "post_url": reverse("campaigns:campaigns"),
             "action_name": "activate",
         },
@@ -1185,7 +1242,7 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
                 clean_html = sanitize(editor_template_parse_html(editor_html))
                 styles_obj = styles_css_to_json(css_text)
                 if not template_name:
-                    tpl_error_msg = _("Имя шаблона обязательно.")
+                    tpl_error_msg = _trans("Имя шаблона обязательно.")
                 else:
                     obj = Templates.objects.create(
                         workspace_id=ws_id,
@@ -1213,7 +1270,7 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
                     clean_html = sanitize(editor_template_parse_html(editor_html))
                     styles_obj = styles_css_to_json(css_text)
                     if not template_name:
-                        tpl_error_msg = _("Имя шаблона обязательно.")
+                        tpl_error_msg = _trans("Имя шаблона обязательно.")
                     else:
                         obj.template_name = template_name
                         obj.template_html = clean_html
@@ -1252,7 +1309,11 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
                 )
                 return redirect(request.get_full_path())
 
-            camp = Campaign.objects.filter(id=int(camp_id), workspace_id=ws_id).only("id", "mailbox_id").first()
+            camp = (
+                Campaign.objects.filter(id=int(camp_id), workspace_id=ws_id)
+                .only("id", "mailbox_id", "sending_list_id")
+                .first()
+            )
             if not camp:
                 _set_flow_test_send_status_json(
                     request,
@@ -1264,13 +1325,46 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
                 )
                 return redirect(request.get_full_path())
 
+            sending_list_task_id = int(getattr(camp, "sending_list_id", 0) or 0)
+            if sending_list_task_id <= 0:
+                _set_flow_test_send_status_json(
+                    request,
+                    {
+                        "action": "SMTP_SEND_CHECK",
+                        "status": "FAIL",
+                        "data": {
+                            "error": "campaign_sending_list_missing",
+                            "campaign_id": int(camp.id),
+                            "to": test_email,
+                        },
+                    },
+                )
+                return redirect(request.get_full_path())
+
+            test_contact, test_sending_list_id = _pick_test_contact_from_top_rated(sending_list_task_id)
+            if (not test_contact) or (not test_sending_list_id):
+                _set_flow_test_send_status_json(
+                    request,
+                    {
+                        "action": "SMTP_SEND_CHECK",
+                        "status": "FAIL",
+                        "data": {
+                            "error": "no_valid_contacts_in_top10_by_rate",
+                            "campaign_id": int(camp.id),
+                            "sending_list_id": int(sending_list_task_id),
+                            "to": test_email,
+                        },
+                    },
+                )
+                return redirect(request.get_full_path())
+
             letter = (
                 Letter.objects.filter(workspace_id=ws_id, campaign_id=int(camp.id))
                 .only("html_content", "ready_content", "subjects", "headers")
                 .first()
             )
             if not letter or not str(getattr(letter, "html_content", "") or "").strip():
-                test_msg = _("Письмо ещё не создано — сначала откройте редактор письма и сохраните.")
+                test_msg = _trans("Письмо ещё не создано — сначала откройте редактор письма и сохраните.")
                 _set_flow_test_send_status_json(
                     request,
                     {
@@ -1295,8 +1389,8 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
                     sent_ok = bool(
                         send_one(
                             campaign=campaign_payload,
-                            contact=None,
-                            sending_list_id=None,
+                            contact=test_contact,
+                            sending_list_id=int(test_sending_list_id),
                             to_email_override=test_email,
                             record_sent=False,
                         )
@@ -1399,7 +1493,7 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
                             create_mode=flow_create_mode,
                         ),
                         "flow_close_url": reverse("campaigns:campaigns"),
-                        "flow_title": edit_obj.title if edit_obj else _("Новая кампания"),
+                        "flow_title": edit_obj.title if edit_obj else _trans("Новая кампания"),
                         "flow_campaign_title_input": title,
                         "flow_header_form_id": "yyCampaignForm",
                         "flow_header_save_action": "save_campaign_stay" if edit_obj else "add_campaign_stay",
@@ -1604,7 +1698,7 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
             create_mode=flow_create_mode,
         ),
         "flow_close_url": reverse("campaigns:campaigns"),
-        "flow_title": edit_obj.title if edit_obj else _("Новая кампания"),
+        "flow_title": edit_obj.title if edit_obj else _trans("Новая кампания"),
         "flow_campaign_ui_id": campaign_ui_id,
         "flow_campaign_user_active": bool(getattr(edit_obj, "user_active", False)) if edit_obj else False,
         "flow_is_followup": flow_is_followup,

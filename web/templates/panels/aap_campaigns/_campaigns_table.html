@@ -66,9 +66,9 @@
                           <button
                             type="submit"
                             class="{% if it.user_active %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-[28ch]"
-                            aria-label="{% if it.user_active %}Остановить кампанию{% else %}Запустить кампанию{% endif %}"
-                            title="{% if it.user_active %}Остановить кампанию{% else %}Запустить кампанию{% endif %}">
-                            <span>{% if it.user_active %}Кампания запущена{% else %}Кампания остановлена{% endif %}</span>
+                            aria-label="{% if it.user_active %}{% trans 'Остановить кампанию' %}{% else %}{% trans 'Запустить кампанию' %}{% endif %}"
+                            title="{% if it.user_active %}{% trans 'Остановить кампанию' %}{% else %}{% trans 'Запустить кампанию' %}{% endif %}">
+                            <span>{% if it.user_active %}{% trans "Кампания запущена" %}{% else %}{% trans "Кампания остановлена" %}{% endif %}</span>
                             {% if it.user_active %}
                               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -83,7 +83,7 @@
                         </form>
                       {% else %}
                         <span class="{% if it.user_active %}YY-STATUS_GREEN{% else %}YY-STATUS_GRAY{% endif %} inline-flex !justify-between !items-center !w-[28ch]">
-                          <span>{% if it.user_active %}Кампания запущена{% else %}Кампания остановлена{% endif %}</span>
+                          <span>{% if it.user_active %}{% trans "Кампания запущена" %}{% else %}{% trans "Кампания остановлена" %}{% endif %}</span>
                           {% if it.user_active %}
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px]" aria-hidden="true">
                               <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 9v6m-4.5 0V9M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -99,22 +99,22 @@
                       {% if it.user_active %}
                         {% if it.is_in_window %}
                           <span class="YY-STATUS_GREEN mt-2 inline-flex !w-[28ch] !justify-between !items-center">
-                            <span>Письма отправляются</span>
+                            <span>{% trans "Письма отправляются" %}</span>
                             <span class="inline-flex size-[22px] shrink-0 items-center justify-center" aria-hidden="true">
                               <span class="inline-block size-[19px] rounded-full border-2 border-[#9bb7d5] border-t-[#2f6fb0] animate-spin"></span>
                             </span>
                           </span>
                         {% else %}
-                          <span class="YY-STATUS_BLUE mt-2 inline-flex !w-[28ch]">Ждем окна отправки</span>
+                          <span class="YY-STATUS_BLUE mt-2 inline-flex !w-[28ch]">{% trans "Ждем окна отправки" %}</span>
                         {% endif %}
                       {% endif %}
                     {% else %}
-                      <span class="YY-STATUS_GRAY inline-flex !w-[28ch]">Кампания без письма</span>
+                      <span class="YY-STATUS_GRAY inline-flex !w-[28ch]">{% trans "Кампания без письма" %}</span>
                     {% endif %}
                   </td>
                   <td class="YY-TB_TD !px-1">
                     <span class="YY-STATUS_BLUE inline-flex !justify-between !items-center !w-[26ch]">
-                      <span class="whitespace-nowrap">Отправлено писем:</span>
+                      <span class="whitespace-nowrap">{% trans "Отправлено писем:" %}</span>
                       <span class="inline-flex ml-auto justify-end text-right">{{ it.stat_sent_fmt }}</span>
                     </span>
                   </td>

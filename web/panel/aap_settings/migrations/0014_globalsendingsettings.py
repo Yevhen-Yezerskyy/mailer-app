@@ -18,7 +18,7 @@ DEFAULT_GLOBAL_GLOBAL_WINDOW = {
 
 def seed_global_global_window(apps, schema_editor):
     GlobalSendingSettings = apps.get_model("aap_settings", "GlobalSendingSettings")
-    obj, _ = GlobalSendingSettings.objects.get_or_create(
+    obj, _unused = GlobalSendingSettings.objects.get_or_create(
         singleton_key=1,
         defaults={"global_global_window": DEFAULT_GLOBAL_GLOBAL_WINDOW},
     )

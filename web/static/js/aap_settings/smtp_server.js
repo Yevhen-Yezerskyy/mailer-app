@@ -5,6 +5,11 @@
 (function () {
   function byId(id) { return document.getElementById(id); }
   function qByName(name) { return document.querySelector('[name="' + name + '"]'); }
+  const i18n = window.yyI18n || (document.documentElement && document.documentElement.yyI18n) || {};
+  function t(key, fallback) {
+    const v = i18n[key];
+    return typeof v === "string" && v.trim() ? v : fallback;
+  }
 
   function mappedButtonClass(key, extra) {
     const classMap = window.yyClassMap || (document.documentElement && document.documentElement.yyClassMap) || {};
@@ -59,7 +64,7 @@
     sel.innerHTML = "";
     const ph = document.createElement("option");
     ph.value = "";
-    ph.textContent = "— выберите провайдера —";
+    ph.textContent = t("select_provider_placeholder", "— select provider —");
     sel.appendChild(ph);
 
     for (const k of keys) {
@@ -125,7 +130,7 @@
     show(userPassRow, isLogin);
 
     if (title) {
-      title.textContent = isRelay ? "RELAY NOAUTH" : "ЛОГИН (Стандарт)";
+      title.textContent = isRelay ? "RELAY NOAUTH" : t("smtp_login_standard", "LOGIN (Standard)");
     }
 
     setBtnStateClass(btnL, isLogin);

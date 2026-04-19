@@ -382,7 +382,7 @@
     function openUnsavedModal(onApprove) {
       const tpl = document.getElementById("yy-unsaved-changes-template");
       if (!tpl || !window.YYModal || typeof window.YYModal.open !== "function") {
-        if (window.confirm("Шаблон не сохранен. Изменения применены не будут. Перейти к списку шаблонов?")) {
+        if (window.confirm("{% trans 'Шаблон не сохранен. Изменения применены не будут. Перейти к списку шаблонов?' %}")) {
           onApprove();
         }
         return;
@@ -396,11 +396,11 @@
       const continueBtn = wrapper.querySelector("[data-unsaved-continue]");
       const cancelBtn = wrapper.querySelector("[data-yy-modal-close]");
 
-      if (title) title.textContent = "Несохраненные изменения";
-      if (text) text.textContent = "Шаблон не сохранен. Изменения применены не будут. Перейти к списку шаблонов?";
-      if (list) list.innerHTML = "<li>Шаблон письма кампании</li>";
-      if (continueBtn) continueBtn.textContent = "Подтвердить";
-      if (cancelBtn) cancelBtn.textContent = "Отменить";
+      if (title) title.textContent = "{% trans 'Несохраненные изменения' %}";
+      if (text) text.textContent = "{% trans 'Шаблон не сохранен. Изменения применены не будут. Перейти к списку шаблонов?' %}";
+      if (list) list.innerHTML = "<li>{% trans 'Шаблон письма кампании' %}</li>";
+      if (continueBtn) continueBtn.textContent = "{% trans 'Подтвердить' %}";
+      if (cancelBtn) cancelBtn.textContent = "{% trans 'Отменить' %}";
 
       window.YYModal.open("text=" + wrapper.innerHTML);
 

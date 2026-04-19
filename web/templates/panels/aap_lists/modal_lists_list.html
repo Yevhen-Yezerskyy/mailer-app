@@ -11,13 +11,14 @@
   <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
 
   {% if status == "done" %}
+    {% trans "Рейтинг не присвоен" as no_company_rate_text %}
 
     <span class="YY-TEXT-BOLD !mb-0">{{ contact.company_name }}</span>
     <div class="YY-TEXT mb-4">{{ contact.address }}</div>
 
     <div class="YY-STATUS_YELLOW !text-[#006991] mb-2 {{ ratings.rate_cl_bg }}">
       {% trans "Рейтинг компании" %}:
-      {{ ratings.rate_cl|default:_("Рейтинг не присвоен") }}
+      {{ ratings.rate_cl|default:no_company_rate_text }}
     </div>
 
     <div class="YY-STATUS_BLUE mb-4">

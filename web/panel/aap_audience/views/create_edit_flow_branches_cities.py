@@ -20,6 +20,7 @@ from engine.common.utils import h64_text, parse_json_response
 from engine.common.translate import get_prompt, translate_text
 from mailer_web.format_contact import get_category_title, get_city_title_by_city_id
 
+from .create_edit_flow_gpt_consts import FLOW_GPT_MODEL, FLOW_GPT_SERVICE_TIER
 from .create_edit_flow_shared import (
     build_flow_render_context,
     build_step_definitions,
@@ -136,7 +137,7 @@ def _request_branch_rating_map(
         return rating_map, branch_state, False
 
     resp = GPTClient().ask_dialog(
-        model="standard",
+        model=FLOW_GPT_MODEL,
         instructions=get_prompt(
             "create_branches_buy_rate" if flow_type == "buy" else "create_branches_sell_rate",
             on_gpt_error=lambda: mark_flow_gpt_unavailable(request),
@@ -154,7 +155,7 @@ def _request_branch_rating_map(
         conversation=(str(branch_state.get("conversation_id") or "").strip() or None),
         previous_response_id=(str(branch_state.get("response_id") or "").strip() or None),
         user_id=str(request.user.id),
-        service_tier="flex",
+        service_tier=FLOW_GPT_SERVICE_TIER,
         web_search=True,
     )
     if not is_gpt_ok(resp):
@@ -918,7 +919,7 @@ def _handle_branches_cities_step_view(
             if items_to_rate:
                 product_de, company_de = _resolve_product_company_de()
                 resp = GPTClient().ask_dialog(
-                    model="standard",
+                    model=FLOW_GPT_MODEL,
                     instructions=get_prompt(
                         "create_branches_buy_rate" if flow_type == "buy" else "create_branches_sell_rate",
                         on_gpt_error=on_gpt_error,
@@ -936,7 +937,7 @@ def _handle_branches_cities_step_view(
                     conversation=(str(branch_state.get("conversation_id") or "").strip() or None),
                     previous_response_id=(str(branch_state.get("response_id") or "").strip() or None),
                     user_id=str(request.user.id),
-                    service_tier="flex",
+                    service_tier=FLOW_GPT_SERVICE_TIER,
                     web_search=True,
                 )
                 if not is_gpt_ok(resp):
@@ -1090,7 +1091,7 @@ def _handle_branches_cities_step_view(
                 if items_to_rate:
                     product_de, company_de = _resolve_product_company_de()
                     resp = GPTClient().ask_dialog(
-                        model="standard",
+                        model=FLOW_GPT_MODEL,
                         instructions=get_prompt(
                             "create_branches_buy_rate" if flow_type == "buy" else "create_branches_sell_rate",
                             on_gpt_error=on_gpt_error,
@@ -1108,7 +1109,7 @@ def _handle_branches_cities_step_view(
                         conversation=(str(branch_state.get("conversation_id") or "").strip() or None),
                         previous_response_id=(str(branch_state.get("response_id") or "").strip() or None),
                         user_id=str(request.user.id),
-                        service_tier="flex",
+                        service_tier=FLOW_GPT_SERVICE_TIER,
                         web_search=True,
                     )
                     if not is_gpt_ok(resp):
@@ -1182,7 +1183,7 @@ def _handle_branches_cities_step_view(
 
             previous_response_id = str(branch_state.get("response_id") or "").strip()
             resp = GPTClient().ask_dialog(
-                model="standard",
+                model=FLOW_GPT_MODEL,
                 instructions=get_prompt(
                     "create_branches_buy" if flow_type == "buy" else "create_branches_sell",
                     on_gpt_error=on_gpt_error,
@@ -1191,7 +1192,7 @@ def _handle_branches_cities_step_view(
                 conversation=(str(branch_state.get("conversation_id") or "").strip() or None),
                 previous_response_id=(previous_response_id or None),
                 user_id=str(request.user.id),
-                service_tier="flex",
+                service_tier=FLOW_GPT_SERVICE_TIER,
                 web_search=True,
             )
             if not is_gpt_ok(resp):
@@ -1241,7 +1242,7 @@ def _handle_branches_cities_step_view(
                 )
                 previous_response_id = str(branch_state.get("response_id") or "").strip()
                 resp = GPTClient().ask_dialog(
-                    model="standard",
+                    model=FLOW_GPT_MODEL,
                     instructions=clean_prompt,
                     input=json.dumps(
                         {
@@ -1255,7 +1256,7 @@ def _handle_branches_cities_step_view(
                     conversation=(str(branch_state.get("conversation_id") or "").strip() or None),
                     previous_response_id=(previous_response_id or None),
                     user_id=str(request.user.id),
-                    service_tier="flex",
+                    service_tier=FLOW_GPT_SERVICE_TIER,
                     web_search=True,
                 )
                 if not is_gpt_ok(resp):
@@ -1355,7 +1356,7 @@ def _handle_branches_cities_step_view(
                 product_de, company_de = _resolve_product_company_de()
                 previous_response_id = str(branch_state.get("response_id") or "").strip()
                 resp = GPTClient().ask_dialog(
-                    model="standard",
+                    model=FLOW_GPT_MODEL,
                     instructions=get_prompt(
                         "create_branches_buy_expand" if flow_type == "buy" else "create_branches_sell_expand",
                         on_gpt_error=on_gpt_error,
@@ -1373,7 +1374,7 @@ def _handle_branches_cities_step_view(
                     conversation=(str(branch_state.get("conversation_id") or "").strip() or None),
                     previous_response_id=(previous_response_id or None),
                     user_id=str(request.user.id),
-                    service_tier="flex",
+                    service_tier=FLOW_GPT_SERVICE_TIER,
                     web_search=True,
                 )
                 if not is_gpt_ok(resp):
@@ -1439,7 +1440,7 @@ def _handle_branches_cities_step_view(
                         )
                         previous_response_id = str(branch_state.get("response_id") or "").strip()
                         resp = GPTClient().ask_dialog(
-                            model="standard",
+                            model=FLOW_GPT_MODEL,
                             instructions=clean_prompt,
                             input=json.dumps(
                                 {
@@ -1453,7 +1454,7 @@ def _handle_branches_cities_step_view(
                             conversation=(str(branch_state.get("conversation_id") or "").strip() or None),
                             previous_response_id=(previous_response_id or None),
                             user_id=str(request.user.id),
-                            service_tier="flex",
+                            service_tier=FLOW_GPT_SERVICE_TIER,
                             web_search=True,
                         )
                         if not is_gpt_ok(resp):

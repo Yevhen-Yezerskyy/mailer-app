@@ -5,7 +5,7 @@
 # - Settings → URL stats: static page with 2 embed-code variants (.de / .com) + RU instructions
 
 from django.shortcuts import redirect, render
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _trans
 
 
 def url_stats_view(request):
@@ -31,7 +31,7 @@ def url_stats_view(request):
 </script>"""
 
     ctx = {
-        "page_title": _("Настройки : Учет переходов URL"),
+        "page_title": _trans("Настройки : Учет переходов URL"),
         "snippet_de": snippet_de,
         "snippet_com": snippet_com,
     }

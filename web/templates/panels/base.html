@@ -35,7 +35,7 @@
 
 <div id="yy-global-loading" class="yy-loading hidden" aria-hidden="true">
   <div class="yy-loading__backdrop"></div>
-  <div class="yy-loading__box" role="status" aria-live="polite" aria-label="Loading">
+  <div class="yy-loading__box" role="status" aria-live="polite" aria-label="{% trans 'Loading' %}">
     <div class="yy-loading__spinner"></div>
   </div>
 </div>
@@ -50,6 +50,65 @@
     {% endfor %}
   };
   document.documentElement.yyClassMap = window.yyClassMap;
+</script>
+{% trans "Loading" as yy_i18n_loading_label %}
+{% trans "Request failed" as yy_i18n_request_failed %}
+{% trans "CSRF validation failed" as yy_i18n_csrf_validation_failed %}
+{% trans "Confirm action?" as yy_i18n_confirm_action_question %}
+{% trans "Confirm" as yy_i18n_confirm_approve %}
+{% trans "Cancel" as yy_i18n_cancel %}
+{% trans "Error" as yy_i18n_error %}
+{% trans "— select provider —" as yy_i18n_select_provider_placeholder %}
+{% trans "LOGIN (Standard)" as yy_i18n_smtp_login_standard %}
+{% trans "Are you sure? Current template work will be partially or fully lost." as yy_i18n_template_switch_confirm %}
+{% trans "Continue" as yy_i18n_continue %}
+{% trans "Campaign letter" as yy_i18n_campaign_letter %}
+{% trans "OK" as yy_i18n_ok %}
+{% trans "Unsaved changes" as yy_i18n_unsaved_changes_title %}
+{% trans "Letter is not saved. Changes will not be applied. Go to campaigns list?" as yy_i18n_unsaved_close_to_campaigns %}
+{% trans "Letter template has changed. Review the letter and save changes. Then the new template will be applied." as yy_i18n_template_changed_save_to_apply %}
+{% trans "There are unsaved changes in the letter. Save the letter first." as yy_i18n_save_first_unsaved_changes %}
+{% trans "Link" as yy_i18n_link_title %}
+{% trans "Protocol" as yy_i18n_link_protocol_label %}
+{% trans "(none)" as yy_i18n_link_protocol_none %}
+{% trans "Address" as yy_i18n_link_address_label %}
+{% trans "Text" as yy_i18n_link_text_label %}
+{% trans "Remove link" as yy_i18n_link_remove %}
+{% trans "Save" as yy_i18n_link_save %}
+{% trans "WhatsApp" as yy_i18n_link_whatsapp %}
+{% trans "Telegram" as yy_i18n_link_telegram %}
+{% trans "Bullet" as yy_i18n_bullet_tooltip %}
+<script>
+  window.yyI18n = Object.assign({}, window.yyI18n || {}, {
+    loading_label: "{{ yy_i18n_loading_label|escapejs }}",
+    request_failed: "{{ yy_i18n_request_failed|escapejs }}",
+    csrf_validation_failed: "{{ yy_i18n_csrf_validation_failed|escapejs }}",
+    confirm_action_question: "{{ yy_i18n_confirm_action_question|escapejs }}",
+    confirm_approve: "{{ yy_i18n_confirm_approve|escapejs }}",
+    cancel: "{{ yy_i18n_cancel|escapejs }}",
+    error: "{{ yy_i18n_error|escapejs }}",
+    select_provider_placeholder: "{{ yy_i18n_select_provider_placeholder|escapejs }}",
+    smtp_login_standard: "{{ yy_i18n_smtp_login_standard|escapejs }}",
+    template_switch_confirm: "{{ yy_i18n_template_switch_confirm|escapejs }}",
+    continue_label: "{{ yy_i18n_continue|escapejs }}",
+    campaign_letter: "{{ yy_i18n_campaign_letter|escapejs }}",
+    ok_label: "{{ yy_i18n_ok|escapejs }}",
+    unsaved_changes_title: "{{ yy_i18n_unsaved_changes_title|escapejs }}",
+    unsaved_close_to_campaigns: "{{ yy_i18n_unsaved_close_to_campaigns|escapejs }}",
+    template_changed_save_to_apply: "{{ yy_i18n_template_changed_save_to_apply|escapejs }}",
+    save_first_unsaved_changes: "{{ yy_i18n_save_first_unsaved_changes|escapejs }}",
+    link_title: "{{ yy_i18n_link_title|escapejs }}",
+    link_protocol_label: "{{ yy_i18n_link_protocol_label|escapejs }}",
+    link_protocol_none: "{{ yy_i18n_link_protocol_none|escapejs }}",
+    link_address_label: "{{ yy_i18n_link_address_label|escapejs }}",
+    link_text_label: "{{ yy_i18n_link_text_label|escapejs }}",
+    link_remove: "{{ yy_i18n_link_remove|escapejs }}",
+    link_save: "{{ yy_i18n_link_save|escapejs }}",
+    link_whatsapp: "{{ yy_i18n_link_whatsapp|escapejs }}",
+    link_telegram: "{{ yy_i18n_link_telegram|escapejs }}",
+    bullet_tooltip: "{{ yy_i18n_bullet_tooltip|escapejs }}"
+  });
+  document.documentElement.yyI18n = window.yyI18n;
 </script>
 
 <svg xmlns="http://www.w3.org/2000/svg" class="hidden">
@@ -76,7 +135,7 @@
       <details {% if sec.open %}open{% endif %} class="YY-MENU-CARD-BLUE">
         <summary class="YY-MENU-SUMMARY">
           {% if sec.url %}
-            <a href="{{ sec.url }}" style="color: inherit; text-decoration: none;" onclick="event.stopPropagation();">
+            <a href="{{ sec.url }}" class="!no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline" style="color: inherit; text-decoration: none;" onclick="event.stopPropagation();">
               {{ sec.title }}
             </a>
           {% else %}
@@ -87,7 +146,7 @@
         <div class="px-0">
           {% for it in sec.items %}
           <a href="{{ it.url }}"
-             class="YY-MENU-DETAIL {% if it.active %}YY-MENU-DETAIL-ACTIVE{% endif %}">
+             class="YY-MENU-DETAIL {% if it.active %}YY-MENU-DETAIL-ACTIVE{% endif %} !no-underline hover:!no-underline focus:!no-underline focus-visible:!no-underline">
             {{ it.title }}
           </a>
           {% endfor %}
@@ -110,7 +169,20 @@
         {% if request.user.is_authenticated %}
           <span class="font-bold mb-2 inline-block">{{ request.user.workspace.company_name|default:"-" }}</span><br>
           {{ request.user.first_name|default:"-" }} {{ request.user.last_name|default:"-" }}<br>
-          {{ request.user.email|default:"-" }}
+          {{ request.user.email|default:"-" }}<br>
+          {% with at=request.user.workspace.access_type|default:"-" %}
+            {% trans "фулл" as access_full_ru %}
+            <span class="inline-block mt-2">
+              {% trans "Тип доступа:" %}
+              {% if at == "test" %}
+                {% trans "тестовый" %}
+              {% elif at == "full" or at == access_full_ru %}
+                {% trans "полный" %}
+              {% else %}
+                {{ at }}
+              {% endif %}
+            </span>
+          {% endwith %}
         {% endif %}
       </div>
     </div>

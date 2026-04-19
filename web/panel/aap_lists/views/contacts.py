@@ -13,6 +13,7 @@ from typing import Any, Optional
 from django.db import connection
 from django.http import HttpResponseRedirect
 from django.shortcuts import redirect, render
+from django.utils.translation import gettext as _trans
 
 from mailer_web.access import encode_id, resolve_pk_or_redirect
 from mailer_web.format_data import get_contact
@@ -228,7 +229,7 @@ def _lists_str(items: list[dict]) -> str:
         if not t:
             continue
         if bool(it.get("archived")):
-            parts.append(f"{t} (архив)")
+            parts.append(_trans("%(title)s (архив)") % {"title": t})
         else:
             parts.append(t)
     return ", ".join(parts)

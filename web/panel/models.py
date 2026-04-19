@@ -5,16 +5,17 @@
 from __future__ import annotations
 
 from django.db import models
+from django.utils.translation import gettext_lazy as _trans
 
 
 class GlobalTemplate(models.Model):
-    template_name = models.CharField(max_length=255, unique=True, help_text="Имя/код шаблона (уникально)")
+    template_name = models.CharField(max_length=255, unique=True, help_text=_trans("Имя/код шаблона (уникально)"))
 
-    html_template = models.TextField(blank=True, default="", help_text="HTML-шаблон (большой)")
-    html_content = models.TextField(blank=True, default="", help_text="HTML-контент (большой)")
+    html_template = models.TextField(blank=True, default="", help_text=_trans("HTML-шаблон (большой)"))
+    html_content = models.TextField(blank=True, default="", help_text=_trans("HTML-контент (большой)"))
 
-    styles = models.JSONField(default=dict, blank=True, help_text="Стили/настройки (JSON)")
-    buttons = models.JSONField(default=dict, blank=True, help_text="Кнопки/настройки (JSON)")
+    styles = models.JSONField(default=dict, blank=True, help_text=_trans("Стили/настройки (JSON)"))
+    buttons = models.JSONField(default=dict, blank=True, help_text=_trans("Кнопки/настройки (JSON)"))
 
     is_active = models.BooleanField(default=True)
     order = models.IntegerField(default=0)

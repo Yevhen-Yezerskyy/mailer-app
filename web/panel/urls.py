@@ -12,8 +12,10 @@ from django.urls.resolvers import URLPattern, URLResolver
 
 from panel.views import (
     dashboard,
+    overview_live_stats,
     stats_view,
-    stats_campaign_view,
+    stats_clicks_view,
+    stats_sending_view,
     switch_user_modal_view,
     switch_user_login_view,
     contact_modal_view,
@@ -54,8 +56,10 @@ def include_flagged(module_path: str):
 urlpatterns = [
     path("", RedirectView.as_view(url="overview/", permanent=False), name="dashboard"),
     path("overview/", _flag_view(dashboard), name="overview"),
+    path("overview/live-stats/", overview_live_stats, name="overview_live_stats"),
     path("stats/", _flag_view(stats_view), name="stats"),
-    path("stats/campaign/<str:uid>/", _flag_view(stats_campaign_view), name="stats_campaign"),
+    path("stats/clicks/", _flag_view(stats_clicks_view), name="stats_clicks"),
+    path("stats/sending/", _flag_view(stats_sending_view), name="stats_sending"),
     path("switch-user/modal/", _flag_view(switch_user_modal_view), name="switch_user_modal"),
     path("switch-user/login/", _flag_view(switch_user_login_view), name="switch_user_login"),
     path("contact/modal/", _flag_view(contact_modal_view), name="contact_modal"),

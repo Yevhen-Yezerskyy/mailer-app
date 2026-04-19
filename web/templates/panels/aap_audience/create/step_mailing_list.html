@@ -16,6 +16,18 @@
         <div class="flex items-center justify-between gap-4">
           <div>
             <div
+              data-mailing-top-state="completed"
+              class="flex items-center gap-2 flex-wrap"
+              {% if not mailing_step.is_completed %}style="display:none !important;"{% endif %}>
+              <span class="{{ flow_mode_class }} !w-[33ch] !mb-0">
+                {% trans "Рейтингование завершено" %}
+              </span>
+              <span class="{{ flow_mode_class }} !w-fit !mb-0">
+                <span>{% trans "Отрейтинговано контактов:" %}&nbsp;</span>
+                <span data-mailing-rated-count-value="1">{{ mailing_step.rated_count_display }}</span>
+              </span>
+            </div>
+            <div
               data-mailing-top-state="active"
               class="flex items-center gap-2 flex-wrap"
               {% if not mailing_step.is_running %}style="display:none !important;"{% endif %}>
@@ -31,7 +43,7 @@
             <div
               data-mailing-top-state="inactive"
               class="flex items-center gap-2 flex-wrap"
-              {% if mailing_step.is_running %}style="display:none !important;"{% endif %}>
+              {% if mailing_step.is_running or mailing_step.is_completed %}style="display:none !important;"{% endif %}>
               <span class="YY-STATUS_GRAY !w-[33ch] !mb-0">
                 {% trans "Рейтингование приостановлено" %}
               </span>
@@ -43,8 +55,8 @@
                 <button
                   type="button"
                   class="{{ flow_mode_class }} !w-fit !mb-0 !px-2 inline-flex items-center justify-center shrink-0"
-                  aria-label="Инфо"
-                  title="Инфо"
+                  aria-label="{% trans 'Инфо' %}"
+                  title="{% trans 'Инфо' %}"
                   data-yy-modal="url={{ mailing_step.pause_info_modal_url|escape }}">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0 block" aria-hidden="true">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
@@ -70,17 +82,17 @@
         <form method="post">
           {% csrf_token %}
           <div class="YY-STATUS_RED !mb-3">
-            Задача на рейтингование и сбор контактов была изменена.
+            {% trans "Задача на рейтингование и сбор контактов была изменена." %}
           </div>
           <div class="grid grid-cols-3 gap-4">
             <button type="submit" name="action" value="contacts_rating_recalc" class="YY-BUTTON_MAIN_FULL">
-              Пересчитать рейтинги
+              {% trans "Пересчитать рейтинги" %}
             </button>
             <button type="submit" name="action" value="contacts_rating_restart" class="YY-BUTTON_MAIN_FULL">
-              Начать сбор контактов заново
+              {% trans "Начать сбор контактов заново" %}
             </button>
             <button type="submit" name="action" value="contacts_rating_ignore_hash" class="YY-BUTTON_MAIN_FULL">
-              Игнорировать
+              {% trans "Игнорировать" %}
             </button>
           </div>
         </form>
@@ -99,12 +111,12 @@
       style="position:absolute;top:10px;right:10px;">✕</button>
     <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
       <div class="YY-STATUS_BLUE !w-fit !mb-3">{% trans "Рейтинг Pair-R" %}</div>
-      <div class="YY-TEXT !mb-1">Сбор контактов производится по паре «Город — Категория».</div>
-      <div class="YY-TEXT">Для обеспечения оптимального порядка сбора контактов (сначала — самые лучшие) категориям и городам присвоен рейтинг.</div>
-      <div class="YY-TEXT !mb-1">Категориям присвоен рейтинг от 1 до 20, где 1 — лучший.</div>
-      <div class="YY-TEXT">Городам присвоен рейтинг от 1 до 100, где 1 — лучший.</div>
-      <div class="YY-TEXT">Рейтинг «Pair-R» — это произведение рейтинга категории и рейтинга города. Именно по нему сортируются пары «Город — Категория» при определении порядка сбора контактов.</div>
-      <div class="YY-TEXT !mb-0">На этапе формирования списка рассылки каждый контакт оценивается индивидуально, и ему присваивается рейтинг от 1 до 100, где 1 — лучший. Таким образом, рейтинг Pair-R — это не рейтинг контакта, а индикатор порядка сбора данных.</div>
+      <div class="YY-TEXT !mb-1">{% trans "Сбор контактов производится по паре «Город — Категория»." %}</div>
+      <div class="YY-TEXT">{% trans "Для обеспечения оптимального порядка сбора контактов (сначала — самые лучшие) категориям и городам присвоен рейтинг." %}</div>
+      <div class="YY-TEXT !mb-1">{% trans "Категориям присвоен рейтинг от 1 до 20, где 1 — лучший." %}</div>
+      <div class="YY-TEXT">{% trans "Городам присвоен рейтинг от 1 до 100, где 1 — лучший." %}</div>
+      <div class="YY-TEXT">{% trans "Рейтинг «Pair-R» — это произведение рейтинга категории и рейтинга города. Именно по нему сортируются пары «Город — Категория» при определении порядка сбора контактов." %}</div>
+      <div class="YY-TEXT !mb-0">{% trans "На этапе формирования списка рассылки каждый контакт оценивается индивидуально, и ему присваивается рейтинг от 1 до 100, где 1 — лучший. Таким образом, рейтинг Pair-R — это не рейтинг контакта, а индикатор порядка сбора данных." %}</div>
     </div>
   </div>
 </template>
@@ -117,14 +129,14 @@
       data-yy-modal-close
       style="position:absolute;top:10px;right:10px;">✕</button>
     <div class="overflow-auto mt-10 mb-10 max-h-[calc(85vh-5rem)]">
-      <div class="YY-STATUS_BLUE !w-fit !mb-3">Рейтинг контакта Con-R</div>
-      <div class="YY-TEXT !mb-1">Рейтинг контакта рассчитывается индивидуально для каждого контакта в списке рассылки.</div>
-      <div class="YY-TEXT !mb-1">Он определяет соответствие данных контакта поставленной задаче в списке (продукт / компания / география).</div>
-      <div class="YY-TEXT !mb-1">Рейтинг присваивается от 1 до 100, где 1 — наилучший.</div>
-      <div class="YY-TEXT !mb-1">Для формирования списка рассылки используется рейтинг отсечения.</div>
-      <div class="YY-TEXT !mb-1">Контакты с рейтингом хуже (больше) рейтинга отсечения в список рассылки не включаются.</div>
-      <div class="YY-TEXT !mb-1">Контакты с успешным (меньше или равным рейтингу отсечения) рейтингом включаются в список.</div>
-      <div class="YY-TEXT !mb-0">Вы можете изменить рейтинг отсечения (возможные значения — от 20 до 60). Чем больше рейтинг отсечения, тем выше вероятность включения ненужных контактов в список рассылки. Чем меньше рейтинг отсечения, тем выше вероятность пропустить действительно нужные контакты.</div>
+      <div class="YY-STATUS_BLUE !w-fit !mb-3">{% trans "Рейтинг контакта Con-R" %}</div>
+      <div class="YY-TEXT !mb-1">{% trans "Рейтинг контакта рассчитывается индивидуально для каждого контакта в списке рассылки." %}</div>
+      <div class="YY-TEXT !mb-1">{% trans "Он определяет соответствие данных контакта поставленной задаче в списке (продукт / компания / география)." %}</div>
+      <div class="YY-TEXT !mb-1">{% trans "Рейтинг присваивается от 1 до 100, где 1 — наилучший." %}</div>
+      <div class="YY-TEXT !mb-1">{% trans "Для формирования списка рассылки используется рейтинг отсечения." %}</div>
+      <div class="YY-TEXT !mb-1">{% trans "Контакты с рейтингом хуже (больше) рейтинга отсечения в список рассылки не включаются." %}</div>
+      <div class="YY-TEXT !mb-1">{% trans "Контакты с успешным (меньше или равным рейтингу отсечения) рейтингом включаются в список." %}</div>
+      <div class="YY-TEXT !mb-0">{% trans "Вы можете изменить рейтинг отсечения (возможные значения — от 20 до 60). Чем больше рейтинг отсечения, тем выше вероятность включения ненужных контактов в список рассылки. Чем меньше рейтинг отсечения, тем выше вероятность пропустить действительно нужные контакты." %}</div>
     </div>
   </div>
 </template>
@@ -165,8 +177,10 @@
 
     function applyStatus(payload) {
       const isRunning = payload && payload.is_running === true;
-      setVisible(document.querySelector("[data-mailing-top-state='active']"), isRunning);
-      setVisible(document.querySelector("[data-mailing-top-state='inactive']"), !isRunning);
+      const isCompleted = payload && payload.is_completed === true;
+      setVisible(document.querySelector("[data-mailing-top-state='completed']"), isCompleted);
+      setVisible(document.querySelector("[data-mailing-top-state='active']"), !isCompleted && isRunning);
+      setVisible(document.querySelector("[data-mailing-top-state='inactive']"), !isCompleted && !isRunning);
       const countText = String((payload && payload.rated_count_display) || "0");
       document.querySelectorAll("[data-mailing-rated-count-value='1']").forEach(function (node) {
         node.textContent = countText;

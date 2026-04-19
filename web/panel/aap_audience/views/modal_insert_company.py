@@ -3,7 +3,7 @@
 # PURPOSE: Modal list of existing audience tasks with saved company descriptions for insertion into the flow.
 
 from django.shortcuts import render
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _trans
 
 from mailer_web.access import decode_id
 from panel.aap_audience.models import AudienceTask
@@ -35,7 +35,7 @@ def modal_insert_company_view(request):
         company_value = (task.source_company or "").strip()
         if not company_value:
             continue
-        title_value = (task.title or "").strip() or f"{_('Список рассылки')} #{int(task.id)}"
+        title_value = (task.title or "").strip() or f"{_trans('Список рассылки')} #{int(task.id)}"
         items.append(
             {
                 "id": int(task.id),

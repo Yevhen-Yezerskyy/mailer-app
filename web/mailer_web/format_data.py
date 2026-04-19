@@ -623,7 +623,7 @@ def get_contact_raw(aggr_id: int) -> Optional[Dict[str, Any]]:
                 return None
 
             cd = _parse_company_data(row[2])
-            _ = _must_norm(cd)  # validate (катастрофа если нет/пустой)
+            _unused_value = _must_norm(cd)  # validate (катастрофа если нет/пустой)
 
             return {
                 "aggr_id": int(row[0]),

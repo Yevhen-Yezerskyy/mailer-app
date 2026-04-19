@@ -9,7 +9,7 @@ import re
 from django import forms
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_lazy as _trans
 
 from mailer_web.models import ClientUser
 
@@ -37,20 +37,20 @@ class RegistrationForm(forms.Form):
         if self.is_edit:
             self.fields["password"].required = False
             self.fields["password2"].required = False
-        self.fields["company_name"].widget.attrs.update({"autocomplete": "off", "placeholder": _("Название компании")})
-        self.fields["company_address"].widget.attrs.update({"autocomplete": "off", "placeholder": _("Адрес компании")})
-        self.fields["last_name"].widget.attrs.update({"autocomplete": "off", "placeholder": _("Фамилия")})
-        self.fields["first_name"].widget.attrs.update({"autocomplete": "off", "placeholder": _("Имя")})
-        self.fields["phone"].widget.attrs.update({"autocomplete": "off", "placeholder": _("Телефон")})
-        self.fields["position"].widget.attrs.update({"autocomplete": "off", "placeholder": _("Должность")})
-        self.fields["email"].widget.attrs.update({"autocomplete": "username", "placeholder": _("Email / Логин")})
-        self.fields["password"].widget.attrs.update({"autocomplete": "new-password", "placeholder": _("Пароль")})
-        self.fields["password2"].widget.attrs.update({"autocomplete": "new-password", "placeholder": _("Подтверждение пароля")})
+        self.fields["company_name"].widget.attrs.update({"autocomplete": "off", "placeholder": _trans("Название компании")})
+        self.fields["company_address"].widget.attrs.update({"autocomplete": "off", "placeholder": _trans("Адрес компании")})
+        self.fields["last_name"].widget.attrs.update({"autocomplete": "off", "placeholder": _trans("Фамилия")})
+        self.fields["first_name"].widget.attrs.update({"autocomplete": "off", "placeholder": _trans("Имя")})
+        self.fields["phone"].widget.attrs.update({"autocomplete": "off", "placeholder": _trans("Телефон")})
+        self.fields["position"].widget.attrs.update({"autocomplete": "off", "placeholder": _trans("Должность")})
+        self.fields["email"].widget.attrs.update({"autocomplete": "username", "placeholder": _trans("Email / Логин")})
+        self.fields["password"].widget.attrs.update({"autocomplete": "new-password", "placeholder": _trans("Пароль")})
+        self.fields["password2"].widget.attrs.update({"autocomplete": "new-password", "placeholder": _trans("Подтверждение пароля")})
 
     def clean_phone(self):
         v = (self.cleaned_data.get("phone") or "").strip()
         if not _PHONE_RE.match(v):
-            raise ValidationError(_("Неверный формат телефона"))
+            raise ValidationError(_trans("Неверный формат телефона"))
         return v
 
     def clean_email(self):
@@ -59,7 +59,7 @@ class RegistrationForm(forms.Form):
         if self.existing_user is not None:
             qs = qs.exclude(id=self.existing_user.id)
         if qs.exists():
-            raise ValidationError(_("Пользователь с таким email уже существует"))
+            raise ValidationError(_trans("Пользователь с таким email уже существует"))
         return email
 
     def clean(self):
@@ -71,11 +71,11 @@ class RegistrationForm(forms.Form):
             return cleaned
 
         if (p1 and not p2) or (p2 and not p1):
-            self.add_error("password2", _("Пароли не совпадают"))
+            self.add_error("password2", _trans("Пароли не совпадают"))
             return cleaned
 
         if p1 and p2 and p1 != p2:
-            self.add_error("password2", _("Пароли не совпадают"))
+            self.add_error("password2", _trans("Пароли не совпадают"))
 
         if p1:
             try:
@@ -92,7 +92,7 @@ class PasswordResetRequestForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["email"].widget.attrs.update(
-            {"autocomplete": "username", "placeholder": _("Email / Логин")}
+            {"autocomplete": "username", "placeholder": _trans("Email / Логин")}
         )
 
 
@@ -103,10 +103,10 @@ class PasswordResetConfirmForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["password"].widget.attrs.update(
-            {"autocomplete": "new-password", "placeholder": _("Новый пароль")}
+            {"autocomplete": "new-password", "placeholder": _trans("Новый пароль")}
         )
         self.fields["password2"].widget.attrs.update(
-            {"autocomplete": "new-password", "placeholder": _("Подтверждение пароля")}
+            {"autocomplete": "new-password", "placeholder": _trans("Подтверждение пароля")}
         )
 
     def clean(self):
@@ -115,7 +115,7 @@ class PasswordResetConfirmForm(forms.Form):
         p2 = cleaned.get("password2") or ""
 
         if p1 and p2 and p1 != p2:
-            self.add_error("password2", _("Пароли не совпадают"))
+            self.add_error("password2", _trans("Пароли не совпадают"))
 
         if p1:
             try:

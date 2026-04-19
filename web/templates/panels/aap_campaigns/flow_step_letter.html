@@ -87,7 +87,7 @@
 
               <div class="mt-auto pt-5">
                 {% if flow_letter_template_changed %}
-                  <div class="YY-STATUS_RED !mb-3">Шаблон письма был изменен</div>
+                  <div class="YY-STATUS_RED !mb-3">{% trans "Шаблон письма был изменен" %}</div>
                 {% endif %}
                 <div class="grid grid-cols-2 gap-3">
                   <button type="submit" name="action" value="save_letter" class="YY-BUTTON_MAIN">{% trans "Сохранить" %}</button>
