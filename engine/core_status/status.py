@@ -16,7 +16,7 @@ from engine.common.db import get_connection
 from engine.common.db import fetch_all
 from engine.common.db import fetch_one
 from engine.common.email_template import _is_de_public_holiday
-from engine.core_status.is_active import is_more_needed
+from engine.core_status.is_active import clear_is_more_needed_full_cache, is_more_needed
 
 _TZ_BERLIN = ZoneInfo("Europe/Berlin")
 _CACHE_TTL_MIN_SEC = 8 * 60
@@ -593,6 +593,13 @@ def run_campaign_status_once() -> dict[str, int | str]:
                 SELECT *
                 FROM unnest(%s::bigint[], %s::boolean[], %s::integer[], %s::integer[])
             ),
+            changed_to_send AS (
+                SELECT c.sending_list_id AS task_id
+                FROM public.campaigns_campaigns c
+                JOIN data
+                  ON data.campaign_id = c.id
+                WHERE c.to_send_num IS DISTINCT FROM data.to_send_value
+            ),
             upd AS (
                 UPDATE public.campaigns_campaigns c
                 SET active = data.active_value,
@@ -608,13 +615,22 @@ def run_campaign_status_once() -> dict[str, int | str]:
                   )
                 RETURNING c.id
             )
-            SELECT COUNT(*)::int
-            FROM upd
+            SELECT
+                (SELECT COUNT(*)::int FROM upd),
+                (
+                    SELECT ARRAY_REMOVE(ARRAY_AGG(DISTINCT task_id), NULL)::bigint[]
+                    FROM changed_to_send
+                )
             """,
             [campaign_ids, active_values, interval_values, to_send_values],
         )
-        updated_cnt = int((cur.fetchone() or [0])[0] or 0)
+        row = cur.fetchone() or [0, []]
+        updated_cnt = int(row[0] or 0)
+        changed_to_send_task_ids = [int(task_id) for task_id in (row[1] or []) if task_id is not None]
         conn.commit()
+
+    for task_id in changed_to_send_task_ids:
+        clear_is_more_needed_full_cache(int(task_id))
 
     active_false_cnt = int(len(campaign_ids) - active_true_cnt)
     return {
