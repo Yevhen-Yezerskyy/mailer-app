@@ -282,6 +282,10 @@ def public_index(request):
     return render(request, "public/index.html")
 
 
+def public_test(request):
+    return render(request, "public/test.html")
+
+
 def public_diag_start(request):
     request_id = str(uuid.uuid4())
     diag_session = _diag_session_payload(request)

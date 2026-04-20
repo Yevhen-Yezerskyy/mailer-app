@@ -1,0 +1,50 @@
+{% load static %}
+{% load i18n %}
+<!doctype html>
+<!-- FILE: web/templates/public_base.html -->
+<html lang="{{ request.LANGUAGE_CODE|default:'de' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Test{% endblock %}</title>
+  <link rel="icon" href="{% static 'img/favicon.ico' %}">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{% static 'css/styles_public.css' %}">
+</head>
+<body class="min-h-screen">
+  <header class="public-header">
+    <div class="public-header__shell">
+      <div class="public-header__row">
+        <a href="/" class="public-brand" aria-label="Serenity">
+          <img class="public-brand__logo" src="{% static 'img/logo.main.svg' %}" alt="Serenity Mail">
+          <span class="public-brand__mail">MAIL</span>
+        </a>
+
+        <div class="public-header__actions">
+          <form method="post" action="{% url 'set_language' %}" class="public-lang" aria-label="Language switch">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            {% for lang in language_switcher %}
+              {% if not forloop.first %}<span class="public-lang__sep" aria-hidden="true">|</span>{% endif %}
+              {% if lang.active %}
+                <span class="public-lang__item public-lang__item--active">{{ lang.label }}</span>
+              {% else %}
+                <button type="submit" name="language" value="{{ lang.code }}" class="public-lang__item">{{ lang.label }}</button>
+              {% endif %}
+            {% endfor %}
+          </form>
+
+          <nav class="public-links" aria-label="Account links">
+            <a href="{% url 'register' %}" class="public-links__item">{% trans "Регистрация" %}</a>
+            <a href="{% url 'login' %}" class="public-links__item">{% trans "Вход для клиентов" %}</a>
+          </nav>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="public-main">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

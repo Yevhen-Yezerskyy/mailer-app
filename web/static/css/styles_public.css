@@ -1,0 +1,260 @@
+/* FILE: web/static/css/styles_public.css */
+/* DATE: 2026-04-19 */
+/* PURPOSE: Base styles for new public external pages. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: linear-gradient(
+    90deg,
+    #0a6f8f 0%,
+    #1786ab 30%,
+    #3fb3d8 50%,
+    #1786ab 70%,
+    #0a6f8f 100%
+  );
+  font-family: "Times New Roman", Times, serif;
+  color: #006991;
+}
+
+.public-header {
+  padding: 22px 20px 0;
+}
+
+.public-header__shell {
+  max-width: 1300px;
+  margin: 0 auto;
+  background: #d9e5ec;
+  border: 1px solid #4d839a;
+  box-shadow: 0 10px 24px rgba(2, 42, 57, 0.35);
+}
+
+.public-header__row {
+  --public-brand-row-h: 60px;
+  --public-brand-scale: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 15px 31px;
+  letter-spacing: 0.2px;
+}
+
+.public-brand {
+  display: flex;
+  align-items: center;
+  height: calc(var(--public-brand-row-h) * var(--public-brand-scale));
+  min-width: 280px;
+  text-decoration: none;
+}
+
+.public-brand__logo {
+  display: block;
+  height: calc(41px * var(--public-brand-scale));
+  width: auto;
+  max-width: 100%;
+}
+
+.public-brand__mail {
+  display: block;
+  margin-left: calc(3.75rem * var(--public-brand-scale));
+  color: #006991;
+  font-family: "Times New Roman", Times, serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: calc(60px * var(--public-brand-scale));
+  height: calc(var(--public-brand-row-h) * var(--public-brand-scale));
+  line-height: calc(var(--public-brand-row-h) * var(--public-brand-scale));
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+.public-header__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 45px;
+  min-height: 45px;
+}
+
+.public-lang {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0;
+  line-height: 1;
+}
+
+.public-lang__sep {
+  display: block;
+  width: 1px;
+  height: 17px;
+  background: #006991;
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+  overflow: hidden;
+}
+
+.public-lang__item {
+  position: relative;
+  border: 0;
+  background: transparent;
+  margin: 0;
+  padding: 0 6px;
+  color: #006991;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.public-lang__item:hover {
+  color: #ffffff;
+  z-index: 0;
+}
+
+.public-lang__item:hover::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  bottom: -1px;
+  background: #006991;
+  z-index: -1;
+}
+
+.public-lang__item--active {
+  background: transparent;
+  color: #ffffff;
+  z-index: 0;
+}
+
+.public-lang__item--active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  bottom: -1px;
+  background: #006991;
+  z-index: -1;
+}
+
+.public-lang__item--active:hover {
+  color: #ffffff;
+}
+
+.public-links {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 28px;
+  margin: 0;
+  line-height: 1;
+}
+
+.public-links__item {
+  color: #006991;
+  text-decoration: none;
+  font-size: 15px;
+  line-height: 1;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.public-links__item:hover {
+  color: #7d4004;
+}
+
+.public-main {
+  width: min(1300px, 100% - 40px);
+  margin: 22px auto 0;
+}
+
+@media (max-width: 980px) {
+  .public-header__row {
+    --public-brand-scale: 0.9;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 20px;
+  }
+
+  .public-brand {
+    width: 100%;
+    justify-content: center;
+    height: auto;
+    min-width: 0;
+  }
+
+  .public-header__actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    height: auto;
+    min-height: 0;
+    gap: 12px;
+  }
+
+  .public-lang {
+    justify-content: center;
+  }
+
+  .public-links {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 620px) {
+  .public-header__row {
+    --public-brand-scale: 0.6;
+  }
+
+  .public-header {
+    padding: 14px 12px 0;
+  }
+
+  .public-header__row {
+    gap: 10px;
+    padding: 15px 13px;
+  }
+
+  .public-lang {
+    gap: 9px;
+  }
+
+  .public-lang__item {
+    font-size: 15px;
+  }
+
+  .public-links {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .public-links__item {
+    text-align: center;
+  }
+
+  .public-main {
+    width: min(1300px, 100% - 24px);
+    margin-top: 14px;
+  }
+}

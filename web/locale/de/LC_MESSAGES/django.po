@@ -1112,7 +1112,7 @@ msgstr "Kampagne starten"
 #: templates/panels/overview.html:199 templates/panels/overview.html:334
 #: templates/panels/overview.html:443
 msgid "Кампания запущена"
-msgstr "Die Kampagne wurde gestartet"
+msgstr "Kampagne gestartet"
 
 #: templates/panels/aap_campaigns/_campaigns_table.html:71
 #: templates/panels/aap_campaigns/_campaigns_table.html:86
