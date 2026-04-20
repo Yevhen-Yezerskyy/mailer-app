@@ -148,3 +148,13 @@ a:focus-visible {
   color: #016b09 !important;
   text-decoration: underline !important;
 }
+
+/* Firefox: prevent table-cell height collapse for panel cards. */
+@supports (-moz-appearance: none) {
+  .YY-MAIN_TOP_LEFT_TD,
+  .YY-MAIN_TOP_RIGHT_TD,
+  .YY-MAIN_TOP_TD,
+  .YY-MAIN_BOTTOM_TD {
+    height: auto !important;
+  }
+}

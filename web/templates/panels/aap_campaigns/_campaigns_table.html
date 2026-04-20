@@ -10,11 +10,11 @@
         <table class="w-full text-left">
           <thead>
             <tr class="YY-TH_TR">
-              <th class="YY-TH_TH w-[100%]">{% trans "Кампания" %}</th>
-              <th class="YY-TH_TH">{% trans "Статус" %}</th>
-              <th class="YY-TH_TH">{% trans "Отправлено" %}</th>
-              <th class="YY-TH_TH">{% trans "Письмо" %}</th>
-              <th class="YY-TH_TH text-right">
+              <th class="YY-TH_TH w-[100%] whitespace-nowrap">{% trans "Кампания" %}</th>
+              <th class="YY-TH_TH whitespace-nowrap">{% trans "Статус" %}</th>
+              <th class="YY-TH_TH whitespace-nowrap">{% trans "Отправлено" %}</th>
+              <th class="YY-TH_TH whitespace-nowrap">{% trans "Письмо" %}</th>
+              <th class="YY-TH_TH text-right whitespace-nowrap">
                 {% if show_archive %}
                   <a href="{% url 'campaigns:campaigns' %}" class="inline-flex items-center gap-1 text-[#8e0000] !font-normal underline">
                     <span>{% trans "Активные" %}</span>
