@@ -65,7 +65,7 @@ def _insert_sending_log_row(
     *,
     log_id: int,
     campaign_id: int,
-    sending_list_id: int,
+    aggr_contact_cb_id: int,
     status: str,
     payload: Dict[str, Any],
     processed: bool = True,
@@ -76,7 +76,7 @@ def _insert_sending_log_row(
             INSERT INTO public.sending_log (
                 id,
                 campaign_id,
-                sending_list_id,
+                aggr_contact_cb_id,
                 processed,
                 status,
                 data,
@@ -109,7 +109,7 @@ def _insert_sending_log_row(
         (
             int(log_id),
             int(campaign_id),
-            int(sending_list_id),
+            int(aggr_contact_cb_id),
             bool(processed),
             str(status),
             json.dumps(payload, ensure_ascii=False),
@@ -193,6 +193,7 @@ def send_one(
     *,
     campaign: Dict[str, Any],
     contact: Optional[Dict[str, Any]] = None,
+    aggr_contact_cb_id: Optional[int] = None,
     sending_list_id: Optional[int] = None,
     to_email_override: Optional[str] = None,
     record_sent: bool = True,
@@ -200,7 +201,9 @@ def send_one(
     campaign_obj = safe_dict(campaign)
     campaign_id = _as_pos_int(campaign_obj.get("id"))
     mailbox_id = _as_pos_int(campaign_obj.get("mailbox_id"))
-    sending_list_id_int = _as_pos_int(sending_list_id)
+    aggr_contact_cb_id_int = _as_pos_int(
+        aggr_contact_cb_id if aggr_contact_cb_id is not None else sending_list_id
+    )
 
     ready_html = campaign_obj.get("ready_content")
     subjects = campaign_obj.get("subjects")
@@ -230,8 +233,8 @@ def send_one(
         bad_campaign_reason = ""
         if campaign_id is None:
             bad_campaign_reason = "CAMPAIGN_ID_MISSING_OR_INVALID"
-        elif sending_list_id_int is None:
-            bad_campaign_reason = "SENDING_LIST_ID_MISSING_OR_INVALID"
+        elif aggr_contact_cb_id_int is None:
+            bad_campaign_reason = "AGGR_CONTACT_CB_ID_MISSING_OR_INVALID"
         elif mailbox_id is None:
             bad_campaign_reason = "MAILBOX_ID_MISSING_OR_INVALID"
         elif not html_tpl:
@@ -248,7 +251,7 @@ def send_one(
             _insert_sending_log_row(
                 log_id=int(log_id),
                 campaign_id=int(campaign_id or _BAD_ID_SENTINEL),
-                sending_list_id=int(sending_list_id_int or _BAD_ID_SENTINEL),
+                aggr_contact_cb_id=int(aggr_contact_cb_id_int or _BAD_ID_SENTINEL),
                 status="BAD_CAMPAIGN_DATA",
                 payload={
                     "reason": bad_campaign_reason,
@@ -267,7 +270,7 @@ def send_one(
             _insert_sending_log_row(
                 log_id=int(log_id),
                 campaign_id=int(campaign_id),
-                sending_list_id=int(sending_list_id_int),
+                aggr_contact_cb_id=int(aggr_contact_cb_id_int),
                 status="BAD_CONTACT_IN_DATABASE",
                 payload={
                     "reason": "EMAIL_MISSING_OR_EMPTY",
@@ -313,7 +316,7 @@ def send_one(
         _insert_sending_log_row(
             log_id=int(log_id),
             campaign_id=int(campaign_id),
-            sending_list_id=int(sending_list_id_int),
+            aggr_contact_cb_id=int(aggr_contact_cb_id_int),
             status="BAD_CONTACT_IN_DATABASE",
             payload={
                 "reason": "CONTACT_BLOCKED_OR_WRONG_EMAIL",
@@ -345,7 +348,7 @@ def send_one(
             _insert_sending_log_row(
                 log_id=int(log_id),
                 campaign_id=int(campaign_id),
-                sending_list_id=int(sending_list_id_int),
+                aggr_contact_cb_id=int(aggr_contact_cb_id_int),
                 status="SEND",
                 payload=payload,
             )
@@ -366,7 +369,7 @@ def send_one(
                 _insert_sending_log_row(
                     log_id=int(log_id),
                     campaign_id=int(campaign_id),
-                    sending_list_id=int(sending_list_id_int),
+                    aggr_contact_cb_id=int(aggr_contact_cb_id_int),
                     status="BAD_ADDRESS",
                     payload={
                         "reason": "SMTP_451_LIMIT_REACHED",
@@ -383,7 +386,7 @@ def send_one(
         _insert_sending_log_row(
             log_id=int(log_id),
             campaign_id=int(campaign_id),
-            sending_list_id=int(sending_list_id_int),
+            aggr_contact_cb_id=int(aggr_contact_cb_id_int),
             status=status,
             payload=payload,
         )

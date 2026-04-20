@@ -41,7 +41,7 @@ class SenderRuntime:
 @dataclass(frozen=True)
 class SendCandidate:
     campaign_id: int
-    sending_list_id: int
+    aggr_contact_cb_id: int
     aggr_contact_id: Optional[int]
     email: str
     company_name: str
@@ -101,7 +101,7 @@ def _pending_by_campaign(campaign_ids: List[int]) -> Dict[int, int]:
         parent_send AS (
           SELECT
             lg.campaign_id AS parent_campaign_id,
-            lg.sending_list_id,
+            lg.aggr_contact_cb_id,
             MAX(COALESCE(lg.processed_at, lg.created_at)) AS parent_sent_at
           FROM public.sending_log lg
           JOIN (
@@ -112,7 +112,7 @@ def _pending_by_campaign(campaign_ids: List[int]) -> Dict[int, int]:
             ON p.campaign_parent_id = lg.campaign_id
           WHERE lg.processed = true
             AND lg.status = 'SEND'
-          GROUP BY lg.campaign_id, lg.sending_list_id
+          GROUP BY lg.campaign_id, lg.aggr_contact_cb_id
         )
         SELECT
           sc.id AS campaign_id,
@@ -126,10 +126,10 @@ def _pending_by_campaign(campaign_ids: List[int]) -> Dict[int, int]:
           ON ac.id = sl.aggr_contact_cb_id
         LEFT JOIN parent_send ps
           ON ps.parent_campaign_id = sc.campaign_parent_id
-         AND ps.sending_list_id = sl.aggr_contact_cb_id
+         AND ps.aggr_contact_cb_id = sl.aggr_contact_cb_id
         LEFT JOIN public.sending_log lg
           ON lg.campaign_id = sc.id
-         AND lg.sending_list_id = sl.aggr_contact_cb_id
+         AND lg.aggr_contact_cb_id = sl.aggr_contact_cb_id
         WHERE COALESCE(sl.removed, false) = false
           AND sl.rate IS NOT NULL
           AND sl.rate <= t.rate_limit
@@ -169,7 +169,7 @@ def _candidate_batch_for_campaign(campaign_id: int, *, limit: int = 200) -> List
         parent_send AS (
           SELECT
             lg.campaign_id AS parent_campaign_id,
-            lg.sending_list_id,
+            lg.aggr_contact_cb_id,
             MAX(COALESCE(lg.processed_at, lg.created_at)) AS parent_sent_at
           FROM public.sending_log lg
           JOIN selected_campaign sc
@@ -177,10 +177,10 @@ def _candidate_batch_for_campaign(campaign_id: int, *, limit: int = 200) -> List
            AND lg.campaign_id = sc.campaign_parent_id
           WHERE lg.processed = true
             AND lg.status = 'SEND'
-          GROUP BY lg.campaign_id, lg.sending_list_id
+          GROUP BY lg.campaign_id, lg.aggr_contact_cb_id
         )
         SELECT
-          sl.aggr_contact_cb_id AS sending_list_id,
+          sl.aggr_contact_cb_id AS aggr_contact_cb_id,
           sl.aggr_contact_cb_id AS aggr_contact_id,
           COALESCE(lower(trim(ac.email)), '') AS email,
           COALESCE(ac.company_name, '') AS company_name,
@@ -194,10 +194,10 @@ def _candidate_batch_for_campaign(campaign_id: int, *, limit: int = 200) -> List
           ON ac.id = sl.aggr_contact_cb_id
         LEFT JOIN parent_send ps
           ON ps.parent_campaign_id = sc.campaign_parent_id
-         AND ps.sending_list_id = sl.aggr_contact_cb_id
+         AND ps.aggr_contact_cb_id = sl.aggr_contact_cb_id
         LEFT JOIN public.sending_log lg
           ON lg.campaign_id = sc.id
-         AND lg.sending_list_id = sl.aggr_contact_cb_id
+         AND lg.aggr_contact_cb_id = sl.aggr_contact_cb_id
         WHERE COALESCE(sl.removed, false) = false
           AND sl.rate IS NOT NULL
           AND sl.rate <= t.rate_limit
@@ -220,12 +220,12 @@ def _candidate_batch_for_campaign(campaign_id: int, *, limit: int = 200) -> List
         [int(campaign_id), int(limit)],
     )
     out: List[SendCandidate] = []
-    for sending_list_id, aggr_contact_id, email, company_name, company_data in rows:
+    for aggr_contact_cb_id, aggr_contact_id, email, company_name, company_data in rows:
         norm = safe_dict(safe_dict(company_data).get("norm"))
         out.append(
             SendCandidate(
                 campaign_id=int(campaign_id),
-                sending_list_id=int(sending_list_id),
+                aggr_contact_cb_id=int(aggr_contact_cb_id),
                 aggr_contact_id=int(aggr_contact_id) if aggr_contact_id is not None else None,
                 email=str(email or "").strip().lower(),
                 company_name=str(company_name or "").strip(),
@@ -473,7 +473,7 @@ def _sender_loop(
             state="SENDING",
             campaign_id=candidate.campaign_id,
             reason=(
-                f"campaign_id={candidate.campaign_id} sending_list_id={candidate.sending_list_id} "
+                f"campaign_id={candidate.campaign_id} aggr_contact_cb_id={candidate.aggr_contact_cb_id} "
                 f"interval_ms={interval_ms}"
             ),
         )
@@ -490,7 +490,7 @@ def _sender_loop(
                 send_one(
                     campaign=campaign_payload,
                     contact=contact,
-                    sending_list_id=int(candidate.sending_list_id),
+                    aggr_contact_cb_id=int(candidate.aggr_contact_cb_id),
                     record_sent=True,
                 )
             )
