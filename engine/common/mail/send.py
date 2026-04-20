@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import random
+import re
 from typing import Any, Dict, List, Optional
 
 from engine.common import db
@@ -23,6 +24,25 @@ _SMTP_451_STATE_TTL_SEC = 7 * 24 * 60 * 60
 _SMTP_451_MAX_FAILS_PER_EMAIL = 3
 _SMTP_451_EMAIL_WRONG_REASON = "451 TMP"
 _BAD_ID_SENTINEL = 0
+_BODY_CLOSE_RE = re.compile(r"(?is)</body\s*>")
+
+
+def _inject_hidden_mailer_table(body_html: str, mailer_id: int) -> str:
+    html = str(body_html or "")
+    marker = (
+        '<table role="presentation" aria-hidden="true" '
+        'style="display:none!important;visibility:hidden;opacity:0;'
+        'max-height:0;max-width:0;overflow:hidden;mso-hide:all;">'
+        "<tr><td>"
+        "X-Mailer-App: Serenity Mailer\n"
+        f"X-Mailer-Id: {int(mailer_id)}"
+        "</td></tr></table>"
+    )
+    matches = list(_BODY_CLOSE_RE.finditer(html))
+    if not matches:
+        return html + marker
+    pos = matches[-1].start()
+    return html[:pos] + marker + html[pos:]
 
 
 def _sending_log_seq_name() -> str:
@@ -300,7 +320,9 @@ def send_one(
         vv = str(v or "").strip()
         if kk and vv:
             headers[kk] = vv
-    headers["X-Mailer-Id"] = str(log_id if bool(record_sent) else 0)
+    mailer_id_value = int(log_id if bool(record_sent) else 0)
+    headers["X-Mailer-Id"] = str(mailer_id_value)
+    body_html = _inject_hidden_mailer_table(body_html, mailer_id_value)
 
     aggr_contact_id_raw = contact_obj.get("aggr_contact_id")
     aggr_contact_id = _as_pos_int(aggr_contact_id_raw)
