@@ -1390,7 +1390,7 @@ def campaigns_flow_view(request, *, step_key: str, item_id: str = ""):
                         send_one(
                             campaign=campaign_payload,
                             contact=test_contact,
-                            sending_list_id=int(test_sending_list_id),
+                            aggr_contact_cb_id=int(test_sending_list_id),
                             to_email_override=test_email,
                             record_sent=False,
                         )

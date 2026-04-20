@@ -148,7 +148,7 @@ def _views_counts_by_campaign_ids(campaign_ids):
     with connection.cursor() as cur:
         cur.execute(
             """
-            SELECT lg.campaign_id, COUNT(DISTINCT lg.sending_list_id) AS views_cnt
+            SELECT lg.campaign_id, COUNT(DISTINCT lg.aggr_contact_cb_id) AS views_cnt
             FROM public.mailbox_stats ms
             JOIN public.sending_log lg
               ON lg.id = ms.letter_id
@@ -174,7 +174,7 @@ def _overview_site_click_rows(ws_id, limit: int = 8):
               c.id AS campaign_id,
               COALESCE(NULLIF(trim(c.title), ''), '#' || c.id::text) AS campaign_title,
               LOWER(COALESCE(t.type, '')) AS campaign_type,
-              lg.sending_list_id::bigint AS aggr_contact_id,
+              lg.aggr_contact_cb_id::bigint AS aggr_contact_id,
               COALESCE(NULLIF(trim(ac.company_name), ''), NULLIF(trim(ac.email), ''), '—') AS contact_name,
               COUNT(*)::int AS visits_cnt
             FROM public.mailbox_stats ms
@@ -186,12 +186,12 @@ def _overview_site_click_rows(ws_id, limit: int = 8):
             LEFT JOIN public.aap_audience_audiencetask t
               ON t.id = c.sending_list_id
             LEFT JOIN public.aggr_contacts_cb ac
-              ON ac.id = lg.sending_list_id
+              ON ac.id = lg.aggr_contact_cb_id
             GROUP BY
               c.id,
               c.title,
               t.type,
-              lg.sending_list_id,
+              lg.aggr_contact_cb_id,
               ac.company_name,
               ac.email
             ORDER BY seen_at DESC
@@ -275,7 +275,7 @@ def _stats_site_click_rows_page(ws_id, *, limit: int = 100, page: int = 1):
             FROM (
               SELECT
                 c.id,
-                lg.sending_list_id,
+                lg.aggr_contact_cb_id,
                 COALESCE(NULLIF(trim(ac.company_name), ''), NULLIF(trim(ac.email), ''), '—')
               FROM public.mailbox_stats ms
               JOIN public.sending_log lg
@@ -284,10 +284,10 @@ def _stats_site_click_rows_page(ws_id, *, limit: int = 100, page: int = 1):
                 ON c.id = lg.campaign_id
                AND c.workspace_id = %s::uuid
               LEFT JOIN public.aggr_contacts_cb ac
-                ON ac.id = lg.sending_list_id
+                ON ac.id = lg.aggr_contact_cb_id
               GROUP BY
                 c.id,
-                lg.sending_list_id,
+                lg.aggr_contact_cb_id,
                 COALESCE(NULLIF(trim(ac.company_name), ''), NULLIF(trim(ac.email), ''), '—')
             ) q
             """,
@@ -307,7 +307,7 @@ def _stats_site_click_rows_page(ws_id, *, limit: int = 100, page: int = 1):
               c.id AS campaign_id,
               COALESCE(NULLIF(trim(c.title), ''), '#' || c.id::text) AS campaign_title,
               LOWER(COALESCE(t.type, '')) AS campaign_type,
-              lg.sending_list_id::bigint AS aggr_contact_id,
+              lg.aggr_contact_cb_id::bigint AS aggr_contact_id,
               COALESCE(NULLIF(trim(ac.company_name), ''), NULLIF(trim(ac.email), ''), '—') AS contact_name,
               COUNT(*)::int AS visits_cnt
             FROM public.mailbox_stats ms
@@ -319,12 +319,12 @@ def _stats_site_click_rows_page(ws_id, *, limit: int = 100, page: int = 1):
             LEFT JOIN public.aap_audience_audiencetask t
               ON t.id = c.sending_list_id
             LEFT JOIN public.aggr_contacts_cb ac
-              ON ac.id = lg.sending_list_id
+              ON ac.id = lg.aggr_contact_cb_id
             GROUP BY
               c.id,
               c.title,
               t.type,
-              lg.sending_list_id,
+              lg.aggr_contact_cb_id,
               ac.company_name,
               ac.email
             ORDER BY seen_at DESC
@@ -381,7 +381,7 @@ def _stats_site_click_rows_for_campaign(ws_id, campaign_id: int):
               c.id AS campaign_id,
               COALESCE(NULLIF(trim(c.title), ''), '#' || c.id::text) AS campaign_title,
               LOWER(COALESCE(t.type, '')) AS campaign_type,
-              lg.sending_list_id::bigint AS aggr_contact_id,
+              lg.aggr_contact_cb_id::bigint AS aggr_contact_id,
               COALESCE(NULLIF(trim(ac.company_name), ''), NULLIF(trim(ac.email), ''), '—') AS contact_name,
               COUNT(*)::int AS visits_cnt
             FROM public.mailbox_stats ms
@@ -394,12 +394,12 @@ def _stats_site_click_rows_for_campaign(ws_id, campaign_id: int):
             LEFT JOIN public.aap_audience_audiencetask t
               ON t.id = c.sending_list_id
             LEFT JOIN public.aggr_contacts_cb ac
-              ON ac.id = lg.sending_list_id
+              ON ac.id = lg.aggr_contact_cb_id
             GROUP BY
               c.id,
               c.title,
               t.type,
-              lg.sending_list_id,
+              lg.aggr_contact_cb_id,
               ac.company_name,
               ac.email
             ORDER BY seen_at DESC
@@ -478,7 +478,7 @@ def _stats_sending_rows_page(ws_id, *, limit: int = 100, page: int = 1):
               c.id AS campaign_id,
               COALESCE(NULLIF(trim(c.title), ''), '#' || c.id::text) AS campaign_title,
               LOWER(COALESCE(t.type, '')) AS campaign_type,
-              lg.sending_list_id::bigint AS aggr_contact_id,
+              lg.aggr_contact_cb_id::bigint AS aggr_contact_id,
               COALESCE(NULLIF(trim(ac.company_name), ''), NULLIF(trim(ac.email), ''), '—') AS contact_name,
               UPPER(COALESCE(lg.status, '')) AS send_status
             FROM public.sending_log lg
@@ -488,7 +488,7 @@ def _stats_sending_rows_page(ws_id, *, limit: int = 100, page: int = 1):
             LEFT JOIN public.aap_audience_audiencetask t
               ON t.id = c.sending_list_id
             LEFT JOIN public.aggr_contacts_cb ac
-              ON ac.id = lg.sending_list_id
+              ON ac.id = lg.aggr_contact_cb_id
             ORDER BY COALESCE(lg.processed_at, lg.created_at) DESC, lg.id DESC
             LIMIT %s
             OFFSET %s
@@ -587,7 +587,7 @@ def _stats_sending_rows_for_campaign_page(ws_id, campaign_id: int, *, limit: int
               c.id AS campaign_id,
               COALESCE(NULLIF(trim(c.title), ''), '#' || c.id::text) AS campaign_title,
               LOWER(COALESCE(t.type, '')) AS campaign_type,
-              lg.sending_list_id::bigint AS aggr_contact_id,
+              lg.aggr_contact_cb_id::bigint AS aggr_contact_id,
               COALESCE(NULLIF(trim(ac.company_name), ''), NULLIF(trim(ac.email), ''), '—') AS contact_name,
               UPPER(COALESCE(lg.status, '')) AS send_status
             FROM public.sending_log lg
@@ -598,7 +598,7 @@ def _stats_sending_rows_for_campaign_page(ws_id, campaign_id: int, *, limit: int
             LEFT JOIN public.aap_audience_audiencetask t
               ON t.id = c.sending_list_id
             LEFT JOIN public.aggr_contacts_cb ac
-              ON ac.id = lg.sending_list_id
+              ON ac.id = lg.aggr_contact_cb_id
             ORDER BY COALESCE(lg.processed_at, lg.created_at) DESC, lg.id DESC
             LIMIT %s
             OFFSET %s
@@ -865,7 +865,7 @@ def _planned_contacts_by_campaign_ids(campaign_ids):
             parent_send AS (
               SELECT
                 lg.campaign_id AS parent_campaign_id,
-                lg.sending_list_id,
+                lg.aggr_contact_cb_id,
                 MAX(COALESCE(lg.processed_at, lg.created_at)) AS parent_sent_at
               FROM public.sending_log lg
               JOIN (
@@ -876,7 +876,7 @@ def _planned_contacts_by_campaign_ids(campaign_ids):
                 ON p.campaign_parent_id = lg.campaign_id
               WHERE lg.processed = true
                 AND lg.status = 'SEND'
-              GROUP BY lg.campaign_id, lg.sending_list_id
+              GROUP BY lg.campaign_id, lg.aggr_contact_cb_id
             ),
             planned AS (
               SELECT
@@ -896,10 +896,10 @@ def _planned_contacts_by_campaign_ids(campaign_ids):
                 ON ac.id = sl.aggr_contact_cb_id
               LEFT JOIN parent_send ps
                 ON ps.parent_campaign_id = sc.campaign_parent_id
-               AND ps.sending_list_id = sl.aggr_contact_cb_id
+               AND ps.aggr_contact_cb_id = sl.aggr_contact_cb_id
               LEFT JOIN public.sending_log lg
                 ON lg.campaign_id = sc.id
-               AND lg.sending_list_id = sl.aggr_contact_cb_id
+               AND lg.aggr_contact_cb_id = sl.aggr_contact_cb_id
               WHERE COALESCE(sl.removed, false) = false
                 AND sl.rate IS NOT NULL
                 AND sl.rate <= t.rate_limit
@@ -948,14 +948,14 @@ def _recent_sending_rows_by_campaign_ids(campaign_ids):
                 COALESCE(lg.processed_at, lg.created_at) AS sent_at,
                 COALESCE(NULLIF(trim(ac.company_name), ''), NULLIF(trim(ac.email), ''), '—') AS company_name,
                 COALESCE(lg.status, '') AS status,
-                lg.sending_list_id AS aggr_contact_id,
+                lg.aggr_contact_cb_id AS aggr_contact_id,
                 ROW_NUMBER() OVER (
                   PARTITION BY lg.campaign_id
                   ORDER BY COALESCE(lg.processed_at, lg.created_at) DESC, lg.id DESC
                 ) AS rn
               FROM public.sending_log lg
               LEFT JOIN public.aggr_contacts_cb ac
-                ON ac.id = lg.sending_list_id
+                ON ac.id = lg.aggr_contact_cb_id
               WHERE lg.campaign_id = ANY(%s)
             ) q
             WHERE rn <= 3
