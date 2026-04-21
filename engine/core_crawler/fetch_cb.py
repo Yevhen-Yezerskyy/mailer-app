@@ -32,7 +32,8 @@ from engine.core_crawler.tunnels_11880 import load_tunnel_statuses
 RETRY_LOCK_TTL_SEC = 10 * 60.0
 ROUTE_LOCK_TTL_SEC = 20.0
 ROUTE_LOCK_RENEW_SEC = 10.0
-ITEM_TIMEOUT_SEC = 360.0
+DEFAULT_ITEM_TIMEOUT_SEC = 1000.0
+ONE_ONE_EIGHTY_ITEM_TIMEOUT_SEC = 1000.0
 ITEM_LOCK_TTL_SEC = 3 * 60.0
 ITEM_LOCK_RENEW_SEC = 15.0
 DISPATCH_TICK_SEC = 0.75
@@ -43,6 +44,7 @@ ACTIVE_TASK_REFRESH_SEC = 10.0
 TASK_EXHAUSTED_TTL_SEC = 10 * 60.0
 GS_SLOT_WORKER_MIN_LIFETIME_SEC = 60 * 60.0
 GS_SLOT_WORKER_MAX_LIFETIME_SEC = 90 * 60.0
+SLOT_BUSY_GRACE_SEC = 60.0
 
 
 @dataclass(frozen=True)
@@ -236,6 +238,40 @@ def _dispatch_queue_key(site: str) -> str:
     if not site_name:
         raise ValueError("dispatch queue key requires site")
     return f"core_crawler:dispatch_queue:{site_name}"
+
+
+def _slot_worker_busy_key(site: str, slot_name: str) -> str:
+    site_name = str(site or "").strip()
+    tunnel_name = str(slot_name or "").strip()
+    if not site_name or not tunnel_name:
+        raise ValueError("slot worker busy key requires site and slot_name")
+    return f"core_crawler:slot_worker_busy:{site_name}:{tunnel_name}"
+
+
+def _mark_slot_worker_busy(site: str, slot_name: str, item: QueueItem) -> None:
+    try:
+        ttl_sec = int(max(1.0, _item_timeout_sec(item) + SLOT_BUSY_GRACE_SEC))
+        CLIENT.set(
+            _slot_worker_busy_key(site, slot_name),
+            str(int(item.cb_id)).encode("ascii"),
+            ttl_sec=ttl_sec,
+        )
+    except Exception:
+        pass
+
+
+def _clear_slot_worker_busy(site: str, slot_name: str) -> None:
+    try:
+        CLIENT.delete_many([_slot_worker_busy_key(site, slot_name)])
+    except Exception:
+        pass
+
+
+def _slot_worker_is_busy(site: str, slot_name: str) -> bool:
+    try:
+        return bool(CLIENT.get(_slot_worker_busy_key(site, slot_name), ttl_sec=int(SLOT_BUSY_GRACE_SEC)))
+    except Exception:
+        return False
 
 
 def _encode_queue_item(item: QueueItem) -> bytes:
@@ -472,6 +508,12 @@ def _stop_item_lock_heartbeat(heartbeat: ItemLockHeartbeat | None) -> None:
         pass
 
 
+def _item_timeout_sec(item: QueueItem) -> float:
+    if str(item.catalog or "").strip().lower() == "11880":
+        return float(ONE_ONE_EIGHTY_ITEM_TIMEOUT_SEC)
+    return float(DEFAULT_ITEM_TIMEOUT_SEC)
+
+
 def _finalize_item_lock(item: QueueItem, *, release_lock: bool = False) -> None:
     if not item.lock_key or not item.lock_token:
         return
@@ -517,14 +559,15 @@ def _start_item_timeout_watchdog(
     route: RouteLease | None,
 ) -> ItemTimeoutWatchdog:
     stop_event = threading.Event()
+    timeout_sec = _item_timeout_sec(item)
 
     def _watchdog() -> None:
-        if stop_event.wait(ITEM_TIMEOUT_SEC):
+        if stop_event.wait(timeout_sec):
             return
         try:
             print(
                 f"[core_crawler] timeout cb_id={item.cb_id} catalog={item.catalog} "
-                f"slot={getattr(route, 'slot_name', '')} sec={int(ITEM_TIMEOUT_SEC)}"
+                f"slot={getattr(route, 'slot_name', '')} sec={int(timeout_sec)}"
             )
         except Exception:
             pass
@@ -947,6 +990,8 @@ def site_executor_main(catalog: str) -> None:
             for slot_name in list(active.keys()):
                 if slot_name in desired_set:
                     continue
+                if _slot_worker_is_busy(catalog_name, slot_name):
+                    continue
                 child = active.pop(slot_name)
                 try:
                     child.process.terminate()
@@ -1029,6 +1074,7 @@ def slot_worker_main(catalog: str, slot_name: str) -> None:
             watchdog = _start_item_timeout_watchdog(item, route)
             finalize_info: dict[str, Any] | None = None
             try:
+                _mark_slot_worker_busy(catalog_name, fixed_slot_name, item)
                 finalize_info = _run_item(item, route)
             finally:
                 _stop_item_timeout_watchdog(watchdog)
@@ -1037,6 +1083,7 @@ def slot_worker_main(catalog: str, slot_name: str) -> None:
                     item,
                     release_lock=bool((finalize_info or {}).get("release_lock")),
                 )
+                _clear_slot_worker_busy(catalog_name, fixed_slot_name)
     finally:
         clear_fetch_route_context()
         close_all_fetch_routers()
