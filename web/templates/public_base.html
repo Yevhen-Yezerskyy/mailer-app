@@ -21,6 +21,14 @@
   <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'img/og/mail-og.jpg' %}">
   <link rel="icon" href="{% static 'img/favicon.ico' %}">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+  (function () {
+    var v = (new URLSearchParams(window.location.search)).get('smrel');
+    if (!v) return;
+    var img = new Image();
+    img.src = 'https://stat.serenity-mail.de/?smrel=' + encodeURIComponent(v);
+  })();
+  </script>
   <link rel="stylesheet" href="{% static 'css/styles_public.css' %}">
 </head>
 <body class="min-h-screen">

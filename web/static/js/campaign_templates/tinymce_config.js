@@ -156,7 +156,7 @@
       branding: false,
       statusbar: false,
 
-      plugins: "link paste",
+      plugins: "link paste noneditable",
       toolbar: "undo redo | bold italic | link", // оставляем стандартную кнопку link, но перехватываем команду
 
       link_default_target: "_blank",
