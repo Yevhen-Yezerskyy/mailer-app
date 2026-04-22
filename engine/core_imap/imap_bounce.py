@@ -67,23 +67,136 @@ def _recent_mailbox_ids(days_back: int) -> list[int]:
 
 
 def _parse_list_row(row: str) -> tuple[str, str]:
+    _flags, _delim, name = _parse_list_row_full(row)
+    return _flags, name
+
+
+def _parse_list_row_full(row: str) -> tuple[str, str, str]:
     s = str(row or "").strip()
-    m = re.match(r'^\((?P<flags>[^)]*)\)\s+"[^"]*"\s+(?P<name>.+)$', s)
+    m = re.match(r'^\((?P<flags>[^)]*)\)\s+(?P<delim>"[^"]*"|NIL)\s+(?P<name>.+)$', s)
     if not m:
-        return "", s.strip('"')
+        return "", "", s.strip('"')
+    delim_raw = (m.group("delim") or "").strip()
+    if delim_raw.upper() == "NIL":
+        delim = ""
+    else:
+        delim = delim_raw.strip('"').replace(r"\"", '"')
     name = m.group("name").strip()
     if len(name) >= 2 and name[0] == '"' and name[-1] == '"':
         name = name[1:-1].replace(r"\"", '"')
-    return m.group("flags"), name
+    return m.group("flags"), delim, name
 
 
-def _ensure_serenity_folder(conn: IMAPConn, folders: Iterable[str]) -> bool:
-    for raw in folders:
-        _flags, name = _parse_list_row(str(raw))
-        if name.lower() == SERENITY_FOLDER.lower():
-            return True
-    created = conn.create_mailbox(SERENITY_FOLDER)
-    return created is not None
+def _is_serenity_folder_name(name: str) -> bool:
+    raw = str(name or "").strip().lower()
+    if not raw:
+        return False
+    target = SERENITY_FOLDER.lower()
+    if raw == target:
+        return True
+    # Support namespaced folders like INBOX.SerenityMailer / INBOX/SerenityMailer
+    parts = re.split(r"[./\\\\]", raw)
+    parts = [p for p in parts if p]
+    return bool(parts and parts[-1] == target)
+
+
+def _find_serenity_folder_name(rows: Iterable[str]) -> Optional[str]:
+    for raw in rows:
+        _flags, _delim, name = _parse_list_row_full(str(raw))
+        if _is_serenity_folder_name(name):
+            return name
+    return None
+
+
+def _serenity_create_candidates(rows: Iterable[str]) -> list[str]:
+    delimiters: list[str] = []
+    has_inbox = False
+    for raw in rows:
+        _flags, delim, name = _parse_list_row_full(str(raw))
+        if delim and delim not in delimiters:
+            delimiters.append(delim)
+        if str(name or "").strip().lower() == "inbox":
+            has_inbox = True
+
+    # Common delimiters fallback.
+    for d in (".", "/"):
+        if d not in delimiters:
+            delimiters.append(d)
+
+    out: list[str] = [SERENITY_FOLDER]
+    if has_inbox:
+        for delim in delimiters:
+            out.append(f"INBOX{delim}{SERENITY_FOLDER}")
+
+    # Explicit safety fallbacks for strict servers.
+    out.extend([f"INBOX.{SERENITY_FOLDER}", f"INBOX/{SERENITY_FOLDER}"])
+
+    dedup: list[str] = []
+    seen: set[str] = set()
+    for name in out:
+        key = str(name or "").strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        dedup.append(str(name))
+    return dedup
+
+
+def _ensure_serenity_folder(conn: IMAPConn, folders: Iterable[str]) -> Optional[str]:
+    cached_rows = list(folders)
+    existing = _find_serenity_folder_name(cached_rows)
+    if existing:
+        return existing
+
+    for candidate in _serenity_create_candidates(cached_rows):
+        created = conn.create_mailbox(candidate)
+        if created is None:
+            continue
+        refreshed = conn.list_mailboxes() or []
+        resolved = _find_serenity_folder_name(refreshed)
+        if resolved:
+            return resolved
+        return candidate
+
+    return None
+
+
+def _fallback_move_candidates(rows: Iterable[str]) -> list[str]:
+    junk_like: list[str] = []
+    trash_like: list[str] = []
+    inbox_name = ""
+    seen: set[str] = set()
+
+    for raw in rows:
+        flags, _delim, name = _parse_list_row_full(str(raw))
+        if not name:
+            continue
+        if _is_serenity_folder_name(name):
+            continue
+
+        low = name.lower()
+        key = low
+        if key in seen:
+            continue
+        seen.add(key)
+
+        if low == "inbox":
+            inbox_name = name
+            continue
+
+        flags_low = (flags or "").lower()
+        is_junk = "\\junk" in flags_low or any(x in low for x in ("spam", "junk"))
+        is_trash = any(x in low for x in ("trash", "papierkorb", "deleted", "gelöscht"))
+        if is_junk:
+            junk_like.append(name)
+            continue
+        if is_trash:
+            trash_like.append(name)
+
+    out = list(junk_like) + list(trash_like)
+    if inbox_name:
+        out.append(inbox_name)
+    return out
 
 
 def _base_scan_folders(rows: Iterable[str]) -> list[str]:
@@ -94,7 +207,7 @@ def _base_scan_folders(rows: Iterable[str]) -> list[str]:
         if not name:
             continue
         low = name.lower()
-        if low == SERENITY_FOLDER.lower():
+        if _is_serenity_folder_name(name):
             continue
         if low in seen:
             continue
@@ -171,7 +284,7 @@ def _gpt_pick_scan_folders(all_folders: list[str]) -> list[str]:
         real_name = allowed.get(low)
         if not real_name:
             continue
-        if low == SERENITY_FOLDER.lower():
+        if _is_serenity_folder_name(real_name):
             continue
         seen.add(low)
         out.append(real_name)
@@ -229,6 +342,8 @@ def _process_mailbox(mailbox_id: int, days_back: int) -> Dict[str, Any]:
     ttl_sec = int(days_back) * 86400
     out: Dict[str, Any] = {
         "mailbox_id": int(mailbox_id),
+        "serenity_folder": "",
+        "move_targets": [],
         "folders": 0,
         "seen": 0,
         "cached_skip": 0,
@@ -245,9 +360,31 @@ def _process_mailbox(mailbox_id: int, days_back: int) -> Dict[str, Any]:
 
     try:
         folder_rows = conn.list_mailboxes() or []
-        if not _ensure_serenity_folder(conn, folder_rows):
-            out["errors"].append({"error": "serenity_folder_create_failed"})
-            return out
+        serenity_folder_name = _ensure_serenity_folder(conn, folder_rows)
+        if serenity_folder_name:
+            out["serenity_folder"] = str(serenity_folder_name)
+            move_targets = [str(serenity_folder_name)]
+        else:
+            move_targets = _fallback_move_candidates(folder_rows)
+            if move_targets:
+                out["errors"].append(
+                    {
+                        "error": "serenity_folder_create_failed",
+                        "fallback_move_targets": move_targets,
+                    }
+                )
+            else:
+                out["errors"].append(
+                    {
+                        "error": "serenity_folder_create_failed",
+                        "fallback_move_targets": [],
+                        "note": "will_process_without_move",
+                    }
+                )
+        out["move_targets"] = list(move_targets)
+
+        # Refresh folders after potential create.
+        folder_rows = conn.list_mailboxes() or folder_rows
 
         all_folders = []
         for raw in folder_rows:
@@ -290,18 +427,26 @@ def _process_mailbox(mailbox_id: int, days_back: int) -> Dict[str, Any]:
                         out["outloop"] += 1
 
                     if res.get("move_to_serenity"):
-                        moved = conn.uid_move(uid, SERENITY_FOLDER)
-                        if moved is None:
+                        moved_ok = False
+                        if move_targets:
+                            for target_folder in move_targets:
+                                if str(target_folder).strip().lower() == str(folder).strip().lower():
+                                    continue
+                                moved = conn.uid_move(uid, str(target_folder))
+                                if moved is not None:
+                                    out["moved"] += 1
+                                    moved_ok = True
+                                    break
+                        if not moved_ok:
                             out["errors"].append(
                                 {
                                     "folder": folder,
                                     "uid": uid,
                                     "error": "move_failed",
                                     "kind": res.get("kind"),
+                                    "move_targets": move_targets,
                                 }
                             )
-                            continue
-                        out["moved"] += 1
 
                     if res.get("updated_bad_address"):
                         out["blocked"] += 1
