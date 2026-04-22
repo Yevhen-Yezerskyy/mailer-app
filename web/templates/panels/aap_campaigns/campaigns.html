@@ -435,7 +435,7 @@
                       {% if it.is_in_window %}
                         <div class="YY-STATUS_GREEN !py-1 mb-2">{% trans "Идет рассылка" %}</div>
                       {% else %}
-                        <div class="YY-STATUS_YELLOW !py-1 mb-2">{% trans "Ждем окно отправки" %}</div>
+                        <div class="YY-STATUS_YELLOW !py-1 mb-2">{% trans 'Ждем "окно"' %}</div>
                       {% endif %}
                       <form method="post" class="inline">
                         {% csrf_token %}

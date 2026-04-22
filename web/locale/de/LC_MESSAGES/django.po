@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-04-19 15:52+0200\n"
+"POT-Creation-Date: 2026-04-22 11:22+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -16,6 +16,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
 #: templates/404.html:19
 msgid "Ничего не найдено"
 msgstr "Nichts gefunden"
@@ -277,7 +278,10 @@ msgstr "Geschäftskategorien und Rubriken"
 msgid ""
 "Необходимо подобрать рубрики и бизнес-категории для поиска контактов в "
 "бизнес-справочниках. Подбор выполняется с помощью ассистента ИИ."
-msgstr "Es müssen Rubriken und Geschäftskategorien für die Suche nach Kontakten in Branchenverzeichnissen ausgewählt werden. Die Auswahl wird mithilfe eines KI-Assistenten durchgeführt."
+msgstr ""
+"Es müssen Rubriken und Geschäftskategorien für die Suche nach Kontakten in "
+"Branchenverzeichnissen ausgewählt werden. Die Auswahl wird mithilfe eines KI-"
+"Assistenten durchgeführt."
 
 #: templates/panels/aap_audience/create/step_branches.html:23
 #: templates/panels/aap_audience/create/step_branches.html:332
@@ -286,20 +290,29 @@ msgid ""
 "его помощью расширить список — как по функциональности, так и по видам "
 "деятельности, а также указать, какие именно категории необходимо добавить. "
 "Лишние категории можно удалить."
-msgstr "Der KI-Assistent führt eine erste Auswahl von Kategorien und Rubriken durch. Anschließend können Sie mit seiner Hilfe die Liste erweitern — sowohl nach Funktionalität als auch nach Tätigkeitsarten — und außerdem angeben, welche Kategorien genau hinzugefügt werden sollen. Überflüssige Kategorien können entfernt werden."
+msgstr ""
+"Der KI-Assistent führt eine erste Auswahl von Kategorien und Rubriken durch. "
+"Anschließend können Sie mit seiner Hilfe die Liste erweitern — sowohl nach "
+"Funktionalität als auch nach Tätigkeitsarten — und außerdem angeben, welche "
+"Kategorien genau hinzugefügt werden sollen. Überflüssige Kategorien können "
+"entfernt werden."
 
 #: templates/panels/aap_audience/create/step_branches.html:24
 #: templates/panels/aap_audience/create/step_branches.html:333
 msgid ""
 "Жёлтые строки — предложения ассистента. Чтобы сохранить их, необходимо явно "
 "добавить их в список."
-msgstr "Gelbe Zeilen sind Vorschläge des Assistenten. Um sie zu speichern, müssen Sie sie ausdrücklich zur Liste hinzufügen."
+msgstr ""
+"Gelbe Zeilen sind Vorschläge des Assistenten. Um sie zu speichern, müssen "
+"Sie sie ausdrücklich zur Liste hinzufügen."
 
 #: templates/panels/aap_audience/create/step_branches.html:25
 #: templates/panels/aap_audience/create/step_branches.html:334
 msgid ""
 "Зелёные строки — категории, уже сохранённые для последующего сбора контактов."
-msgstr "Grüne Zeilen — Kategorien, die bereits für die spätere Sammlung von Kontakten gespeichert wurden."
+msgstr ""
+"Grüne Zeilen — Kategorien, die bereits für die spätere Sammlung von "
+"Kontakten gespeichert wurden."
 
 #: templates/panels/aap_audience/create/step_branches.html:26
 #: templates/panels/aap_audience/create/step_branches.html:335
@@ -308,7 +321,12 @@ msgid ""
 "рейтинг (от 1 до 20, где 1 — наилучший). Рейтинг определяет порядок сбора "
 "контактов. Он кликабелен и может быть изменён — при изменении рейтинга "
 "автоматически меняется порядок сбора контактов."
-msgstr "Für die hinzugefügten Kategorien (grüne Zeilen) ist links die Vergleichsbewertung angegeben (von 1 bis 20, wobei 1 die beste ist). Die Bewertung bestimmt die Reihenfolge der Kontaktgewinnung. Sie ist anklickbar und kann geändert werden — bei einer Änderung der Bewertung ändert sich automatisch die Reihenfolge der Kontaktgewinnung."
+msgstr ""
+"Für die hinzugefügten Kategorien (grüne Zeilen) ist links die "
+"Vergleichsbewertung angegeben (von 1 bis 20, wobei 1 die beste ist). Die "
+"Bewertung bestimmt die Reihenfolge der Kontaktgewinnung. Sie ist anklickbar "
+"und kann geändert werden — bei einer Änderung der Bewertung ändert sich "
+"automatisch die Reihenfolge der Kontaktgewinnung."
 
 #: templates/panels/aap_audience/create/step_branches.html:29
 msgid "Подобрать бизнес-категории и рубрики"
@@ -327,7 +345,11 @@ msgid ""
 "Ассистент ИИ подбирает категории на основе лингвистического и семантического "
 "анализа с использованием нейросетевых алгоритмов. Поэтому результат может не "
 "в полной мере учитывать бизнес-логику конкретной задачи."
-msgstr "Der KI-Assistent wählt Kategorien auf Grundlage einer linguistischen und semantischen Analyse unter Verwendung neuronaler Algorithmen aus. Daher kann das Ergebnis die Geschäftslogik der konkreten Aufgabe möglicherweise nicht vollständig berücksichtigen."
+msgstr ""
+"Der KI-Assistent wählt Kategorien auf Grundlage einer linguistischen und "
+"semantischen Analyse unter Verwendung neuronaler Algorithmen aus. Daher kann "
+"das Ergebnis die Geschäftslogik der konkreten Aufgabe möglicherweise nicht "
+"vollständig berücksichtigen."
 
 #: templates/panels/aap_audience/create/step_branches.html:43
 #: templates/panels/aap_audience/create/step_branches.html:337
@@ -335,7 +357,10 @@ msgid ""
 "Лишние категории, добавленные ассистентом, необходимо удалить — это повысит "
 "эффективность адресной рассылки. Удаление категорий с помощью ИИ-ассистента "
 "не предусмотрено."
-msgstr "Zusätzliche, vom Assistenten hinzugefügte Kategorien müssen entfernt werden — das erhöht die Effizienz des gezielten Versands. Das Löschen von Kategorien mithilfe des KI-Assistenten ist nicht vorgesehen."
+msgstr ""
+"Zusätzliche, vom Assistenten hinzugefügte Kategorien müssen entfernt werden "
+"— das erhöht die Effizienz des gezielten Versands. Das Löschen von "
+"Kategorien mithilfe des KI-Assistenten ist nicht vorgesehen."
 
 #: templates/panels/aap_audience/create/step_branches.html:44
 #: templates/panels/aap_audience/create/step_branches.html:338
@@ -343,7 +368,10 @@ msgid ""
 "Если вы считаете, что список нужно расширить, используйте стандартные "
 "элементы интерфейса: добавляйте смежные категории или категории, "
 "представляющие посредников."
-msgstr "Wenn Sie der Meinung sind, dass die Liste erweitert werden sollte, verwenden Sie die Standardelemente der Benutzeroberfläche: fügen Sie benachbarte Kategorien oder Kategorien hinzu, die Vermittler darstellen."
+msgstr ""
+"Wenn Sie der Meinung sind, dass die Liste erweitert werden sollte, verwenden "
+"Sie die Standardelemente der Benutzeroberfläche: fügen Sie benachbarte "
+"Kategorien oder Kategorien hinzu, die Vermittler darstellen."
 
 #: templates/panels/aap_audience/create/step_branches.html:45
 #: templates/panels/aap_audience/create/step_branches.html:339
@@ -351,7 +379,10 @@ msgid ""
 "Вы также можете задать инструкцию для расширения списка категорий — указать "
 "конкретные категории или дать смысловое указание (например: «добавь все "
 "категории, связанные с туризмом»)."
-msgstr "Sie können auch eine Anweisung zur Erweiterung der Kategorienliste festlegen — bestimmte Kategorien angeben oder eine inhaltliche Vorgabe machen (zum Beispiel: „füge alle Kategorien hinzu, die mit Tourismus zusammenhängen“)."
+msgstr ""
+"Sie können auch eine Anweisung zur Erweiterung der Kategorienliste festlegen "
+"— bestimmte Kategorien angeben oder eine inhaltliche Vorgabe machen (zum "
+"Beispiel: „füge alle Kategorien hinzu, die mit Tourismus zusammenhängen“)."
 
 #: templates/panels/aap_audience/create/step_branches.html:92
 #: templates/panels/aap_audience/create/step_branches.html:96
@@ -410,7 +441,8 @@ msgstr "Hinzufügen"
 
 #: templates/panels/aap_audience/create/step_branches.html:204
 msgid "Вы можете расширить список за счёт смежных бизнес-категорий и рубрик."
-msgstr "Sie können die Liste um verwandte Geschäftskategorien und Rubriken erweitern."
+msgstr ""
+"Sie können die Liste um verwandte Geschäftskategorien und Rubriken erweitern."
 
 #: templates/panels/aap_audience/create/step_branches.html:208
 msgid "Смежные категории и рубрики:"
@@ -426,7 +458,9 @@ msgstr "Liste erweitern"
 msgid ""
 "Вы можете расширить список за счёт бизнес-категорий и рубрик посредников и "
 "торговых компаний."
-msgstr "Sie können die Liste um Geschäftskategorien sowie Rubriken von Vermittlern und Handelsunternehmen erweitern."
+msgstr ""
+"Sie können die Liste um Geschäftskategorien sowie Rubriken von Vermittlern "
+"und Handelsunternehmen erweitern."
 
 #: templates/panels/aap_audience/create/step_branches.html:226
 msgid "Посредники и торговые компании:"
@@ -442,7 +476,9 @@ msgstr "Wie kann ich die Liste erweitern?"
 
 #: templates/panels/aap_audience/create/step_branches.html:259
 msgid "Кнопки расширения появятся после первичного подбора категорий."
-msgstr "Die Schaltflächen zur Erweiterung erscheinen nach der ersten Auswahl von Kategorien."
+msgstr ""
+"Die Schaltflächen zur Erweiterung erscheinen nach der ersten Auswahl von "
+"Kategorien."
 
 #: templates/panels/aap_audience/create/step_branches.html:272
 #: templates/panels/aap_audience/create/step_branches.html:284
@@ -467,28 +503,44 @@ msgid ""
 "рейтингование осуществляется на основании информации о продукте и компании и "
 "был выполнен до внесённых изменений. Поэтому подбор аудиторий и их рейтинг "
 "могут стать некорректными."
-msgstr "Sie haben die Informationen zum Produkt und/oder zum Unternehmen geändert. Die Auswahl der Kategorien und deren Bewertung erfolgt auf Grundlage der Informationen zum Produkt und zum Unternehmen und wurde vor den vorgenommenen Änderungen durchgeführt. Daher können die Auswahl der Zielgruppen und ihre Bewertung fehlerhaft werden."
+msgstr ""
+"Sie haben die Informationen zum Produkt und/oder zum Unternehmen geändert. "
+"Die Auswahl der Kategorien und deren Bewertung erfolgt auf Grundlage der "
+"Informationen zum Produkt und zum Unternehmen und wurde vor den "
+"vorgenommenen Änderungen durchgeführt. Daher können die Auswahl der "
+"Zielgruppen und ihre Bewertung fehlerhaft werden."
 
 #: templates/panels/aap_audience/create/step_branches.html:310
 msgid ""
 "Если информация о компании/продукте изменилась несущественно и не влияет на "
 "выбор категорий и их рейтинг, проигнорируйте это несоответствие. Кнопка "
 "«Игнорировать» справа."
-msgstr "Wenn sich die Informationen über das Unternehmen/Produkt nur geringfügig geändert haben und keinen Einfluss auf die Auswahl der Kategorien und deren Bewertung haben, ignorieren Sie diese Abweichung. Die Schaltfläche „Ignorieren“ befindet sich rechts."
+msgstr ""
+"Wenn sich die Informationen über das Unternehmen/Produkt nur geringfügig "
+"geändert haben und keinen Einfluss auf die Auswahl der Kategorien und deren "
+"Bewertung haben, ignorieren Sie diese Abweichung. Die Schaltfläche "
+"„Ignorieren“ befindet sich rechts."
 
 #: templates/panels/aap_audience/create/step_branches.html:311
 msgid ""
 "Если изменения достаточно существенны и требуется пересчитать рейтинги "
 "категорий, проведите только пересчёт рейтингов. Кнопка «Пересчитать "
 "рейтинги» слева."
-msgstr "Wenn die Änderungen ausreichend erheblich sind und die Kategorien-Ratings neu berechnet werden müssen, führen Sie nur die Neuberechnung der Ratings durch. Die Schaltfläche „Ratings neu berechnen“ befindet sich links."
+msgstr ""
+"Wenn die Änderungen ausreichend erheblich sind und die Kategorien-Ratings "
+"neu berechnet werden müssen, führen Sie nur die Neuberechnung der Ratings "
+"durch. Die Schaltfläche „Ratings neu berechnen“ befindet sich links."
 
 #: templates/panels/aap_audience/create/step_branches.html:312
 msgid ""
 "Если изменения кардинально меняют логику выбора категорий, требуется "
 "произвести набор категорий заново. Все подобранные категории будут удалены, "
 "и вы начнёте их подбор сначала. Кнопка «Очистить / наполнить» посередине."
-msgstr "Wenn die Änderungen die Logik der Kategorieauswahl grundlegend ändern, muss die Kategorieauswahl erneut durchgeführt werden. Alle ausgewählten Kategorien werden entfernt, und Sie beginnen die Auswahl von vorne. Die Schaltfläche „Löschen / Befüllen“ befindet sich in der Mitte."
+msgstr ""
+"Wenn die Änderungen die Logik der Kategorieauswahl grundlegend ändern, muss "
+"die Kategorieauswahl erneut durchgeführt werden. Alle ausgewählten "
+"Kategorien werden entfernt, und Sie beginnen die Auswahl von vorne. Die "
+"Schaltfläche „Löschen / Befüllen“ befindet sich in der Mitte."
 
 #: templates/panels/aap_audience/create/step_cities.html:24
 #: templates/panels/aap_audience/create/step_cities.html:343
@@ -496,7 +548,10 @@ msgid ""
 "Необходимо подобрать города и населённые пункты Германии для поиска "
 "контактов в бизнес-справочниках. Обрабатываются города с населением более 12 "
 "000 человек."
-msgstr "Es ist erforderlich, Städte und Ortschaften in Deutschland für die Suche nach Kontakten in Branchenverzeichnissen auszuwählen. Es werden Städte mit einer Bevölkerung von mehr als 12.000 Einwohnern verarbeitet."
+msgstr ""
+"Es ist erforderlich, Städte und Ortschaften in Deutschland für die Suche "
+"nach Kontakten in Branchenverzeichnissen auszuwählen. Es werden Städte mit "
+"einer Bevölkerung von mehr als 12.000 Einwohnern verarbeitet."
 
 #: templates/panels/aap_audience/create/step_cities.html:25
 #: templates/panels/aap_audience/create/step_cities.html:344
@@ -504,14 +559,19 @@ msgid ""
 "Подбор выполняется с помощью ассистента ИИ. Если заданы ограничения по "
 "географии (территория, радиус, расстояние, конкретные города или федеральные "
 "земли), они учитываются при подборе."
-msgstr "Die Auswahl erfolgt mithilfe eines KI-Assistenten. Wenn geografische Einschränkungen festgelegt sind (Gebiet, Radius, Entfernung, bestimmte Städte oder Bundesländer), werden sie bei der Auswahl berücksichtigt."
+msgstr ""
+"Die Auswahl erfolgt mithilfe eines KI-Assistenten. Wenn geografische "
+"Einschränkungen festgelegt sind (Gebiet, Radius, Entfernung, bestimmte "
+"Städte oder Bundesländer), werden sie bei der Auswahl berücksichtigt."
 
 #: templates/panels/aap_audience/create/step_cities.html:26
 #: templates/panels/aap_audience/create/step_cities.html:345
 msgid ""
 "Если ограничений нет, используется полный список из 1 326 городов и "
 "населённых пунктов."
-msgstr "Wenn es keine Einschränkungen gibt, wird die vollständige Liste mit 1.326 Städten und Ortschaften verwendet."
+msgstr ""
+"Wenn es keine Einschränkungen gibt, wird die vollständige Liste mit 1.326 "
+"Städten und Ortschaften verwendet."
 
 #: templates/panels/aap_audience/create/step_cities.html:27
 msgid "Далее выполняется рейтингование городов и населённых пунктов."
@@ -522,7 +582,9 @@ msgstr "Anschließend erfolgt die Bewertung der Städte und Ortschaften."
 msgid ""
 "Для изменения результата измените географические критерии. Это можно сделать "
 "в разделе \\"
-msgstr "Um das Ergebnis zu ändern, ändern Sie die geografischen Kriterien. Dies kann im Abschnitt \\\\ erfolgen."
+msgstr ""
+"Um das Ergebnis zu ändern, ändern Sie die geografischen Kriterien. Dies kann "
+"im Abschnitt \\\\ erfolgen."
 
 #: templates/panels/aap_audience/create/step_cities.html:31
 msgid "Подобрать города и населенные пункты"
@@ -566,7 +628,9 @@ msgstr "Bewertung von Städten und Ortschaften"
 msgid ""
 "Производится рейтингование городов. Рейтинг присваивается от 1 до 100, где 1 "
 "— наилучший. Он указан слева от названия города."
-msgstr "Es wird eine Rangliste der Städte erstellt. Die Bewertung wird von 1 bis 100 vergeben, wobei 1 die beste ist. Sie steht links neben dem Namen der Stadt."
+msgstr ""
+"Es wird eine Rangliste der Städte erstellt. Die Bewertung wird von 1 bis 100 "
+"vergeben, wobei 1 die beste ist. Sie steht links neben dem Namen der Stadt."
 
 #: templates/panels/aap_audience/create/step_cities.html:268
 #: templates/panels/aap_audience/create/step_cities.html:348
@@ -574,14 +638,19 @@ msgid ""
 "На основании рейтинга определяется порядок сбора контактов. Рейтинг "
 "кликабелен и может быть изменён — таким образом вы меняете порядок сбора "
 "контактов."
-msgstr "Auf Grundlage des Ratings wird die Reihenfolge der Kontaktaufnahme festgelegt. Das Rating ist anklickbar und kann geändert werden — dadurch ändern Sie die Reihenfolge der Kontaktaufnahme."
+msgstr ""
+"Auf Grundlage des Ratings wird die Reihenfolge der Kontaktaufnahme "
+"festgelegt. Das Rating ist anklickbar und kann geändert werden — dadurch "
+"ändern Sie die Reihenfolge der Kontaktaufnahme."
 
 #: templates/panels/aap_audience/create/step_cities.html:269
 #: templates/panels/aap_audience/create/step_cities.html:349
 msgid ""
 "Вы также можете удалить города, которые считаете ненужными. Это повысит "
 "вероятность сбора контактов из приоритетных городов."
-msgstr "Sie können auch Städte entfernen, die Sie für unnötig halten. Dadurch erhöht sich die Wahrscheinlichkeit, Kontakte aus prioritären Städten zu sammeln."
+msgstr ""
+"Sie können auch Städte entfernen, die Sie für unnötig halten. Dadurch erhöht "
+"sich die Wahrscheinlichkeit, Kontakte aus prioritären Städten zu sammeln."
 
 #: templates/panels/aap_audience/create/step_cities.html:281
 #: templates/panels/aap_audience/create/step_cities.html:295
@@ -594,28 +663,44 @@ msgid ""
 "населенных пунктов, их рейтингование осуществляется на основании информации "
 "о продукте, компании географии, был выполнен до внесённых изменений. Поэтому "
 "подбор городов и их рейтинг могут стать некорректными."
-msgstr "Sie haben Informationen zum Produkt, zum Unternehmen oder zur Geografie geändert. Die Auswahl von Städten und Ortschaften sowie deren Ranking erfolgt auf Grundlage der Informationen zum Produkt, zum Unternehmen und zur Geografie und wurde vor den vorgenommenen Änderungen durchgeführt. Daher können die Auswahl der Städte und ihr Ranking möglicherweise unkorrekt sein."
+msgstr ""
+"Sie haben Informationen zum Produkt, zum Unternehmen oder zur Geografie "
+"geändert. Die Auswahl von Städten und Ortschaften sowie deren Ranking "
+"erfolgt auf Grundlage der Informationen zum Produkt, zum Unternehmen und zur "
+"Geografie und wurde vor den vorgenommenen Änderungen durchgeführt. Daher "
+"können die Auswahl der Städte und ihr Ranking möglicherweise unkorrekt sein."
 
 #: templates/panels/aap_audience/create/step_cities.html:321
 msgid ""
 "Если информация о компании/продукте/географии изменилась несущественно и не "
 "влияет на выбор городов и их рейтинг, проигнорируйте это несоответствие. "
 "Кнопка «Игнорировать» справа."
-msgstr "Wenn sich Informationen über das Unternehmen/Produkt/die Geografie nur geringfügig geändert haben und dies die Auswahl der Städte und ihre Bewertung nicht beeinflusst, ignorieren Sie diese Abweichung. Die Schaltfläche „Ignorieren“ befindet sich rechts."
+msgstr ""
+"Wenn sich Informationen über das Unternehmen/Produkt/die Geografie nur "
+"geringfügig geändert haben und dies die Auswahl der Städte und ihre "
+"Bewertung nicht beeinflusst, ignorieren Sie diese Abweichung. Die "
+"Schaltfläche „Ignorieren“ befindet sich rechts."
 
 #: templates/panels/aap_audience/create/step_cities.html:322
 msgid ""
 "Если изменения достаточно существенны и требуется пересчитать рейтинги "
 "городов, проведите только пересчёт рейтингов. Кнопка «Пересчитать рейтинги» "
 "слева."
-msgstr "Wenn die Änderungen ausreichend erheblich sind und die Stadtbewertungen neu berechnet werden müssen, führen Sie nur die Neuberechnung der Bewertungen durch. Die Schaltfläche „Bewertungen neu berechnen“ befindet sich links."
+msgstr ""
+"Wenn die Änderungen ausreichend erheblich sind und die Stadtbewertungen neu "
+"berechnet werden müssen, führen Sie nur die Neuberechnung der Bewertungen "
+"durch. Die Schaltfläche „Bewertungen neu berechnen“ befindet sich links."
 
 #: templates/panels/aap_audience/create/step_cities.html:323
 msgid ""
 "Если изменения кардинально меняют логику выбора городов, требуется "
 "произвести набор городов заново. Все подобранные города будут удалены, и вы "
 "начнёте их подбор сначала. Кнопка «Очистить / наполнить» посередине."
-msgstr "Wenn die Änderungen die Logik der Stadtauswahl grundlegend ändern, muss die Stadtauswahl erneut durchgeführt werden. Alle ausgewählten Städte werden gelöscht, und Sie beginnen mit der Auswahl von vorne. Die Schaltfläche „Löschen / Befüllen“ befindet sich in der Mitte."
+msgstr ""
+"Wenn die Änderungen die Logik der Stadtauswahl grundlegend ändern, muss die "
+"Stadtauswahl erneut durchgeführt werden. Alle ausgewählten Städte werden "
+"gelöscht, und Sie beginnen mit der Auswahl von vorne. Die Schaltfläche "
+"„Löschen / Befüllen“ befindet sich in der Mitte."
 
 #: templates/panels/aap_audience/create/step_contacts.html:24
 msgid "Контакты собираются"
@@ -662,7 +747,8 @@ msgstr "Paare von Kategorien / Städten"
 #: templates/panels/aap_audience/create/step_contacts.html:129
 #: templates/panels/aap_audience/create/step_mailing_list.html:85
 msgid "Задача на рейтингование и сбор контактов была изменена."
-msgstr "Die Aufgabe zur Bewertung und zum Sammeln von Kontakten wurde geändert."
+msgstr ""
+"Die Aufgabe zur Bewertung und zum Sammeln von Kontakten wurde geändert."
 
 #: templates/panels/aap_audience/create/step_contacts.html:136
 #: templates/panels/aap_audience/create/step_mailing_list.html:92
@@ -679,17 +765,22 @@ msgstr "Der Kontakt wird nach dem Paar „Stadt — Kategorie“ gesammelt."
 msgid ""
 "Для обеспечения оптимального порядка сбора контактов (сначала — самые "
 "лучшие) категориям и городам присвоен рейтинг."
-msgstr "Zur Sicherstellung der optimalen Reihenfolge beim Sammeln von Kontakten (zuerst — die besten) wurden Kategorien und Städten ein Ranking zugewiesen."
+msgstr ""
+"Zur Sicherstellung der optimalen Reihenfolge beim Sammeln von Kontakten "
+"(zuerst — die besten) wurden Kategorien und Städten ein Ranking zugewiesen."
 
 #: templates/panels/aap_audience/create/step_contacts.html:160
 #: templates/panels/aap_audience/create/step_mailing_list.html:116
 msgid "Категориям присвоен рейтинг от 1 до 20, где 1 — лучший."
-msgstr "Kategorien wurde eine Bewertung von 1 bis 20 zugewiesen, wobei 1 die beste ist."
+msgstr ""
+"Kategorien wurde eine Bewertung von 1 bis 20 zugewiesen, wobei 1 die beste "
+"ist."
 
 #: templates/panels/aap_audience/create/step_contacts.html:161
 #: templates/panels/aap_audience/create/step_mailing_list.html:117
 msgid "Городам присвоен рейтинг от 1 до 100, где 1 — лучший."
-msgstr "Städten wird eine Bewertung von 1 bis 100 zugewiesen, wobei 1 die beste ist."
+msgstr ""
+"Städten wird eine Bewertung von 1 bis 100 zugewiesen, wobei 1 die beste ist."
 
 #: templates/panels/aap_audience/create/step_contacts.html:162
 #: templates/panels/aap_audience/create/step_mailing_list.html:118
@@ -697,7 +788,10 @@ msgid ""
 "Рейтинг «Pair-R» — это произведение рейтинга категории и рейтинга города. "
 "Именно по нему сортируются пары «Город — Категория» при определении порядка "
 "сбора контактов."
-msgstr "Der „Pair-R“-Rating ist das Produkt aus dem Rating der Kategorie und dem Rating der Stadt. Genau danach werden die Paare „Stadt — Kategorie“ sortiert, wenn die Reihenfolge der Kontaktsammlung festgelegt wird."
+msgstr ""
+"Der „Pair-R“-Rating ist das Produkt aus dem Rating der Kategorie und dem "
+"Rating der Stadt. Genau danach werden die Paare „Stadt — Kategorie“ "
+"sortiert, wenn die Reihenfolge der Kontaktsammlung festgelegt wird."
 
 #: templates/panels/aap_audience/create/step_contacts.html:163
 #: templates/panels/aap_audience/create/step_mailing_list.html:119
@@ -706,7 +800,11 @@ msgid ""
 "индивидуально, и ему присваивается рейтинг от 1 до 100, где 1 — лучший. "
 "Таким образом, рейтинг Pair-R — это не рейтинг контакта, а индикатор порядка "
 "сбора данных."
-msgstr "In der Phase der Erstellung der Mailingliste wird jeder Kontakt individuell bewertet und erhält eine Bewertung von 1 bis 100, wobei 1 die beste ist. Daher ist das Pair-R-Rating kein Kontaktrating, sondern ein Indikator für die Reihenfolge der Datenerfassung."
+msgstr ""
+"In der Phase der Erstellung der Mailingliste wird jeder Kontakt individuell "
+"bewertet und erhält eine Bewertung von 1 bis 100, wobei 1 die beste ist. "
+"Daher ist das Pair-R-Rating kein Kontaktrating, sondern ein Indikator für "
+"die Reihenfolge der Datenerfassung."
 
 #: templates/panels/aap_audience/create/step_form.html:21
 #: templates/panels/aap_audience/create/step_form.html:22
@@ -757,8 +855,8 @@ msgstr "Ganz Deutschland"
 #: templates/panels/aap_settings/mail_servers/_mail_limits.html:88
 #: templates/panels/aap_settings/mail_servers/_smtp_server.html:127
 #: templates/panels/aap_settings/sending.html:99
-#: templates/public/password_reset_confirm.html:54
-#: templates/public/register.html:84
+#: templates/public/password_reset_confirm.html:55
+#: templates/public/register.html:83
 msgid "Сохранить"
 msgstr "Speichern"
 
@@ -770,7 +868,10 @@ msgstr "Befehl / Frage für den KI-Assistenten."
 msgid ""
 "Дайте команду и / или задайте вопрос асситенту ИИ. Команда будет применена к "
 "описанию, на вопрос предлагается независимый ответ"
-msgstr "Geben Sie einen Befehl und/oder stellen Sie dem KI-Assistenten eine Frage. Der Befehl wird auf die Beschreibung angewendet, auf die Frage wird eine unabhängige Antwort gegeben."
+msgstr ""
+"Geben Sie einen Befehl und/oder stellen Sie dem KI-Assistenten eine Frage. "
+"Der Befehl wird auf die Beschreibung angewendet, auf die Frage wird eine "
+"unabhängige Antwort gegeben."
 
 #: templates/panels/aap_audience/create/step_form.html:109
 msgid "Выполнить / задать вопрос"
@@ -828,13 +929,17 @@ msgstr "Die Bewertung wurde ausgesetzt"
 msgid ""
 "Рейтинг контакта рассчитывается индивидуально для каждого контакта в списке "
 "рассылки."
-msgstr "Die Bewertung eines Kontakts wird individuell für jeden Kontakt in der Mailingliste berechnet."
+msgstr ""
+"Die Bewertung eines Kontakts wird individuell für jeden Kontakt in der "
+"Mailingliste berechnet."
 
 #: templates/panels/aap_audience/create/step_mailing_list.html:134
 msgid ""
 "Он определяет соответствие данных контакта поставленной задаче в списке "
 "(продукт / компания / география)."
-msgstr "Er bestimmt die Übereinstimmung der Kontaktdaten mit der gestellten Aufgabe in der Liste (Produkt / Unternehmen / Geografie)."
+msgstr ""
+"Er bestimmt die Übereinstimmung der Kontaktdaten mit der gestellten Aufgabe "
+"in der Liste (Produkt / Unternehmen / Geografie)."
 
 #: templates/panels/aap_audience/create/step_mailing_list.html:135
 msgid "Рейтинг присваивается от 1 до 100, где 1 — наилучший."
@@ -848,13 +953,17 @@ msgstr "Zur Erstellung der Mailingliste wird ein Cutoff-Rating verwendet."
 msgid ""
 "Контакты с рейтингом хуже (больше) рейтинга отсечения в список рассылки не "
 "включаются."
-msgstr "Kontakte mit einem schlechteren (höheren) Rating als dem Abschneide-Rating werden nicht in die Verteilerliste aufgenommen."
+msgstr ""
+"Kontakte mit einem schlechteren (höheren) Rating als dem Abschneide-Rating "
+"werden nicht in die Verteilerliste aufgenommen."
 
 #: templates/panels/aap_audience/create/step_mailing_list.html:138
 msgid ""
 "Контакты с успешным (меньше или равным рейтингу отсечения) рейтингом "
 "включаются в список."
-msgstr "Kontakte mit einem erfolgreichen Rating (kleiner oder gleich dem Cutoff-Rating) werden in die Liste aufgenommen."
+msgstr ""
+"Kontakte mit einem erfolgreichen Rating (kleiner oder gleich dem Cutoff-"
+"Rating) werden in die Liste aufgenommen."
 
 #: templates/panels/aap_audience/create/step_mailing_list.html:139
 msgid ""
@@ -862,7 +971,13 @@ msgid ""
 "больше рейтинг отсечения, тем выше вероятность включения ненужных контактов "
 "в список рассылки. Чем меньше рейтинг отсечения, тем выше вероятность "
 "пропустить действительно нужные контакты."
-msgstr "Sie können den Schwellenwert für den Ausschluss ändern (mögliche Werte liegen zwischen 20 und 60). Je höher der Ausschlussschwellenwert ist, desto wahrscheinlicher ist es, dass unnötige Kontakte in die Mailingliste aufgenommen werden. Je niedriger der Ausschlussschwellenwert ist, desto wahrscheinlicher ist es, dass tatsächlich benötigte Kontakte übersehen werden."
+msgstr ""
+"Sie können den Schwellenwert für den Ausschluss ändern (mögliche Werte "
+"liegen zwischen 20 und 60). Je höher der Ausschlussschwellenwert ist, desto "
+"wahrscheinlicher ist es, dass unnötige Kontakte in die Mailingliste "
+"aufgenommen werden. Je niedriger der Ausschlussschwellenwert ist, desto "
+"wahrscheinlicher ist es, dass tatsächlich benötigte Kontakte übersehen "
+"werden."
 
 #: templates/panels/aap_audience/create_list.html:43
 #: templates/panels/aap_audience/create_list.html:54
@@ -966,7 +1081,10 @@ msgstr "Es wurde noch keine Mailingliste erstellt."
 msgid ""
 "Создайте новый список, задайте для него цель (продукт / компания / "
 "география) и запустите сбор контактов под эту задачу."
-msgstr "Erstellen Sie eine neue Liste, legen Sie das Ziel dafür fest (Produkt / Unternehmen / Geografie) und starten Sie die Sammlung von Kontakten für diese Aufgabe."
+msgstr ""
+"Erstellen Sie eine neue Liste, legen Sie das Ziel dafür fest (Produkt / "
+"Unternehmen / Geografie) und starten Sie die Sammlung von Kontakten für "
+"diese Aufgabe."
 
 #: templates/panels/aap_audience/modal_create_activate.html:7
 msgid "Активировать задачу?"
@@ -1002,10 +1120,10 @@ msgstr "Aktivieren"
 #: templates/panels/aap_settings/modal_sending_reset.html:33
 #: templates/panels/aap_settings/partials/mail_secret_modal.html:19
 #: templates/panels/modals/system/unsaved_changes.html:13
-#: templates/public/login.html:35
-#: templates/public/password_reset_confirm.html:53
-#: templates/public/password_reset_request.html:26
-#: templates/public/register.html:80 templates/public/register.html:82
+#: templates/public/login.html:30
+#: templates/public/password_reset_confirm.html:54
+#: templates/public/password_reset_request.html:27
+#: templates/public/register.html:79 templates/public/register.html:81
 msgid "Отмена"
 msgstr "Abbrechen"
 
@@ -1032,7 +1150,6 @@ msgstr "Kundenunternehmen"
 #: templates/panels/aap_lists/lists_list.html:163
 #: templates/panels/aap_lists/modal_contacts.html:37
 #: templates/panels/modals/switch_user.html:17
-#: templates/public/register.html:27
 msgid "Компания"
 msgstr "Unternehmen"
 
@@ -1128,10 +1245,11 @@ msgid "Письма отправляются"
 msgstr "E-Mails werden gesendet"
 
 #: templates/panels/aap_campaigns/_campaigns_table.html:108
+#: templates/panels/aap_campaigns/campaigns.html:438
 #: templates/panels/overview.html:170 templates/panels/overview.html:305
 #: templates/panels/overview.html:1132
-msgid "Ждем окна отправки"
-msgstr "Wir warten auf das Versandfenster"
+msgid "Ждем \"окно\""
+msgstr "Warten auf Sendefenster"
 
 #: templates/panels/aap_campaigns/_campaigns_table.html:112
 #: templates/panels/overview.html:213 templates/panels/overview.html:348
@@ -1376,10 +1494,6 @@ msgstr "Kampagne aktiviert"
 msgid "Идет рассылка"
 msgstr "Der Versand läuft."
 
-#: templates/panels/aap_campaigns/campaigns.html:438
-msgid "Ждем окно отправки"
-msgstr "Wir warten auf das Senden-Fenster"
-
 #: templates/panels/aap_campaigns/campaigns.html:445
 msgid "Отключить"
 msgstr "Deaktivieren"
@@ -1475,13 +1589,18 @@ msgstr "Die E-Mail-Vorlage wurde geändert"
 msgid ""
 "Для рассылки используются шаблоны писем. Часто один и тот же шаблон удобно "
 "использовать для нескольких кампаний."
-msgstr "Für den Versand werden E-Mail-Vorlagen verwendet. Oft ist es praktisch, dieselbe Vorlage für mehrere Kampagnen zu verwenden."
+msgstr ""
+"Für den Versand werden E-Mail-Vorlagen verwendet. Oft ist es praktisch, "
+"dieselbe Vorlage für mehrere Kampagnen zu verwenden."
 
 #: templates/panels/aap_campaigns/flow_step_template.html:40
 msgid ""
 "Пожалуйста, выберите шаблон для этой кампании из сохранённых вами для "
 "использования в этой компании или создайте новый шаблон."
-msgstr "Bitte wählen Sie für diese Kampagne eine der von Ihnen gespeicherten Vorlagen aus, um sie in diesem Unternehmen zu verwenden, oder erstellen Sie eine neue Vorlage."
+msgstr ""
+"Bitte wählen Sie für diese Kampagne eine der von Ihnen gespeicherten "
+"Vorlagen aus, um sie in diesem Unternehmen zu verwenden, oder erstellen Sie "
+"eine neue Vorlage."
 
 #: templates/panels/aap_campaigns/flow_step_template.html:43
 msgid ""
@@ -1489,7 +1608,13 @@ msgid ""
 "письме условный — при реальной рассылке он будет заменён на текст письма "
 "конкретной кампании. При редакции письма, наоборот, можно менять только "
 "текст писма, хедер и футер как часть шаблона менять нельзя."
-msgstr "Beim Bearbeiten einer Vorlage können nur die Kopf- und Fußzeile der E-Mail geändert werden. Der Text in der E-Mail ist Platzhalter — bei einer echten Versendung wird er durch den Text der E-Mail der jeweiligen Kampagne ersetzt. Beim Bearbeiten einer E-Mail kann man umgekehrt nur den Text der E-Mail ändern; Header und Footer als Teil der Vorlage können nicht geändert werden."
+msgstr ""
+"Beim Bearbeiten einer Vorlage können nur die Kopf- und Fußzeile der E-Mail "
+"geändert werden. Der Text in der E-Mail ist Platzhalter — bei einer echten "
+"Versendung wird er durch den Text der E-Mail der jeweiligen Kampagne "
+"ersetzt. Beim Bearbeiten einer E-Mail kann man umgekehrt nur den Text der E-"
+"Mail ändern; Header und Footer als Teil der Vorlage können nicht geändert "
+"werden."
 
 #: templates/panels/aap_campaigns/flow_step_template.html:104
 #: templates/panels/aap_campaigns/templates.html:124
@@ -1585,13 +1710,19 @@ msgstr "Überprüfen Sie die E-Mail und speichern Sie die Änderungen"
 msgid ""
 "При смене шаблона письмо кампании автоматически не изменяется. Для "
 "оптимального результата необходимо проверить результат смены шаблона."
-msgstr "Beim Ändern der Vorlage wird die Kampagnen-E-Mail nicht automatisch geändert. Für ein optimales Ergebnis необходимо das Ergebnis des Vorlagenwechsels zu überprüfen."
+msgstr ""
+"Beim Ändern der Vorlage wird die Kampagnen-E-Mail nicht automatisch "
+"geändert. Für ein optimales Ergebnis необходимо das Ergebnis des "
+"Vorlagenwechsels zu überprüfen."
 
 #: templates/panels/aap_campaigns/modal_template_choose_warning.html:14
 msgid ""
 "Перейдите в письмо кампании, для которого шаблон был изменён, проверьте "
 "результат и сохраните изменения. Тогда новый шаблон будет применён."
-msgstr "Gehen Sie zur Kampagnen-E-Mail, für die die Vorlage geändert wurde, überprüfen Sie das Ergebnis und speichern Sie die Änderungen. Dann wird die neue Vorlage angewendet."
+msgstr ""
+"Gehen Sie zur Kampagnen-E-Mail, für die die Vorlage geändert wurde, "
+"überprüfen Sie das Ergebnis und speichern Sie die Änderungen. Dann wird die "
+"neue Vorlage angewendet."
 
 #: templates/panels/aap_campaigns/modal_template_choose_warning.html:16
 #: templates/panels/modals/system/unsaved_changes.html:12
@@ -1627,7 +1758,9 @@ msgstr "Die Vorlage wird nicht verwendet"
 #: templates/panels/aap_campaigns/templates.html:400
 msgid ""
 "Шаблон не сохранен. Изменения применены не будут. Перейти к списку шаблонов?"
-msgstr "Vorlage wurde nicht gespeichert. Änderungen werden nicht angewendet. Zur Liste der Vorlagen wechseln?"
+msgstr ""
+"Vorlage wurde nicht gespeichert. Änderungen werden nicht angewendet. Zur "
+"Liste der Vorlagen wechseln?"
 
 #: templates/panels/aap_campaigns/templates.html:399
 #: templates/panels/modals/system/unsaved_changes.html:8
@@ -1648,7 +1781,8 @@ msgstr "Bestätigen"
 msgid "Контакты. Списки рассылок:"
 msgstr "Kontakte. Verteilerlisten:"
 
-#: templates/panels/aap_lists/contacts.html:26
+#: templates/panels/aap_lists/contacts.html:26 templates/public/test.html:350
+#: templates/public/test.html:355
 msgid "Контакты"
 msgstr "Kontakte"
 
@@ -1868,7 +2002,7 @@ msgstr "Telefon:"
 
 #: templates/panels/aap_lists/modal_contacts.html:65
 #: templates/panels/aap_lists/modal_lists_list.html:50
-#: templates/public/login.html:29
+#: templates/public/login.html:24
 msgid "Email:"
 msgstr "E-Mail:"
 
@@ -2003,7 +2137,8 @@ msgstr "Implementierung der Automatisierung bis zum 1. Juni 2026."
 #: templates/panels/aap_settings/mail_servers/_smtp_server.html:106
 #: templates/panels/aap_settings/mail_servers/_smtp_server.html:116
 msgid "Обратитесь к менеджеру для подключения вручную."
-msgstr "Wenden Sie sich an den Manager, um die Verbindung manuell herzustellen."
+msgstr ""
+"Wenden Sie sich an den Manager, um die Verbindung manuell herzustellen."
 
 #: templates/panels/aap_settings/mail_servers/_imap_server.html:135
 msgid "Добавление IMAP сервера"
@@ -2177,7 +2312,9 @@ msgstr "werden gelöscht."
 
 #: templates/panels/aap_settings/modal_sending_reset.html:18
 msgid "После удаления будут применяться глобальные настройки окон отправки."
-msgstr "Nach dem Löschen werden die globalen Einstellungen für Versandfenster angewendet."
+msgstr ""
+"Nach dem Löschen werden die globalen Einstellungen für Versandfenster "
+"angewendet."
 
 #: templates/panels/aap_settings/modal_sending_reset.html:21
 msgid "У компании"
@@ -2217,7 +2354,11 @@ msgid ""
 "Отправка писем не всегда одинаково эффективна. Если отправить письмо в "
 "субботу утром, до понедельника оно будет перекрыто другими письмами. "
 "Вероятность того, что его прочтут и обратят внимание, снижается."
-msgstr "Das Versenden von E-Mails ist nicht immer gleich effektiv. Wenn Sie eine E-Mail am Samstagmorgen senden, wird sie bis Montag von anderen E-Mails überlagert. Die Wahrscheinlichkeit, dass sie gelesen und beachtet wird, sinkt."
+msgstr ""
+"Das Versenden von E-Mails ist nicht immer gleich effektiv. Wenn Sie eine E-"
+"Mail am Samstagmorgen senden, wird sie bis Montag von anderen E-Mails "
+"überlagert. Die Wahrscheinlichkeit, dass sie gelesen und beachtet wird, "
+"sinkt."
 
 #: templates/panels/aap_settings/sending.html:113
 #, python-format
@@ -2226,24 +2367,36 @@ msgid ""
 "со вторника по четверг. В пятницу в то же время эффективность существенно "
 "снижается, а понедельник еще ниже. В праздники и выходные дни обычно "
 "эффективность составляет 5-10%% от возможной."
-msgstr "Aus Erfahrung mit Mailings ist die effektivste Zeit für den Versand von 08:30 bis 12:30 von Dienstag bis Donnerstag. Am Freitag sinkt die Effektivität zur gleichen Zeit deutlich, und am Montag ist sie noch niedriger. An Feiertagen und an Wochenenden liegt die Effektivität in der Regel bei 5-10%% des möglichen Werts."
+msgstr ""
+"Aus Erfahrung mit Mailings ist die effektivste Zeit für den Versand von "
+"08:30 bis 12:30 von Dienstag bis Donnerstag. Am Freitag sinkt die "
+"Effektivität zur gleichen Zeit deutlich, und am Montag ist sie noch "
+"niedriger. An Feiertagen und an Wochenenden liegt die Effektivität in der "
+"Regel bei 5-10%% des möglichen Werts."
 
 #: templates/panels/aap_settings/sending.html:114
 msgid "Мы рекомендуем учитывать это при настройке окон для отправки."
-msgstr "Wir empfehlen, dies bei der Konfiguration der Versandfenster zu berücksichtigen."
+msgstr ""
+"Wir empfehlen, dies bei der Konfiguration der Versandfenster zu "
+"berücksichtigen."
 
 #: templates/panels/aap_settings/sending.html:115
 msgid ""
 "Эти настройки - глобальные для Вашей учетной записи. Для конкретной кампании "
 "это может быть переопределено. Тогда глобальные настройки на настройки "
 "отправки кампании больше не влияют."
-msgstr "Diese Einstellungen gelten global für Ihr Konto. Für eine bestimmte Kampagne kann dies überschrieben werden. Dann haben die globalen Einstellungen keinen Einfluss mehr auf die Sendeeinstellungen der Kampagne."
+msgstr ""
+"Diese Einstellungen gelten global für Ihr Konto. Für eine bestimmte Kampagne "
+"kann dies überschrieben werden. Dann haben die globalen Einstellungen keinen "
+"Einfluss mehr auf die Sendeeinstellungen der Kampagne."
 
 #: templates/panels/aap_settings/sending.html:116
 msgid ""
 "Окна - это отрезки времени, когда письма отправляться будут. Вне окон "
 "рассылка не осуществляется. Время (часовой пояс) - Берлин, Германия"
-msgstr "Fenster sind Zeiträume, in denen E-Mails gesendet werden. Außerhalb der Fenster erfolgt kein Versand. Zeit (Zeitzone) - Berlin, Deutschland"
+msgstr ""
+"Fenster sind Zeiträume, in denen E-Mails gesendet werden. Außerhalb der "
+"Fenster erfolgt kein Versand. Zeit (Zeitzone) - Berlin, Deutschland"
 
 #: templates/panels/aap_settings/url_stats.html:14
 msgid "Учет переходов"
@@ -2252,7 +2405,9 @@ msgstr "Klickverfolgung"
 #: templates/panels/aap_settings/url_stats.html:17
 msgid ""
 "Выберите ОДИН из двух вариантов кода и установите его на Ваш интернет-сайт."
-msgstr "Wählen Sie EINE von zwei Code-Varianten aus und installieren Sie sie auf Ihrer Internetseite."
+msgstr ""
+"Wählen Sie EINE von zwei Code-Varianten aus und installieren Sie sie auf "
+"Ihrer Internetseite."
 
 #: templates/panels/aap_settings/url_stats.html:22
 msgid "Вариант 1 — stat.serenity-mail.de"
@@ -2274,26 +2429,35 @@ msgstr "Wählen Sie EINE der beiden Code-Optionen links aus (beliebige)."
 msgid ""
 "Установите код на Ваш в раздел &lt;head&gt; (перед закрывающим тегом &lt;/"
 "head&gt;)."
-msgstr "Installieren Sie den Code in Ihrem Bereich <head> (vor dem schließenden Tag </head>)."
+msgstr ""
+"Installieren Sie den Code in Ihrem Bereich <head> (vor dem schließenden Tag "
+"</head>)."
 
 #: templates/panels/aap_settings/url_stats.html:44
 msgid ""
 "Если используется Google Tag Manager — добавьте как Custom HTML и включите "
 "на всех страницах."
-msgstr "Wenn Google Tag Manager verwendet wird, fügen Sie es als Custom HTML hinzu und aktivieren Sie es auf allen Seiten."
+msgstr ""
+"Wenn Google Tag Manager verwendet wird, fügen Sie es als Custom HTML hinzu "
+"und aktivieren Sie es auf allen Seiten."
 
 #: templates/panels/aap_settings/url_stats.html:45
 msgid ""
 "Скрипт (код) учитывает (срабатывает) ТОЛЬКО если в URL страницы есть "
 "параметр smrel=... , или ТОЛЬКО при переходах из рассылки, сделанной через "
 "Serenity Mailer"
-msgstr "Das Skript (der Code) berücksichtigt (wird ausgelöst) NUR, wenn in der URL der Seite der Parameter smrel=... vorhanden ist, oder NUR bei Übergängen aus einem Versand, der über Serenity Mailer erstellt wurde"
+msgstr ""
+"Das Skript (der Code) berücksichtigt (wird ausgelöst) NUR, wenn in der URL "
+"der Seite der Parameter smrel=... vorhanden ist, oder NUR bei Übergängen aus "
+"einem Versand, der über Serenity Mailer erstellt wurde"
 
 #: templates/panels/aap_settings/url_stats.html:46
 msgid ""
 "Параметр устанавливается к ссылке на Ваш сайт в письмах рассылки "
 "автоматически."
-msgstr "Der Parameter wird in den E-Mails des Mailings automatisch mit dem Link zu Ihrer Website gesetzt."
+msgstr ""
+"Der Parameter wird in den E-Mails des Mailings automatisch mit dem Link zu "
+"Ihrer Website gesetzt."
 
 #: templates/panels/base.html:38 templates/panels/base.html:54
 msgid "Loading"
@@ -2333,7 +2497,9 @@ msgstr "ANMELDUNG (Standard)"
 
 #: templates/panels/base.html:63
 msgid "Are you sure? Current template work will be partially or fully lost."
-msgstr "Sind Sie sicher? Die aktuelle Vorlagenarbeit wird teilweise oder vollständig verloren gehen."
+msgstr ""
+"Sind Sie sicher? Die aktuelle Vorlagenarbeit wird teilweise oder vollständig "
+"verloren gehen."
 
 #: templates/panels/base.html:64
 msgid "Continue"
@@ -2353,17 +2519,22 @@ msgstr "Nicht gespeicherte Änderungen"
 
 #: templates/panels/base.html:68
 msgid "Letter is not saved. Changes will not be applied. Go to campaigns list?"
-msgstr "Der Brief wird nicht gespeichert. Änderungen werden nicht übernommen. Zur Kampagnenliste gehen?"
+msgstr ""
+"Der Brief wird nicht gespeichert. Änderungen werden nicht übernommen. Zur "
+"Kampagnenliste gehen?"
 
 #: templates/panels/base.html:69
 msgid ""
 "Letter template has changed. Review the letter and save changes. Then the "
 "new template will be applied."
-msgstr "Die Briefvorlage wurde geändert. Überprüfen Sie den Brief und speichern Sie die Änderungen. Dann wird die neue Vorlage angewendet."
+msgstr ""
+"Die Briefvorlage wurde geändert. Überprüfen Sie den Brief und speichern Sie "
+"die Änderungen. Dann wird die neue Vorlage angewendet."
 
 #: templates/panels/base.html:70
 msgid "There are unsaved changes in the letter. Save the letter first."
-msgstr "Es gibt ungespeicherte Änderungen im Brief. Speichern Sie zuerst den Brief."
+msgstr ""
+"Es gibt ungespeicherte Änderungen im Brief. Speichern Sie zuerst den Brief."
 
 #: templates/panels/base.html:71
 msgid "Link"
@@ -2409,28 +2580,28 @@ msgstr "Aufzählungspunkt"
 msgid "Сменить пользователя"
 msgstr "Benutzer wechseln"
 
-#: templates/panels/base.html:174
+#: templates/panels/base.html:186
 msgid "фулл"
 msgstr "vollständig"
 
-#: templates/panels/base.html:176
+#: templates/panels/base.html:188
 msgid "Тип доступа:"
 msgstr "Zugriffstyp:"
 
-#: templates/panels/base.html:178
+#: templates/panels/base.html:190
 msgid "тестовый"
 msgstr "Testversion"
 
-#: templates/panels/base.html:180
+#: templates/panels/base.html:192
 msgid "полный"
 msgstr "vollständig"
 
-#: templates/panels/base.html:263
+#: templates/panels/base.html:275
 msgid "Выйти"
 msgstr "Abmelden"
 
 #: templates/panels/modals/contact_from_audience.html:14
-#: templates/public/register.html:30
+#: templates/public/register.html:29
 msgid "Название компании"
 msgstr "Firmenname"
 
@@ -2494,7 +2665,7 @@ msgstr "Vorname Nachname"
 msgid "Доступ"
 msgstr "Zugriff"
 
-#: templates/panels/modals/switch_user.html:35 templates/public/login.html:35
+#: templates/panels/modals/switch_user.html:35 templates/public/login.html:30
 msgid "Войти"
 msgstr "Anmelden"
 
@@ -2529,7 +2700,10 @@ msgstr "Zeit"
 msgid ""
 "Переходов на сайт / сайты из писем по рассылкам не зафиксировано. Проверьте "
 "установку счетчика переходов на сайте."
-msgstr "Keine Klicks auf die Website / Websites aus E-Mails von Kampagnen wurden erfasst. Bitte prüfen Sie die Installation des Klick-Trackers auf der Website."
+msgstr ""
+"Keine Klicks auf die Website / Websites aus E-Mails von Kampagnen wurden "
+"erfasst. Bitte prüfen Sie die Installation des Klick-Trackers auf der "
+"Website."
 
 #: templates/panels/overview.html:129
 msgid "Ваши кампании"
@@ -2661,996 +2835,1550 @@ msgstr "Erfolgreich:"
 #: templates/panels/stats.html:152 templates/panels/stats.html:386
 #: templates/panels/stats.html:414
 msgid "Переходов на сайт / сайты из писем по рассылкам не зафиксировано."
-msgstr "Keine Zugriffe auf die Website / Websites aus E-Mails von Mailings wurden erfasst."
+msgstr ""
+"Keine Zugriffe auf die Website / Websites aus E-Mails von Mailings wurden "
+"erfasst."
 
 #: templates/panels/stats.html:301 templates/panels/stats.html:507
 #: templates/panels/stats.html:545
 msgid "Отправок по рассылкам не зафиксировано."
 msgstr "Für den Newsletter-Versand wurden keine Sendungen erfasst."
 
-#: templates/public/base.html:11 templates/public/index.html:6
-msgid "Интеллектуальные email-коммуникации"
+#: templates/public/_interactive_heading.html:3
+#| msgid "Интеллектуальные email-коммуникации"
+msgid "Интеллектуальные Email коммуникации"
 msgstr "Intelligente E-Mail-Kommunikation"
 
-#: templates/public/base.html:12
-msgid ""
-"Интеллектуальная система email-коммуникаций для малого и среднего бизнеса."
-msgstr "Intelligentes E-Mail-Kommunikationssystem für kleine und mittlere Unternehmen."
-
 #: templates/public/confirm_email_done.html:4
-#: templates/public/confirm_email_done.html:9
+#: templates/public/confirm_email_done.html:10
 msgid "Email подтверждён"
 msgstr "E-Mail bestätigt"
 
-#: templates/public/confirm_email_done.html:15
+#: templates/public/confirm_email_done.html:16
 msgid "Ваш адрес электронной почты подтвержден"
 msgstr "Ihre E-Mail-Adresse wurde bestätigt"
 
-#: templates/public/confirm_email_done.html:20 templates/public/login.html:40
-#: templates/public/password_reset_confirm.html:62
-#: templates/public/password_reset_done.html:17
-#: templates/public/register_email_pending.html:46
+#: templates/public/confirm_email_done.html:21 templates/public/login.html:35
+#: templates/public/password_reset_confirm.html:63
+#: templates/public/password_reset_done.html:18
+#: templates/public/register_email_pending.html:47
 msgid "Вернуться к логину"
 msgstr "Zurück zum Login"
 
-#: templates/public/index.html:14 templates/public/login.html:13
-msgid "Интеллектуальные"
-msgstr "Intelligente"
-
-#: templates/public/index.html:14 templates/public/login.html:14
-msgid "email-коммуникации"
-msgstr "E-Mail-Kommunikation"
-
-#: templates/public/index.html:18
-msgid "Вход для клиентов:"
-msgstr "Kunden-Login:"
-
-#: templates/public/index.html:19
-msgid "Перейти"
-msgstr "Wechseln"
-
-#: templates/public/index.html:23
-msgid "Регистрация:"
-msgstr "Registrierung:"
-
-#: templates/public/index.html:24 templates/public/register.html:84
-msgid "Зарегистрироваться"
-msgstr "Registrieren"
-
-#: templates/public/index.html:35
-msgid ""
-"интеллектуальная система email-коммуникаций для малого и среднего бизнеса, "
-"ориентированная на работу на рынке Германии."
-msgstr "Intelligentes E-Mail-Kommunikationssystem für kleine und mittelständische Unternehmen, ausgerichtet auf den deutschen Markt."
-
-#: templates/public/index.html:39
-msgid ""
-"Платформа предназначена для компаний, которые регулярно взаимодействуют с "
-"другими предприятиями в рамках делового сотрудничества — как в продажах, так "
-"и в закупках."
-msgstr "Die Plattform ist für Unternehmen bestimmt, die regelmäßig im Rahmen geschäftlicher Zusammenarbeit mit anderen Unternehmen interagieren – sowohl im Vertrieb als auch im Einkauf."
-
-#: templates/public/index.html:42
-msgid "Функциональные возможности:"
-msgstr "Funktionale Möglichkeiten:"
-
-#: templates/public/index.html:44
-msgid "Интеллектуальный подбор и приоритизация деловых контактов для продаж."
-msgstr "Intelligente Auswahl und Priorisierung geschäftlicher Kontakte für den Vertrieb."
-
-#: templates/public/index.html:45
-msgid "Интеллектуальный подбор и приоритизация деловых контактов для закупок."
-msgstr "Intelligente Auswahl und Priorisierung von Geschäftskontakten für den Einkauf."
-
-#: templates/public/index.html:46
-msgid "Отправка коммерческих предложений целевым и релевантным получателям."
-msgstr "Versand von коммерziellen Angeboten an zielgerichtete und relevante Empfänger."
-
-#: templates/public/index.html:47
-msgid "Отправка запросов поставщикам и подрядчикам по заданным критериям."
-msgstr "Anfragen an Lieferanten und Auftragnehmer nach festgelegten Kriterien senden."
-
-#: templates/public/index.html:48
-msgid "Отслеживание отклика и последующих взаимодействий."
-msgstr "Verfolgung von Rückmeldungen und nachfolgenden Interaktionen."
-
-#: templates/public/index.html:49
-msgid "Информационные рассылки для существующих клиентов и партнёров."
-msgstr "Informationsschreiben für bestehende Kunden und Partner."
-
-#: templates/public/index.html:61
-msgid "Вы получаете"
-msgstr "Sie erhalten"
-
-#: templates/public/index.html:62
-msgid "понятный"
-msgstr "verständlich"
-
-#: templates/public/index.html:63
-msgid "и"
-msgstr "und"
-
-#: templates/public/index.html:64
-msgid "управляемый"
-msgstr "verwaltet"
-
-#: templates/public/index.html:65
-msgid ""
-"инструмент для автоматизации привлечения клиентов, а также поиска "
-"поставщиков и подрядчиков в B2B-сегменте."
-msgstr "ein Tool zur Automatisierung der Kundengewinnung sowie zur Suche nach Lieferanten und Auftragnehmern im B2B-Segment."
-
-#: templates/public/index.html:69
-msgid ""
-"С помощью искусственного интеллекта вы формируете точные критерии того, что "
-"хотите продать или приобрести. AI не принимает решений за вас, а помогает "
-"корректно сформулировать запрос, убрать неточности и упростить процесс."
-msgstr "Mit Hilfe künstlicher Intelligenz formulieren Sie präzise Kriterien dafür, was Sie verkaufen oder erwerben möchten. AI trifft keine Entscheidungen für Sie, sondern hilft dabei, die Anfrage korrekt zu formulieren, Ungenauigkeiten zu beseitigen und den Prozess zu vereinfachen."
-
-#: templates/public/index.html:73
-msgid ""
-"Вы указываете информацию о своей компании, о товаре или услуге, а также "
-"задаёте географические условия работы на рынке Германии."
-msgstr "Sie geben Informationen zu Ihrem Unternehmen, Ihrem Produkt oder Ihrer Dienstleistung an und legen außerdem die geografischen Bedingungen für die Tätigkeit auf dem deutschen Markt fest."
-
-#: templates/public/index.html:77
-msgid ""
-"На основе этих данных система анализирует и ранжирует города Германии и "
-"категории компаний, в которых вероятность заключения сделки наиболее высока. "
-"Сортировка выполняется с использованием AI и опирается на базу из 790 бизнес-"
-"категорий и 1 326 городов Германии с населением от 12 000 человек. Эти "
-"данные могут использоваться как для продаж, так и для закупок."
-msgstr "Auf Grundlage dieser Daten analysiert und priorisiert das System deutsche Städte und Unternehmenskategorien, in denen die Wahrscheinlichkeit eines Geschäftsabschlusses am höchsten ist. Die Sortierung erfolgt mithilfe von KI und stützt sich auf eine Datenbasis von 790 Geschäftskategorien und 1.326 deutschen Städten mit einer Bevölkerung ab 12.000 Einwohnern. Diese Daten können sowohl für den Vertrieb als auch für den Einkauf verwendet werden."
-
-#: templates/public/index.html:89
-msgid "На основании сформированной задачи система собирает"
-msgstr "Auf Grundlage der erstellten Aufgabe sammelt das System"
-
-#: templates/public/index.html:90
-msgid "контактные данные"
-msgstr "Kontaktdaten"
-
-#: templates/public/index.html:91
-msgid ""
-"компаний в соответствии с заданными приоритетами. Используются открытые "
-"источники: немецкие «Жёлтые страницы», бизнес-справочник 11880 и другие "
-"публичные базы. Совокупный охват этих источников превышает 4 млн компаний, "
-"работающих в Германии."
-msgstr "von Unternehmen entsprechend den festgelegten Prioritäten. Es werden offene Quellen genutzt: die deutschen „Gelben Seiten“, das Branchenverzeichnis 11880 und andere öffentliche Datenbanken. Die Gesamtabdeckung dieser Quellen übersteigt 4 Mio. Unternehmen, die in Deutschland tätig sind."
-
-#: templates/public/index.html:95
-msgid "Далее каждая компания оценивается индивидуально с применением"
-msgstr "Anschließend wird jedes Unternehmen individuell unter Anwendung bewertet"
-
-#: templates/public/index.html:96
-msgid "AI"
-msgstr "KI"
-
-#: templates/public/index.html:97
-msgid ""
-"Анализируется вероятность успешного заключения сделки и ожидаемая скорость "
-"её достижения. Проводится многофакторная оценка и отбор, в результате чего "
-"формируется целевая аудитория под конкретное деловое предложение или запрос."
-msgstr "Die Wahrscheinlichkeit eines erfolgreichen Abschlusses des Geschäfts und die erwartete Geschwindigkeit seiner Erreichung werden analysiert. Es erfolgt eine multifaktorielle Bewertung und Auswahl, wodurch eine Zielgruppe für ein bestimmtes Geschäftsangebot oder eine Anfrage gebildet wird."
-
-#: templates/public/index.html:101
-msgid ""
-"Все этапы работы системы прозрачны: вы можете корректировать как исходную "
-"задачу, так и промежуточные результаты."
-msgstr "Alle Arbeitsschritte des Systems sind transparent: Sie können sowohl die ursprüngliche Aufgabe als auch die Zwischenergebnisse anpassen."
-
-#: templates/public/index.html:113
-msgid "После отбора формируется"
-msgstr "Nach der Auswahl wird gebildet"
-
-#: templates/public/index.html:114
-msgid "готовая аудитория"
-msgstr "fertige Zielgruppe"
-
-#: templates/public/index.html:115
-msgid ""
-"— список адресатов для деловой email-коммуникации. С помощью AI и "
-"подготовленных шаблонов вы формируете коммерческое предложение или деловой "
-"запрос, адаптированные под выбранную аудиторию."
-msgstr "— Liste der Empfänger für die geschäftliche E-Mail-Kommunikation. Mithilfe von KI und vorbereiteten Vorlagen erstellen Sie ein kommerzielles Angebot oder eine geschäftliche Anfrage, die auf die ausgewählte Zielgruppe zugeschnitten sind."
-
-#: templates/public/index.html:119
-msgid "Рассылка выполняется исключительно от вашего имени и с использованием"
-msgstr "Der Versand erfolgt ausschließlich in Ihrem Namen und unter Verwendung von"
-
-#: templates/public/index.html:120
-msgid "корпоративного адреса"
-msgstr "der Firmenadresse"
-
-#: templates/public/index.html:121
-msgid ""
-"электронной почты. Благодаря предварительной фильтрации и приоритизации "
-"контактов объём рассылки ограничивается 50–100 письмами в час (в зависимости "
-"от используемого почтового провайдера)."
-msgstr "E-Mail. Dank Vorfilterung und Priorisierung der Kontakte wird das Versandvolumen auf 50–100 E-Mails pro Stunde begrenzt (je nach verwendetem E-Mail-Anbieter)."
-
-#: templates/public/index.html:125
-msgid ""
-"Такой формат коммуникации основан на законном деловом интересе (berechtigtes "
-"Interesse) и соответствует требованиям UWG и DSGVO."
-msgstr "Ein solches Kommunikationsformat basiert auf einem berechtigten geschäftlichen Interesse (berechtigtes Interesse) und entspricht den Anforderungen des UWG und der DSGVO."
-
-#: templates/public/index.html:137
-msgid "В процессе рассылки система фиксирует"
-msgstr "Während des Versands erfasst das System"
-
-#: templates/public/index.html:138
-msgid "реакцию адресатов"
-msgstr "Reaktion der Empfänger"
-
-#: templates/public/index.html:139
-msgid ""
-"на ваше сообщение. В режиме реального времени отображается, какие компании "
-"перешли на ваш сайт по ссылкам из отправленных писем. Для каждого такого "
-"перехода доступна информация о компании, связанная с конкретным отправленным "
-"сообщением."
-msgstr "auf Ihre Nachricht. In Echtzeit wird angezeigt, welche Unternehmen über Links aus versendeten E-Mails auf Ihre Website gewechselt sind. Für jeden solchen Wechsel sind Informationen zum Unternehmen verfügbar, die mit der jeweiligen gesendeten Nachricht verknüpft sind."
-
-#: templates/public/index.html:143
-msgid ""
-"Также автоматически учитываются ответы на письма, жалобы на рассылку и "
-"другие реакции. На основе этих данных формируется статистика и уточняются "
-"алгоритмы приоритизации для последующих коммуникаций."
-msgstr "Auch Antworten auf E-Mails, Beschwerden über den Versand und andere Reaktionen werden automatisch berücksichtigt. Auf Grundlage dieser Daten werden Statistiken erstellt und die Priorisierungsalgorithmen für weitere Kommunikationen verfeinert."
-
-#: templates/public/index.html:147
-msgid "Мы — предприниматели с"
-msgstr "Wir sind Unternehmer mit"
-
-#: templates/public/index.html:148
-msgid "практическим опытом"
-msgstr "praktischen Erfahrungen"
-
-#: templates/public/index.html:149
-msgid ""
-"ведения бизнеса. Эта система была создана для решения собственных задач, "
-"поскольку на рынке не существовало решения с сопоставимой логикой и уровнем "
-"прозрачности. Сервис ориентирован на пользователей без технической "
-"подготовки и максимально упрощён в использовании. После подтверждения "
-"эффективности на практике мы приняли решение предложить этот инструмент "
-"другим предпринимателям."
-msgstr "Geschäftsführung. Dieses System wurde entwickelt, um eigene Anforderungen zu lösen, da es auf dem Markt keine Lösung mit vergleichbarer Logik und Transparenz gab. Der Service richtet sich an Nutzer ohne technische Vorkenntnisse und ist in der Anwendung максимально vereinfacht. Nach der Bestätigung seiner Wirksamkeit in der Praxis haben wir beschlossen, dieses Werkzeug auch anderen Unternehmern anzubieten."
-
-#: templates/public/login.html:4 templates/public/login.html:17
+#: templates/public/login.html:4 templates/public/login.html:12
 msgid "Вход"
 msgstr "Anmeldung"
 
-#: templates/public/login.html:22
+#: templates/public/login.html:17
 msgid "Неверный логин или пароль"
 msgstr "Falscher Login oder falsches Passwort"
 
-#: templates/public/login.html:32
+#: templates/public/login.html:27
 msgid "Пароль:"
 msgstr "Passwort:"
 
-#: templates/public/login.html:36
+#: templates/public/login.html:31
+#: templates/public/password_reset_request.html:30
 msgid "Забыли пароль?"
 msgstr "Passwort vergessen?"
 
 #: templates/public/password_reset_confirm.html:4
-#: templates/public/password_reset_confirm.html:9
-#: templates/public/password_reset_confirm.html:43
+#: templates/public/password_reset_confirm.html:10
+#: templates/public/password_reset_confirm.html:44
 msgid "Новый пароль"
 msgstr "Neues Passwort"
 
-#: templates/public/password_reset_confirm.html:21
+#: templates/public/password_reset_confirm.html:22
 msgid "Ссылка для смены пароля недействительна или устарела."
 msgstr "Der Link zum Ändern des Passworts ist ungültig oder abgelaufen."
 
-#: templates/public/password_reset_confirm.html:25
+#: templates/public/password_reset_confirm.html:26
 msgid "Пароль успешно изменен."
 msgstr "Das Passwort wurde erfolgreich geändert."
 
-#: templates/public/password_reset_confirm.html:48
-#: templates/public/register.html:74
+#: templates/public/password_reset_confirm.html:49
+#: templates/public/register.html:73
 msgid "Подтверждение пароля"
 msgstr "Passwort bestätigen"
 
 #: templates/public/password_reset_done.html:4
-#: templates/public/password_reset_done.html:9
+#: templates/public/password_reset_done.html:10
 #: templates/public/password_reset_request.html:4
-#: templates/public/password_reset_request.html:9
+#: templates/public/password_reset_request.html:10
 msgid "Сброс пароля"
 msgstr "Passwort zurücksetzen"
 
-#: templates/public/password_reset_done.html:12
+#: templates/public/password_reset_done.html:13
 msgid "Если такой адрес есть, на него отправлена ссылка для смены пароля."
-msgstr "Wenn eine solche Adresse vorhanden ist, wurde an sie ein Link zum Ändern des Passworts gesendet."
+msgstr ""
+"Wenn eine solche Adresse vorhanden ist, wurde an sie ein Link zum Ändern des "
+"Passworts gesendet."
 
-#: templates/public/password_reset_request.html:16
+#: templates/public/password_reset_request.html:17
 msgid "Введите корректный email"
 msgstr "Geben Sie eine gültige E-Mail-Adresse ein"
 
-#: templates/public/password_reset_request.html:21
+#: templates/public/password_reset_request.html:22
 msgid "Введите адрес электронной почты"
 msgstr "Geben Sie die E-Mail-Adresse ein"
 
-#: templates/public/password_reset_request.html:27
+#: templates/public/password_reset_request.html:28
 msgid "Отправить"
 msgstr "Senden"
 
-#: templates/public/register.html:4 templates/public/register.html:10
+#: templates/public/register.html:4 templates/public/register.html:11
+#: templates/public_base.html:50
 msgid "Регистрация"
 msgstr "Registrierung"
 
-#: templates/public/register.html:10
-#: templates/public/register_email_pending.html:41
+#: templates/public/register.html:11
+#: templates/public/register_email_pending.html:42
 msgid "Изменить данные"
 msgstr "Daten ändern"
 
-#: templates/public/register.html:18
+#: templates/public/register.html:19
 msgid "Проверьте заполнение формы"
 msgstr "Überprüfen Sie das Ausfüllen des Formulars"
 
-#: templates/public/register.html:35
+#: templates/public/register.html:34
 msgid "Адрес компании"
 msgstr "Firmenadresse"
 
-#: templates/public/register.html:39
-msgid "Пользователь"
-msgstr "Benutzer"
-
-#: templates/public/register.html:42
+#: templates/public/register.html:41
 msgid "Фамилия"
 msgstr "Nachname"
 
-#: templates/public/register.html:47
+#: templates/public/register.html:46
 msgid "Имя"
 msgstr "Name"
 
-#: templates/public/register.html:52
+#: templates/public/register.html:51
 msgid "Телефон"
 msgstr "Telefon"
 
-#: templates/public/register.html:57
+#: templates/public/register.html:56
 msgid "Должность"
 msgstr "Position"
 
-#: templates/public/register.html:61
-msgid "Логин информация"
-msgstr "Anmeldeinformationen"
-
-#: templates/public/register.html:64
+#: templates/public/register.html:63
 msgid "Email / Логин"
 msgstr "E-Mail / Login"
 
-#: templates/public/register.html:69
+#: templates/public/register.html:68
 msgid "Пароль"
 msgstr "Passwort"
 
+#: templates/public/register.html:83
+msgid "Зарегистрироваться"
+msgstr "Registrieren"
+
 #: templates/public/register_email_pending.html:4
-#: templates/public/register_email_pending.html:9
+#: templates/public/register_email_pending.html:10
 msgid "Подтверждение email"
 msgstr "E-Mail-Bestätigung"
 
-#: templates/public/register_email_pending.html:13
+#: templates/public/register_email_pending.html:14
 msgid "Спасибо за регистрацию в системе Serenity Mailer."
 msgstr "Danke für die Registrierung im Serenity Mailer-System."
 
-#: templates/public/register_email_pending.html:14
-msgid "Для начала работы необходимо подтвердить Ваш электронный адрес."
-msgstr "Um mit der Arbeit zu beginnen, müssen Sie Ihre E-Mail-Adresse bestätigen."
-
 #: templates/public/register_email_pending.html:15
+msgid "Для начала работы необходимо подтвердить Ваш электронный адрес."
+msgstr ""
+"Um mit der Arbeit zu beginnen, müssen Sie Ihre E-Mail-Adresse bestätigen."
+
+#: templates/public/register_email_pending.html:16
 #, python-format
 msgid ""
 "Подтвердите адрес электронной почты %(email)s как Ваш идентификатор и логин "
 "в систему."
-msgstr "Bestätigen Sie die E-Mail-Adresse %(email)s als Ihre Kennung und Ihren Login für das System."
+msgstr ""
+"Bestätigen Sie die E-Mail-Adresse %(email)s als Ihre Kennung und Ihren Login "
+"für das System."
 
-#: templates/public/register_email_pending.html:30
+#: templates/public/register_email_pending.html:31
 #, python-format
 msgid ""
 "Ссылка для подтверждения адреса электронной почты отправлена вам по адресу "
 "%(email)s"
-msgstr "Der Link zur Bestätigung der E-Mail-Adresse wurde an %(email)s gesendet"
+msgstr ""
+"Der Link zur Bestätigung der E-Mail-Adresse wurde an %(email)s gesendet"
 
-#: templates/public/register_email_pending.html:36
+#: templates/public/register_email_pending.html:37
 msgid "Подтвердить email"
 msgstr "E-Mail bestätigen"
-#: panel/aap_lists/views/contacts.py:232
-#: panel/aap_lists/views/contacts.py:232
-msgid "%(title)s (архив)"
-msgstr "%(title)s (Archiv)"
-
-#: panel/menu.py:91
-msgid "'Окна' отправки"
-msgstr "Sende-„Fenster“"
-
-#: panel/aap_settings/forms.py:348 panel/aap_settings/forms.py:87 public/aap_auth/views.py:155 public/aap_auth/views.py:178
-msgid "Email"
-msgstr "E-Mail"
-
-#: panel/aap_settings/views/mail_servers_flow.py:10
-msgid "Email и лимиты"
-msgstr "E-Mail und Limits"
-
-#: panel/models.py:15
-msgid "HTML-контент (большой)"
-msgstr "HTML-Inhalt (groß)"
-
-#: panel/models.py:14
-msgid "HTML-шаблон (большой)"
-msgstr "HTML-Vorlage (groß)"
-
-#: panel/context_processors.py:54
-msgid "SERENITY PANEL"
-msgstr "SERENITY-Bedienfeld"
-
-#: panel/aap_campaigns/forms.py:40
-msgid "styles: invalid JSON"
-msgstr "Stile: ungültiges JSON"
-
-#: panel/aap_campaigns/forms.py:42
-msgid "styles: must be a JSON object"
-msgstr "styles: muss ein JSON-Objekt sein"
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:39
-msgid "Ассистент ИИ сейчас недоступен. Повторите попытку в течение пяти минут."
-msgstr "Der KI-Assistent ist derzeit nicht verfügbar. Versuchen Sie es innerhalb von fünf Minuten erneut."
-
-#: panel/aap_audience/views/modal_pause_info.py:172
-msgid "В настоящий момент собрано достаточно контактов с успешным рейтингом для обеспечения рассылок."
-msgstr "Derzeit sind genügend Kontakte mit erfolgreicher Bewertung gesammelt, um den Versand sicherzustellen."
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:51
-msgid "В процессе обработки ИИ будет задавать вопросы и давать подсказки для уточнения описания. Поскольку основные варианты уже указаны в начальном описании, часть подсказок может быть нерелевантной. При необходимости добавьте информацию в описание или в команду для ассистента ИИ."
-msgstr "Während der Bearbeitung wird die KI Fragen stellen und Hinweise geben, um die Beschreibung zu präzisieren. Da die wichtigsten Optionen bereits in der ersten Beschreibung angegeben sind, können einige Hinweise möglicherweise irrelevant sein. Fügen Sie bei Bedarf Informationen zur Beschreibung oder zum Befehl für den KI-Assistenten hinzu."
-
-#: panel/aap_audience/views/modal_pause_info.py:219
-msgid "В тестовом доступе действуют ограничения:"
-msgstr "Im Testzugang gelten folgende Einschränkungen:"
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:153
-msgid "Введите команду для работы с {subject} — что нужно добавить, удалить или изменить. Указанная команда будет применена к текущему описанию."
-msgstr "Geben Sie einen Befehl für die Arbeit mit {subject} ein — was hinzugefügt, entfernt oder geändert werden soll. Der angegebene Befehl wird auf die aktuelle Beschreibung angewendet."
-
-#: panel/aap_audience/views/modal_edit_rate_limit.py:43 panel/aap_audience/views/modal_edit_rate_limit.py:46
-msgid "Введите лимит от 20 до 60."
-msgstr "Geben Sie einen Wert zwischen 20 und 60 ein."
-
-#: panel/aap_audience/views/modal_edit_title.py:121
-msgid "Введите название списка рассылки."
-msgstr "Geben Sie den Namen der Mailingliste ein."
-
-#: panel/aap_audience/views/modal_edit_city_rate.py:64 panel/aap_audience/views/modal_edit_city_rate.py:67
-msgid "Введите рейтинг от 1 до 100."
-msgstr "Geben Sie eine Bewertung von 1 bis 100 ein."
-
-#: panel/aap_audience/views/modal_edit_branch_rate.py:65 panel/aap_audience/views/modal_edit_branch_rate.py:68
-msgid "Введите рейтинг от 1 до 20."
-msgstr "Geben Sie eine Bewertung von 1 bis 20 ein."
-
-#: panel/aap_audience/views/create_list.py:156 panel/aap_campaigns/views/campaigns.py:1072 panel/aap_campaigns/views/templates.py:406 panel/aap_settings/views/mail_servers.py:353
-msgid "Вернуть из архива"
-msgstr "Aus dem Archiv zurückholen"
-
-#: panel/aap_audience/views/modal_pause_info.py:204
-msgid "Вы можете создать новый список рассылки и в нём по-другому задать параметры сбора контактов."
-msgstr "Sie können eine neue Mailingliste erstellen und darin die Parameter für die Erfassung von Kontakten anders festlegen."
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:160
-msgid "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над {subject}. Ответ на вопрос будет дан отдельно и не изменит текст описания."
-msgstr "Sie können dem KI-Assistenten auch eine Frage im Kontext der Arbeit an {subject} stellen. Die Antwort auf die Frage wird separat gegeben und ändert den Beschreibungstext nicht."
-
-#: panel/aap_audience/views/modal_pause_info.py:205
-msgid "Вы также можете исправить задачу для этого списка рассылки — убрать ненужные категории, изменить описание продукта или компании."
-msgstr "Sie können auch die Aufgabe für diese Mailingliste bearbeiten — unnötige Kategorien entfernen, die Produkt- oder Unternehmensbeschreibung ändern."
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:253 panel/aap_audience/views/create_edit_flow_shared.py:255 panel/aap_audience/views/create_edit_flow_shared.py:337 panel/aap_audience/views/create_edit_flow_shared.py:339
-msgid "География. Ограничения, предпочтения, приоритеты."
-msgstr "Geografie. Einschränkungen, Präferenzen, Prioritäten."
-
-#: panel/aap_audience/views/modal_edit_city_rate.py:59
-msgid "Город не найден."
-msgstr "Stadt nicht gefunden."
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:64 panel/aap_audience/views/create_edit_flow_shared.py:65 panel/aap_audience/views/create_edit_flow_shared.py:66
-msgid "Города"
-msgstr "Städte"
-
-#: public/aap_auth/views.py:306
-msgid "Данные обновлены"
-msgstr "Daten aktualisiert"
 
-#: panel/aap_audience/views/modal_pause_info.py:176
-msgid "Действует ограничение на рейтингование контактов — не более 50 000 контактов в месяц, вне зависимости от успешности рейтингования. Также действует ограничение на отправку через один почтовый сервер — не более 1 000 писем в день."
-msgstr "Für die Bewertung von Kontakten gilt eine Begrenzung — nicht mehr als 50.000 Kontakte pro Monat, unabhängig vom Erfolg der Bewertung. Außerdem gilt eine Begrenzung für den Versand über einen einzelnen Mailserver — nicht mehr als 1.000 E-Mails pro Tag."
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:233
-msgid "Для корректного выбора бизнес-категорий и рейтингования потенциальных клиентов необходимо сформировать описание компании-продавца. Укажите название компании, страну и адрес. Уточните специализацию компании, опыт работы, возраст и размер компании. Укажите сайт компании. Используйте ссылки в формате: https://www.example.com. При необходимости можно воспользоваться помощью ИИ-ассистента.\n\n«Обработать» — помощь ИИ\nПри нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, сделает его более подробным, структурированным и удобным для машинной обработки. В дальнейшем любые добавленные вами данные будут встроены в описание. Удалённые элементы также будут корректно исключены. Результат обработки автоматически не сохраняется.\n\n«Сохранить» — сохранить описание\nКнопка «Сохранить» записывает текущую версию описания для дальнейшего использования."
-msgstr "Für die korrekte Auswahl von Geschäftskategorien und das Ranking potenzieller Kunden muss eine Beschreibung des Verkäuferunternehmens erstellt werden. Geben Sie den Namen des Unternehmens, das Land und die Adresse an. Präzisieren Sie die Spezialisierung des Unternehmens, die Berufserfahrung, das Alter und die Größe des Unternehmens. Geben Sie die Website des Unternehmens an. Verwenden Sie Links im Format: https://www.example.com. Bei Bedarf kann die Hilfe des KI-Assistenten genutzt werden.\n\n„Verarbeiten“ — Hilfe durch KI  \nBeim Klicken auf die Schaltfläche „Verarbeiten“ erweitert der KI-Assistent die Beschreibung, macht sie detaillierter, strukturierter und für die maschinelle Verarbeitung geeigneter. Alle von Ihnen später hinzugefügten Daten werden in die Beschreibung integriert. Gelöschte Elemente werden ebenfalls korrekt entfernt. Das Verarbeitungsergebnis wird nicht automatisch gespeichert.\n\n„Speichern“ — Beschreibung speichern  \nDie Schaltfläche „Speichern“ schreibt die aktuelle Version der Beschreibung zur weiteren Verwendung."
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:211
-msgid "Для корректного выбора бизнес-категорий и рейтингования потенциальных клиентов необходимо сформировать описание продукта или услуги. Введите описание продукта / услуги. Можно использовать ссылку / ссылки в формате https://www.example.com. Можно воспользоваться помощью ИИ-ассистента.\n\n«Обработать» — помощь ИИ.\nПри нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, сделает его более подробным, структурированным и удобным для машинной обработки. В дальнейшем любые добавленные вами данные будут автоматически встроены в структуру описания. Удалённые элементы также будут корректно исключены. Результат обработки не сохраняется автоматически.\n\n«Сохранить» — сохранить описание\nКнопка «Сохранить» записывает текущую версию описания для дальнейшего использования."
-msgstr "Für die korrekte Auswahl von Geschäftskategorien und die Bewertung potenzieller Kunden ist es erforderlich, eine Beschreibung des Produkts oder der Dienstleistung zu erstellen. Geben Sie eine Beschreibung des Produkts / der Dienstleistung ein. Sie können einen Link / mehrere Links im Format https://www.example.com verwenden. Sie können die Hilfe eines KI-Assistenten in Anspruch nehmen.\n\n„Verarbeiten“ — KI-Hilfe.\nBeim Klicken auf die Schaltfläche „Verarbeiten“ erweitert der KI-Assistent die Beschreibung, macht sie detaillierter, strukturierter und für die maschinelle Verarbeitung besser geeignet. In Zukunft werden alle von Ihnen hinzugefügten Daten automatisch in die Struktur der Beschreibung eingebunden. Entfernte Elemente werden ebenfalls korrekt ausgeschlossen. Das Verarbeitungsergebnis wird nicht automatisch gespeichert.\n\n„Speichern“ — Beschreibung speichern\nDie Schaltfläche „Speichern“ speichert die aktuelle Version der Beschreibung zur weiteren Verwendung."
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:294
-msgid "Для корректного выбора бизнес-категорий и рейтингования потенциальных поставщиков и подрядчиков необходимо сформировать описание закупаемого продукта, услуги или работ. Введите описание того, что нужно купить, заказать или отдать на подряд. Можно использовать ссылку / ссылки в формате https://www.example.com. Можно воспользоваться помощью ИИ-ассистента.\n\n«Обработать» — помощь ИИ.\nПри нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, сделает его более подробным, структурированным и удобным для машинной обработки. В дальнейшем любые добавленные вами данные будут автоматически встроены в структуру описания. Удалённые элементы также будут корректно исключены. Результат обработки не сохраняется автоматически.\n\n«Сохранить» — сохранить описание\nКнопка «Сохранить» записывает текущую версию описания для дальнейшего использования."
-msgstr "Für die korrekte Auswahl von Geschäftskategorien und die Bewertung potenzieller Lieferanten und Auftragnehmer muss eine Beschreibung des zu beschaffenden Produkts, der Dienstleistung oder der Arbeiten erstellt werden. Geben Sie eine Beschreibung dessen ein, was gekauft, bestellt oder als Auftrag vergeben werden soll. Sie können einen Link bzw. Links im Format https://www.example.com verwenden. Sie können die Hilfe des KI-Assistenten in Anspruch nehmen.\n\n„Verarbeiten“ — KI-Hilfe.  \nBeim Klicken auf die Schaltfläche „Verarbeiten“ erweitert der KI-Assistent die Beschreibung, macht sie ausführlicher, strukturierter und für die maschinelle Verarbeitung geeigneter. Alle von Ihnen später hinzugefügten Daten werden automatisch in die Beschreibungsstruktur integriert. Entfernte Elemente werden ebenfalls korrekt ausgeschlossen. Das Verarbeitungsergebnis wird nicht automatisch gespeichert.\n\n„Speichern“ — Beschreibung speichern  \nDie Schaltfläche „Speichern“ speichert die aktuelle Version der Beschreibung zur weiteren Verwendung."
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:317
-msgid "Для корректного выбора бизнес-категорий и рейтингования потенциальных поставщиков и подрядчиков необходимо сформировать описание компании-заказчика. Укажите название компании, страну и адрес. Уточните специализацию компании, опыт работы, возраст и размер компании. Укажите сайт компании. Используйте ссылки в формате: https://www.example.com. При необходимости можно воспользоваться помощью ИИ-ассистента.\n\n«Обработать» — помощь ИИ\nПри нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, сделает его более подробным, структурированным и удобным для машинной обработки. В дальнейшем любые добавленные вами данные будут встроены в описание. Удалённые элементы также будут корректно исключены. Результат обработки автоматически не сохраняется.\n\n«Сохранить» — сохранить описание\nКнопка «Сохранить» записывает текущую версию описания для дальнейшего использования."
-msgstr "Für die korrekte Auswahl von Geschäftskategorien und die Bewertung potenzieller Lieferanten und Auftragnehmer ist es erforderlich, eine Beschreibung des Auftrag gebenden Unternehmens zu erstellen. Geben Sie den Namen des Unternehmens, das Land und die Adresse an. Präzisieren Sie die Spezialisierung des Unternehmens, die Berufserfahrung, das Alter und die Größe des Unternehmens. Geben Sie die Website des Unternehmens an. Verwenden Sie Links im Format: https://www.example.com. Bei Bedarf kann die Hilfe des KI-Assistenten genutzt werden.\n\n„Verarbeiten“ — Hilfe durch KI  \nBeim Klick auf die Schaltfläche „Verarbeiten“ erweitert der KI-Assistent die Beschreibung, macht sie detaillierter, strukturierter und besser für die maschinelle Verarbeitung geeignet. Künftig werden alle von Ihnen hinzugefügten Daten in die Beschreibung eingebunden. Gelöschte Elemente werden ebenfalls korrekt entfernt. Das Verarbeitungsergebnis wird nicht automatisch gespeichert.\n\n„Speichern“ — Beschreibung speichern  \nDie Schaltfläche „Speichern“ schreibt die aktuelle Version der Beschreibung zur weiteren Verwendung."
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:340
-msgid "Для корректного отбора и приоритезации городов необходимо сформировать географические критерии поиска поставщиков и подрядчиков.\nЕсли существуют конкретные ограничения по географии поиска поставщиков и подрядчиков, укажите их. Это может быть конкретный город, радиус вокруг города, федеральная земля, агломерация и т. д.\n\nПри необходимости можно воспользоваться помощью ИИ-ассистента.\n\n«Обработать» — помощь ИИ\nПри нажатии на кнопку «Обработать» ИИ-ассистент развернёт географические предпочтения и ограничения, сделает их более подробными и конкретными. В дальнейшем любые добавленные вами данные будут встроены в описание. Удалённые элементы также будут корректно исключены. Результат обработки автоматически не сохраняется.\n\n«Сохранить» — сохранить географические ограничения и предпочтения\nКнопка «Сохранить» записывает текущую версию географических критериев для дальнейшего использования."
-msgstr "Für die korrekte Auswahl und Priorisierung von Städten müssen geografische Kriterien für die Suche nach Lieferanten und Auftragnehmern festgelegt werden.\nWenn es konkrete Einschränkungen für die geografische Suche nach Lieferanten und Auftragnehmern gibt, geben Sie diese an. Das kann eine bestimmte Stadt, ein Radius um eine Stadt, ein Bundesland, eine Agglomeration usw. sein.\n\nBei Bedarf können Sie die Hilfe des KI-Assistenten nutzen.\n\n„Verarbeiten“ — Hilfe durch KI\nWenn Sie auf die Schaltfläche „Verarbeiten“ klicken, erweitert der KI-Assistent die geografischen Präferenzen und Einschränkungen und macht sie detaillierter und konkreter. Anschließend werden alle von Ihnen hinzugefügten Daten in die Beschreibung eingebunden. Auch entfernte Elemente werden korrekt ausgeschlossen. Das Ergebnis der Verarbeitung wird nicht automatisch gespeichert.\n\n„Speichern“ — geografische Einschränkungen und Präferenzen speichern\nDie Schaltfläche „Speichern“ speichert die aktuelle Version der geografischen Kriterien für die weitere Verwendung."
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:256
-msgid "Для корректного отбора и приоритезации городов необходимо сформировать географические критерии.\nЕсли существуют конкретные ограничения по географии поиска клиентов, укажите их. Это может быть конкретный город, радиус вокруг города, федеральная земля, агломерация и т. д.\n\nПри необходимости можно воспользоваться помощью ИИ-ассистента.\n\n«Обработать» — помощь ИИ\nПри нажатии на кнопку «Обработать» ИИ-ассистент развернёт географические предпочтения и ограничения, сделает их более подробными и конкретными. В дальнейшем любые добавленные вами данные будут встроены в описание. Удалённые элементы также будут корректно исключены. Результат обработки автоматически не сохраняется.\n\n«Сохранить» — сохранить географические ограничения и предпочтения\nКнопка «Сохранить» записывает текущую версию географических критериев для дальнейшего использования."
-msgstr "Für eine korrekte Auswahl und Priorisierung von Städten müssen geografische Kriterien festgelegt werden.\nWenn es konkrete Einschränkungen hinsichtlich der geografischen Kundensuche gibt, geben Sie diese bitte an. Dies kann eine bestimmte Stadt, ein Radius um eine Stadt, ein Bundesland, eine Agglomeration usw. sein.\n\nBei Bedarf kann die Hilfe des KI-Assistenten genutzt werden.\n\n„Verarbeiten“ — Hilfe durch KI\nBeim Klicken auf die Schaltfläche „Verarbeiten“ erweitert der KI-Assistent die geografischen Präferenzen und Einschränkungen und macht sie detaillierter und konkreter. Künftig werden alle von Ihnen hinzugefügten Daten in die Beschreibung integriert. Entfernte Elemente werden ebenfalls korrekt ausgeschlossen. Das Verarbeitungsergebnis wird nicht automatisch gespeichert.\n\n„Speichern“ — geografische Einschränkungen und Präferenzen speichern\nDie Schaltfläche „Speichern“ speichert die aktuelle Version der geografischen Kriterien für die weitere Verwendung."
-
-#: panel/aap_audience/views/modal_pause_info.py:225
-msgid "Для нормальной работы, пожалуйста, свяжитесь с нами и приобретите подписку."
-msgstr "Für den normalen Betrieb wenden Sie sich bitte an uns und erwerben Sie ein Abonnement."
-
-#: panel/aap_audience/views/modal_edit_title.py:85
-msgid "Для предложения названия нужно сохранить продукт и компанию."
-msgstr "Für den Vorschlag eines Namens müssen das Produkt und das Unternehmen beibehalten werden."
-
-#: panel/aap_audience/views/modal_pause_info.py:215
-msgid "Для продолжения сбора контактов и рейтингования включите обработку списка наверху страницы."
-msgstr "Um mit dem Sammeln von Kontakten und der Bewertung fortzufahren, aktivieren Sie die Verarbeitung der Liste oben auf der Seite."
-
-#: panel/aap_settings/views/domains.py:38
-msgid "Домен добавлен."
-msgstr "Die Domain wurde hinzugefügt."
-
-#: panel/aap_settings/views/domains.py:74
-msgid "Домен удалён."
-msgstr "Die Domain wurde gelöscht."
-
-#: panel/aap_audience/views/modal_pause_info.py:206
-msgid "Если вы хотите продолжать сбор и рейтингование контактов в этой задаче, пожалуйста, подтвердите это. В этом случае мы рекомендуем следить за дальнейшим сбором контактов, и, если контактов с успешным рейтингом по-прежнему будет очень мало, отключить обработку этого списка."
-msgstr "Wenn Sie weiterhin Kontakte in dieser Aufgabe erfassen und bewerten möchten, bestätigen Sie dies bitte. In diesem Fall empfehlen wir, die weitere Erfassung von Kontakten zu überwachen und, falls es weiterhin nur sehr wenige Kontakte mit erfolgreicher Bewertung gibt, die Verarbeitung dieser Liste zu deaktivieren."
-
-#: panel/aap_audience/views/modal_edit_branch_rate.py:58 panel/aap_audience/views/modal_edit_city_rate.py:57 panel/aap_audience/views/modal_edit_rate_limit.py:38 panel/aap_audience/views/modal_edit_title.py:76
-msgid "Запись не найдена."
-msgstr "Eintrag nicht gefunden."
-
-#: panel/aap_settings/forms.py:320
-msgid "Заполните все поля IMAP."
-msgstr "Füllen Sie alle IMAP-Felder aus."
-
-#: panel/aap_settings/forms.py:383
-msgid "Заполните все поля SMTP (LOGIN)."
-msgstr "Füllen Sie alle SMTP-Felder (LOGIN) aus."
-
-#: panel/aap_settings/forms.py:378
-msgid "Заполните все поля SMTP (RELAY NOAUTH)."
-msgstr "Füllen Sie alle SMTP-Felder (RELAY NOAUTH) aus."
-
-#: panel/aap_settings/forms.py:261
-msgid "Заполните все поля SMTP."
-msgstr "Füllen Sie alle SMTP-Felder aus."
-
-#: panel/aap_lists/forms.py:40
-msgid "Заполните все поля."
-msgstr "Füllen Sie alle Felder aus."
-
-#: panel/aap_audience/views/modal_pause_info.py:196
-msgid "Из последних %(total_cnt)s контактов с успешным рейтингом — не более %(good_percent)s%%."
-msgstr "Von den letzten %(total_cnt)s Kontakten mit erfolgreicher Bewertung – nicht mehr als %(good_percent)s%%."
-
-#: panel/aap_campaigns/views/campaigns.py:1245 panel/aap_campaigns/views/campaigns.py:1273 panel/aap_campaigns/views/templates.py:247
-msgid "Имя шаблона обязательно."
-msgstr "Der Vorlagenname ist erforderlich."
-
-#: panel/models.py:12
-msgid "Имя/код шаблона (уникально)"
-msgstr "Vorlagenname/-code (eindeutig)"
-
-#: panel/menu.py:51
-msgid "Кампании : Шаблоны писем"
-msgstr "Kampagnen: E-Mail-Vorlagen"
-
-#: panel/menu.py:45
-msgid "Кампании : рассылки и письма"
-msgstr "Kampagnen: Mailings und E-Mails"
-
-#: panel/menu.py:44
-msgid "Кампании и письма"
-msgstr "Kampagnen und E-Mails"
-
-#: panel/menu.py:39
-msgid "Кампании рассылок"
-msgstr "E-Mail-Kampagnen"
-
-#: panel/views.py:1892
-msgid "Карточка компании"
-msgstr "Firmenkarte"
-
-#: panel/aap_audience/views/modal_edit_branch_rate.py:60
-msgid "Категория не найдена."
-msgstr "Kategorie nicht gefunden."
-
-#: panel/models.py:18
-msgid "Кнопки/настройки (JSON)"
-msgstr "Schaltflächen/Einstellungen (JSON)"
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:230
-msgid "Компания - продавец"
-msgstr "Unternehmen - Verkäufer"
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:232
-msgid "Компания - продавец. Название, адрес, страна, размер, опыт, специализация."
-msgstr "Unternehmen - Verkäufer. Name, Adresse, Land, Größe, Erfahrung, Spezialisierung."
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:316
-msgid "Компания-заказчик. Название, адрес, страна, размер, опыт, специализация."
-msgstr "Kundeunternehmen. Name, Adresse, Land, Größe, Erfahrung, Spezialisierung."
-
-#: panel/views.py:1099
-msgid "Контакт 1"
-msgstr "Kontakt 1"
-
-#: panel/views.py:1100
-msgid "Контакт 2"
-msgstr "Kontakt 2"
-
-#: panel/views.py:1101
-msgid "Контакт 3"
-msgstr "Kontakt 3"
-
-#: panel/views.py:1102
-msgid "Контакт 4"
-msgstr "Kontakt 4"
-
-#: panel/views.py:1103
-msgid "Контакт 5"
-msgstr "Kontakt 5"
-
-#: panel/aap_settings/forms.py:269
-msgid "Лимит должен быть не меньше 1 письма в час."
-msgstr "Das Limit muss mindestens 1 E-Mail pro Stunde betragen."
-
-#: panel/aap_settings/forms.py:211
-msgid "Лимит/час"
-msgstr "Limit/Stunde"
-
-#: public/aap_auth/views.py:34
-msgid "Логин больше не обслуживается"
-msgstr "Der Login wird nicht mehr unterstützt"
-
-#: public/aap_auth/views.py:33
-msgid "Логин заблокирован"
-msgstr "Der Login ist gesperrt"
-
-#: panel/aap_settings/forms.py:272
-msgid "Максимум 300 писем в час."
-msgstr "Maximal 300 E-Mails pro Stunde."
-
-#: panel/aap_audience/views/modal_pause_info.py:195
-msgid "Мы приостановили сбор контактов и их рейтингование для этого списка рассылки."
-msgstr "Wir haben das Sammeln von Kontakten und deren Bewertung für diese Mailingliste vorübergehend eingestellt."
-
-#: panel/aap_lists/forms.py:10 panel/aap_lists/forms.py:13
-msgid "Название списка"
-msgstr "Name der Liste"
-
-#: panel/aap_audience/views/modal_pause_info.py:203
-msgid "Напоминаем, что действует ограничение на рейтингование контактов — не более 50 000 контактов в месяц, вне зависимости от успешности рейтингования."
-msgstr "Wir erinnern daran, dass eine Beschränkung für das Bewerten von Kontakten gilt — nicht mehr als 50.000 Kontakte pro Monat, unabhängig vom Erfolg der Bewertung."
-
-#: panel/menu.py:80
-msgid "Настройки"
-msgstr "Einstellungen"
-
-#: panel/menu.py:92
-msgid "Настройки : 'Окна' отправки"
-msgstr "Einstellungen: Sende-Fenster"
-
-#: panel/menu.py:86
-msgid "Настройки : Почтовые серверы"
-msgstr "Einstellungen: Mailserver"
-
-#: panel/menu.py:98
-msgid "Настройки : Учет переходов"
-msgstr "Einstellungen: Klickverfolgung"
-
-#: panel/aap_settings/views/url_stats.py:34
-msgid "Настройки : Учет переходов URL"
-msgstr "Einstellungen: URL-Klickverfolgung"
-
-#: panel/menu.py:10 panel/menu.py:11
+# Public landing / auth migration (2026-04-22)
+#: templates/public/test.html:4 templates/public/test.html:9
+#: templates/public_base.html:9
+msgid "Email-рассылки Германия"
+msgstr "E-Mail-Kampagnen in Deutschland"
+
+#: templates/public/test.html:10
+msgid "Только B2B. Пресейл"
+msgstr "Nur B2B. Presale"
+
+#: templates/public/test.html:12
+msgid ""
+"До 1 июня - тестирование и доработка интерфейса для полноценного "
+"программного продукта"
+msgstr ""
+"Bis zum 1. Juni – Testen und Weiterentwicklung der Oberfläche für ein "
+"vollwertiges Softwareprodukt"
+
+#: templates/public/test.html:29
+msgid "Поиск клиентов и поставщиков"
+msgstr "Suche nach Kunden und Lieferanten"
+
+#: templates/public/test.html:35
+msgid "Рейтингование и отбор"
+msgstr "Bewertung und Auswahl"
+
+#: templates/public/test.html:41
+msgid "Формирование списка рассылки"
+msgstr "Erstellung der Versandliste"
+
+#: templates/public/test.html:47
+msgid "Таргетированная e-mail-рассылка"
+msgstr "Zielgerichtete E-Mail-Kampagne"
+
+#: templates/public/test.html:53
+msgid "Повторные кампании"
+msgstr "Wiederholte Kampagnen"
+
+#: templates/public/test.html:59
+msgid "Использование ИИ на всех этапах"
+msgstr "Einsatz von KI in allen Phasen"
+
+#: templates/public/test.html:67 templates/public/test.html:190
+#: templates/public/test.html:248 templates/public/test.html:342
+msgid "Протестировать / зарегистрироваться"
+msgstr "Testen / registrieren"
+
+#: templates/public/test.html:76
+msgid "Что это? Автоматизация с помощью ИИ!"
+msgstr "Was ist das? Automatisierung mit KI!"
+
+#: templates/public/test.html:77
+msgid "Поиск клиентов / поставщиков и отправка предложений / запросов."
+msgstr "Suche nach Kunden / Lieferanten und Versand von Angeboten / Anfragen."
+
+#: templates/public/test.html:85
+msgid "Постановка задачи"
+msgstr "Aufgabenstellung"
+
+#: templates/public/test.html:93
+msgid "Категории и города"
+msgstr "Kategorien und Städte"
+
+#: templates/public/test.html:101
+msgid "Сбор компаний"
+msgstr "Sammlung von Unternehmen"
+
+#: templates/public/test.html:109 templates/public/test.html:170
+msgid "Рейтингование контактов"
+msgstr "Kontaktbewertung"
+
+#: templates/public/test.html:119
+msgid "Рассылка E-mail"
+msgstr "E-Mail-Versand"
+
+#: templates/public/test.html:131 templates/public/test.html:182
+msgid "Контроль результатов"
+msgstr "Ergebniskontrolle"
+
+#: templates/public/test.html:139 templates/public/test.html:144
+msgid "Клиентам"
+msgstr "Für Kunden"
+
+#: templates/public/test.html:152
+msgid "Эффективный поиск клиентов"
+msgstr "Effektive Kundensuche"
+
+#: templates/public/test.html:158
+msgid "Эффективный поиск поставщиков"
+msgstr "Effektive Lieferantensuche"
+
+#: templates/public/test.html:164
+msgid "Усилено искусственным интеллектом"
+msgstr "Verstärkt durch künstliche Intelligenz"
+
+#: templates/public/test.html:176
+msgid "Органичная деловая рассылка"
+msgstr "Organischer geschäftlicher Versand"
+
+#: templates/public/test.html:197 templates/public/test.html:202
+msgid "Агентствам"
+msgstr "Für Agenturen"
+
+#: templates/public/test.html:210
+msgid "Эффективный результат для клиентов"
+msgstr "Effektive Ergebnisse für Kunden"
+
+#: templates/public/test.html:216
+msgid "Привлечение новых клиентов"
+msgstr "Gewinnung neuer Kunden"
+
+#: templates/public/test.html:222
+msgid "Исследования рынка и тестирование"
+msgstr "Marktforschung und Tests"
+
+#: templates/public/test.html:228
+msgid "Интенсивное обучение"
+msgstr "Intensives Training"
+
+#: templates/public/test.html:234
+msgid "Вовлечение в развитие продукта"
+msgstr "Einbindung in die Produktentwicklung"
+
+#: templates/public/test.html:240
+msgid "Гибкость в обеспечении потребностей"
+msgstr "Flexibilität bei der Bedarfsdeckung"
+
+#: templates/public/test.html:258
+msgid "Стоимость работы в системе / тестирование / пресэйл"
+msgstr "Kosten für die Nutzung des Systems / Testen / Presale"
+
+#: templates/public/test.html:262
+msgid "Оплата помесячно"
+msgstr "Monatliche Zahlung"
+
+#: templates/public/test.html:263 templates/public/test.html:266
+#: templates/public/test.html:276 templates/public/test.html:279
+#: templates/public/test.html:289 templates/public/test.html:292
+msgid "в месяц"
+msgstr "pro Monat"
+
+#: templates/public/test.html:265 templates/public/test.html:278
+#: templates/public/test.html:291
+msgid "До 1 июня:"
+msgstr "Bis zum 1. Juni:"
+
+#: templates/public/test.html:275
+msgid "Оплата за полгода"
+msgstr "6 Monate"
+
+#: templates/public/test.html:288
+msgid "Оплата за год"
+msgstr "1 Jahr"
+
+#: templates/public/test.html:300 templates/public/test.html:305
+msgid "Кто мы"
+msgstr "Wer wir sind"
+
+#: templates/public/test.html:308
+msgid ""
+"Мы — предприниматели с практическим опытом ведения бизнеса. Система создана "
+"для решения собственных задач, поскольку на рынке не было решения с "
+"сопоставимой логикой и уровнем прозрачности. Украинская команда "
+"разработчиков, маркетологов и предпринимателей."
+msgstr ""
+"Wir sind Unternehmer mit praktischer Geschäftserfahrung. Das System wurde "
+"zur Lösung eigener Aufgaben entwickelt, da es auf dem Markt keine Lösung mit "
+"vergleichbarer Logik und Transparenz gab. Ein ukrainisches Team aus "
+"Entwicklern, Marketern und Unternehmern."
+
+#: templates/public/test.html:312 templates/public/test.html:317
+msgid "Наш продукт"
+msgstr "Unser Produkt"
+
+#: templates/public/test.html:320
+msgid ""
+"Это SaaS для малого и среднего бизнеса. Не требует интеграции в бизнес-"
+"процессы. Не является CRM или автоответчиком. Искусственный интеллект "
+"помогает, но не заменяет человека. Прост в использовании. Достаточный, но "
+"ограниченный функционал. Удивительная эффективность."
+msgstr ""
+"Dies ist ein SaaS für kleine und mittlere Unternehmen. Es erfordert keine "
+"Integration in Geschäftsprozesse. Es ist weder ein CRM noch ein "
+"Autoresponder. Künstliche Intelligenz hilft, ersetzt aber den Menschen "
+"nicht. Einfach in der Nutzung. Ausreichender, aber begrenzter "
+"Funktionsumfang. Erstaunliche Effizienz."
+
+#: templates/public/test.html:328 templates/public/test.html:333
+msgid "Опыт"
+msgstr "Erfahrung"
+
+#: templates/public/test.html:336
+msgid ""
+"Мы проводили рассылки для собственного бизнеса, а также для первых клиентов "
+"— для привлечения клиентов и подрядчиков. Результаты оказались неожиданно "
+"высокими."
+msgstr ""
+"Wir haben Mailings für unser eigenes Unternehmen sowie für erste Kunden "
+"durchgeführt, um Kunden und Auftragnehmer zu gewinnen. Die Ergebnisse waren "
+"unerwartet hoch."
+
+#: templates/public/test.html:337
+#, python-format
+#| msgid ""
+#| "Рассылка нескольких сотен писем в день давала 8–15% CTR (переходы на "
+#| "сайт), качество собранных контактов — до 94%. Коммерческий результат "
+#| "также был заметным: запросы от клиентов и предложения от подрядчиков "
+#| "поступали в течение 7–14 дней."
+msgid ""
+"Мы — украинская команда разработчиков, маркетологов и предпринимателей, и "
+"пока плохо говорим по-немецки."
+msgstr ""
+"Wir sind ein ukrainisches Team aus Entwicklern, Marketern und Unternehmern "
+"und sprechen derzeit noch schlecht Deutsch."
+
+#: templates/public/test.html:361
+msgid "Для общения на английском — звоните:"
+msgstr "Für Kommunikation auf Englisch rufen Sie an:"
+
+#: templates/public/test.html:366
+msgid "Для общения в мессенджерах пишите нам в WhatsApp / Telegram:"
+msgstr ""
+"Für Kommunikation in Messengern schreiben Sie uns in WhatsApp / Telegram:"
+
+#: templates/public/test.html:372
+msgid "Пишите нам:"
+msgstr "Schreiben Sie uns:"
+
+#: templates/public_base.html:10
+msgid ""
+"Только B2B. Пресейл. Поиск клиентов и поставщиков, рейтингование и отбор, "
+"формирование списка рассылки, таргетированная e-mail-рассылка, повторные "
+"кампании, использование ИИ."
+msgstr ""
+"Nur B2B. Presale. Suche nach Kunden und Lieferanten, Bewertung und Auswahl, "
+"Erstellung der Versandliste, zielgerichtete E-Mail-Kampagne, wiederholte "
+"Kampagnen, Einsatz von KI."
+
+#: templates/public_base.html:36
+msgid "Language switch"
+msgstr "Sprachumschalter"
+
+#: templates/public_base.html:49
+msgid "Account links"
+msgstr "Konto-Links"
+
+#: templates/public_base.html:51
+msgid "Вход для клиентов"
+msgstr "Kunden-Login"
+
+#: templates/public_base.html:66
+msgid "Serenity footer"
+msgstr "Serenity-Footer"
+
+#: templates/public_base.html:71
+msgid "Legal links"
+msgstr "Rechtslinks"
+
+#: templates/public_base.html:72
+msgid "Impressum"
+msgstr "Impressum"
+
+#: templates/public_base.html:73
+msgid "Datenschutz"
+msgstr "Datenschutz"
+
+#~ msgid ""
+#~ "Интеллектуальная система email-коммуникаций для малого и среднего бизнеса."
+#~ msgstr ""
+#~ "Intelligentes E-Mail-Kommunikationssystem für kleine und mittlere "
+#~ "Unternehmen."
+
+#~ msgid "Интеллектуальные"
+#~ msgstr "Intelligente"
+
+#~ msgid "email-коммуникации"
+#~ msgstr "E-Mail-Kommunikation"
+
+#~ msgid "Вход для клиентов:"
+#~ msgstr "Kunden-Login:"
+
+#~ msgid "Перейти"
+#~ msgstr "Wechseln"
+
+#~ msgid "Регистрация:"
+#~ msgstr "Registrierung:"
+
+#~ msgid ""
+#~ "интеллектуальная система email-коммуникаций для малого и среднего "
+#~ "бизнеса, ориентированная на работу на рынке Германии."
+#~ msgstr ""
+#~ "Intelligentes E-Mail-Kommunikationssystem für kleine und mittelständische "
+#~ "Unternehmen, ausgerichtet auf den deutschen Markt."
+
+#~ msgid ""
+#~ "Платформа предназначена для компаний, которые регулярно взаимодействуют с "
+#~ "другими предприятиями в рамках делового сотрудничества — как в продажах, "
+#~ "так и в закупках."
+#~ msgstr ""
+#~ "Die Plattform ist für Unternehmen bestimmt, die regelmäßig im Rahmen "
+#~ "geschäftlicher Zusammenarbeit mit anderen Unternehmen interagieren – "
+#~ "sowohl im Vertrieb als auch im Einkauf."
+
+#~ msgid "Функциональные возможности:"
+#~ msgstr "Funktionale Möglichkeiten:"
+
+#~ msgid ""
+#~ "Интеллектуальный подбор и приоритизация деловых контактов для продаж."
+#~ msgstr ""
+#~ "Intelligente Auswahl und Priorisierung geschäftlicher Kontakte für den "
+#~ "Vertrieb."
+
+#~ msgid ""
+#~ "Интеллектуальный подбор и приоритизация деловых контактов для закупок."
+#~ msgstr ""
+#~ "Intelligente Auswahl und Priorisierung von Geschäftskontakten für den "
+#~ "Einkauf."
+
+#~ msgid "Отправка коммерческих предложений целевым и релевантным получателям."
+#~ msgstr ""
+#~ "Versand von коммерziellen Angeboten an zielgerichtete und relevante "
+#~ "Empfänger."
+
+#~ msgid "Отправка запросов поставщикам и подрядчикам по заданным критериям."
+#~ msgstr ""
+#~ "Anfragen an Lieferanten und Auftragnehmer nach festgelegten Kriterien "
+#~ "senden."
+
+#~ msgid "Отслеживание отклика и последующих взаимодействий."
+#~ msgstr "Verfolgung von Rückmeldungen und nachfolgenden Interaktionen."
+
+#~ msgid "Информационные рассылки для существующих клиентов и партнёров."
+#~ msgstr "Informationsschreiben für bestehende Kunden und Partner."
+
+#~ msgid "Вы получаете"
+#~ msgstr "Sie erhalten"
+
+#~ msgid "понятный"
+#~ msgstr "verständlich"
+
+#~ msgid "и"
+#~ msgstr "und"
+
+#~ msgid "управляемый"
+#~ msgstr "verwaltet"
+
+#~ msgid ""
+#~ "инструмент для автоматизации привлечения клиентов, а также поиска "
+#~ "поставщиков и подрядчиков в B2B-сегменте."
+#~ msgstr ""
+#~ "ein Tool zur Automatisierung der Kundengewinnung sowie zur Suche nach "
+#~ "Lieferanten und Auftragnehmern im B2B-Segment."
+
+#~ msgid ""
+#~ "С помощью искусственного интеллекта вы формируете точные критерии того, "
+#~ "что хотите продать или приобрести. AI не принимает решений за вас, а "
+#~ "помогает корректно сформулировать запрос, убрать неточности и упростить "
+#~ "процесс."
+#~ msgstr ""
+#~ "Mit Hilfe künstlicher Intelligenz formulieren Sie präzise Kriterien "
+#~ "dafür, was Sie verkaufen oder erwerben möchten. AI trifft keine "
+#~ "Entscheidungen für Sie, sondern hilft dabei, die Anfrage korrekt zu "
+#~ "formulieren, Ungenauigkeiten zu beseitigen und den Prozess zu "
+#~ "vereinfachen."
+
+#~ msgid ""
+#~ "Вы указываете информацию о своей компании, о товаре или услуге, а также "
+#~ "задаёте географические условия работы на рынке Германии."
+#~ msgstr ""
+#~ "Sie geben Informationen zu Ihrem Unternehmen, Ihrem Produkt oder Ihrer "
+#~ "Dienstleistung an und legen außerdem die geografischen Bedingungen für "
+#~ "die Tätigkeit auf dem deutschen Markt fest."
+
+#~ msgid ""
+#~ "На основе этих данных система анализирует и ранжирует города Германии и "
+#~ "категории компаний, в которых вероятность заключения сделки наиболее "
+#~ "высока. Сортировка выполняется с использованием AI и опирается на базу из "
+#~ "790 бизнес-категорий и 1 326 городов Германии с населением от 12 000 "
+#~ "человек. Эти данные могут использоваться как для продаж, так и для "
+#~ "закупок."
+#~ msgstr ""
+#~ "Auf Grundlage dieser Daten analysiert und priorisiert das System deutsche "
+#~ "Städte und Unternehmenskategorien, in denen die Wahrscheinlichkeit eines "
+#~ "Geschäftsabschlusses am höchsten ist. Die Sortierung erfolgt mithilfe von "
+#~ "KI und stützt sich auf eine Datenbasis von 790 Geschäftskategorien und "
+#~ "1.326 deutschen Städten mit einer Bevölkerung ab 12.000 Einwohnern. Diese "
+#~ "Daten können sowohl für den Vertrieb als auch für den Einkauf verwendet "
+#~ "werden."
+
+#~ msgid "На основании сформированной задачи система собирает"
+#~ msgstr "Auf Grundlage der erstellten Aufgabe sammelt das System"
+
+#~ msgid "контактные данные"
+#~ msgstr "Kontaktdaten"
+
+#~ msgid ""
+#~ "компаний в соответствии с заданными приоритетами. Используются открытые "
+#~ "источники: немецкие «Жёлтые страницы», бизнес-справочник 11880 и другие "
+#~ "публичные базы. Совокупный охват этих источников превышает 4 млн "
+#~ "компаний, работающих в Германии."
+#~ msgstr ""
+#~ "von Unternehmen entsprechend den festgelegten Prioritäten. Es werden "
+#~ "offene Quellen genutzt: die deutschen „Gelben Seiten“, das "
+#~ "Branchenverzeichnis 11880 und andere öffentliche Datenbanken. Die "
+#~ "Gesamtabdeckung dieser Quellen übersteigt 4 Mio. Unternehmen, die in "
+#~ "Deutschland tätig sind."
+
+#~ msgid "Далее каждая компания оценивается индивидуально с применением"
+#~ msgstr ""
+#~ "Anschließend wird jedes Unternehmen individuell unter Anwendung bewertet"
+
+#~ msgid "AI"
+#~ msgstr "KI"
+
+#~ msgid ""
+#~ "Анализируется вероятность успешного заключения сделки и ожидаемая "
+#~ "скорость её достижения. Проводится многофакторная оценка и отбор, в "
+#~ "результате чего формируется целевая аудитория под конкретное деловое "
+#~ "предложение или запрос."
+#~ msgstr ""
+#~ "Die Wahrscheinlichkeit eines erfolgreichen Abschlusses des Geschäfts und "
+#~ "die erwartete Geschwindigkeit seiner Erreichung werden analysiert. Es "
+#~ "erfolgt eine multifaktorielle Bewertung und Auswahl, wodurch eine "
+#~ "Zielgruppe für ein bestimmtes Geschäftsangebot oder eine Anfrage gebildet "
+#~ "wird."
+
+#~ msgid ""
+#~ "Все этапы работы системы прозрачны: вы можете корректировать как исходную "
+#~ "задачу, так и промежуточные результаты."
+#~ msgstr ""
+#~ "Alle Arbeitsschritte des Systems sind transparent: Sie können sowohl die "
+#~ "ursprüngliche Aufgabe als auch die Zwischenergebnisse anpassen."
+
+#~ msgid "После отбора формируется"
+#~ msgstr "Nach der Auswahl wird gebildet"
+
+#~ msgid "готовая аудитория"
+#~ msgstr "fertige Zielgruppe"
+
+#~ msgid ""
+#~ "— список адресатов для деловой email-коммуникации. С помощью AI и "
+#~ "подготовленных шаблонов вы формируете коммерческое предложение или "
+#~ "деловой запрос, адаптированные под выбранную аудиторию."
+#~ msgstr ""
+#~ "— Liste der Empfänger für die geschäftliche E-Mail-Kommunikation. "
+#~ "Mithilfe von KI und vorbereiteten Vorlagen erstellen Sie ein "
+#~ "kommerzielles Angebot oder eine geschäftliche Anfrage, die auf die "
+#~ "ausgewählte Zielgruppe zugeschnitten sind."
+
+#~ msgid ""
+#~ "Рассылка выполняется исключительно от вашего имени и с использованием"
+#~ msgstr ""
+#~ "Der Versand erfolgt ausschließlich in Ihrem Namen und unter Verwendung von"
+
+#~ msgid "корпоративного адреса"
+#~ msgstr "der Firmenadresse"
+
+#~ msgid ""
+#~ "электронной почты. Благодаря предварительной фильтрации и приоритизации "
+#~ "контактов объём рассылки ограничивается 50–100 письмами в час (в "
+#~ "зависимости от используемого почтового провайдера)."
+#~ msgstr ""
+#~ "E-Mail. Dank Vorfilterung und Priorisierung der Kontakte wird das "
+#~ "Versandvolumen auf 50–100 E-Mails pro Stunde begrenzt (je nach "
+#~ "verwendetem E-Mail-Anbieter)."
+
+#~ msgid ""
+#~ "Такой формат коммуникации основан на законном деловом интересе "
+#~ "(berechtigtes Interesse) и соответствует требованиям UWG и DSGVO."
+#~ msgstr ""
+#~ "Ein solches Kommunikationsformat basiert auf einem berechtigten "
+#~ "geschäftlichen Interesse (berechtigtes Interesse) und entspricht den "
+#~ "Anforderungen des UWG und der DSGVO."
+
+#~ msgid "В процессе рассылки система фиксирует"
+#~ msgstr "Während des Versands erfasst das System"
+
+#~ msgid "реакцию адресатов"
+#~ msgstr "Reaktion der Empfänger"
+
+#~ msgid ""
+#~ "на ваше сообщение. В режиме реального времени отображается, какие "
+#~ "компании перешли на ваш сайт по ссылкам из отправленных писем. Для "
+#~ "каждого такого перехода доступна информация о компании, связанная с "
+#~ "конкретным отправленным сообщением."
+#~ msgstr ""
+#~ "auf Ihre Nachricht. In Echtzeit wird angezeigt, welche Unternehmen über "
+#~ "Links aus versendeten E-Mails auf Ihre Website gewechselt sind. Für jeden "
+#~ "solchen Wechsel sind Informationen zum Unternehmen verfügbar, die mit der "
+#~ "jeweiligen gesendeten Nachricht verknüpft sind."
+
+#~ msgid ""
+#~ "Также автоматически учитываются ответы на письма, жалобы на рассылку и "
+#~ "другие реакции. На основе этих данных формируется статистика и уточняются "
+#~ "алгоритмы приоритизации для последующих коммуникаций."
+#~ msgstr ""
+#~ "Auch Antworten auf E-Mails, Beschwerden über den Versand und andere "
+#~ "Reaktionen werden automatisch berücksichtigt. Auf Grundlage dieser Daten "
+#~ "werden Statistiken erstellt und die Priorisierungsalgorithmen für weitere "
+#~ "Kommunikationen verfeinert."
+
+#~ msgid "Мы — предприниматели с"
+#~ msgstr "Wir sind Unternehmer mit"
+
+#~ msgid "практическим опытом"
+#~ msgstr "praktischen Erfahrungen"
+
+#~ msgid ""
+#~ "ведения бизнеса. Эта система была создана для решения собственных задач, "
+#~ "поскольку на рынке не существовало решения с сопоставимой логикой и "
+#~ "уровнем прозрачности. Сервис ориентирован на пользователей без "
+#~ "технической подготовки и максимально упрощён в использовании. После "
+#~ "подтверждения эффективности на практике мы приняли решение предложить "
+#~ "этот инструмент другим предпринимателям."
+#~ msgstr ""
+#~ "Geschäftsführung. Dieses System wurde entwickelt, um eigene Anforderungen "
+#~ "zu lösen, da es auf dem Markt keine Lösung mit vergleichbarer Logik und "
+#~ "Transparenz gab. Der Service richtet sich an Nutzer ohne technische "
+#~ "Vorkenntnisse und ist in der Anwendung максимально vereinfacht. Nach der "
+#~ "Bestätigung seiner Wirksamkeit in der Praxis haben wir beschlossen, "
+#~ "dieses Werkzeug auch anderen Unternehmern anzubieten."
+
+#~ msgid "Пользователь"
+#~ msgstr "Benutzer"
+
+#~ msgid "Логин информация"
+#~ msgstr "Anmeldeinformationen"
+
+#~ msgid "Ждем окна отправки"
+#~ msgstr "Wir warten auf das Versandfenster"
+
+#~ msgid "%(title)s (архив)"
+#~ msgstr "%(title)s (Archiv)"
+
+#~ msgid "Email"
+#~ msgstr "E-Mail"
+
+#~ msgid "Email и лимиты"
+#~ msgstr "E-Mail und Limits"
+
+#~ msgid "HTML-контент (большой)"
+#~ msgstr "HTML-Inhalt (groß)"
+
+#~ msgid "HTML-шаблон (большой)"
+#~ msgstr "HTML-Vorlage (groß)"
+
+#~ msgid "SERENITY PANEL"
+#~ msgstr "SERENITY-Bedienfeld"
+
+#~ msgid "styles: invalid JSON"
+#~ msgstr "Stile: ungültiges JSON"
+
+#~ msgid "styles: must be a JSON object"
+#~ msgstr "styles: muss ein JSON-Objekt sein"
+
+#~ msgid ""
+#~ "Ассистент ИИ сейчас недоступен. Повторите попытку в течение пяти минут."
+#~ msgstr ""
+#~ "Der KI-Assistent ist derzeit nicht verfügbar. Versuchen Sie es innerhalb "
+#~ "von fünf Minuten erneut."
+
+#~ msgid ""
+#~ "В настоящий момент собрано достаточно контактов с успешным рейтингом для "
+#~ "обеспечения рассылок."
+#~ msgstr ""
+#~ "Derzeit sind genügend Kontakte mit erfolgreicher Bewertung gesammelt, um "
+#~ "den Versand sicherzustellen."
+
+#~ msgid ""
+#~ "В процессе обработки ИИ будет задавать вопросы и давать подсказки для "
+#~ "уточнения описания. Поскольку основные варианты уже указаны в начальном "
+#~ "описании, часть подсказок может быть нерелевантной. При необходимости "
+#~ "добавьте информацию в описание или в команду для ассистента ИИ."
+#~ msgstr ""
+#~ "Während der Bearbeitung wird die KI Fragen stellen und Hinweise geben, um "
+#~ "die Beschreibung zu präzisieren. Da die wichtigsten Optionen bereits in "
+#~ "der ersten Beschreibung angegeben sind, können einige Hinweise "
+#~ "möglicherweise irrelevant sein. Fügen Sie bei Bedarf Informationen zur "
+#~ "Beschreibung oder zum Befehl für den KI-Assistenten hinzu."
+
+#~ msgid "В тестовом доступе действуют ограничения:"
+#~ msgstr "Im Testzugang gelten folgende Einschränkungen:"
+
+#~ msgid ""
+#~ "Введите команду для работы с {subject} — что нужно добавить, удалить или "
+#~ "изменить. Указанная команда будет применена к текущему описанию."
+#~ msgstr ""
+#~ "Geben Sie einen Befehl für die Arbeit mit {subject} ein — was "
+#~ "hinzugefügt, entfernt oder geändert werden soll. Der angegebene Befehl "
+#~ "wird auf die aktuelle Beschreibung angewendet."
+
+#~ msgid "Введите лимит от 20 до 60."
+#~ msgstr "Geben Sie einen Wert zwischen 20 und 60 ein."
+
+#~ msgid "Введите название списка рассылки."
+#~ msgstr "Geben Sie den Namen der Mailingliste ein."
+
+#~ msgid "Введите рейтинг от 1 до 100."
+#~ msgstr "Geben Sie eine Bewertung von 1 bis 100 ein."
+
+#~ msgid "Введите рейтинг от 1 до 20."
+#~ msgstr "Geben Sie eine Bewertung von 1 bis 20 ein."
+
+#~ msgid "Вернуть из архива"
+#~ msgstr "Aus dem Archiv zurückholen"
+
+#~ msgid ""
+#~ "Вы можете создать новый список рассылки и в нём по-другому задать "
+#~ "параметры сбора контактов."
+#~ msgstr ""
+#~ "Sie können eine neue Mailingliste erstellen und darin die Parameter für "
+#~ "die Erfassung von Kontakten anders festlegen."
+
+#~ msgid ""
+#~ "Вы также можете задать вопрос ИИ-ассистенту в контексте работы над "
+#~ "{subject}. Ответ на вопрос будет дан отдельно и не изменит текст описания."
+#~ msgstr ""
+#~ "Sie können dem KI-Assistenten auch eine Frage im Kontext der Arbeit an "
+#~ "{subject} stellen. Die Antwort auf die Frage wird separat gegeben und "
+#~ "ändert den Beschreibungstext nicht."
+
+#~ msgid ""
+#~ "Вы также можете исправить задачу для этого списка рассылки — убрать "
+#~ "ненужные категории, изменить описание продукта или компании."
+#~ msgstr ""
+#~ "Sie können auch die Aufgabe für diese Mailingliste bearbeiten — unnötige "
+#~ "Kategorien entfernen, die Produkt- oder Unternehmensbeschreibung ändern."
+
+#~ msgid "География. Ограничения, предпочтения, приоритеты."
+#~ msgstr "Geografie. Einschränkungen, Präferenzen, Prioritäten."
+
+#~ msgid "Город не найден."
+#~ msgstr "Stadt nicht gefunden."
+
+#~ msgid "Города"
+#~ msgstr "Städte"
+
+#~ msgid "Данные обновлены"
+#~ msgstr "Daten aktualisiert"
+
+#~ msgid ""
+#~ "Действует ограничение на рейтингование контактов — не более 50 000 "
+#~ "контактов в месяц, вне зависимости от успешности рейтингования. Также "
+#~ "действует ограничение на отправку через один почтовый сервер — не более 1 "
+#~ "000 писем в день."
+#~ msgstr ""
+#~ "Für die Bewertung von Kontakten gilt eine Begrenzung — nicht mehr als "
+#~ "50.000 Kontakte pro Monat, unabhängig vom Erfolg der Bewertung. Außerdem "
+#~ "gilt eine Begrenzung für den Versand über einen einzelnen Mailserver — "
+#~ "nicht mehr als 1.000 E-Mails pro Tag."
+
+#~ msgid ""
+#~ "Для корректного выбора бизнес-категорий и рейтингования потенциальных "
+#~ "клиентов необходимо сформировать описание компании-продавца. Укажите "
+#~ "название компании, страну и адрес. Уточните специализацию компании, опыт "
+#~ "работы, возраст и размер компании. Укажите сайт компании. Используйте "
+#~ "ссылки в формате: https://www.example.com. При необходимости можно "
+#~ "воспользоваться помощью ИИ-ассистента.\n"
+#~ "\n"
+#~ "«Обработать» — помощь ИИ\n"
+#~ "При нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, "
+#~ "сделает его более подробным, структурированным и удобным для машинной "
+#~ "обработки. В дальнейшем любые добавленные вами данные будут встроены в "
+#~ "описание. Удалённые элементы также будут корректно исключены. Результат "
+#~ "обработки автоматически не сохраняется.\n"
+#~ "\n"
+#~ "«Сохранить» — сохранить описание\n"
+#~ "Кнопка «Сохранить» записывает текущую версию описания для дальнейшего "
+#~ "использования."
+#~ msgstr ""
+#~ "Für die korrekte Auswahl von Geschäftskategorien und das Ranking "
+#~ "potenzieller Kunden muss eine Beschreibung des Verkäuferunternehmens "
+#~ "erstellt werden. Geben Sie den Namen des Unternehmens, das Land und die "
+#~ "Adresse an. Präzisieren Sie die Spezialisierung des Unternehmens, die "
+#~ "Berufserfahrung, das Alter und die Größe des Unternehmens. Geben Sie die "
+#~ "Website des Unternehmens an. Verwenden Sie Links im Format: https://"
+#~ "www.example.com. Bei Bedarf kann die Hilfe des KI-Assistenten genutzt "
+#~ "werden.\n"
+#~ "\n"
+#~ "„Verarbeiten“ — Hilfe durch KI  \n"
+#~ "Beim Klicken auf die Schaltfläche „Verarbeiten“ erweitert der KI-"
+#~ "Assistent die Beschreibung, macht sie detaillierter, strukturierter und "
+#~ "für die maschinelle Verarbeitung geeigneter. Alle von Ihnen später "
+#~ "hinzugefügten Daten werden in die Beschreibung integriert. Gelöschte "
+#~ "Elemente werden ebenfalls korrekt entfernt. Das Verarbeitungsergebnis "
+#~ "wird nicht automatisch gespeichert.\n"
+#~ "\n"
+#~ "„Speichern“ — Beschreibung speichern  \n"
+#~ "Die Schaltfläche „Speichern“ schreibt die aktuelle Version der "
+#~ "Beschreibung zur weiteren Verwendung."
+
+#~ msgid ""
+#~ "Для корректного выбора бизнес-категорий и рейтингования потенциальных "
+#~ "клиентов необходимо сформировать описание продукта или услуги. Введите "
+#~ "описание продукта / услуги. Можно использовать ссылку / ссылки в формате "
+#~ "https://www.example.com. Можно воспользоваться помощью ИИ-ассистента.\n"
+#~ "\n"
+#~ "«Обработать» — помощь ИИ.\n"
+#~ "При нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, "
+#~ "сделает его более подробным, структурированным и удобным для машинной "
+#~ "обработки. В дальнейшем любые добавленные вами данные будут автоматически "
+#~ "встроены в структуру описания. Удалённые элементы также будут корректно "
+#~ "исключены. Результат обработки не сохраняется автоматически.\n"
+#~ "\n"
+#~ "«Сохранить» — сохранить описание\n"
+#~ "Кнопка «Сохранить» записывает текущую версию описания для дальнейшего "
+#~ "использования."
+#~ msgstr ""
+#~ "Für die korrekte Auswahl von Geschäftskategorien und die Bewertung "
+#~ "potenzieller Kunden ist es erforderlich, eine Beschreibung des Produkts "
+#~ "oder der Dienstleistung zu erstellen. Geben Sie eine Beschreibung des "
+#~ "Produkts / der Dienstleistung ein. Sie können einen Link / mehrere Links "
+#~ "im Format https://www.example.com verwenden. Sie können die Hilfe eines "
+#~ "KI-Assistenten in Anspruch nehmen.\n"
+#~ "\n"
+#~ "„Verarbeiten“ — KI-Hilfe.\n"
+#~ "Beim Klicken auf die Schaltfläche „Verarbeiten“ erweitert der KI-"
+#~ "Assistent die Beschreibung, macht sie detaillierter, strukturierter und "
+#~ "für die maschinelle Verarbeitung besser geeignet. In Zukunft werden alle "
+#~ "von Ihnen hinzugefügten Daten automatisch in die Struktur der "
+#~ "Beschreibung eingebunden. Entfernte Elemente werden ebenfalls korrekt "
+#~ "ausgeschlossen. Das Verarbeitungsergebnis wird nicht automatisch "
+#~ "gespeichert.\n"
+#~ "\n"
+#~ "„Speichern“ — Beschreibung speichern\n"
+#~ "Die Schaltfläche „Speichern“ speichert die aktuelle Version der "
+#~ "Beschreibung zur weiteren Verwendung."
+
+#~ msgid ""
+#~ "Для корректного выбора бизнес-категорий и рейтингования потенциальных "
+#~ "поставщиков и подрядчиков необходимо сформировать описание закупаемого "
+#~ "продукта, услуги или работ. Введите описание того, что нужно купить, "
+#~ "заказать или отдать на подряд. Можно использовать ссылку / ссылки в "
+#~ "формате https://www.example.com. Можно воспользоваться помощью ИИ-"
+#~ "ассистента.\n"
+#~ "\n"
+#~ "«Обработать» — помощь ИИ.\n"
+#~ "При нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, "
+#~ "сделает его более подробным, структурированным и удобным для машинной "
+#~ "обработки. В дальнейшем любые добавленные вами данные будут автоматически "
+#~ "встроены в структуру описания. Удалённые элементы также будут корректно "
+#~ "исключены. Результат обработки не сохраняется автоматически.\n"
+#~ "\n"
+#~ "«Сохранить» — сохранить описание\n"
+#~ "Кнопка «Сохранить» записывает текущую версию описания для дальнейшего "
+#~ "использования."
+#~ msgstr ""
+#~ "Für die korrekte Auswahl von Geschäftskategorien und die Bewertung "
+#~ "potenzieller Lieferanten und Auftragnehmer muss eine Beschreibung des zu "
+#~ "beschaffenden Produkts, der Dienstleistung oder der Arbeiten erstellt "
+#~ "werden. Geben Sie eine Beschreibung dessen ein, was gekauft, bestellt "
+#~ "oder als Auftrag vergeben werden soll. Sie können einen Link bzw. Links "
+#~ "im Format https://www.example.com verwenden. Sie können die Hilfe des KI-"
+#~ "Assistenten in Anspruch nehmen.\n"
+#~ "\n"
+#~ "„Verarbeiten“ — KI-Hilfe.  \n"
+#~ "Beim Klicken auf die Schaltfläche „Verarbeiten“ erweitert der KI-"
+#~ "Assistent die Beschreibung, macht sie ausführlicher, strukturierter und "
+#~ "für die maschinelle Verarbeitung geeigneter. Alle von Ihnen später "
+#~ "hinzugefügten Daten werden automatisch in die Beschreibungsstruktur "
+#~ "integriert. Entfernte Elemente werden ebenfalls korrekt ausgeschlossen. "
+#~ "Das Verarbeitungsergebnis wird nicht automatisch gespeichert.\n"
+#~ "\n"
+#~ "„Speichern“ — Beschreibung speichern  \n"
+#~ "Die Schaltfläche „Speichern“ speichert die aktuelle Version der "
+#~ "Beschreibung zur weiteren Verwendung."
+
+#~ msgid ""
+#~ "Для корректного выбора бизнес-категорий и рейтингования потенциальных "
+#~ "поставщиков и подрядчиков необходимо сформировать описание компании-"
+#~ "заказчика. Укажите название компании, страну и адрес. Уточните "
+#~ "специализацию компании, опыт работы, возраст и размер компании. Укажите "
+#~ "сайт компании. Используйте ссылки в формате: https://www.example.com. При "
+#~ "необходимости можно воспользоваться помощью ИИ-ассистента.\n"
+#~ "\n"
+#~ "«Обработать» — помощь ИИ\n"
+#~ "При нажатии на кнопку «Обработать» ИИ-ассистент развернёт описание, "
+#~ "сделает его более подробным, структурированным и удобным для машинной "
+#~ "обработки. В дальнейшем любые добавленные вами данные будут встроены в "
+#~ "описание. Удалённые элементы также будут корректно исключены. Результат "
+#~ "обработки автоматически не сохраняется.\n"
+#~ "\n"
+#~ "«Сохранить» — сохранить описание\n"
+#~ "Кнопка «Сохранить» записывает текущую версию описания для дальнейшего "
+#~ "использования."
+#~ msgstr ""
+#~ "Für die korrekte Auswahl von Geschäftskategorien und die Bewertung "
+#~ "potenzieller Lieferanten und Auftragnehmer ist es erforderlich, eine "
+#~ "Beschreibung des Auftrag gebenden Unternehmens zu erstellen. Geben Sie "
+#~ "den Namen des Unternehmens, das Land und die Adresse an. Präzisieren Sie "
+#~ "die Spezialisierung des Unternehmens, die Berufserfahrung, das Alter und "
+#~ "die Größe des Unternehmens. Geben Sie die Website des Unternehmens an. "
+#~ "Verwenden Sie Links im Format: https://www.example.com. Bei Bedarf kann "
+#~ "die Hilfe des KI-Assistenten genutzt werden.\n"
+#~ "\n"
+#~ "„Verarbeiten“ — Hilfe durch KI  \n"
+#~ "Beim Klick auf die Schaltfläche „Verarbeiten“ erweitert der KI-Assistent "
+#~ "die Beschreibung, macht sie detaillierter, strukturierter und besser für "
+#~ "die maschinelle Verarbeitung geeignet. Künftig werden alle von Ihnen "
+#~ "hinzugefügten Daten in die Beschreibung eingebunden. Gelöschte Elemente "
+#~ "werden ebenfalls korrekt entfernt. Das Verarbeitungsergebnis wird nicht "
+#~ "automatisch gespeichert.\n"
+#~ "\n"
+#~ "„Speichern“ — Beschreibung speichern  \n"
+#~ "Die Schaltfläche „Speichern“ schreibt die aktuelle Version der "
+#~ "Beschreibung zur weiteren Verwendung."
+
+#~ msgid ""
+#~ "Для корректного отбора и приоритезации городов необходимо сформировать "
+#~ "географические критерии поиска поставщиков и подрядчиков.\n"
+#~ "Если существуют конкретные ограничения по географии поиска поставщиков и "
+#~ "подрядчиков, укажите их. Это может быть конкретный город, радиус вокруг "
+#~ "города, федеральная земля, агломерация и т. д.\n"
+#~ "\n"
+#~ "При необходимости можно воспользоваться помощью ИИ-ассистента.\n"
+#~ "\n"
+#~ "«Обработать» — помощь ИИ\n"
+#~ "При нажатии на кнопку «Обработать» ИИ-ассистент развернёт географические "
+#~ "предпочтения и ограничения, сделает их более подробными и конкретными. В "
+#~ "дальнейшем любые добавленные вами данные будут встроены в описание. "
+#~ "Удалённые элементы также будут корректно исключены. Результат обработки "
+#~ "автоматически не сохраняется.\n"
+#~ "\n"
+#~ "«Сохранить» — сохранить географические ограничения и предпочтения\n"
+#~ "Кнопка «Сохранить» записывает текущую версию географических критериев для "
+#~ "дальнейшего использования."
+#~ msgstr ""
+#~ "Für die korrekte Auswahl und Priorisierung von Städten müssen "
+#~ "geografische Kriterien für die Suche nach Lieferanten und Auftragnehmern "
+#~ "festgelegt werden.\n"
+#~ "Wenn es konkrete Einschränkungen für die geografische Suche nach "
+#~ "Lieferanten und Auftragnehmern gibt, geben Sie diese an. Das kann eine "
+#~ "bestimmte Stadt, ein Radius um eine Stadt, ein Bundesland, eine "
+#~ "Agglomeration usw. sein.\n"
+#~ "\n"
+#~ "Bei Bedarf können Sie die Hilfe des KI-Assistenten nutzen.\n"
+#~ "\n"
+#~ "„Verarbeiten“ — Hilfe durch KI\n"
+#~ "Wenn Sie auf die Schaltfläche „Verarbeiten“ klicken, erweitert der KI-"
+#~ "Assistent die geografischen Präferenzen und Einschränkungen und macht sie "
+#~ "detaillierter und konkreter. Anschließend werden alle von Ihnen "
+#~ "hinzugefügten Daten in die Beschreibung eingebunden. Auch entfernte "
+#~ "Elemente werden korrekt ausgeschlossen. Das Ergebnis der Verarbeitung "
+#~ "wird nicht automatisch gespeichert.\n"
+#~ "\n"
+#~ "„Speichern“ — geografische Einschränkungen und Präferenzen speichern\n"
+#~ "Die Schaltfläche „Speichern“ speichert die aktuelle Version der "
+#~ "geografischen Kriterien für die weitere Verwendung."
+
+#~ msgid ""
+#~ "Для корректного отбора и приоритезации городов необходимо сформировать "
+#~ "географические критерии.\n"
+#~ "Если существуют конкретные ограничения по географии поиска клиентов, "
+#~ "укажите их. Это может быть конкретный город, радиус вокруг города, "
+#~ "федеральная земля, агломерация и т. д.\n"
+#~ "\n"
+#~ "При необходимости можно воспользоваться помощью ИИ-ассистента.\n"
+#~ "\n"
+#~ "«Обработать» — помощь ИИ\n"
+#~ "При нажатии на кнопку «Обработать» ИИ-ассистент развернёт географические "
+#~ "предпочтения и ограничения, сделает их более подробными и конкретными. В "
+#~ "дальнейшем любые добавленные вами данные будут встроены в описание. "
+#~ "Удалённые элементы также будут корректно исключены. Результат обработки "
+#~ "автоматически не сохраняется.\n"
+#~ "\n"
+#~ "«Сохранить» — сохранить географические ограничения и предпочтения\n"
+#~ "Кнопка «Сохранить» записывает текущую версию географических критериев для "
+#~ "дальнейшего использования."
+#~ msgstr ""
+#~ "Für eine korrekte Auswahl und Priorisierung von Städten müssen "
+#~ "geografische Kriterien festgelegt werden.\n"
+#~ "Wenn es konkrete Einschränkungen hinsichtlich der geografischen "
+#~ "Kundensuche gibt, geben Sie diese bitte an. Dies kann eine bestimmte "
+#~ "Stadt, ein Radius um eine Stadt, ein Bundesland, eine Agglomeration usw. "
+#~ "sein.\n"
+#~ "\n"
+#~ "Bei Bedarf kann die Hilfe des KI-Assistenten genutzt werden.\n"
+#~ "\n"
+#~ "„Verarbeiten“ — Hilfe durch KI\n"
+#~ "Beim Klicken auf die Schaltfläche „Verarbeiten“ erweitert der KI-"
+#~ "Assistent die geografischen Präferenzen und Einschränkungen und macht sie "
+#~ "detaillierter und konkreter. Künftig werden alle von Ihnen hinzugefügten "
+#~ "Daten in die Beschreibung integriert. Entfernte Elemente werden ebenfalls "
+#~ "korrekt ausgeschlossen. Das Verarbeitungsergebnis wird nicht automatisch "
+#~ "gespeichert.\n"
+#~ "\n"
+#~ "„Speichern“ — geografische Einschränkungen und Präferenzen speichern\n"
+#~ "Die Schaltfläche „Speichern“ speichert die aktuelle Version der "
+#~ "geografischen Kriterien für die weitere Verwendung."
+
+#~ msgid ""
+#~ "Для нормальной работы, пожалуйста, свяжитесь с нами и приобретите "
+#~ "подписку."
+#~ msgstr ""
+#~ "Für den normalen Betrieb wenden Sie sich bitte an uns und erwerben Sie "
+#~ "ein Abonnement."
+
+#~ msgid "Для предложения названия нужно сохранить продукт и компанию."
+#~ msgstr ""
+#~ "Für den Vorschlag eines Namens müssen das Produkt und das Unternehmen "
+#~ "beibehalten werden."
+
+#~ msgid ""
+#~ "Для продолжения сбора контактов и рейтингования включите обработку списка "
+#~ "наверху страницы."
+#~ msgstr ""
+#~ "Um mit dem Sammeln von Kontakten und der Bewertung fortzufahren, "
+#~ "aktivieren Sie die Verarbeitung der Liste oben auf der Seite."
+
+#~ msgid "Домен добавлен."
+#~ msgstr "Die Domain wurde hinzugefügt."
+
+#~ msgid "Домен удалён."
+#~ msgstr "Die Domain wurde gelöscht."
+
+#~ msgid ""
+#~ "Если вы хотите продолжать сбор и рейтингование контактов в этой задаче, "
+#~ "пожалуйста, подтвердите это. В этом случае мы рекомендуем следить за "
+#~ "дальнейшим сбором контактов, и, если контактов с успешным рейтингом по-"
+#~ "прежнему будет очень мало, отключить обработку этого списка."
+#~ msgstr ""
+#~ "Wenn Sie weiterhin Kontakte in dieser Aufgabe erfassen und bewerten "
+#~ "möchten, bestätigen Sie dies bitte. In diesem Fall empfehlen wir, die "
+#~ "weitere Erfassung von Kontakten zu überwachen und, falls es weiterhin nur "
+#~ "sehr wenige Kontakte mit erfolgreicher Bewertung gibt, die Verarbeitung "
+#~ "dieser Liste zu deaktivieren."
+
+#~ msgid "Запись не найдена."
+#~ msgstr "Eintrag nicht gefunden."
+
+#~ msgid "Заполните все поля IMAP."
+#~ msgstr "Füllen Sie alle IMAP-Felder aus."
+
+#~ msgid "Заполните все поля SMTP (LOGIN)."
+#~ msgstr "Füllen Sie alle SMTP-Felder (LOGIN) aus."
+
+#~ msgid "Заполните все поля SMTP (RELAY NOAUTH)."
+#~ msgstr "Füllen Sie alle SMTP-Felder (RELAY NOAUTH) aus."
+
+#~ msgid "Заполните все поля SMTP."
+#~ msgstr "Füllen Sie alle SMTP-Felder aus."
+
+#~ msgid "Заполните все поля."
+#~ msgstr "Füllen Sie alle Felder aus."
+
+#~ msgid ""
+#~ "Из последних %(total_cnt)s контактов с успешным рейтингом — не более %"
+#~ "(good_percent)s%%."
+#~ msgstr ""
+#~ "Von den letzten %(total_cnt)s Kontakten mit erfolgreicher Bewertung – "
+#~ "nicht mehr als %(good_percent)s%%."
+
+#~ msgid "Имя шаблона обязательно."
+#~ msgstr "Der Vorlagenname ist erforderlich."
+
+#~ msgid "Имя/код шаблона (уникально)"
+#~ msgstr "Vorlagenname/-code (eindeutig)"
+
+#~ msgid "Карточка компании"
+#~ msgstr "Firmenkarte"
+
+#~ msgid "Категория не найдена."
+#~ msgstr "Kategorie nicht gefunden."
+
+#~ msgid "Кнопки/настройки (JSON)"
+#~ msgstr "Schaltflächen/Einstellungen (JSON)"
+
+#~ msgid "Компания - продавец"
+#~ msgstr "Unternehmen - Verkäufer"
+
+#~ msgid ""
+#~ "Компания - продавец. Название, адрес, страна, размер, опыт, специализация."
+#~ msgstr ""
+#~ "Unternehmen - Verkäufer. Name, Adresse, Land, Größe, Erfahrung, "
+#~ "Spezialisierung."
+
+#~ msgid ""
+#~ "Компания-заказчик. Название, адрес, страна, размер, опыт, специализация."
+#~ msgstr ""
+#~ "Kundeunternehmen. Name, Adresse, Land, Größe, Erfahrung, Spezialisierung."
+
+#~ msgid "Контакт 1"
+#~ msgstr "Kontakt 1"
+
+#~ msgid "Контакт 2"
+#~ msgstr "Kontakt 2"
+
+#~ msgid "Контакт 3"
+#~ msgstr "Kontakt 3"
+
+#~ msgid "Контакт 4"
+#~ msgstr "Kontakt 4"
+
+#~ msgid "Контакт 5"
+#~ msgstr "Kontakt 5"
+
+#~ msgid "Лимит должен быть не меньше 1 письма в час."
+#~ msgstr "Das Limit muss mindestens 1 E-Mail pro Stunde betragen."
+
+#~ msgid "Лимит/час"
+#~ msgstr "Limit/Stunde"
+
+#~ msgid "Логин больше не обслуживается"
+#~ msgstr "Der Login wird nicht mehr unterstützt"
+
+#~ msgid "Логин заблокирован"
+#~ msgstr "Der Login ist gesperrt"
+
+#~ msgid "Максимум 300 писем в час."
+#~ msgstr "Maximal 300 E-Mails pro Stunde."
+
+#~ msgid ""
+#~ "Мы приостановили сбор контактов и их рейтингование для этого списка "
+#~ "рассылки."
+#~ msgstr ""
+#~ "Wir haben das Sammeln von Kontakten und deren Bewertung für diese "
+#~ "Mailingliste vorübergehend eingestellt."
+
+#~ msgid "Название списка"
+#~ msgstr "Name der Liste"
+
+#~ msgid ""
+#~ "Напоминаем, что действует ограничение на рейтингование контактов — не "
+#~ "более 50 000 контактов в месяц, вне зависимости от успешности "
+#~ "рейтингования."
+#~ msgstr ""
+#~ "Wir erinnern daran, dass eine Beschränkung für das Bewerten von Kontakten "
+#~ "gilt — nicht mehr als 50.000 Kontakte pro Monat, unabhängig vom Erfolg "
+#~ "der Bewertung."
+
+#~ msgid "Не заполнены или не сохранены разделы:"
+#~ msgstr "Nicht ausgefüllt oder nicht gespeicherte Bereiche:"
+
+#~ msgid "Не заполнены обязательные разделы"
+#~ msgstr "Pflichtfelder sind nicht ausgefüllt"
+
+#~ msgid "Не удалось отправить письмо"
+#~ msgstr "Das Senden der E-Mail ist fehlgeschlagen"
+
+#~ msgid "Не удалось предложить название."
+#~ msgstr "Der Name konnte nicht vorgeschlagen werden."
+
+#~ msgid "Неверный JSON."
+#~ msgstr "Ungültiges JSON."
+
+#~ msgid "Неверный пользователь"
+#~ msgstr "Ungültiger Benutzer"
+
+#~ msgid "Неверный формат телефона"
+#~ msgstr "Ungültiges Telefonnummernformat"
+
+#~ msgid "Неизвестное действие."
+#~ msgstr "Unbekannte Aktion."
+
+#~ msgid "Некорректное значение шифрования."
+#~ msgstr "Ungültiger Verschlüsselungswert."
+
+#~ msgid "Некорректный домен."
+#~ msgstr "Ungültige Domain."
+
+#~ msgid "Новая кампания"
+#~ msgstr "Neue Kampagne"
+
+#~ msgid "Новый почтовый сервер"
+#~ msgstr "Neuer Mailserver"
+
+#~ msgid "Обработка списка отключена"
+#~ msgstr "Verarbeitung der Liste ist deaktiviert"
+
+#~ msgid ""
+#~ "Ограничение на рейтингование для незадействованного списка — до 100 "
+#~ "контактов."
+#~ msgstr ""
+#~ "Beschränkung der Bewertung für die nicht verwendete Liste – bis zu 100 "
+#~ "Kontakte."
+
+#~ msgid "Ограничение тестового доступа"
+#~ msgstr "Beschränkung des Testzugangs"
+
+#~ msgid "Отправитель:"
+#~ msgstr "Absender:"
+
+#~ msgid "Пароли не совпадают"
+#~ msgstr "Passwörter stimmen nicht überein"
+
+#~ msgid "Пароль обязателен."
+#~ msgstr "Das Passwort ist erforderlich."
+
+#~ msgid "Перенести в архив"
+#~ msgstr "In Archiv verschieben"
+
+#~ msgid ""
+#~ "Письмо ещё не создано — сначала откройте редактор письма и сохраните."
+#~ msgstr ""
+#~ "Die E-Mail wurde noch nicht erstellt — öffnen Sie zuerst den E-Mail-"
+#~ "Editor und speichern Sie sie."
+
+#~ msgid "Пишите нам: sales@serenity-mail.de"
+#~ msgstr "Schreiben Sie uns: sales@serenity-mail.de"
+
+#~ msgid "Подтвердите действие."
+#~ msgstr "Bestätigen Sie die Aktion."
+
+#~ msgid ""
+#~ "Пока список не задействован, вы можете пересчитывать рейтинги и начинать "
+#~ "сбор контактов заново. Для этого необходимо изменить задачу (продукт, "
+#~ "компания, география)."
+#~ msgstr ""
+#~ "Solange die Liste nicht verwendet wird, können Sie die Rankings neu "
+#~ "berechnen und mit der Kontaktsammlung erneut beginnen. Dazu müssen Sie "
+#~ "die Aufgabe ändern (Produkt, Unternehmen, Geografie)."
+
+#~ msgid "Пользователь недоступен"
+#~ msgstr "Benutzer nicht verfügbar"
+
+#~ msgid "Пользователь с таким email уже существует"
+#~ msgstr "Ein Benutzer mit dieser E-Mail existiert bereits"
+
+#~ msgid ""
+#~ "После изменения задачи вам будет предложено начать сбор контактов заново "
+#~ "или произвести пересчёт рейтинга для уже собранных контактов по "
+#~ "изменённой задаче."
+#~ msgstr ""
+#~ "Nach der Änderung der Aufgabe werden Sie aufgefordert, das Sammeln von "
+#~ "Kontakten erneut zu starten oder die Bewertung für die bereits "
+#~ "gesammelten Kontakte anhand der geänderten Aufgabe neu zu berechnen."
+
+#~ msgid ""
+#~ "После того как список рассылки задействован в кампании и прорейтинговано "
+#~ "значительно более 100 контактов, а также этим контактам отправлены "
+#~ "письма, повторное рейтингование для собранных контактов не проводится. "
+#~ "Однако, если вы изменили задачу, новые собранные контакты будут "
+#~ "рейтинговаться по новой задаче."
+#~ msgstr ""
+#~ "Nachdem die Mailingliste in einer Kampagne verwendet wurde und deutlich "
+#~ "mehr als 100 Kontakte bewertet wurden sowie diesen Kontakten E-Mails "
+#~ "gesendet wurden, wird für die gesammelten Kontakte keine erneute "
+#~ "Bewertung durchgeführt. Wenn Sie jedoch die Aufgabe geändert haben, "
+#~ "werden neue gesammelte Kontakte anhand der neuen Aufgabe bewertet."
+
+#~ msgid "Продукт"
+#~ msgstr "Produkt"
+
+#~ msgid ""
+#~ "Продукт / услуга. Что нужно купить / заказать? Кто поставляет / выполняет "
+#~ "работы?"
+#~ msgstr ""
+#~ "Produkt / Dienstleistung. Was soll gekauft / bestellt werden? Wer "
+#~ "liefert / führt die Arbeiten aus?"
+
+#~ msgid "Продукт / услуга. Что продаётся? Где применяется? Кто покупатель?"
+#~ msgstr ""
+#~ "Produkt / Dienstleistung. Was wird verkauft? Wo wird es eingesetzt? Wer "
+#~ "ist der Käufer?"
+
+#~ msgid "Путь домена уже занят не каталогом."
+#~ msgstr "Der Domainpfad ist bereits durch kein Verzeichnis belegt."
+
+#~ msgid "Рабочее пространство не найдено"
+#~ msgstr "Arbeitsbereich nicht gefunden"
+
+#~ msgid "Рейтинг"
+#~ msgstr "Bewertung"
+
+#~ msgid "Рейтинг отсечения — %(rate_limit)s."
+#~ msgstr "Ausschlussbewertung — %(rate_limit)s."
+
+#~ msgid "С рейтингом %(next_rate_from)s–100 — %(bad_cnt)s контактов."
+#~ msgstr ""
+#~ "Mit einer Bewertung von %(next_rate_from)s–100 — %(bad_cnt)s Kontakte."
+
+#~ msgid "С рейтингом 1–%(rate_limit)s — %(good_cnt)s контактов."
+#~ msgstr "Mit einem Rating von 1–%(rate_limit)s — %(good_cnt)s Kontakte."
+
+#~ msgid "Сбор контактов"
+#~ msgstr "Kontaktsammlung"
+
+#~ msgid ""
+#~ "Сбор контактов и их рейтингование производится автоматически по мере "
+#~ "осуществления рассылок."
+#~ msgstr ""
+#~ "Das Sammeln von Kontakten und deren Bewertung erfolgt automatisch im Zuge "
+#~ "der Durchführung von Mailings."
+
+#~ msgid ""
+#~ "Сбор контактов по списку приостановлен, рейтингование контактов не "
+#~ "производится."
+#~ msgstr ""
+#~ "Das Sammeln von Kontakten anhand der Liste ist pausiert, die Bewertung "
+#~ "von Kontakten wird nicht durchgeführt."
+
+#~ msgid "Сбор контактов приостановлен из-за низкого качества контактов."
+#~ msgstr ""
+#~ "Das Sammeln von Kontakten wurde aufgrund der niedrigen Kontaktqualität "
+#~ "ausgesetzt."
+
+#~ msgid "Сбор контактов тестируется"
+#~ msgstr "Das Sammeln von Kontakten wird getestet"
+
+#~ msgid "Собрано и отрейтинговано достаточно контактов"
+#~ msgstr "Es wurden genügend Kontakte gesammelt und bewertet."
+
+#~ msgid "Список рассылки: поиск клиентов / покупателей"
+#~ msgstr "Mailingliste: Suche nach Kunden / Käufern"
+
+#~ msgid "Список рассылки: поиск поставщиков / подрядчиков"
+#~ msgstr "Mailingliste: Suche nach Lieferanten / Auftragnehmern"
+
+#~ msgid "Ссылка подтверждения недействительна или устарела"
+#~ msgstr "Der Bestätigungslink ist ungültig oder abgelaufen"
+
+#~ msgid "Стили/настройки (JSON)"
+#~ msgstr "Stile/Einstellungen (JSON)"
+
+#~ msgid "Такой домен уже добавлен."
+#~ msgstr "Eine solche Domain wurde bereits hinzugefügt."
+
+#~ msgid ""
+#~ "Только контакты с рейтингом лучше (меньше), чем рейтинг отсечения, "
+#~ "попадают в рассылку."
+#~ msgstr ""
+#~ "Nur Kontakte mit einem besseren Rating (niedriger), als das "
+#~ "Abschneidungsrating, werden in den Versand aufgenommen."
+
+#~ msgid "Укажите домен."
+#~ msgstr "Geben Sie die Domain an."
+
+#~ msgid "Укажите корректный домен."
+#~ msgstr "Geben Sie die korrekte Domain an."
+
+#~ msgid "Укажите только домен без протокола и пути."
+#~ msgstr "Geben Sie nur die Domain ohne Protokoll und Pfad an."
+
+#~ msgid "Успешная кампания по рассылке - %(name)s"
+#~ msgstr "Erfolgreiche E-Mail-Kampagne - %(name)s"
+
+#~ msgid "Шаблон с таким именем уже существует."
+#~ msgstr "Eine Vorlage mit diesem Namen existiert bereits."
+
+#~ msgid "Шаблон удален"
+#~ msgstr "Vorlage gelöscht"
+
+#~ msgid "Это сделано для возможности оперативного управления рейтингованием."
+#~ msgstr ""
+#~ "Dies wurde gemacht, um eine schnelle Verwaltung der Bewertung zu "
+#~ "ermöglichen."
+
+#~ msgid "Этот Email уже используется."
+#~ msgstr "Diese E-Mail wird bereits verwendet."
+
+#~ msgid ""
+#~ "Этот список рассылки не задействован ни в одной кампании. Пока список "
+#~ "рассылки не задействован, рейтингование контактов ограничено."
+#~ msgstr ""
+#~ "Diese Mailingliste wird in keiner Kampagne verwendet. Solange die "
+#~ "Mailingliste nicht verwendet wird, ist das Kontaktranking eingeschränkt."
+
+#~ msgid "количество контактов для рейтингования — не более 60 контактов."
+#~ msgstr "Anzahl der Kontakte für die Bewertung — nicht mehr als 60 Kontakte."
+
+#~ msgid "описанием географии"
+#~ msgstr "Beschreibung der Geografie"
+
+#~ msgid "описанием географии поиска поставщиков и подрядчиков"
+#~ msgstr ""
+#~ "Beschreibung der geografischen Suche nach Lieferanten und Auftragnehmern"
+
+#~ msgid "описанием закупаемого продукта, услуги или работ"
+#~ msgstr ""
+#~ "mit einer Beschreibung des zu beschaffenden Produkts, der Dienstleistung "
+#~ "oder der Arbeiten"
+
+#~ msgid "описанием компании"
+#~ msgstr "Beschreibung des Unternehmens"
+
+#~ msgid "описанием компании-заказчика"
+#~ msgstr "Beschreibung des Kundenunternehmens"
+
+#~ msgid "описанием продукта или услуги"
+#~ msgstr "Produkt- oder Dienstleistungsbeschreibung"
+
+#~ msgid ""
+#~ "сбор контактов с успешным рейтингом (рейтинг меньше или равен рейтингу "
+#~ "отсечения) — не более 20 контактов;"
+#~ msgstr ""
+#~ "Kontakterfassung mit erfolgreicher Bewertung (Bewertung kleiner oder "
+#~ "gleich der Abschneidebewertung) — nicht mehr als 20 Kontakte;"
+
+#: panel/menu.py
 msgid "Начало"
 msgstr "Anfang"
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:741
-msgid "Не заполнены или не сохранены разделы:"
-msgstr "Nicht ausgefüllt oder nicht gespeicherte Bereiche:"
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:740
-msgid "Не заполнены обязательные разделы"
-msgstr "Pflichtfelder sind nicht ausgefüllt"
-
-#: public/aap_auth/views.py:246
-msgid "Не удалось отправить письмо"
-msgstr "Das Senden der E-Mail ist fehlgeschlagen"
-
-#: panel/aap_audience/views/modal_edit_title.py:112
-msgid "Не удалось предложить название."
-msgstr "Der Name konnte nicht vorgeschlagen werden."
-
-#: panel/aap_settings/views/sending.py:95
-msgid "Неверный JSON."
-msgstr "Ungültiges JSON."
-
-#: panel/views.py:1607
-msgid "Неверный пользователь"
-msgstr "Ungültiger Benutzer"
-
-#: public/aap_auth/forms.py:53
-msgid "Неверный формат телефона"
-msgstr "Ungültiges Telefonnummernformat"
-
-#: panel/aap_audience/views/modal_edit_title.py:128
-msgid "Неизвестное действие."
-msgstr "Unbekannte Aktion."
-
-#: panel/aap_settings/forms.py:277 panel/aap_settings/forms.py:325 panel/aap_settings/forms.py:390
-msgid "Некорректное значение шифрования."
-msgstr "Ungültiger Verschlüsselungswert."
-
-#: panel/aap_settings/client_subsites.py:43
-msgid "Некорректный домен."
-msgstr "Ungültige Domain."
-
-#: panel/aap_campaigns/views/campaigns.py:1496 panel/aap_campaigns/views/campaigns.py:1701
-msgid "Новая кампания"
-msgstr "Neue Kampagne"
-
-#: panel/aap_settings/views/mail_servers.py:149
-msgid "Новый почтовый сервер"
-msgstr "Neuer Mailserver"
-
-#: panel/menu.py:16
+#: panel/menu.py
 msgid "Обзор"
 msgstr "Überblick"
 
-#: panel/menu.py:17
+#: panel/menu.py
 msgid "Обзор : Начало"
 msgstr "Übersicht: Start"
 
-#: panel/aap_audience/views/modal_pause_info.py:212
-msgid "Обработка списка отключена"
-msgstr "Verarbeitung der Liste ist deaktiviert"
-
-#: panel/aap_audience/views/modal_pause_info.py:236
-msgid "Ограничение на рейтингование для незадействованного списка — до 100 контактов."
-msgstr "Beschränkung der Bewertung für die nicht verwendete Liste – bis zu 100 Kontakte."
-
-#: panel/aap_audience/views/modal_pause_info.py:218
-msgid "Ограничение тестового доступа"
-msgstr "Beschränkung des Testzugangs"
-
-#: panel/aap_settings/forms.py:205
-msgid "Отправитель:"
-msgstr "Absender:"
-
-#: public/aap_auth/forms.py:118 public/aap_auth/forms.py:74 public/aap_auth/forms.py:78
-msgid "Пароли не совпадают"
-msgstr "Passwörter stimmen nicht überein"
-
-#: panel/aap_settings/views/imap_server.py:265 panel/aap_settings/views/smtp_server.py:334
-msgid "Пароль обязателен."
-msgstr "Das Passwort ist erforderlich."
-
-#: panel/aap_audience/views/create_list.py:119 panel/aap_campaigns/views/campaigns.py:1036 panel/aap_campaigns/views/templates.py:370 panel/aap_settings/views/mail_servers.py:310
-msgid "Перенести в архив"
-msgstr "In Archiv verschieben"
-
-#: panel/aap_campaigns/views/campaigns.py:1367
-msgid "Письмо ещё не создано — сначала откройте редактор письма и сохраните."
-msgstr "Die E-Mail wurde noch nicht erstellt — öffnen Sie zuerst den E-Mail-Editor und speichern Sie sie."
-
-#: panel/aap_audience/views/modal_pause_info.py:226
-msgid "Пишите нам: sales@serenity-mail.de"
-msgstr "Schreiben Sie uns: sales@serenity-mail.de"
-
-#: panel/aap_campaigns/views/campaigns_api.py:220
-msgid "Подтвердите действие."
-msgstr "Bestätigen Sie die Aktion."
-
-#: panel/aap_audience/views/modal_pause_info.py:237
-msgid "Пока список не задействован, вы можете пересчитывать рейтинги и начинать сбор контактов заново. Для этого необходимо изменить задачу (продукт, компания, география)."
-msgstr "Solange die Liste nicht verwendet wird, können Sie die Rankings neu berechnen und mit der Kontaktsammlung erneut beginnen. Dazu müssen Sie die Aufgabe ändern (Produkt, Unternehmen, Geografie)."
-
-#: panel/views.py:1616
-msgid "Пользователь недоступен"
-msgstr "Benutzer nicht verfügbar"
-
-#: public/aap_auth/forms.py:62
-msgid "Пользователь с таким email уже существует"
-msgstr "Ein Benutzer mit dieser E-Mail existiert bereits"
-
-#: panel/aap_audience/views/modal_pause_info.py:241
-msgid "После изменения задачи вам будет предложено начать сбор контактов заново или произвести пересчёт рейтинга для уже собранных контактов по изменённой задаче."
-msgstr "Nach der Änderung der Aufgabe werden Sie aufgefordert, das Sammeln von Kontakten erneut zu starten oder die Bewertung für die bereits gesammelten Kontakte anhand der geänderten Aufgabe neu zu berechnen."
-
-#: panel/aap_audience/views/modal_pause_info.py:245
-msgid "После того как список рассылки задействован в кампании и прорейтинговано значительно более 100 контактов, а также этим контактам отправлены письма, повторное рейтингование для собранных контактов не проводится. Однако, если вы изменили задачу, новые собранные контакты будут рейтинговаться по новой задаче."
-msgstr "Nachdem die Mailingliste in einer Kampagne verwendet wurde und deutlich mehr als 100 Kontakte bewertet wurden sowie diesen Kontakten E-Mails gesendet wurden, wird für die gesammelten Kontakte keine erneute Bewertung durchgeführt. Wenn Sie jedoch die Aufgabe geändert haben, werden neue gesammelte Kontakte anhand der neuen Aufgabe bewertet."
-
-#: panel/menu.py:85
-msgid "Почтовые серверы"
-msgstr "Mailserver"
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:207 panel/aap_audience/views/create_edit_flow_shared.py:288
-msgid "Продукт"
-msgstr "Produkt"
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:291
-msgid "Продукт / услуга. Что нужно купить / заказать? Кто поставляет / выполняет работы?"
-msgstr "Produkt / Dienstleistung. Was soll gekauft / bestellt werden? Wer liefert / führt die Arbeiten aus?"
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:210
-msgid "Продукт / услуга. Что продаётся? Где применяется? Кто покупатель?"
-msgstr "Produkt / Dienstleistung. Was wird verkauft? Wo wird es eingesetzt? Wer ist der Käufer?"
-
-#: panel/aap_settings/client_subsites.py:51
-msgid "Путь домена уже занят не каталогом."
-msgstr "Der Domainpfad ist bereits durch kein Verzeichnis belegt."
-
-#: public/aap_auth/views.py:283
-msgid "Рабочее пространство не найдено"
-msgstr "Arbeitsbereich nicht gefunden"
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:74
-msgid "Рейтинг"
-msgstr "Bewertung"
-
-#: panel/aap_audience/views/modal_pause_info.py:198
-msgid "Рейтинг отсечения — %(rate_limit)s."
-msgstr "Ausschlussbewertung — %(rate_limit)s."
-
-#: panel/aap_audience/views/modal_pause_info.py:201
-msgid "С рейтингом %(next_rate_from)s–100 — %(bad_cnt)s контактов."
-msgstr "Mit einer Bewertung von %(next_rate_from)s–100 — %(bad_cnt)s Kontakte."
-
-#: panel/aap_audience/views/modal_pause_info.py:199
-msgid "С рейтингом 1–%(rate_limit)s — %(good_cnt)s контактов."
-msgstr "Mit einem Rating von 1–%(rate_limit)s — %(good_cnt)s Kontakte."
-
-#: panel/aap_audience/views/create_edit_flow_shared.py:70 panel/aap_audience/views/create_edit_flow_shared.py:71
-msgid "Сбор контактов"
-msgstr "Kontaktsammlung"
-
-#: panel/aap_audience/views/modal_pause_info.py:173
-msgid "Сбор контактов и их рейтингование производится автоматически по мере осуществления рассылок."
-msgstr "Das Sammeln von Kontakten und deren Bewertung erfolgt automatisch im Zuge der Durchführung von Mailings."
-
-#: panel/aap_audience/views/modal_pause_info.py:214
-msgid "Сбор контактов по списку приостановлен, рейтингование контактов не производится."
-msgstr "Das Sammeln von Kontakten anhand der Liste ist pausiert, die Bewertung von Kontakten wird nicht durchgeführt."
-
-#: panel/aap_audience/views/modal_pause_info.py:193
-msgid "Сбор контактов приостановлен из-за низкого качества контактов."
-msgstr "Das Sammeln von Kontakten wurde aufgrund der niedrigen Kontaktqualität ausgesetzt."
-
-#: panel/aap_audience/views/modal_pause_info.py:230
-msgid "Сбор контактов тестируется"
-msgstr "Das Sammeln von Kontakten wird getestet"
-
-#: panel/aap_audience/views/modal_pause_info.py:170
-msgid "Собрано и отрейтинговано достаточно контактов"
-msgstr "Es wurden genügend Kontakte gesammelt und bewertet."
-
-#: panel/menu.py:30 panel/menu.py:31
+#: panel/menu.py
 msgid "Списки и рейтинг"
 msgstr "Listen und Bewertung"
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:202
-msgid "Список рассылки: поиск клиентов / покупателей"
-msgstr "Mailingliste: Suche nach Kunden / Käufern"
+#: panel/menu.py
+msgid "Кампании рассылок"
+msgstr "E-Mail-Kampagnen"
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:283
-msgid "Список рассылки: поиск поставщиков / подрядчиков"
-msgstr "Mailingliste: Suche nach Lieferanten / Auftragnehmern"
+#: panel/menu.py
+msgid "Кампании и письма"
+msgstr "Kampagnen und E-Mails"
 
-#: public/aap_auth/views.py:254
-msgid "Ссылка подтверждения недействительна или устарела"
-msgstr "Der Bestätigungslink ist ungültig oder abgelaufen"
+#: panel/menu.py
+msgid "Кампании : рассылки и письма"
+msgstr "Kampagnen: Mailings und E-Mails"
 
-#: panel/menu.py:59 panel/menu.py:60
-msgid "Статистика"
-msgstr "Statistik"
-
-#: panel/menu.py:72
-msgid "Статистика : Отправка"
-msgstr "Statistik: Versand"
-
-#: panel/menu.py:66
-msgid "Статистика : Переходы"
-msgstr "Statistik: Weiterleitungen"
-
-#: panel/models.py:17
-msgid "Стили/настройки (JSON)"
-msgstr "Stile/Einstellungen (JSON)"
-
-#: panel/aap_settings/forms.py:173
-msgid "Такой домен уже добавлен."
-msgstr "Eine solche Domain wurde bereits hinzugefügt."
-
-#: panel/aap_audience/views/modal_pause_info.py:174
-msgid "Только контакты с рейтингом лучше (меньше), чем рейтинг отсечения, попадают в рассылку."
-msgstr "Nur Kontakte mit einem besseren Rating (niedriger), als das Abschneidungsrating, werden in den Versand aufgenommen."
-
-#: panel/aap_settings/client_subsites.py:25
-msgid "Укажите домен."
-msgstr "Geben Sie die Domain an."
-
-#: panel/aap_settings/client_subsites.py:29
-msgid "Укажите корректный домен."
-msgstr "Geben Sie die korrekte Domain an."
-
-#: panel/aap_settings/client_subsites.py:27
-msgid "Укажите только домен без протокола и пути."
-msgstr "Geben Sie nur die Domain ohne Protokoll und Pfad an."
-
-#: panel/views.py:1171
-msgid "Успешная кампания по рассылке - %(name)s"
-msgstr "Erfolgreiche E-Mail-Kampagne - %(name)s"
-
-#: panel/aap_campaigns/views/templates.py:264 panel/aap_campaigns/views/templates.py:302
-msgid "Шаблон с таким именем уже существует."
-msgstr "Eine Vorlage mit diesem Namen existiert bereits."
-
-#: panel/aap_campaigns/views/campaigns.py:599 panel/aap_campaigns/views/campaigns.py:784
-msgid "Шаблон удален"
-msgstr "Vorlage gelöscht"
-
-#: panel/menu.py:50
+#: panel/menu.py
 msgid "Шаблоны писем"
 msgstr "E-Mail-Vorlagen"
 
-#: panel/aap_audience/views/modal_pause_info.py:175
-msgid "Это сделано для возможности оперативного управления рейтингованием."
-msgstr "Dies wurde gemacht, um eine schnelle Verwaltung der Bewertung zu ermöglichen."
+#: panel/menu.py
+msgid "Кампании : Шаблоны писем"
+msgstr "Kampagnen: E-Mail-Vorlagen"
 
-#: panel/aap_settings/forms.py:139
-msgid "Этот Email уже используется."
-msgstr "Diese E-Mail wird bereits verwendet."
+#: panel/menu.py
+msgid "Статистика"
+msgstr "Statistik"
 
-#: panel/aap_audience/views/modal_pause_info.py:232
-msgid "Этот список рассылки не задействован ни в одной кампании. Пока список рассылки не задействован, рейтингование контактов ограничено."
-msgstr "Diese Mailingliste wird in keiner Kampagne verwendet. Solange die Mailingliste nicht verwendet wird, ist das Kontaktranking eingeschränkt."
+#: panel/menu.py
+msgid "Статистика : Переходы"
+msgstr "Statistik: Weiterleitungen"
 
-#: panel/aap_audience/views/modal_pause_info.py:222
-msgid "количество контактов для рейтингования — не более 60 контактов."
-msgstr "Anzahl der Kontakte für die Bewertung — nicht mehr als 60 Kontakte."
+#: panel/menu.py
+msgid "Статистика : Отправка"
+msgstr "Statistik: Versand"
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:270
-msgid "описанием географии"
-msgstr "Beschreibung der Geografie"
+#: panel/menu.py
+msgid "Настройки"
+msgstr "Einstellungen"
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:355
-msgid "описанием географии поиска поставщиков и подрядчиков"
-msgstr "Beschreibung der geografischen Suche nach Lieferanten und Auftragnehmern"
+#: panel/menu.py
+msgid "Почтовые серверы"
+msgstr "Mailserver"
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:308
-msgid "описанием закупаемого продукта, услуги или работ"
-msgstr "mit einer Beschreibung des zu beschaffenden Produkts, der Dienstleistung oder der Arbeiten"
+#: panel/menu.py
+msgid "Настройки : Почтовые серверы"
+msgstr "Einstellungen: Mailserver"
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:247
-msgid "описанием компании"
-msgstr "Beschreibung des Unternehmens"
+#: panel/menu.py
+msgid "'Окна' отправки"
+msgstr "Sende-„Fenster“"
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:331
-msgid "описанием компании-заказчика"
-msgstr "Beschreibung des Kundenunternehmens"
+#: panel/menu.py
+msgid "Настройки : 'Окна' отправки"
+msgstr "Einstellungen: Sende-Fenster"
 
-#: panel/aap_audience/views/create_edit_flow_shared.py:224
-msgid "описанием продукта или услуги"
-msgstr "Produkt- oder Dienstleistungsbeschreibung"
+#: panel/menu.py
+msgid "Настройки : Учет переходов"
+msgstr "Einstellungen: Klickverfolgung"
 
-#: panel/aap_audience/views/modal_pause_info.py:221
-msgid "сбор контактов с успешным рейтингом (рейтинг меньше или равен рейтингу отсечения) — не более 20 контактов;"
-msgstr "Kontakterfassung mit erfolgreicher Bewertung (Bewertung kleiner oder gleich der Abschneidebewertung) — nicht mehr als 20 Kontakte;"
+#: panel/menu.py
+msgid "Настройки : Учет переходов URL"
+msgstr "Einstellungen: URL-Klickverfolgung"
 
+#: templates/public/test.html
+msgid "евро"
+msgstr "Euro"
+
+#: templates/panels/base.html
+msgid "Свяжитесь с нами:"
+msgstr "Kontaktieren Sie uns:"
+
+#: templates/panels/base.html
+msgid "WhatsApp / Telegram:"
+msgstr "WhatsApp / Telegram:"

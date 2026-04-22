@@ -167,7 +167,7 @@
                     data-overview-run-status="1"
                     data-campaign-ui="{{ row.0.ui_id }}"
                     class="{% if row.0.is_in_window %}YY-STATUS_GREEN inline-flex !w-full !justify-between !items-center !mb-0{% else %}YY-STATUS_BLUE inline-flex !w-full !mb-0{% endif %}">
-                    <span data-overview-run-text="1" data-campaign-ui="{{ row.0.ui_id }}">{% if row.0.is_in_window %}{% trans "Письма отправляются" %}{% else %}{% trans "Ждем окна отправки" %}{% endif %}</span>
+                    <span data-overview-run-text="1" data-campaign-ui="{{ row.0.ui_id }}">{% if row.0.is_in_window %}{% trans "Письма отправляются" %}{% else %}{% trans 'Ждем "окно"' %}{% endif %}</span>
                       <span
                         data-overview-run-spinner="1"
                         data-campaign-ui="{{ row.0.ui_id }}"
@@ -302,7 +302,7 @@
                       data-overview-run-status="1"
                       data-campaign-ui="{{ row.1.ui_id }}"
                       class="{% if row.1.is_in_window %}YY-STATUS_GREEN inline-flex !w-full !justify-between !items-center !mb-0{% else %}YY-STATUS_BLUE inline-flex !w-full !mb-0{% endif %}">
-                      <span data-overview-run-text="1" data-campaign-ui="{{ row.1.ui_id }}">{% if row.1.is_in_window %}{% trans "Письма отправляются" %}{% else %}{% trans "Ждем окна отправки" %}{% endif %}</span>
+                      <span data-overview-run-text="1" data-campaign-ui="{{ row.1.ui_id }}">{% if row.1.is_in_window %}{% trans "Письма отправляются" %}{% else %}{% trans 'Ждем "окно"' %}{% endif %}</span>
                       <span
                         data-overview-run-spinner="1"
                         data-campaign-ui="{{ row.1.ui_id }}"
@@ -1129,7 +1129,7 @@
         }
 
         var runTextNodes = document.querySelectorAll('[data-overview-run-text][data-campaign-ui="' + ui + '"]');
-        var runText = item.is_in_window ? "{% trans 'Письма отправляются' %}" : "{% trans 'Ждем окна отправки' %}";
+        var runText = item.is_in_window ? "{% trans 'Письма отправляются' %}" : "{% trans 'Ждем "окно"' %}";
         for (var o = 0; o < runTextNodes.length; o += 1) {
           runTextNodes[o].textContent = runText;
         }

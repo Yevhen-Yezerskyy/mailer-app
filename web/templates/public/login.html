@@ -1,4 +1,4 @@
-{% extends "public/base.html" %}
+{% extends "public_base.html" %}
 {% load i18n %}
 
 {% block title %}{% trans "Вход" %} — Serenity{% endblock %}
@@ -7,14 +7,9 @@
 <!-- FILE: web/templates/public/login.html  (обновлено — 2026-03-07)
 Смысл: публичный логин с проверками статусов workspace/user/email_confirmed. -->
 <div class="box" style="flex-direction: column;">
+    {% include "public/_interactive_heading.html" %}
 
-
-    <h2 style="margin-bottom: 20px;">
-      {% trans "Интеллектуальные" %}<br>
-      {% trans "email-коммуникации" %}
-    </h2>
-
-    <h2>{% trans "Вход" %}</h2>
+    <h2 class="interactive-page-title">{% trans "Вход" %}</h2>
 
     {% if auth_error %}
       <p style="color:#750b00;margin-top:20px;">{{ auth_error }}</p>
@@ -26,14 +21,14 @@
       <form method="post">
         {% csrf_token %}
 
-        <p style="margin-top:20px;">{% trans "Email:" %}</p>
+        <p class="interactive-label" style="margin-top:20px;">{% trans "Email:" %}</p>
         <p>{{ form.username }}</p>
 
-        <p style="margin-top:20px;">{% trans "Пароль:" %}</p>
+        <p class="interactive-label" style="margin-top:20px;">{% trans "Пароль:" %}</p>
         <p>{{ form.password }}</p>
 
          <p class="buttons" style="margin-top:20px;margin-bottom: 20px;"><a href="{% url 'public_index' %}" class="btn">&nbsp;&nbsp;&nbsp;&nbsp;{% trans "Отмена" %}&nbsp;&nbsp;&nbsp;&nbsp;</a>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<button type="submit" class="btn">&nbsp;&nbsp;&nbsp;&nbsp;{% trans "Войти" %}&nbsp;&nbsp;&nbsp;&nbsp;</button></p>
-         <p style="margin:0 0 10px 0;"><a href="{% url 'password_reset_request' %}" style="color:#006991;text-decoration:underline;">{% trans "Забыли пароль?" %}</a></p>
+         <p style="margin:0 0 30px 0;"><a href="{% url 'password_reset_request' %}" class="interactive-forgot-link">{% trans "Забыли пароль?" %}</a></p>
      </form>
     {% else %}
       <p class="buttons" style="margin-top:40px;margin-bottom:20px;">

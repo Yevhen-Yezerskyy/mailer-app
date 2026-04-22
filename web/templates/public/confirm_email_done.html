@@ -1,4 +1,4 @@
-{% extends "public/base.html" %}
+{% extends "public_base.html" %}
 {% load i18n %}
 
 {% block title %}{% trans "Email подтверждён" %} — Serenity{% endblock %}
@@ -6,6 +6,7 @@
 {% block content %}
 <!-- FILE: web/templates/public/confirm_email_done.html -->
 <div class="box" style="flex-direction: column;">
+  {% include "public/_interactive_heading.html" %}
   <h2>{% trans "Email подтверждён" %}</h2>
 
   <div style="margin-top:22px;color:#006991;line-height:1.6;width:100%;max-width:560px;">

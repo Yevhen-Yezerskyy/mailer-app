@@ -1,4 +1,4 @@
-{% extends "public/base.html" %}
+{% extends "public_base.html" %}
 {% load i18n %}
 
 {% block title %}{% trans "Подтверждение email" %} — Serenity{% endblock %}
@@ -6,6 +6,7 @@
 {% block content %}
 <!-- FILE: web/templates/public/register_email_pending.html -->
 <div class="box" style="flex-direction: column;">
+  {% include "public/_interactive_heading.html" %}
   <h2>{% trans "Подтверждение email" %}</h2>
 
   {% if not email_sent %}

@@ -164,8 +164,20 @@
     </div>
     {% endif %}
 
+    {% if request.user.is_authenticated and request.user.workspace and request.user.workspace.access_type != "super" %}
+    <div class="YY-MENU-CARD-BLUE mb-2">
+      <div class="px-2 py-3 text-sm text-[#006991] rounded-md !block !font-normal leading-snug cursor-default pointer-events-auto">
+        <span class="font-bold text-[14px] inline-block mb-2">{% trans "Свяжитесь с нами:" %}</span><br>
+        <a href="mailto:support@serenity-mail.de">support@serenity-mail.de</a><br>
+        <span class="font-bold text-[14px] inline-block mt-2">{% trans "WhatsApp / Telegram:" %}</span><br>
+        <a href="https://wa.me/380672399339" target="_blank" rel="noopener noreferrer">+380 67 239 93 39</a><br>
+        <a href="https://wa.me/380689322021" target="_blank" rel="noopener noreferrer">+380 68 932 20 21</a>
+      </div>
+    </div>
+    {% endif %}
+
     <div class="YY-MENU-CARD-BLUE">
-      <div class="YY-MENU-SUMMARY !block !font-normal leading-snug cursor-default">
+      <div class="px-2 py-3 text-sm text-[#006991] rounded-md !block !font-normal leading-snug cursor-default pointer-events-auto">
         {% if request.user.is_authenticated %}
           <span class="font-bold mb-2 inline-block">{{ request.user.workspace.company_name|default:"-" }}</span><br>
           {{ request.user.first_name|default:"-" }} {{ request.user.last_name|default:"-" }}<br>

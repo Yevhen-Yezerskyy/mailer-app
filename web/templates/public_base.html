@@ -6,7 +6,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Test{% endblock %}</title>
+  {% trans "Email-рассылки Германия" as og_title %}
+  {% trans "Только B2B. Пресейл. Поиск клиентов и поставщиков, рейтингование и отбор, формирование списка рассылки, таргетированная e-mail-рассылка, повторные кампании, использование ИИ." as og_description %}
+  <title>{% block title %}Serenity Mail{% endblock %}</title>
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Serenity Mail">
+  <meta property="og:title" content="{{ og_title }}">
+  <meta property="og:description" content="{{ og_description }}">
+  <meta property="og:url" content="{{ request.build_absolute_uri }}">
+  <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'img/og/mail-og.jpg' %}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ og_title }}">
+  <meta name="twitter:description" content="{{ og_description }}">
+  <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'img/og/mail-og.jpg' %}">
   <link rel="icon" href="{% static 'img/favicon.ico' %}">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="{% static 'css/styles_public.css' %}">
@@ -21,7 +33,7 @@
         </a>
 
         <div class="public-header__actions">
-          <form method="post" action="{% url 'set_language' %}" class="public-lang" aria-label="Language switch">
+          <form method="post" action="{% url 'set_language' %}" class="public-lang" aria-label="{% trans 'Language switch' %}">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
             {% for lang in language_switcher %}
@@ -34,7 +46,7 @@
             {% endfor %}
           </form>
 
-          <nav class="public-links" aria-label="Account links">
+          <nav class="public-links" aria-label="{% trans 'Account links' %}">
             <a href="{% url 'register' %}" class="public-links__item">{% trans "Регистрация" %}</a>
             <a href="{% url 'login' %}" class="public-links__item">{% trans "Вход для клиентов" %}</a>
           </nav>
@@ -46,5 +58,26 @@
   <main class="public-main">
     {% block content %}{% endblock %}
   </main>
+
+  <div class="public-prefooter-logo" aria-hidden="true">
+    <img class="public-prefooter-logo__img" src="{% static 'img/logo.main.svg' %}" alt="Serenity">
+  </div>
+
+  <footer class="public-footer" aria-label="{% trans 'Serenity footer' %}">
+    <div class="public-footer__shell">
+      <div class="public-footer__row">
+        <div class="public-footer__left">
+          <a class="public-footer__mail" href="mailto:sales@serenity-mail.de">sales@serenity-mail.de</a>
+          <nav class="public-footer__links" aria-label="{% trans 'Legal links' %}">
+            <a class="public-footer__link" href="{% url 'public_impressum' %}">{% trans "Impressum" %}</a>
+            <a class="public-footer__link" href="{% url 'public_datenschutz' %}">{% trans "Datenschutz" %}</a>
+          </nav>
+        </div>
+        <a href="/" class="public-brand public-brand--footer" aria-label="Serenity">
+          <img class="public-brand__logo" src="{% static 'img/logo.main.svg' %}" alt="Serenity">
+        </a>
+      </div>
+    </div>
+  </footer>
 </body>
 </html>

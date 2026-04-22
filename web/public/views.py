@@ -279,11 +279,19 @@ def _append_jsonl(path: Path, payload: dict[str, object]) -> None:
 
 
 def public_index(request):
-    return render(request, "public/index.html")
+    return render(request, "public/test.html")
 
 
 def public_test(request):
     return render(request, "public/test.html")
+
+
+def public_impressum(request):
+    return render(request, "public/impressum.html")
+
+
+def public_datenschutz(request):
+    return render(request, "public/datenschutz.html")
 
 
 def public_diag_start(request):
