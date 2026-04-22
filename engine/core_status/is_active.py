@@ -260,7 +260,7 @@ def _load_active_campaign_demands(task_id: int) -> list[tuple[int, int]]:
         """
         SELECT
             COALESCE(c.sent_num, 0)::int AS sent_num,
-            GREATEST(COALESCE(c.to_send_num, 0)::int - COALESCE(c.sent_num, 0)::int, 0)::int AS need_num
+            COALESCE(c.to_send_num, 0)::int AS ready_target_num
         FROM public.campaigns_campaigns c
         WHERE c.sending_list_id = %s
           AND COALESCE(c.archived, false) = false
@@ -291,7 +291,7 @@ def _is_full_needed_by_campaigns(task_id: int, rate_limit: int) -> tuple[bool, i
         if need_i <= 0:
             continue
         available_i = max(0, int(good_total) - int(sent_num))
-        if int(available_i) > int(need_i):
+        if int(available_i) >= int(need_i):
             continue
         all_campaigns_closed = False
         deficit_i = max(0, int(need_i) - int(available_i))
