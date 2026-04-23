@@ -17,7 +17,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from engine.common.email_template import render_html, sanitize
-from engine.common.prompts.process import translate_text
+from engine.common.translate import translate_text
 from mailer_web.access import decode_id, encode_id
 from mailer_web.models import MailLetter, MailLetterLang, MailTemplate
 from panel.aap_campaigns.template_editor import (
@@ -238,7 +238,7 @@ def mail_letter_lang_edit_view(request: HttpRequest, pk: int, lang: str) -> Http
     if not tpl:
         return redirect(reverse("settings:mail_template"))
 
-    row, _ = MailLetterLang.objects.get_or_create(letter=letter, lang=lang)
+    row, _unused = MailLetterLang.objects.get_or_create(letter=letter, lang=lang)
     row.ui_id = encode_id(int(row.id))
 
     tpl_html = tpl.template_html or ""
@@ -342,7 +342,7 @@ def mail_letter_lang_translate_view(request: HttpRequest, pk: int, lang: str) ->
     if not tpl:
         return redirect(reverse("settings:mail_template"))
 
-    target, _ = MailLetterLang.objects.get_or_create(letter=letter, lang=lang)
+    target, _unused = MailLetterLang.objects.get_or_create(letter=letter, lang=lang)
     if not _is_lang_row_empty(target):
         return redirect(reverse("settings:mail_letter_lang_edit", kwargs={"pk": int(letter.id), "lang": lang}))
 

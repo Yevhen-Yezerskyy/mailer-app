@@ -9,9 +9,11 @@ from .views.modal_edit_branch_rate import modal_edit_branch_rate_view
 from .views.modal_edit_city_rate import modal_edit_city_rate_view
 from .views.modal_edit_title import modal_edit_title_view
 from .views.modal_edit_rate_limit import modal_edit_rate_limit_view
+from .views.modal_edit_contact_rate import modal_edit_contact_rate_view
 from .views.modal_pause_info import modal_pause_info_view
 from .views.modal_insert_company import modal_insert_company_view
 from .views.create_list import create_activate_modal_view, create_archive_modal_view, create_list_view
+from .views.contacts_manage import contacts_manage_toggle_modal_view, contacts_manage_view
 from .views.create_edit_flow_contacts import (
     contacts_all_partial_view,
     contacts_branch_city_partial_view,
@@ -54,6 +56,8 @@ app_name = "audience"
 
 urlpatterns = [
     path("", lambda r: redirect("audience:create_list"), name="index"),
+    path("contacts-manage/", contacts_manage_view, name="contacts_manage"),
+    path("contacts-manage/toggle/modal/", contacts_manage_toggle_modal_view, name="contacts_manage_toggle_modal"),
 
     path("create/modal/", modal_create_task_view, name="create_modal"),
     path("create/archive/modal/", create_archive_modal_view, name="create_archive_modal"),
@@ -62,6 +66,7 @@ urlpatterns = [
     path("create/city-rate/modal/", modal_edit_city_rate_view, name="create_city_rate_modal"),
     path("create/title/modal/", modal_edit_title_view, name="create_title_modal"),
     path("create/rate-limit/modal/", modal_edit_rate_limit_view, name="create_rate_limit_modal"),
+    path("create/contact-rate/modal/", modal_edit_contact_rate_view, name="create_contact_rate_modal"),
     path("create/pause-info/modal/", modal_pause_info_view, name="create_pause_info_modal"),
     path("create/company/insert/modal/", modal_insert_company_view, name="create_company_insert_modal"),
     path("create/contacts-total/", contacts_total_view, name="create_contacts_total"),

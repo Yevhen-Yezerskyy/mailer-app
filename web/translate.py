@@ -6,6 +6,7 @@
 #     - delete entries with broken python-format placeholders (forces re-translate)
 # - (1) makemessages (incremental) for ru/de/uk/en
 # - (2) ALWAYS remove "#, fuzzy" from all .po
+# - (2.5) ALWAYS remove obsolete "#~ ..." entries from all .po
 # - (3) POST-CLEAN target langs again (duplicates/broken format ONLY; MUST NOT drop empty after makemessages)
 # - (4) translate ALL empty/suspicious entries for target langs (de/uk/en) with strict placeholder safety
 #     - 3 passes: pass1 uses cache, pass2/pass3 disable cache to "dodge" cached empties/bad outputs
@@ -36,6 +37,22 @@ LOCALE_DIR = PROJECT_ROOT / "locale"
 SOURCE_LANG = "ru"
 TARGET_LANGS = ["de", "uk", "en"]
 ALL_LANGS = [SOURCE_LANG] + TARGET_LANGS
+
+MANUAL_OVERRIDES: Dict[str, Dict[str, str]] = {
+    "de": {
+        "Кампании рассылок": "E-Mail-Kampagnen",
+        "Сбор контактов приостановлен": "Kontaktsammlung pausiert",
+        "Рейтингование приостановлено": "Bewertung pausiert",
+        "Кампания запущена": "Kampagne gestartet",
+        'Ждем "окно"': "Warten auf Sendefenster",
+    },
+    "en": {
+        'Ждем "окно"': 'Waiting for "window"',
+    },
+    "uk": {
+        'Ждем "окно"': 'Чекаємо "вікно"',
+    },
+}
 
 SYSTEM_PROMPT = """You are a professional technical translator.
 
@@ -118,11 +135,51 @@ def _collect_python_trans_literals() -> Dict[str, List[str]]:
     return refs_by_msgid
 
 
+def _collect_obsolete_msgstr_map(path: Path) -> Dict[str, str]:
+    if not path.exists():
+        return {}
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    i = 0
+    out: Dict[str, str] = {}
+    while i < len(lines):
+        line = lines[i]
+        if not line.startswith("#~ msgid "):
+            i += 1
+            continue
+
+        msgid_lines = [line[3:]]
+        i += 1
+        while i < len(lines) and lines[i].startswith('#~ "'):
+            msgid_lines.append(lines[i][3:])
+            i += 1
+
+        msgstr_lines: List[str] = []
+        while i < len(lines):
+            cur = lines[i]
+            if cur.startswith("#~ msgstr "):
+                msgstr_lines = [cur[3:]]
+                i += 1
+                while i < len(lines) and lines[i].startswith('#~ "'):
+                    msgstr_lines.append(lines[i][3:])
+                    i += 1
+                break
+            if cur.startswith("msgid ") or cur.startswith("#: ") or cur.startswith("#, ") or cur.startswith("#. "):
+                break
+            i += 1
+
+        msgid = _field_text(msgid_lines, "msgid ")
+        msgstr = _field_text(msgstr_lines, "msgstr ")
+        if msgid and msgstr:
+            out[msgid] = msgstr
+    return out
+
+
 def _inject_python_trans_literals(lang: str, refs_by_msgid: Dict[str, List[str]]) -> int:
     p = po_path(lang)
     if not p.exists() or not refs_by_msgid:
         return 0
 
+    obsolete_msgstr_by_msgid = _collect_obsolete_msgstr_map(p)
     header, entries = parse_po(p.read_text(encoding="utf-8"))
     existing_keys = {_entry_key(e) for e in entries}
 
@@ -133,11 +190,13 @@ def _inject_python_trans_literals(lang: str, refs_by_msgid: Dict[str, List[str]]
             continue
         refs = sorted(set(refs_by_msgid.get(msgid) or []))
         prefix = [f"#: {' '.join(refs)}\n"] if refs else []
+        restored_msgstr = obsolete_msgstr_by_msgid.get(msgid, "")
+        msgstr_lines = [f"msgstr {_quote_po(restored_msgstr)}\n"] if restored_msgstr else ['msgstr ""\n']
         entries.append(
             PoEntry(
                 prefix_lines=prefix,
                 msgid_lines=[f"msgid {_quote_po(msgid)}\n"],
-                msgstr_lines=['msgstr ""\n'],
+                msgstr_lines=msgstr_lines,
                 suffix_lines=["\n"],
             )
         )
@@ -147,6 +206,34 @@ def _inject_python_trans_literals(lang: str, refs_by_msgid: Dict[str, List[str]]
     if added:
         p.write_text(serialize_po(header, entries), encoding="utf-8")
     return added
+
+
+def _apply_manual_overrides(lang: str) -> int:
+    overrides = MANUAL_OVERRIDES.get(lang) or {}
+    if not overrides:
+        return 0
+    p = po_path(lang)
+    if not p.exists():
+        return 0
+
+    header, entries = parse_po(p.read_text(encoding="utf-8"))
+    changed = 0
+    for e in entries:
+        msgctxt, msgid, msgid_plural = _entry_key(e)
+        if msgctxt or msgid_plural:
+            continue
+        desired = overrides.get(msgid)
+        if desired is None:
+            continue
+        current = _field_text(e.msgstr_lines, "msgstr ")
+        if current == desired:
+            continue
+        e.msgstr_lines = [f"msgstr {_quote_po(desired)}\n"]
+        changed += 1
+
+    if changed:
+        p.write_text(serialize_po(header, entries), encoding="utf-8")
+    return changed
 
 
 # ---------------- fuzzy cleanup ----------------
@@ -175,6 +262,27 @@ def strip_fuzzy_all() -> None:
         p = po_path(lang)
         if p.exists():
             strip_fuzzy_in_po_file(p)
+
+
+def strip_obsolete_in_po_file(path: Path) -> None:
+    text = path.read_text(encoding="utf-8")
+    lines = text.splitlines(keepends=True)
+    out: list[str] = []
+    changed = False
+    for line in lines:
+        if line.startswith("#~"):
+            changed = True
+            continue
+        out.append(line)
+    if changed:
+        path.write_text("".join(out), encoding="utf-8")
+
+
+def strip_obsolete_all() -> None:
+    for lang in ALL_LANGS:
+        p = po_path(lang)
+        if p.exists():
+            strip_obsolete_in_po_file(p)
 
 
 # ---------------- PO parsing ----------------
@@ -927,6 +1035,9 @@ def main() -> None:
     for lang in TARGET_LANGS:
         _drop_duplicates_and_bad(lang, drop_empty=True)
 
+    print("[0.5/6] strip obsolete entries (#~ ...) from all .po")
+    strip_obsolete_all()
+
     print("[1/6] makemessages")
     run_makemessages()
 
@@ -938,6 +1049,9 @@ def main() -> None:
 
     print("[2/6] strip fuzzy")
     strip_fuzzy_all()
+
+    print("[2.5/6] strip obsolete entries (#~ ...) again")
+    strip_obsolete_all()
 
     print("[3/6] post-clean target .po again (after makemessages merge)")
     # IMPORTANT: MUST NOT drop empty here, because makemessages creates new entries with empty msgstr by design.
@@ -967,6 +1081,11 @@ def main() -> None:
     for lang in TARGET_LANGS:
         fixed_format, fixed_newline = _heal_po_for_compile(lang)
         print(f"    - {lang}: fixed_format={fixed_format} fixed_newline={fixed_newline}")
+
+    print("[4.7/6] apply manual translation overrides")
+    for lang in TARGET_LANGS:
+        changed = _apply_manual_overrides(lang)
+        print(f"    - {lang}: changed={changed}")
 
     print("[5/6] compilemessages (always)")
     run_compilemessages()

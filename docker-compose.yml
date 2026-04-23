@@ -478,92 +478,92 @@ services:
         "engine.core_status.status_processor"
       ]
 
-  # mailer-engine-stat-prod:
-  #   image: mailer-python:latest
-  #   container_name: mailer-engine-stat-prod
-  #   working_dir: /app
-  #   restart: unless-stopped
-  #   depends_on:
-  #     mailer-set-env:
-  #       condition: service_started
-  #     mailer-db:
-  #       condition: service_started
-  #     mailer-redis:
-  #       condition: service_started
-  #   environment:
-  #     PYTHONPATH: /app
-  #   volumes:
-  #     - ./logs:/host-logs
-  #     - serenity-logs:/serenity-logs
-  #     - mailer-app-prod:/app
-  #     - serenity-redis-run:/app/run/redis
-  #     - serenity-secrets:/run/serenity-secrets:ro
-  #   cpus: "0.10"
-  #   command:
-  #     [
-  #       "/app/config/sh/with-secrets.sh",
-  #       "python",
-  #       "-m",
-  #       "engine.core_stats.stat_processor"
-  #     ]
+  mailer-engine-stat-prod:
+    image: mailer-python:latest
+    container_name: mailer-engine-stat-prod
+    working_dir: /app
+    restart: unless-stopped
+    depends_on:
+      mailer-set-env:
+        condition: service_started
+      mailer-db:
+        condition: service_started
+      mailer-redis:
+        condition: service_started
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
+      - mailer-app-prod:/app
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
+    cpus: "0.10"
+    command:
+      [
+        "/app/config/sh/with-secrets.sh",
+        "python",
+        "-m",
+        "engine.core_stats.stat_processor"
+      ]
 
-  # mailer-engine-sender-prod:
-  #   image: mailer-python:latest
-  #   container_name: mailer-engine-sender-prod
-  #   working_dir: /app
-  #   restart: unless-stopped
-  #   depends_on:
-  #     mailer-set-env:
-  #       condition: service_started
-  #     mailer-db:
-  #       condition: service_started
-  #     mailer-redis:
-  #       condition: service_started
-  #   environment:
-  #     PYTHONPATH: /app
-  #   volumes:
-  #     - ./logs:/host-logs
-  #     - serenity-logs:/serenity-logs
-  #     - mailer-app-prod:/app
-  #     - serenity-redis-run:/app/run/redis
-  #     - serenity-secrets:/run/serenity-secrets:ro
-  #   cpus: "0.10"
-  #   command:
-  #     [
-  #       "/app/config/sh/with-secrets.sh",
-  #       "python",
-  #       "-m",
-  #       "engine.core_sender.sender"
-  #     ]
+  mailer-engine-send-prod:
+    image: mailer-python:latest
+    container_name: mailer-engine-send-prod
+    init: true
+    working_dir: /app
+    restart: unless-stopped
+    depends_on:
+      mailer-set-env:
+        condition: service_started
+      mailer-db:
+        condition: service_started
+      mailer-redis:
+        condition: service_started
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
+      - mailer-app-prod:/app
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
+    cpus: "0.10"
+    command:
+      [
+        "/app/config/sh/with-secrets.sh",
+        "python",
+        "-m",
+        "engine.core_send.sender"
+      ]
 
-  # mailer-engine-imap-prod:
-  #   image: mailer-python:latest
-  #   container_name: mailer-engine-imap-prod
-  #   working_dir: /app
-  #   restart: unless-stopped
-  #   depends_on:
-  #     mailer-set-env:
-  #       condition: service_started
-  #     mailer-db:
-  #       condition: service_started
-  #     mailer-redis:
-  #       condition: service_started
-  #   environment:
-  #     PYTHONPATH: /app
-  #   volumes:
-  #     - ./logs:/host-logs
-  #     - serenity-logs:/serenity-logs
-  #     - mailer-app-prod:/app
-  #     - serenity-redis-run:/app/run/redis
-  #     - serenity-secrets:/run/serenity-secrets:ro
-  #   cpus: "0.10"
-  #   command:
-  #     [
-  #       "/app/config/sh/with-secrets.sh",
-  #       "python",
-  #       "-m",
-  #       "engine.core_imap.imap_bounce_processor"
-  #     ]
+  mailer-engine-imap-prod:
+    image: mailer-python:latest
+    container_name: mailer-engine-imap-prod
+    working_dir: /app
+    restart: unless-stopped
+    depends_on:
+      mailer-set-env:
+        condition: service_started
+      mailer-db:
+        condition: service_started
+      mailer-redis:
+        condition: service_started
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - ./logs:/host-logs
+      - serenity-logs:/serenity-logs
+      - mailer-app-prod:/app
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
+    cpus: "0.10"
+    command:
+      [
+        "/app/config/sh/with-secrets.sh",
+        "python",
+        "-m",
+        "engine.core_imap.imap_bounce_processor"
+      ]
 
   nginx:
     image: nginx:1.26

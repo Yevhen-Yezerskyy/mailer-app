@@ -3,7 +3,7 @@
 # DATE: 2026-02-03
 # SUMMARY (patch):
 # - fix: keep POSTed form values when mailing list is taken (dedup error), so form doesn't reset
-# - stats in bottom table: total/sent/left for each campaign (total=active sending_lists rows; sent=all mailbox_sent rows; left=max(0,total-sent))
+# - stats in bottom table: total/sent/left for each campaign (total=active sending_lists rows; sent=all sending_log rows with status=SEND; left=max(0,total-sent))
 # - POST action send_test: only when letter exists; sends test with to_email_override + record_sent=False
 # - do NOT touch existing window logic/helpers (kept local); reuse shared _is_de_public_holiday() helper
 
@@ -65,7 +65,7 @@ def _guard(request) -> tuple[Optional[UUID], Optional[object]]:
 def _qs(ws_id: UUID, *, show_archive: bool = False):
     return (
         Campaign.objects.filter(workspace_id=ws_id, archived=bool(show_archive))
-        .select_related("sending_list", "mailing_list", "mailbox", "campaign_parent", "letter", "letter__template")
+        .select_related("sending_list", "mailbox", "campaign_parent", "letter", "letter__template")
         .order_by("-id")
     )
 

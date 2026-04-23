@@ -60,6 +60,7 @@
               <input type="hidden" name="mailing_section" value="{{ mailing_step.active_section }}">
               <input type="text"
                      name="q"
+                     data-mailing-search-input="1"
                      class="YY-INPUT !mb-0 !w-[340px]"
                      placeholder="{% trans 'Поиск по компании или email' %}"
                      value="{{ mailing_step.mailing_query }}">
@@ -149,7 +150,18 @@
                   {{ row.city_title }}
                 </td>
                 <td class="YY-TB_TD text-center">{{ row.pair_rate|default_if_none:"-" }}</td>
-                <td class="YY-TB_TD text-center">{{ row.contact_rate_display }}</td>
+                <td class="YY-TB_TD text-center">
+                  {% if mailing_step.contact_rate_modal_base_url %}
+                    <a
+                      href="#"
+                      class="underline"
+                      data-yy-modal="url={{ mailing_step.contact_rate_modal_base_url|escape }}&sid={{ row.sending_list_id|urlencode }}">
+                      {{ row.contact_rate_display }}
+                    </a>
+                  {% else %}
+                    {{ row.contact_rate_display }}
+                  {% endif %}
+                </td>
                 <td class="YY-TB_TD">
                   <a href="#"
                      class="YY-LINK flex items-center gap-1 whitespace-nowrap"
@@ -225,24 +237,23 @@
               <strong class="font-semibold text-base text-[#016b09]">{{ mailing_step.mailing_page }}</strong>
             {% endif %}
           </div>
-          {% if mailing_step.active_section == "all" %}
-            <form method="get" action="{{ mailing_step.base_url }}" class="flex items-center gap-2 ml-auto">
-              <input type="hidden" name="mailing_section" value="{{ mailing_step.active_section }}">
-              <input type="text"
-                     name="q"
-                     class="YY-INPUT !mb-0 !w-[340px]"
-                     placeholder="{% trans 'Поиск по компании или email' %}"
-                     value="{{ mailing_step.mailing_query }}">
-              <button type="submit" class="YY-BUTTON_MAIN !mb-0 !w-fit">
-                {% trans "Искать" %}
-              </button>
-              {% if mailing_step.mailing_query %}
-                <a href="{{ mailing_step.base_url }}?mailing_section={{ mailing_step.active_section }}" class="YY-BUTTON_MAIN !mb-0 !w-fit">
-                  {% trans "Очистить" %}
-                </a>
-              {% endif %}
-            </form>
-          {% endif %}
+          <form method="get" action="{{ mailing_step.base_url }}" class="flex items-center gap-2 ml-auto">
+            <input type="hidden" name="mailing_section" value="{{ mailing_step.active_section }}">
+            <input type="text"
+                   name="q"
+                   data-mailing-search-input="1"
+                   class="YY-INPUT !mb-0 !w-[340px]"
+                   placeholder="{% trans 'Поиск по компании или email' %}"
+                   value="{{ mailing_step.mailing_query }}">
+            <button type="submit" class="YY-BUTTON_MAIN !mb-0 !w-fit">
+              {% trans "Искать" %}
+            </button>
+            {% if mailing_step.mailing_query %}
+              <a href="{{ mailing_step.base_url }}?mailing_section={{ mailing_step.active_section }}" class="YY-BUTTON_MAIN !mb-0 !w-fit">
+                {% trans "Очистить" %}
+              </a>
+            {% endif %}
+          </form>
         </div>
       </div>
     </td>

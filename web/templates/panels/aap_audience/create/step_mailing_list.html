@@ -218,6 +218,12 @@
       });
     }
 
+    function isMailingSearchFocused() {
+      const active = document.activeElement;
+      if (!active) return false;
+      return active.matches("[data-mailing-search-input='1']");
+    }
+
     function refreshTick() {
       if (inFlight) return;
       inFlight = true;
@@ -239,8 +245,13 @@
         })
       );
       if (allowSectionRefresh) {
+        const skipSectionRefresh = isMailingSearchFocused();
         tasks.push(
-          fetchHtml(sectionUrl).then(function (html) {
+          (skipSectionRefresh
+            ? Promise.resolve("")
+            : fetchHtml(sectionUrl)
+          ).then(function (html) {
+            if (skipSectionRefresh) return;
             const sectionWrapper = document.querySelector("[data-mailing-section-wrapper='1']");
             if (!sectionWrapper || !html) return;
             sectionWrapper.innerHTML = html;

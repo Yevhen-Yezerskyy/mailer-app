@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from django.core.validators import MaxValueValidator
 from django.db import models
+from django.utils.translation import gettext_lazy as _trans
 
 from engine.common.mail.types import IMAP_CREDENTIALS_FORMAT, SMTP_CREDENTIALS_FORMAT
 
@@ -126,7 +127,7 @@ class ProviderPreset(models.Model):
     name = models.CharField(max_length=255)
     preset_json = models.JSONField(
         default=dict,
-        help_text="Произвольные подсказки для UI (smtp/imap host/ports/security/auth_type/oauth_hint/etc.)",
+        help_text=_trans("Произвольные подсказки для UI (smtp/imap host/ports/security/auth_type/oauth_hint/etc.)"),
     )
 
     is_active = models.BooleanField(default=True)
@@ -153,7 +154,7 @@ class ProviderPresetNoAuth(models.Model):
     name = models.CharField(max_length=255)
     preset_json = models.JSONField(
         default=dict,
-        help_text="Произвольные подсказки для UI (smtp relay noauth host/ports/security/auth_type/etc.)",
+        help_text=_trans("Произвольные подсказки для UI (smtp relay noauth host/ports/security/auth_type/etc.)"),
     )
 
     is_active = models.BooleanField(default=True)

@@ -6,15 +6,16 @@
 from __future__ import annotations
 
 from django.db import models
+from django.utils.translation import gettext_lazy as _trans
 
 
 class Templates(models.Model):
     workspace_id = models.UUIDField(db_index=True)
 
-    template_name = models.CharField(max_length=255, help_text="Имя/код шаблона")
-    template_html = models.TextField(blank=True, default="", help_text="HTML шаблона")
+    template_name = models.CharField(max_length=255, help_text=_trans("Имя/код шаблона"))
+    template_html = models.TextField(blank=True, default="", help_text=_trans("HTML шаблона"))
 
-    styles = models.JSONField(default=dict, blank=True, help_text="Стили (JSON)")
+    styles = models.JSONField(default=dict, blank=True, help_text=_trans("Стили (JSON)"))
 
     is_active = models.BooleanField(default=True)
     archived = models.BooleanField(default=False)  # NEW
@@ -44,15 +45,8 @@ class Templates(models.Model):
 class Campaign(models.Model):
     workspace_id = models.UUIDField(db_index=True)
 
-    title = models.CharField(max_length=255, help_text="Название кампании")
+    title = models.CharField(max_length=255, help_text=_trans("Название кампании"))
 
-    mailing_list = models.ForeignKey(
-        "aap_lists.MailingList",
-        on_delete=models.PROTECT,
-        related_name="campaigns",
-        null=True,
-        blank=True,
-    )
     sending_list = models.ForeignKey(
         "aap_audience.AudienceTask",
         on_delete=models.PROTECT,
@@ -83,7 +77,7 @@ class Campaign(models.Model):
     window = models.JSONField(
         default=dict,
         blank=True,
-        help_text="Окно отправки (override глобальных настроек)",
+        help_text=_trans("Окно отправки (override глобальных настроек)"),
     )
 
     mailbox = models.ForeignKey(

@@ -13,7 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _trans
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
@@ -223,7 +223,7 @@ def system_mail_template_edit_view(request: HttpRequest) -> HttpResponse:
             if not template_name:
                 storage = messages.get_messages(request)
                 storage.used = True
-                messages.error(request, _("Имя шаблона обязательно."))
+                messages.error(request, _trans("Имя шаблона обязательно."))
                 return redirect(request.get_full_path())
 
             clean_html = sanitize(editor_template_parse_html(editor_html))

@@ -8,22 +8,10 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("aap_audience", "0011_remove_audiencetask_collected_and_more"),
-        ("aap_lists", "0001_initial"),
         ("aap_campaigns", "0003_templates_archived"),
     ]
 
     operations = [
-        migrations.AlterField(
-            model_name="campaign",
-            name="mailing_list",
-            field=models.ForeignKey(
-                blank=True,
-                null=True,
-                on_delete=django.db.models.deletion.PROTECT,
-                related_name="campaigns",
-                to="aap_lists.mailinglist",
-            ),
-        ),
         migrations.AddField(
             model_name="campaign",
             name="sending_list",

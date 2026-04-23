@@ -32,6 +32,12 @@ PANEL_MENU = [
                 "url_name": "audience:create_list",
                 "active_prefixes": ["/panel/audience/create/"],
             },
+            {
+                "title": _trans("Блокировка кантактов"),
+                "page_title": _trans("Блокировка кантактов"),
+                "url_name": "audience:contacts_manage",
+                "active_prefixes": ["/panel/audience/contacts-manage/"],
+            },
         ],
     },
     {

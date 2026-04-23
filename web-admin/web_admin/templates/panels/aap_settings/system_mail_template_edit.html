@@ -22,7 +22,9 @@
 
         {% if messages %}
           {% for m in messages %}
-            <div class="YY-CARD_IN_FORM_ERROR">{{ m }}</div>
+            {% if 'error' in m.tags %}
+              <div class="YY-CARD_IN_FORM_ERROR">{{ m }}</div>
+            {% endif %}
           {% endfor %}
         {% endif %}
 

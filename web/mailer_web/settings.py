@@ -53,7 +53,6 @@ INSTALLED_APPS = [
     # panel sub-apps (ОБЯЗАТЕЛЬНО)
     "panel.aap_audience",
     "panel.aap_settings",
-    "panel.aap_lists",
     "panel.aap_campaigns",
 ]
 

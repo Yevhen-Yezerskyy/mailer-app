@@ -35,7 +35,7 @@ def _mailbox_domain(email: str) -> str:
 
 
 def _ensure_service_mailbox() -> Mailbox:
-    mailbox, _ = Mailbox.objects.get_or_create(
+    mailbox, _unused = Mailbox.objects.get_or_create(
         workspace_id=SERVICE_WORKSPACE_ID,
         email=SERVICE_MAILBOX_EMAIL,
         defaults={

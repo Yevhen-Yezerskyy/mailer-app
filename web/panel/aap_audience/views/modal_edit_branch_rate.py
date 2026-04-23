@@ -9,7 +9,7 @@ from django.shortcuts import render
 from django.utils.translation import gettext as _trans
 
 from mailer_web.access import decode_id
-from mailer_web.format_data import get_branches_sys_translations
+from mailer_web.format_contact import get_category_title
 from panel.aap_audience.models import AudienceTask
 from django.db import connection
 
@@ -101,9 +101,8 @@ def modal_edit_branch_rate_view(request):
     current_rate = rows[0][1]
     translated_name = ""
     if request.ui_lang_code != "de":
-        translated = get_branches_sys_translations([int(row[0]) for row in rows], request.ui_lang_code)
         for row in rows:
-            value = str(translated.get(int(row[0])) or "").strip()
+            value = " ".join(str(get_category_title(int(row[0]), request, single=True)).split()).strip()
             if value and value != branch_name:
                 translated_name = value
                 break

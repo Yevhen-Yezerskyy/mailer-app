@@ -1,0 +1,248 @@
+{% extends "panels/base.html" %}
+{% load i18n %}
+<!-- FILE: web/templates/panels/aap_audience/contacts_manage.html -->
+<!-- DATE: 2026-04-22 -->
+<!-- PURPOSE: AAP Audience contacts management page with workspace-unique contacts search and paging. -->
+
+{% block content %}
+<style>
+  [data-contacts-manage-table="1"] .YY-TB_TR,
+  [data-contacts-manage-table="1"] .YY-TH_TH,
+  [data-contacts-manage-table="1"] .YY-TB_TD {
+    height: auto !important;
+    min-height: 0 !important;
+    vertical-align: top !important;
+  }
+</style>
+
+<table class="YY-MAIN_TABLE">
+  <tr>
+    <td class="YY-MAIN_TOP_TD">
+      <div class="YY-CARD_WHITE">
+        <div class="YY-MAIN_TEXT flex items-center justify-between gap-4">
+          <div class="YY-STATUS_BLUE !mb-0 inline-flex !w-1/2">
+            {% trans "Поиск" %}
+          </div>
+          <form method="get" action="{{ contacts_manage_url }}" class="flex items-center gap-x-5 ml-auto">
+            <label class="YY-STATUS_BLUE !mb-0 inline-flex items-center gap-1 whitespace-nowrap font-semibold">
+              <span>{% trans "Заблокирован:" %}</span>
+              <input type="checkbox" name="blocked" value="1" {% if contacts_blocked_only %}checked{% endif %}>
+            </label>
+            <label class="YY-STATUS_BLUE !mb-0 inline-flex items-center gap-1 whitespace-nowrap font-semibold">
+              <span>{% trans "Есть отправки:" %}</span>
+              <input type="checkbox" name="has_sends" value="1" {% if contacts_has_sends %}checked{% endif %}>
+            </label>
+            <div class="flex items-center gap-2">
+              <input type="text"
+                     name="q"
+                     class="YY-INPUT !mb-0 !w-[340px]"
+                     placeholder="{% trans 'Поиск по компании или email' %}"
+                     value="{{ contacts_query }}">
+              <button type="submit" class="YY-BUTTON_MAIN !mb-0 !w-fit">
+                {% trans "Искать" %}
+              </button>
+              {% if contacts_query %}
+                <a href="{{ contacts_manage_url }}" class="YY-BUTTON_MAIN !mb-0 !w-fit">
+                  {% trans "Очистить" %}
+                </a>
+              {% endif %}
+            </div>
+          </form>
+        </div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+{% if contacts_show_paging %}
+  <table class="YY-MAIN_TABLE !mt-3">
+    <tr>
+      <td class="YY-MAIN_TOP_TD">
+        <div class="YY-CARD_WHITE">
+          <div class="YY-MAIN_TEXT flex items-center gap-3">
+            <span>{% trans "Найдено:" %}&nbsp;{{ contacts_total_display }},</span>
+            <span>{% trans "Страница:" %}</span>
+            {% if contacts_page_items %}
+              {% if contacts_has_prev %}
+                <a href="{{ contacts_manage_url }}?page={{ contacts_prev_page }}{% if contacts_query %}&q={{ contacts_query|urlencode }}{% endif %}{% if contacts_blocked_only %}&blocked=1{% endif %}{% if contacts_has_sends %}&has_sends=1{% endif %}"
+                   class="YY-LINK inline-flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[22px] shrink-0 relative top-[0px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+              {% for item in contacts_page_items %}
+                {% if item.kind == "gap" %}
+                  <span>...</span>
+                {% elif item.is_current %}
+                  <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
+                {% else %}
+                  <a href="{{ contacts_manage_url }}?page={{ item.number }}{% if contacts_query %}&q={{ contacts_query|urlencode }}{% endif %}{% if contacts_blocked_only %}&blocked=1{% endif %}{% if contacts_has_sends %}&has_sends=1{% endif %}"
+                     class="YY-LINK">{{ item.number }}</a>
+                {% endif %}
+              {% endfor %}
+              {% if contacts_has_next %}
+                <a href="{{ contacts_manage_url }}?page={{ contacts_next_page }}{% if contacts_query %}&q={{ contacts_query|urlencode }}{% endif %}{% if contacts_blocked_only %}&blocked=1{% endif %}{% if contacts_has_sends %}&has_sends=1{% endif %}"
+                   class="YY-LINK inline-flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[22px] shrink-0 rotate-180 relative top-[2px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+            {% else %}
+              <strong class="font-semibold text-base text-[#016b09]">{{ contacts_page }}</strong>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+{% endif %}
+
+<table class="YY-MAIN_TABLE !mt-3">
+  <tr>
+    <td class="YY-MAIN_BOTTOM_TD !pb-0">
+      <div class="YY-MAIN_BOTTOM_DIV overflow-x-auto">
+        <table class="w-full text-left" data-contacts-manage-table="1">
+          <thead>
+            <tr class="YY-TH_TR">
+              <th class="YY-TH_TH w-[30%]">{% trans "Компания" %}</th>
+              <th class="YY-TH_TH w-[35%]">{% trans "Списки" %}</th>
+              <th class="YY-TH_TH w-[20%] whitespace-nowrap">{% trans "Отправка" %}</th>
+              <th class="YY-TH_TH w-[15%]">&nbsp;</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in contacts_rows %}
+              <tr class="YY-TB_TR align-top">
+                <td class="YY-TB_TD">
+                  <a href="#"
+                     data-yy-modal="url={{ row.contact_modal_url|escape }}">
+                    <strong>{{ row.company_name|default:"-" }}</strong>
+                  </a><br>
+                  {{ row.email|default:"-" }}
+                </td>
+                <td class="YY-TB_TD">
+                  {% if row.list_titles %}
+                    {% for title in row.list_titles %}
+                      <div{% if not forloop.last %} class="mb-1"{% endif %}>{{ title }}</div>
+                    {% endfor %}
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+                <td class="YY-TB_TD whitespace-nowrap">
+                  {% if row.send_times %}
+                    {% for send_at in row.send_times %}
+                      <div{% if not forloop.last %} class="mb-1"{% endif %}>{{ send_at|date:"d.m.Y H:i:s" }}</div>
+                    {% endfor %}
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+                <td class="YY-TB_TD">
+                  {% if row.is_blocked %}
+                    <div class="YY-STATUS_RED !mb-2 !w-fit">{% trans "Заблокирован" %}</div>
+                    <a
+                      href="#"
+                      class="inline-flex items-center gap-1 text-[#006991] !font-normal underline"
+                      data-yy-modal="url={% url 'audience:contacts_manage_toggle_modal' %}?id={{ row.aggr_contact_ui_id|urlencode }}&mode=unblock&next={{ contacts_current_url|urlencode }}">
+                      <span>{% trans "Разблокировать" %}</span>
+                      <svg class="size-[22px] shrink-0" aria-hidden="true">
+                        <use href="#icon-arrow-circle"></use>
+                      </svg>
+                    </a>
+                  {% else %}
+                    <a
+                      href="#"
+                      class="inline-flex items-center gap-1 text-[#8e0000] !font-normal underline"
+                      data-yy-modal="url={% url 'audience:contacts_manage_toggle_modal' %}?id={{ row.aggr_contact_ui_id|urlencode }}&mode=block&next={{ contacts_current_url|urlencode }}">
+                      <span>{% trans "Заблокировать" %}</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-[22px] shrink-0">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                      </svg>
+                    </a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr class="YY-TB_TR">
+                <td class="YY-TB_TD" colspan="4">{% trans "Здесь пока нет данных" %}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </td>
+  </tr>
+</table>
+
+{% if contacts_show_paging %}
+  <table class="YY-MAIN_TABLE !mt-3">
+    <tr>
+      <td class="YY-MAIN_TOP_TD">
+        <div class="YY-CARD_WHITE">
+          <div class="YY-MAIN_TEXT flex items-center gap-3">
+            <span>{% trans "Найдено:" %}&nbsp;{{ contacts_total_display }},</span>
+            <span>{% trans "Страница:" %}</span>
+            {% if contacts_page_items %}
+              {% if contacts_has_prev %}
+                <a href="{{ contacts_manage_url }}?page={{ contacts_prev_page }}{% if contacts_query %}&q={{ contacts_query|urlencode }}{% endif %}{% if contacts_blocked_only %}&blocked=1{% endif %}{% if contacts_has_sends %}&has_sends=1{% endif %}"
+                   class="YY-LINK inline-flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[22px] shrink-0 relative top-[0px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+              {% for item in contacts_page_items %}
+                {% if item.kind == "gap" %}
+                  <span>...</span>
+                {% elif item.is_current %}
+                  <strong class="font-semibold text-base text-[#016b09]">{{ item.number }}</strong>
+                {% else %}
+                  <a href="{{ contacts_manage_url }}?page={{ item.number }}{% if contacts_query %}&q={{ contacts_query|urlencode }}{% endif %}{% if contacts_blocked_only %}&blocked=1{% endif %}{% if contacts_has_sends %}&has_sends=1{% endif %}"
+                     class="YY-LINK">{{ item.number }}</a>
+                {% endif %}
+              {% endfor %}
+              {% if contacts_has_next %}
+                <a href="{{ contacts_manage_url }}?page={{ contacts_next_page }}{% if contacts_query %}&q={{ contacts_query|urlencode }}{% endif %}{% if contacts_blocked_only %}&blocked=1{% endif %}{% if contacts_has_sends %}&has_sends=1{% endif %}"
+                   class="YY-LINK inline-flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg"
+                       fill="none"
+                       viewBox="0 0 24 24"
+                       stroke-width="1.5"
+                       stroke="currentColor"
+                       class="size-[22px] shrink-0 rotate-180 relative top-[2px]"
+                       aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061A1.125 1.125 0 0 1 21 8.689v8.122ZM11.25 16.811c0 .864-.933 1.406-1.683.977l-7.108-4.061a1.125 1.125 0 0 1 0-1.954l7.108-4.061a1.125 1.125 0 0 1 1.683.977v8.122Z" />
+                  </svg>
+                </a>
+              {% endif %}
+            {% else %}
+              <strong class="font-semibold text-base text-[#016b09]">{{ contacts_page }}</strong>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+{% endif %}
+{% endblock %}

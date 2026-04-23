@@ -8,7 +8,6 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('aap_campaigns', '0001_initial'),
-        ('aap_lists', '0002_mailinglist_archived'),
         ('aap_settings', '0004_sendingsettings'),
     ]
 
@@ -38,7 +37,6 @@ class Migration(migrations.Migration):
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('campaign_parent', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='children', to='aap_campaigns.campaign')),
                 ('mailbox', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='campaigns', to='aap_settings.mailbox')),
-                ('mailing_list', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='campaigns', to='aap_lists.mailinglist')),
             ],
             options={
                 'db_table': 'campaigns_campaigns',

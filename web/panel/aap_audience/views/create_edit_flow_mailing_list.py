@@ -166,6 +166,7 @@ def _build_mailing_row(request, row: tuple[Any, ...]) -> dict[str, Any]:
     aggr_contact_id = int(row[0])
     contact_rate = row[6]
     return {
+        "sending_list_id": aggr_contact_id,
         "aggr_contact_id": aggr_contact_id,
         "aggr_contact_ui_id": encode_id(aggr_contact_id),
         "company_name": str(row[1] or "").strip(),
@@ -429,8 +430,6 @@ def _build_mailing_section_context(
 ) -> dict[str, Any]:
     section_key = _normalize_mailing_section(active_section)
     search_query = str(query or "").strip()
-    if section_key != MAILING_SECTION_ALL:
-        search_query = ""
     mailing_rows_ctx = _fetch_mailing_rows(
         request,
         task=task,
@@ -446,6 +445,11 @@ def _build_mailing_section_context(
             **mailing_rows_ctx,
             "base_url": _build_mailing_base_url(flow_type, item_id),
             "active_section": section_key,
+            "contact_rate_modal_base_url": (
+                reverse("audience:create_contact_rate_modal") + f"?id={item_id}"
+                if item_id
+                else ""
+            ),
             "rate_limit_modal_url": (
                 reverse("audience:create_rate_limit_modal") + f"?id={item_id}"
                 if item_id
@@ -528,8 +532,6 @@ def handle_mailing_list_step_view(
 
     active_section = _normalize_mailing_section(str(request.GET.get("mailing_section") or ""))
     query = str(request.GET.get("q") or "").strip()
-    if active_section != MAILING_SECTION_ALL:
-        query = ""
     page = _get_page_value(str(request.GET.get("page") or "1"))
 
     mailing_rows_ctx = _fetch_mailing_rows(
@@ -551,6 +553,11 @@ def handle_mailing_list_step_view(
     )
     rate_limit_modal_url = (
         reverse("audience:create_rate_limit_modal") + f"?id={item_id}"
+        if item_id
+        else ""
+    )
+    contact_rate_modal_url = (
+        reverse("audience:create_contact_rate_modal") + f"?id={item_id}"
         if item_id
         else ""
     )
@@ -593,6 +600,7 @@ def handle_mailing_list_step_view(
                     "section_urls": section_urls,
                     "active_section": active_section,
                     "status_url": status_url,
+                    "contact_rate_modal_base_url": contact_rate_modal_url,
                     "rate_limit_modal_url": rate_limit_modal_url,
                     "pause_info_modal_url": pause_info_modal_url,
                     "nav_partial_url": nav_partial_url,
