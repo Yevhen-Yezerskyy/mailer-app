@@ -1,6 +1,5 @@
-# FILE: web/panel/aap_settings/models.py  (обновлено — 2026-03-19)
-# PURPOSE: aap_settings models for mailboxes, sending settings, and client domains.
-# CHANGE: Added WorkspaceDomain for client subsite directories.
+# FILE: web/panel/aap_settings/models.py
+# PURPOSE: aap_settings models for mailboxes and sending settings.
 
 from __future__ import annotations
 
@@ -191,22 +190,3 @@ class GlobalSendingSettings(models.Model):
     class Meta:
         app_label = "aap_settings"
         db_table = "aap_settings_global_sending_settings"
-
-
-class WorkspaceDomain(models.Model):
-    workspace_id = models.UUIDField(db_index=True)
-    domain = models.CharField(max_length=255, unique=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        app_label = "aap_settings"
-        db_table = "aap_settings_workspace_domains"
-        ordering = ["domain", "id"]
-        indexes = [
-            models.Index(fields=["workspace_id", "created_at"], name="aap_setting_workspa_6fb126_idx"),
-        ]
-
-    def __str__(self) -> str:
-        return self.domain

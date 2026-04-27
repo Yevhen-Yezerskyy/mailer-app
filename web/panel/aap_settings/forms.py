@@ -13,8 +13,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _trans
 
 from engine.common.mail.types import ConnSecurity, ImapCredsLogin, SmtpCredsLogin, SmtpCredsRelayNoAuth
-from panel.aap_settings.client_subsites import normalize_client_domain
-from panel.aap_settings.models import Mailbox, WorkspaceDomain
+from panel.aap_settings.models import Mailbox
 
 
 def _typed_dict_keys(td: Any) -> List[str]:
@@ -139,46 +138,6 @@ class MailboxAddForm(forms.Form):
             self.add_error("email", _trans("Этот Email уже используется."))
 
         return cleaned
-
-
-class WorkspaceDomainForm(forms.ModelForm):
-    class Meta:
-        model = WorkspaceDomain
-        fields = [
-            "domain",
-        ]
-        widgets = {
-            "domain": forms.TextInput(
-                attrs={
-                    "class": "YY-INPUT",
-                    "placeholder": "example.com",
-                    "maxlength": "255",
-                }
-            ),
-        }
-        labels = {
-            "domain": _trans("Домен"),
-        }
-
-    def __init__(self, *args, workspace_id=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.workspace_id = workspace_id
-
-    def clean_domain(self):
-        domain = normalize_client_domain(self.cleaned_data.get("domain") or "")
-        qs = WorkspaceDomain.objects.filter(domain=domain)
-        if self.instance and self.instance.pk:
-            qs = qs.exclude(pk=self.instance.pk)
-        if qs.exists():
-            raise forms.ValidationError(_trans("Такой домен уже добавлен."))
-        return domain
-
-    def save(self, commit=True):
-        obj = super().save(commit=False)
-        obj.workspace_id = self.workspace_id
-        if commit:
-            obj.save()
-        return obj
 
 
 class _LoginFieldsFromTypesMixin:

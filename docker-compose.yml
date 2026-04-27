@@ -185,7 +185,6 @@ services:
     volumes:
       - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
       - mailer-app-prod:/app
-      - ./client-subsites:/app/client-subsites
       - mailer-static:/app/web/staticfiles
       - mailer-media:/app/web/media
       - serenity-redis-run:/app/run/redis
@@ -576,8 +575,6 @@ services:
         soft: 4096
         hard: 4096
     depends_on:
-      certbot-init:
-        condition: service_completed_successfully
       mailer-web:
         condition: service_started
       mailer-web-prod:
@@ -594,7 +591,6 @@ services:
       - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
       - ./config/nginx/includes:/etc/nginx/includes:ro
       - mailer-app-prod:/app
-      - ./client-subsites:/app/client-subsites:ro
       - mailer-static:/var/www/mail-static:ro
       - mailer-media:/var/www/mail-media
       - certbot-www:/var/www/certbot
@@ -610,47 +606,42 @@ services:
         chmod 777 /home/eee/mailer-app/logs/nginx /host-logs/smrel /serenity-logs/smrel || true
         exec nginx -g 'daemon off;'
 
-  certbot-init:
-    image: certbot/certbot:latest
-    container_name: serenity-certbot-init
-    init: true
-    restart: "no"
-    environment:
-      CERTBOT_MODE: "init"
-      CERTBOT_EMAIL: "yevhen.yezerskyy@gmail.com"
-    volumes:
-      - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
-      - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./config/sh/certbot_run.sh:/usr/local/bin/certbot_run.sh:ro
-      - certbot-www:/var/www/certbot
-      - certbot-etc:/etc/letsencrypt
-    ports:
-      - "80:80"
-      - "443:443"
-    entrypoint: ["/bin/sh", "/usr/local/bin/certbot_run.sh"]
-
   certbot:
     image: certbot/certbot:latest
     container_name: serenity-certbot
     init: true
     restart: unless-stopped
+    working_dir: /app
     pid: "service:nginx"
     stop_signal: SIGKILL
     stop_grace_period: 0s
     depends_on:
+      mailer-set-env:
+        condition: service_started
+      mailer-redis:
+        condition: service_started
       nginx:
         condition: service_started
     environment:
-      CERTBOT_MODE: "renew"
+      PYTHONPATH: /app
       CERTBOT_EMAIL: "yevhen.yezerskyy@gmail.com"
-      CERTBOT_RENEW_INTERVAL_SECONDS: "43200"
+      NGINX_WATCH_EVERY_SEC: "30"
+      NGINX_RENEW_EVERY_SEC: "86400"
     volumes:
       - /home/eee/mailer-app/logs:/home/eee/mailer-app/logs
-      - ./config/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./config/sh/certbot_run.sh:/usr/local/bin/certbot_run.sh:ro
+      - ./logs:/host-logs
+      - mailer-app-prod:/app:ro
+      - serenity-redis-run:/app/run/redis
+      - serenity-secrets:/run/serenity-secrets:ro
+      - ./config/nginx/conf.d:/etc/nginx/conf.d
       - certbot-www:/var/www/certbot
       - certbot-etc:/etc/letsencrypt
-    entrypoint: ["/bin/sh", "/usr/local/bin/certbot_run.sh"]
+    entrypoint:
+      [
+        "/app/config/sh/with-secrets.sh",
+        "python",
+        "/app/config/nginx-worker/processor.py"
+      ]
 
 volumes:
   mailer-db-data:

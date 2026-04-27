@@ -1,26 +1,18 @@
 #!/bin/sh
 # FILE: config/sh/certbot_run.sh
-# DATE: 2026-02-21
-# PURPOSE: Certbot entrypoint with two modes:
-# - init: issue/ensure certificates using standalone challenge before nginx starts.
-# - renew: verify certs and run periodic renew via webroot while nginx is running.
+# DATE: 2026-04-27
+# PURPOSE: Certbot renew loop via webroot while nginx is running.
 
 set -eu
 
-MODE="${CERTBOT_MODE:-renew}"
 CONF_DIR="${CERTBOT_NGINX_CONF_DIR:-/etc/nginx/conf.d}"
 WEBROOT="${CERTBOT_WEBROOT:-/var/www/certbot}"
 LE_DIR="${CERTBOT_LE_DIR:-/etc/letsencrypt}"
 EMAIL="${CERTBOT_EMAIL:?CERTBOT_EMAIL is required}"
 RENEW_INTERVAL_SECONDS="${CERTBOT_RENEW_INTERVAL_SECONDS:-43200}"
-STAGING="${CERTBOT_STAGING:-0}"
 LOG_DIR="${CERTBOT_LOG_DIR:-/home/eee/mailer-app/logs/certbot}"
 
-LOG_BASENAME="certbot.log"
-if [ "$MODE" = "init" ]; then
-  LOG_BASENAME="certbot-init.log"
-fi
-LOG_FILE="$LOG_DIR/$LOG_BASENAME"
+LOG_FILE="$LOG_DIR/certbot.log"
 
 mkdir -p "$LOG_DIR"
 
@@ -31,7 +23,7 @@ tee -a "$LOG_FILE" <"$LOG_PIPE" &
 exec >"$LOG_PIPE" 2>&1
 rm -f "$LOG_PIPE"
 
-echo "INFO: certbot logger enabled mode=$MODE log=$LOG_FILE"
+echo "INFO: certbot logger enabled mode=renew log=$LOG_FILE"
 
 mkdir -p "$WEBROOT"
 
@@ -137,47 +129,6 @@ awk -F '\t' '{print $1}' "$tmp_pairs" | sort -u > "$tmp_certs"
 if [ ! -s "$tmp_certs" ]; then
   echo "ERROR: no cert definitions found in $CONF_DIR/*.conf"
   exit 1
-fi
-
-if [ "$MODE" = "init" ]; then
-  while IFS= read -r cert_name; do
-    [ -n "$cert_name" ] || continue
-    if [ -s "$LE_DIR/live/$cert_name/fullchain.pem" ] && [ -s "$LE_DIR/live/$cert_name/privkey.pem" ]; then
-      echo "INFO: cert exists, skip init issue: $cert_name"
-      continue
-    fi
-
-    domains="$(awk -F '\t' -v c="$cert_name" '$1 == c {print $2}' "$tmp_pairs" | sort -u)"
-    if [ -z "$domains" ]; then
-      domains="$cert_name"
-    fi
-
-    set -- certbot certonly \
-      --non-interactive \
-      --agree-tos \
-      --email "$EMAIL" \
-      --keep-until-expiring \
-      --expand \
-      --cert-name "$cert_name" \
-      --standalone \
-      --preferred-challenges http
-
-    if [ "$STAGING" = "1" ]; then
-      set -- "$@" --test-cert
-    fi
-
-    has_cert_name=0
-    for d in $domains; do
-      [ "$d" = "$cert_name" ] && has_cert_name=1
-      set -- "$@" -d "$d"
-    done
-    [ "$has_cert_name" -eq 1 ] || set -- "$@" -d "$cert_name"
-
-    "$@"
-  done < "$tmp_certs"
-
-  certbot certificates
-  exit 0
 fi
 
 while IFS= read -r cert_name; do
